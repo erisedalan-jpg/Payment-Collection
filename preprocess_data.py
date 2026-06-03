@@ -8,6 +8,7 @@ import re
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 import config
+import schema
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -1147,14 +1148,9 @@ def main():
         "followupRecords": followup_records,
     }
 
-    # === 10. 保存 ===
-    output_file = f"{OUTPUT_DIR}/analysis_data.js"
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("// 自动生成的分析数据V3 - 合并回款节点清单 + 项目验收日期Sheet\n")
-        f.write(f"// 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write("var ANALYSIS_DATA = ")
-        json.dump(final_data, f, ensure_ascii=False, indent=1)
-        f.write(";\n")
+    # === 10. 保存（校验后输出 JSON）===
+    output_file = schema.validate_and_write_json(final_data, OUTPUT_DIR)
+    print("[OK] 数据已通过 schema 校验")
 
     print(f"\n[INFO] 数据预处理V3完成!")
     print(f"  项目总数(去重): {dashboard['totalProjectCount']}")
