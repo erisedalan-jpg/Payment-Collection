@@ -22,6 +22,13 @@ yundocs_data/
 # 本地跟进记录（运行时用户数据）
 data/followup_records.json
 
+# ── 前端（Vue/Vite）──
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+# schema.py 导出的中间产物（TS 类型生成用），不入库
+schema.json
+
 # ── 系统 ──
 .DS_Store
 Thumbs.db
