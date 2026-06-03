@@ -1,0 +1,31 @@
+# config.py
+"""集中配置常量：消除散落在 preprocess_data.py 各处的硬编码。"""
+
+# ── 云文档 Sheet 名 ──
+SHEET_PAYMENT_NODES = "项目回款节点（里程碑）清单"
+SHEET_PROJECT_OVERVIEW = "项目验收日期、回款条件信息收集"
+SHEET_FOLLOWUP = "项目回款跟进记录"
+
+# ── 金额分层阈值（元）与标签 ──
+TIER_ABOVE_1M = 1_000_000
+TIER_ABOVE_500K = 500_000
+TIER_ABOVE_1M_LABEL = "100万以上"
+TIER_MID_LABEL = "50-100万"
+TIER_BELOW_500K_LABEL = "50万以下"
+TIER_LABELS = [TIER_ABOVE_1M_LABEL, TIER_MID_LABEL, TIER_BELOW_500K_LABEL]
+
+# ── Excel 序列号合理范围 ──
+EXCEL_SERIAL_MIN = 40000
+EXCEL_SERIAL_MAX = 60000
+
+# ── 节点状态枚举（判定优先级顺序）──
+STATUS_CAN_ADVANCE = "加资源可提前"
+STATUS_REACHED = "达到回款条件"
+STATUS_ADVANCE_PAID = "已提前回款"
+STATUS_FULL_PAID = "已全额回款"
+STATUS_DELAYED = "延期"
+STATUS_ON_TIME = "正常实施中"
+NODE_STATUSES = [
+    STATUS_CAN_ADVANCE, STATUS_REACHED, STATUS_ADVANCE_PAID,
+    STATUS_FULL_PAID, STATUS_DELAYED, STATUS_ON_TIME,
+]
