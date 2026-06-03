@@ -66,7 +66,7 @@ def excel_serial_to_date(val):
     val_str = str(val).strip()
     try:
         num = float(val_str)
-        if 40000 < num < 60000:
+        if config.EXCEL_SERIAL_MIN < num < config.EXCEL_SERIAL_MAX:
             base = datetime(1899, 12, 30)
             return (base + timedelta(days=int(num))).strftime("%Y-%m-%d")
     except:
@@ -449,7 +449,7 @@ def process_followup_records():
     """解析跟进记录Sheet，按项目编号分组，每个项目取最近5条
     跟进状态重置：节点动作完成时间 <= 今天 且 状态=已解决 → 重置为跟进中
     """
-    followup_data = load_sheet("项目回款跟进记录")
+    followup_data = load_sheet(config.SHEET_FOLLOWUP)
     if not followup_data or len(followup_data) < 2:
         print("[INFO] 跟进记录Sheet无数据或不存在，跳过")
         return {}
@@ -477,7 +477,7 @@ def process_followup_records():
                     # 跟进时间可能包含时分：Excel序列号的小数部分=时分秒
                     try:
                         val = float(str(raw))
-                        if val > 40000:
+                        if val > config.EXCEL_SERIAL_MIN:
                             base = datetime(1899, 12, 30)
                             dt = base + timedelta(days=int(val))
                             if val % 1 > 0:
@@ -987,7 +987,7 @@ def main():
 
     # === 1. 处理合并后的回款节点清单 ===
     print("[INFO] 处理 项目回款节点（里程碑）清单...")
-    sheet = load_sheet("项目回款节点（里程碑）清单")
+    sheet = load_sheet(config.SHEET_PAYMENT_NODES)
     if sheet:
         # 先用 below100 逻辑处理所有行（字段映射一致），统一标记为待修正 tier
         nodes = process_below100_nodes(sheet, "__temp__")
@@ -1002,7 +1002,7 @@ def main():
 
     # === 2. 处理项目验收日期Sheet ===
     print("[INFO] 处理 项目验收日期、回款条件信息收集...")
-    overview_sheet = load_sheet("项目验收日期、回款条件信息收集")
+    overview_sheet = load_sheet(config.SHEET_PROJECT_OVERVIEW)
     overview_sheet_headers = []
     if overview_sheet:
         project_overview, naguan_map, naguan_exclude, overview_sheet_headers = process_project_overview(overview_sheet)
@@ -1069,7 +1069,7 @@ def main():
         "remarks2": "备注2", "signUnit": "签约单位",
     }
     # 从云文档 Sheet 获取实际列顺序
-    node_sheet = load_sheet("项目回款节点（里程碑）清单")
+    node_sheet = load_sheet(config.SHEET_PAYMENT_NODES)
     node_sheet_headers = []
     if node_sheet:
         raw_headers, _ = parse_header_and_data(node_sheet)

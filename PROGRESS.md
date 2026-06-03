@@ -46,6 +46,7 @@ _（无）_
 - [ ] **B-4** `index.html:9` 改用本地 `fonts/google-fonts.css`，移除外链 Google Fonts：离线环境消除超时/字体闪烁。
 
 ### 🟠 高（后端健壮性）
+- [ ] **A2-debt** 继续消除硬编码（A1 遗留）：compute_dashboard/compute_tier_summary 中 ~15 处 nodeStatus 字符串改用 config.STATUS_*；tier 迭代/校验改用 config.TIER_LABELS；集成测试 process_below100_nodes 的时间依赖改注入 now。
 - [ ] **H-5** `sync_state/import_state/followup_sync_state` 多线程读写加锁（配合 B-1）。
 - [ ] **H-6** `followup_sync_state` 只增不删，成功后清理，防内存缓慢增长。
 - [ ] **H-7** `server.py:130 _get_node_action_date` 不再用正则扫 2.2MB 的 JS 文本；让 `preprocess_data.py` 额外输出结构化 JSON 供后端直接读。 (部分由 A1 完成：已输出结构化 analysis_data.json + schema 校验)
