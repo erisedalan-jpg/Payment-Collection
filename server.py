@@ -109,6 +109,19 @@ FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'followup_records.json')
 FOLLOWUP_TYPES = ['电话沟通', '邮件推动', '现场拜访', '内部协调', '合同确认', '里程碑跟进', '回款确认', '其他']
 FOLLOWUP_STATUSES = ['跟进中', '已解决', '暂停跟进', '需升级处理', '已取消']
 
+# ── 统一错误响应 ──
+ERR_VALIDATION = "validation_error"   # 字段校验失败
+ERR_BUSY = "busy"                     # 同步/导入互斥冲突
+ERR_PARSE = "parse_error"             # 请求体解析失败
+ERR_NOT_FOUND = "not_found"           # 记录不存在
+ERR_INTERNAL = "internal_error"       # 其它内部错误
+
+
+def _error_payload(code, message):
+    """统一错误响应体：{success: False, code, message}。"""
+    return {"success": False, "code": code, "message": message}
+
+
 def _load_followup_records():
     """加载本地跟进记录"""
     if os.path.exists(FOLLOWUP_FILE):
@@ -426,17 +439,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         global import_state
         # 互斥检查
         if sync_state["running"]:
-            self._json_response({"success": False, "message": "同步正在进行中，请等待完成或停止同步后再导入"})
+            self._json_response(_error_payload(ERR_BUSY, "同步正在进行中，请等待完成或停止同步后再导入"))
             return
         if import_state["running"]:
-            self._json_response({"success": False, "message": "导入正在进行中，请等待完成或停止上传"})
+            self._json_response(_error_payload(ERR_BUSY, "导入正在进行中，请等待完成或停止上传"))
             return
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
         # 启动导入线程
         import_state = {"running": True, "progress": 5, "message": "正在保存数据..."}
@@ -501,34 +514,34 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
-        
+
         # 校验必填字段
         required = ['项目编号', '项目名称', '跟进人', '跟进类型', '跟进内容', '跟进状态']
         for field in required:
             if not data.get(field):
-                self._json_response({"success": False, "message": f"缺少必填字段: {field}"})
+                self._json_response(_error_payload(ERR_VALIDATION, f"缺少必填字段: {field}"))
                 return
-        
+
         # 校验跟进内容长度
         if len(data.get('跟进内容', '')) > 500:
-            self._json_response({"success": False, "message": "跟进内容不能超过500字"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进内容不能超过500字"))
             return
-        
+
         # 校验跟进人长度
         if len(data.get('跟进人', '')) > 20:
-            self._json_response({"success": False, "message": "跟进人姓名不能超过20个字符"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进人姓名不能超过20个字符"))
             return
-        
+
         # 校验跟进类型
         if data.get('跟进类型') not in FOLLOWUP_TYPES:
-            self._json_response({"success": False, "message": f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"))
             return
-        
+
         # 校验跟进状态
         if data.get('跟进状态') not in FOLLOWUP_STATUSES:
-            self._json_response({"success": False, "message": f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"))
             return
         
         # 自动生成记录编号
@@ -577,12 +590,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
 
         record_id = data.get('记录编号', '')
         if not record_id:
-            self._json_response({"success": False, "message": "缺少记录编号"})
+            self._json_response(_error_payload(ERR_VALIDATION, "缺少记录编号"))
             return
 
         # 从本地JSON中删除指定记录
@@ -591,7 +604,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         records = [r for r in records if r.get('记录编号') != record_id]
 
         if len(records) == original_count:
-            self._json_response({"success": False, "message": f"未找到记录: {record_id}"})
+            self._json_response(_error_payload(ERR_NOT_FOUND, f"未找到记录: {record_id}"))
             return
 
         _save_followup_records(records)
@@ -618,26 +631,26 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
-        
+
         record_id = data.get('记录编号', '')
         if not record_id:
-            self._json_response({"success": False, "message": "缺少记录编号"})
+            self._json_response(_error_payload(ERR_VALIDATION, "缺少记录编号"))
             return
-        
+
         # 校验可编辑字段
         if data.get('跟进人') and len(data.get('跟进人', '')) > 20:
-            self._json_response({"success": False, "message": "跟进人姓名不能超过20个字符"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进人姓名不能超过20个字符"))
             return
         if data.get('跟进内容') and len(data.get('跟进内容', '')) > 500:
-            self._json_response({"success": False, "message": "跟进内容不能超过500字"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进内容不能超过500字"))
             return
         if data.get('跟进类型') and data.get('跟进类型') not in FOLLOWUP_TYPES:
-            self._json_response({"success": False, "message": f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"))
             return
         if data.get('跟进状态') and data.get('跟进状态') not in FOLLOWUP_STATUSES:
-            self._json_response({"success": False, "message": f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"))
             return
         
         # 从本地JSON中查找并更新记录
@@ -656,7 +669,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 break
         
         if not found:
-            self._json_response({"success": False, "message": f"未找到记录: {record_id}"})
+            self._json_response(_error_payload(ERR_NOT_FOUND, f"未找到记录: {record_id}"))
             return
         
         _save_followup_records(records)
