@@ -15,8 +15,8 @@ dist/
 log/
 
 # ── 生成物 / 抓取物 / 运行时数据（不入库，由脚本在本机生成）──
-# analysis_data.js 由 preprocess_data.py 生成（~2.2MB）；测试样本请放 tests/fixtures/
-data/analysis_data.js
+# analysis_data.json 由 preprocess_data.py 生成（~2.2MB）；测试样本请放 tests/fixtures/
+data/analysis_data.json
 # yundocs_data/ 由 fetch_yundocs_full.py 抓取，含真实业务数据，不入库
 yundocs_data/
 # 本地跟进记录（运行时用户数据）
