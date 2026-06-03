@@ -279,7 +279,7 @@ def compute_node_status(*, is_payment_related, can_advance, completion_pct,
     if can_advance and (cp is not None and cp < 1.0) and (ar is not None and ar < 1.0):
         return config.STATUS_CAN_ADVANCE, 0
     # 步骤2: 达到回款条件
-    if (cp is not None and cp >= 1.0) and ("是" in str(is_milestone_achieved)) and (ar is None or ar < 1.0):
+    if (cp is not None and cp >= 1.0) and is_yes(is_milestone_achieved) and (ar is None or ar < 1.0):
         return config.STATUS_REACHED, 0
     # 步骤3: 已提前回款
     if _future(plan_date) and (ar is not None and ar >= 1.0):
