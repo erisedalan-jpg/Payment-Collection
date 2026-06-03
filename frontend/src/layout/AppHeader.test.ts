@@ -22,6 +22,7 @@ describe('AppHeader', () => {
     vi.stubGlobal('fetch', f)
     const wrapper = mount(AppHeader)
     await wrapper.get('[data-test="stop-server"]').trigger('click')
-    expect(f).toHaveBeenCalledWith('/api/stop')
+    expect(f).toHaveBeenCalled()
+    expect(f.mock.calls[0][0]).toBe('/api/stop')
   })
 })

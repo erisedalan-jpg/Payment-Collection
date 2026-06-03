@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
 
 const APP_VERSION = 'V6.0.0' // 单一来源；发版时更新
 
@@ -10,7 +11,7 @@ const updateTime = computed(() => store.data?.meta.lastUpdate ?? '-')
 async function stopServer() {
   if (!confirm('确认停止本地服务？停止后页面将无法继续使用。')) return
   try {
-    await fetch('/api/stop')
+    await api.get('/api/stop')
   } catch {
     // 服务停止时连接会中断，忽略错误
   }
