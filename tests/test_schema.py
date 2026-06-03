@@ -1,5 +1,6 @@
 # tests/test_schema.py
 import pytest
+from pydantic import ValidationError
 import schema
 
 
@@ -29,14 +30,14 @@ def test_valid_data_parses():
 def test_missing_top_level_key_fails():
     bad = _minimal_valid()
     del bad["dashboard"]
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         schema.AnalysisData.model_validate(bad)
 
 
 def test_wrong_type_on_core_field_fails():
     bad = _minimal_valid()
     bad["rawNodes"][0]["isPaymentRelated"] = "not-a-bool-like"
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         schema.AnalysisData.model_validate(bad)
 
 

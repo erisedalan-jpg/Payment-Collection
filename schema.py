@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict
@@ -67,8 +68,6 @@ class AnalysisData(_Base):
 def validate_and_write_json(final_data: dict, output_dir: str) -> str:
     """用 AnalysisData 校验 final_data，校验通过后写出 analysis_data.json。
     返回输出文件路径。校验失败抛 pydantic.ValidationError。"""
-    import os
-
     AnalysisData.model_validate(final_data)
     os.makedirs(output_dir, exist_ok=True)
     out_path = os.path.join(output_dir, "analysis_data.json")
