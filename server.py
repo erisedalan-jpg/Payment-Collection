@@ -89,6 +89,7 @@ sync_url = ""
 import_state = {"running": False, "progress": 0, "message": ""}
 followup_sync_state = {}  # key: 记录编号, value: {status:'syncing'|'success'|'failed', message:''}
 _followup_lock = threading.Lock()
+_write_followup_lock = threading.Lock()  # 云文档写入串行化，防并发覆盖
 _FOLLOWUP_STATE_MAX = 200  # 限制规模，防止只增不删导致内存缓慢增长（H-6）
 
 
@@ -180,53 +181,54 @@ def _get_node_action_date(project_id):
 def _write_followup_async(record, cloud_url):
     """异步写入跟进记录到云文档（含进度追踪）"""
     record_id = record.get('记录编号', '')
-    try:
-        # 初始化同步状态追踪
-        _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
-        logger.info(f"[followup-sync] {record_id} 开始同步到云文档")
+    with _write_followup_lock:
+        try:
+            # 初始化同步状态追踪
+            _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
+            logger.info(f"[followup-sync] {record_id} 开始同步到云文档")
 
-        write_script, write_cwd = _find_script("write_followup.py")
-        if not write_script:
-            logger.error("写入脚本 write_followup.py 不存在")
-            _set_followup_state(record_id, {"status": "failed", "message": "写入脚本不存在，同步失败"})
-            _update_followup_sync_status(record_id, '同步失败')
-            return
-        if getattr(sys, 'frozen', False):
-            # 打包模式：直接导入运行
-            _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
-            old_argv = sys.argv[:]
-            sys.argv = [write_script, cloud_url, json.dumps(record, ensure_ascii=False)]
-            try:
-                _run_script_direct(write_script, 'write_followup', write_cwd)
-                _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
-                logger.info(f"跟进记录 {record_id} 写入云文档成功")
-                _update_followup_sync_status(record_id, '已同步')
-            except Exception as e:
-                logger.error(f"异步写入云文档失败: {e}")
-                _set_followup_state(record_id, {"status": "failed", "message": f"同步失败: {str(e)[:80]}"})
+            write_script, write_cwd = _find_script("write_followup.py")
+            if not write_script:
+                logger.error("写入脚本 write_followup.py 不存在")
+                _set_followup_state(record_id, {"status": "failed", "message": "写入脚本不存在，同步失败"})
                 _update_followup_sync_status(record_id, '同步失败')
-            finally:
-                sys.argv = old_argv
-        else:
-            # 开发模式：subprocess
-            _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
-            cmd = [sys.executable, '-u', write_script, cloud_url,
-                   json.dumps(record, ensure_ascii=False)]
-            result = subprocess.run(cmd, capture_output=True, text=True,
-                                   cwd=write_cwd, encoding='utf-8', errors='replace', timeout=300)
-            if result.returncode == 0:
-                _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
-                logger.info(f"跟进记录 {record_id} 写入云文档成功")
-                _update_followup_sync_status(record_id, '已同步')
+                return
+            if getattr(sys, 'frozen', False):
+                # 打包模式：直接导入运行
+                _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
+                old_argv = sys.argv[:]
+                sys.argv = [write_script, cloud_url, json.dumps(record, ensure_ascii=False)]
+                try:
+                    _run_script_direct(write_script, 'write_followup', write_cwd)
+                    _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
+                    logger.info(f"跟进记录 {record_id} 写入云文档成功")
+                    _update_followup_sync_status(record_id, '已同步')
+                except Exception as e:
+                    logger.error(f"异步写入云文档失败: {e}")
+                    _set_followup_state(record_id, {"status": "failed", "message": f"同步失败: {str(e)[:80]}"})
+                    _update_followup_sync_status(record_id, '同步失败')
+                finally:
+                    sys.argv = old_argv
             else:
-                err_msg = (result.stderr or result.stdout or '未知错误')[:100]
-                _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步失败: {err_msg}"})
-                logger.error(f"跟进记录写入云文档失败: stderr={result.stderr[:200] if result.stderr else ''} stdout={result.stdout[:200] if result.stdout else ''}")
-                _update_followup_sync_status(record_id, '同步失败')
-    except Exception as e:
-        logger.error(f"异步写入云文档异常: {e}", exc_info=True)
-        _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"})
-        _update_followup_sync_status(record_id, '同步失败')
+                # 开发模式：subprocess
+                _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
+                cmd = [sys.executable, '-u', write_script, cloud_url,
+                       json.dumps(record, ensure_ascii=False)]
+                result = subprocess.run(cmd, capture_output=True, text=True,
+                                       cwd=write_cwd, encoding='utf-8', errors='replace', timeout=300)
+                if result.returncode == 0:
+                    _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
+                    logger.info(f"跟进记录 {record_id} 写入云文档成功")
+                    _update_followup_sync_status(record_id, '已同步')
+                else:
+                    err_msg = (result.stderr or result.stdout or '未知错误')[:100]
+                    _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步失败: {err_msg}"})
+                    logger.error(f"跟进记录写入云文档失败: stderr={result.stderr[:200] if result.stderr else ''} stdout={result.stdout[:200] if result.stdout else ''}")
+                    _update_followup_sync_status(record_id, '同步失败')
+        except Exception as e:
+            logger.error(f"异步写入云文档异常: {e}", exc_info=True)
+            _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"})
+            _update_followup_sync_status(record_id, '同步失败')
 
 def _update_followup_sync_status(record_id, sync_status):
     """更新本地JSON中指定记录的syncStatus字段"""
