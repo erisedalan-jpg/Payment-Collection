@@ -7,6 +7,7 @@ import os
 import re
 from datetime import datetime, date, timedelta
 from collections import defaultdict
+import config
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -79,6 +80,16 @@ def excel_serial_to_date(val):
     if m:
         return f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}"
     return None
+
+def assign_tier(amount):
+    """按项目金额（元）确定分层标签。None 视为 0。"""
+    amt = amount if amount is not None else 0
+    if amt >= config.TIER_ABOVE_1M:
+        return config.TIER_ABOVE_1M_LABEL
+    if amt >= config.TIER_ABOVE_500K:
+        return config.TIER_MID_LABEL
+    return config.TIER_BELOW_500K_LABEL
+
 
 def _clean_text(val):
     """清理文本字段：过滤Excel错误值（如#REF!被解析为负数大数）"""
@@ -799,12 +810,8 @@ def process_project_overview(sheet_json):
         sheet_tier = project.get("项目分层", "").strip()
         if sheet_tier and sheet_tier in ("100万以上", "50-100万", "50万以下"):
             amount_tier = sheet_tier
-        elif project_amount >= 1000000:
-            amount_tier = "100万以上"
-        elif project_amount >= 500000:
-            amount_tier = "50-100万"
         else:
-            amount_tier = "50万以下"
+            amount_tier = assign_tier(project_amount)
         project["amountTier"] = amount_tier
 
         # 兼容旧字段名（用于分类计算）
@@ -955,13 +962,7 @@ def main():
         nodes = process_below100_nodes(sheet, "__temp__")
         # 根据实际项目金额重新分配 tier
         for node in nodes:
-            amt = node.get("projectAmount", 0)
-            if amt >= 1000000:
-                node["tier"] = "100万以上"
-            elif amt >= 500000:
-                node["tier"] = "50-100万"
-            else:
-                node["tier"] = "50万以下"
+            node["tier"] = assign_tier(node.get("projectAmount", 0))
         # amountTier 保留 Excel"项目金额分层"列的原始值，不再用金额覆盖
         all_nodes.extend(nodes)
         print(f"  [OK] {len(nodes)} 个节点 (100万以上: {sum(1 for n in nodes if n['tier']=='100万以上')}, 50-100万: {sum(1 for n in nodes if n['tier']=='50-100万')}, 50万以下: {sum(1 for n in nodes if n['tier']=='50万以下')})")
