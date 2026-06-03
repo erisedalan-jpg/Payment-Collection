@@ -1,0 +1,7 @@
+# 运行时依赖
+# 说明：server.py / preprocess_data.py 本体仅用 Python 标准库；
+#       第三方依赖只有 Playwright（用于 fetch_yundocs_full.py 抓取 WPS 云文档、
+#       write_followup.py 回写云文档）。安装后还需执行：playwright install chromium
+#
+# 锁定精确版本：在可用环境里运行 `pip freeze > requirements.lock.txt`
+playwright>=1.40

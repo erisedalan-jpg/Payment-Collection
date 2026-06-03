@@ -1,0 +1,14 @@
+# 统一换行符，避免 Windows CRLF 破坏脚本执行
+* text=auto
+
+# Shell 脚本必须 LF（否则 bash 报 \r 错误）
+*.sh text eol=lf
+
+# Windows 批处理保持 CRLF
+*.bat text eol=crlf
+
+# 二进制资源不做换行转换
+*.png binary
+*.ico binary
+*.woff2 binary
+*.min.js binary
