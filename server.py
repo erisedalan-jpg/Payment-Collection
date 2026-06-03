@@ -1303,7 +1303,7 @@ $sc.Save()
 def _open_browser():
     """启动后自动打开浏览器"""
     import webbrowser
-    url = f'http://localhost:{PORT}'
+    url = f'http://{HOST}:{PORT}'
     # 稍等片刻确保服务就绪
     import threading
     def _delayed_open():
@@ -1314,8 +1314,7 @@ def _open_browser():
 
 
 def create_server(host=HOST, port=PORT):
-    """创建多线程 HTTP 服务并绑定指定主机。"""
-    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    """创建多线程 HTTP 服务并绑定指定主机（ThreadingHTTPServer 默认已启用 allow_reuse_address）。"""
     return http.server.ThreadingHTTPServer((host, port), CustomHandler)
 
 
