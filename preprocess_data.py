@@ -246,6 +246,61 @@ def is_future(date_str):
     except:
         return False
 
+def compute_node_status(*, is_payment_related, can_advance, completion_pct,
+                        actual_ratio, is_milestone_achieved, plan_date, now):
+    """计算回款节点状态与延期天数（行为同原 process_below100_nodes 内联逻辑）。
+
+    completion_pct / actual_ratio 为 0~1 小数或 None；now 为参考时间（datetime）。
+    返回 (nodeStatus, delayDays)。
+    """
+    if not is_payment_related:
+        return "", 0
+
+    cp = completion_pct
+    ar = actual_ratio
+
+    def _past(ds):
+        if not ds or len(ds) < 10:
+            return False
+        try:
+            return datetime.strptime(ds[:10], "%Y-%m-%d") < now
+        except Exception:
+            return False
+
+    def _future(ds):
+        if not ds or len(ds) < 10:
+            return False
+        try:
+            return datetime.strptime(ds[:10], "%Y-%m-%d") > now
+        except Exception:
+            return False
+
+    # 步骤1: 加资源可提前
+    if can_advance and (cp is not None and cp < 1.0) and (ar is not None and ar < 1.0):
+        return config.STATUS_CAN_ADVANCE, 0
+    # 步骤2: 达到回款条件
+    if (cp is not None and cp >= 1.0) and ("是" in str(is_milestone_achieved)) and (ar is None or ar < 1.0):
+        return config.STATUS_REACHED, 0
+    # 步骤3: 已提前回款
+    if _future(plan_date) and (ar is not None and ar >= 1.0):
+        return config.STATUS_ADVANCE_PAID, 0
+    # 步骤4: 已全额回款
+    if ar is not None and ar >= 1.0:
+        return config.STATUS_FULL_PAID, 0
+    # 步骤5: 延期
+    if _past(plan_date) and (cp is None or cp < 1.0) and (ar is None or ar < 1.0):
+        delay_days = 0
+        if plan_date:
+            try:
+                plan_d = datetime.strptime(plan_date[:10], "%Y-%m-%d")
+                delay_days = max(0, (now - plan_d).days)
+            except Exception:
+                pass
+        return config.STATUS_DELAYED, delay_days
+    # 步骤6: 正常实施中（兜底）
+    return config.STATUS_ON_TIME, 0
+
+
 # ============================================================
 # 50万/50-100万 回款节点清单处理
 # ============================================================
@@ -325,41 +380,16 @@ def process_below100_nodes(sheet_json, tier_name):
             nodes.append(node)
             continue
 
-        node_status = "正常实施中"  # 兜底
-        delay_days = 0
-        
-        # 步骤1: 加资源可提前
-        # 条件："是否增加资源是否可以提前完成里程碑计划"=是 且 "当前项目完成%"<100% 且 "实际回款比例"<100%
-        if can_advance and (completion_pct is not None and completion_pct < 1.0) and (actual_ratio is not None and actual_ratio < 1.0):
-            node_status = "加资源可提前"
-        # 步骤2: 达到回款条件
-        # 条件："当前项目完成%"=100% 且 "是否已达成里程碑"=是 且 "实际回款比例"<100%
-        elif (completion_pct is not None and completion_pct >= 1.0) and is_yes(is_milestone_achieved) and (actual_ratio is None or actual_ratio < 1.0):
-            node_status = "达到回款条件"
-        # 步骤3: 已提前回款
-        # 条件："该节点计划完成时间">当前时间 且 "实际回款比例">=100%
-        elif is_future(plan_date) and (actual_ratio is not None and actual_ratio >= 1.0):
-            node_status = "已提前回款"
-        # 步骤4: 已全额回款
-        # 条件："实际回款比例">=100%
-        elif actual_ratio is not None and actual_ratio >= 1.0:
-            node_status = "已全额回款"
-        # 步骤5: 延期
-        # 条件："该节点计划完成时间"<当前时间 且 ("当前项目完成%"为空 或 <100%) 且 "实际回款比例"<100%
-        elif is_past(plan_date) and (completion_pct is None or completion_pct < 1.0) and (actual_ratio is None or actual_ratio < 1.0):
-            node_status = "延期"
-            # 仅延期状态时计算延期天数
-            if plan_date:
-                try:
-                    plan_d = datetime.strptime(plan_date[:10], "%Y-%m-%d")
-                    delay_days = max(0, (datetime.now() - plan_d).days)
-                except:
-                    pass
-        # 步骤6: 正常实施中（兜底）
-        # 条件："该节点计划完成时间">=当前时间 且 ("当前项目完成%"为空 或 <100%) 且 "实际回款比例"<100%
-        else:
-            node_status = "正常实施中"
-        
+        node_status, delay_days = compute_node_status(
+            is_payment_related=is_payment_related,
+            can_advance=can_advance,
+            completion_pct=completion_pct,
+            actual_ratio=actual_ratio,
+            is_milestone_achieved=is_milestone_achieved,
+            plan_date=plan_date,
+            now=datetime.now(),
+        )
+
         # 保存所有原始字段
         node = {
             "source": "below100",
