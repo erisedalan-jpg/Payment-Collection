@@ -1,6 +1,7 @@
 # tests/test_pipeline_integration.py
 import json
 import os
+from datetime import datetime
 
 import preprocess_data as P
 
@@ -39,3 +40,22 @@ def test_compute_dashboard_basic_counts():
     assert dash["totalPaymentNodes"] == 2          # P1/P2 关联回款
     assert dash["totalPaidNodes"] == 1             # 仅 P1 已全额回款
     assert dash["totalDelayed"] == 1               # 仅 P2 延期
+
+
+def test_tier_summary_status_counts():
+    nodes = P.process_below100_nodes(_load_fixture(), "__temp__")
+    for n in nodes:
+        n["tier"] = P.assign_tier(n["projectAmount"])
+    s100 = P.compute_tier_summary(nodes, "100万以上")
+    s50 = P.compute_tier_summary(nodes, "50-100万")
+    assert s100["fullPaidCount"] == 1      # P1 已全额回款
+    assert s100["delayedCount"] == 0
+    assert s50["delayedCount"] == 1        # P2 延期
+    assert s50["fullPaidCount"] == 0
+
+
+def test_process_nodes_now_injection_deterministic():
+    nodes = P.process_below100_nodes(_load_fixture(), "__temp__", now=datetime(2026, 6, 3))
+    by_id = {n["projectId"]: n for n in nodes}
+    # P2 plan_date 2025-01-10 → 2026-06-03 固定延期天数
+    assert by_id["P2"]["delayDays"] == 509

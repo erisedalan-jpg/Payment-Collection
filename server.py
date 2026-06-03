@@ -43,6 +43,7 @@ if getattr(sys, 'frozen', False):
     os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', '0')
 
 PORT = 8080
+HOST = "127.0.0.1"  # 仅绑定本地回环，避免局域网无认证访问
 # PyInstaller 打包后，BASE_DIR 应为 exe 所在目录而非临时解压目录
 # STATIC_DIR 为静态Web文件目录（打包后从 _MEIPASS 临时目录读取）
 if getattr(sys, 'frozen', False):
@@ -87,6 +88,19 @@ sync_url = ""
 # 导入状态（与同步互斥）
 import_state = {"running": False, "progress": 0, "message": ""}
 followup_sync_state = {}  # key: 记录编号, value: {status:'syncing'|'success'|'failed', message:''}
+_followup_lock = threading.Lock()
+_FOLLOWUP_STATE_MAX = 200  # 限制规模，防止只增不删导致内存缓慢增长（H-6）
+
+
+def _set_followup_state(record_id, state):
+    """线程安全地设置跟进同步状态，并限制字典规模（超出按插入顺序丢弃最旧）。"""
+    with _followup_lock:
+        followup_sync_state[record_id] = state
+        while len(followup_sync_state) > _FOLLOWUP_STATE_MAX:
+            oldest = next(iter(followup_sync_state))
+            del followup_sync_state[oldest]
+
+
 # 子进程引用（用于停止同步/导入时终止）
 active_process = None
 
@@ -153,53 +167,52 @@ def _get_node_action_date(project_id):
 def _write_followup_async(record, cloud_url):
     """异步写入跟进记录到云文档（含进度追踪）"""
     record_id = record.get('记录编号', '')
-    global followup_sync_state
     try:
         # 初始化同步状态追踪
-        followup_sync_state[record_id] = {"status": "syncing", "message": "正在连接云文档..."}
+        _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
         logger.info(f"[followup-sync] {record_id} 开始同步到云文档")
 
         write_script, write_cwd = _find_script("write_followup.py")
         if not write_script:
             logger.error("写入脚本 write_followup.py 不存在")
-            followup_sync_state[record_id] = {"status": "failed", "message": "写入脚本不存在，同步失败"}
+            _set_followup_state(record_id, {"status": "failed", "message": "写入脚本不存在，同步失败"})
             _update_followup_sync_status(record_id, '同步失败')
             return
         if getattr(sys, 'frozen', False):
             # 打包模式：直接导入运行
-            followup_sync_state[record_id] = {"status": "syncing", "message": "正在写入云文档..."}
+            _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
             old_argv = sys.argv[:]
             sys.argv = [write_script, cloud_url, json.dumps(record, ensure_ascii=False)]
             try:
                 _run_script_direct(write_script, 'write_followup', write_cwd)
-                followup_sync_state[record_id] = {"status": "success", "message": "✅ 已同步到云文档"}
+                _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
                 logger.info(f"跟进记录 {record_id} 写入云文档成功")
                 _update_followup_sync_status(record_id, '已同步')
             except Exception as e:
                 logger.error(f"异步写入云文档失败: {e}")
-                followup_sync_state[record_id] = {"status": "failed", "message": f"同步失败: {str(e)[:80]}"}
+                _set_followup_state(record_id, {"status": "failed", "message": f"同步失败: {str(e)[:80]}"})
                 _update_followup_sync_status(record_id, '同步失败')
             finally:
                 sys.argv = old_argv
         else:
             # 开发模式：subprocess
-            followup_sync_state[record_id] = {"status": "syncing", "message": "正在写入云文档..."}
+            _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
             cmd = [sys.executable, '-u', write_script, cloud_url,
                    json.dumps(record, ensure_ascii=False)]
             result = subprocess.run(cmd, capture_output=True, text=True,
                                    cwd=write_cwd, encoding='utf-8', errors='replace', timeout=300)
             if result.returncode == 0:
-                followup_sync_state[record_id] = {"status": "success", "message": "✅ 已同步到云文档"}
+                _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
                 logger.info(f"跟进记录 {record_id} 写入云文档成功")
                 _update_followup_sync_status(record_id, '已同步')
             else:
                 err_msg = (result.stderr or result.stdout or '未知错误')[:100]
-                followup_sync_state[record_id] = {"status": "failed", "message": f"✕ 同步失败: {err_msg}"}
+                _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步失败: {err_msg}"})
                 logger.error(f"跟进记录写入云文档失败: stderr={result.stderr[:200] if result.stderr else ''} stdout={result.stdout[:200] if result.stdout else ''}")
                 _update_followup_sync_status(record_id, '同步失败')
     except Exception as e:
         logger.error(f"异步写入云文档异常: {e}", exc_info=True)
-        followup_sync_state[record_id] = {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"}
+        _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"})
         _update_followup_sync_status(record_id, '同步失败')
 
 def _update_followup_sync_status(record_id, sync_status):
@@ -585,8 +598,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         logger.info(f"跟进记录已删除: {record_id}")
 
         # 清理同步状态
-        if record_id in followup_sync_state:
-            del followup_sync_state[record_id]
+        with _followup_lock:
+            followup_sync_state.pop(record_id, None)
 
         # 云文档同步：根据记录编号删除云文档中对应行
         cloud_url = sync_url or data.get('cloudUrl', '')
@@ -659,8 +672,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         cloud_url = sync_url or data.get('cloudUrl', '')
         if cloud_url and updated_record:
             # 清理旧同步状态
-            if record_id in followup_sync_state:
-                del followup_sync_state[record_id]
+            with _followup_lock:
+                followup_sync_state.pop(record_id, None)
             updated_record['__action__'] = 'update'
             threading.Thread(target=_write_followup_async, args=[updated_record, cloud_url], daemon=True).start()
         else:
@@ -709,10 +722,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         qs = self.parse_path()
         record_id = qs.get('recordId', [''])[0]
         if not record_id:
-            # 返回所有正在同步的状态
-            self._json_response({"success": True, "states": followup_sync_state})
+            # 返回所有正在同步的状态（锁内快照，避免与限容清理并发迭代）
+            with _followup_lock:
+                states = dict(followup_sync_state)
+            self._json_response({"success": True, "states": states})
             return
-        state = followup_sync_state.get(record_id, {"status": "unknown", "message": "未找到同步状态"})
+        with _followup_lock:
+            state = followup_sync_state.get(record_id, {"status": "unknown", "message": "未找到同步状态"})
         self._json_response({"success": True, "recordId": record_id, "state": state})
     
     def _json_response(self, data):
@@ -736,25 +752,33 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             except:
                 pass
 
+def _browser_candidate_paths():
+    """返回 (chrome 路径列表, edge 路径列表)。所有环境变量取值带 '' 默认，避免缺失时崩溃。"""
+    pf = os.environ.get('PROGRAMFILES', '')
+    pf86 = os.environ.get('PROGRAMFILES(X86)', '')
+    local = os.environ.get('LOCALAPPDATA', '')
+    chrome = [
+        os.path.join(pf, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        os.path.join(pf86, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        os.path.join(local, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    ]
+    edge = [
+        os.path.join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        os.path.join(pf86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    ]
+    return chrome, edge
+
+
 def _check_browser_available():
     """检测系统是否安装了可用浏览器（Chrome 或 Edge）
     返回 (可用: bool, 浏览器名称: str)
     """
-    # Windows 下 Chrome 和 Edge 的常见安装路径
-    chrome_paths = [
-        os.path.join(os.environ.get('PROGRAMFILES', ''), 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        os.path.join(os.environ.get('PROGRAMFILES(X86)', ''), 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Google', 'Chrome', 'Application', 'chrome.exe'),
-    ]
-    edge_paths = [
-        os.path.join(os.environ.get('PROGRAMFILES', ''), 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-        os.path.join(os.environ.get('PROGRAMFILES(X86)'), 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-    ]
+    chrome_paths, edge_paths = _browser_candidate_paths()
     for p in chrome_paths:
-        if os.path.isfile(p):
+        if p and os.path.isfile(p):
             return True, 'Google Chrome'
     for p in edge_paths:
-        if os.path.isfile(p):
+        if p and os.path.isfile(p):
             return True, 'Microsoft Edge'
     return False, ''
 
@@ -1279,7 +1303,7 @@ $sc.Save()
 def _open_browser():
     """启动后自动打开浏览器"""
     import webbrowser
-    url = f'http://localhost:{PORT}'
+    url = f'http://{HOST}:{PORT}'
     # 稍等片刻确保服务就绪
     import threading
     def _delayed_open():
@@ -1287,6 +1311,11 @@ def _open_browser():
         webbrowser.open(url)
         logger.info(f"已自动打开浏览器: {url}")
     threading.Thread(target=_delayed_open, daemon=True).start()
+
+
+def create_server(host=HOST, port=PORT):
+    """创建多线程 HTTP 服务并绑定指定主机（ThreadingHTTPServer 默认已启用 allow_reuse_address）。"""
+    return http.server.ThreadingHTTPServer((host, port), CustomHandler)
 
 
 def main():
@@ -1308,15 +1337,10 @@ def main():
     _kill_port_process(PORT)
     time.sleep(1)
     
-    handler = CustomHandler
-    
-    # 设置 allow_reuse_address 减少端口占用冲突（仅用于TIME_WAIT状态，不能解决多进程同时监听）
-    http.server.HTTPServer.allow_reuse_address = True
-    
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
-            with http.server.HTTPServer(("", PORT), handler) as httpd:
+            with create_server() as httpd:
                 logger.info(f"服务启动成功，监听端口 {PORT}")
                 # 启动后自动打开浏览器
                 _open_browser()

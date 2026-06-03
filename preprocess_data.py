@@ -306,8 +306,10 @@ def compute_node_status(*, is_payment_related, can_advance, completion_pct,
 # 50万/50-100万 回款节点清单处理
 # ============================================================
 
-def process_below100_nodes(sheet_json, tier_name):
+def process_below100_nodes(sheet_json, tier_name, now=None):
     """处理50万以下和50-100万回款节点清单"""
+    if now is None:
+        now = datetime.now()
     headers, rows = parse_header_and_data(sheet_json)
     
     nodes = []
@@ -388,7 +390,7 @@ def process_below100_nodes(sheet_json, tier_name):
             actual_ratio=actual_ratio,
             is_milestone_achieved=is_milestone_achieved,
             plan_date=plan_date,
-            now=datetime.now(),
+            now=now,
         )
 
         # 保存所有原始字段
@@ -555,15 +557,15 @@ def compute_dashboard(all_nodes):
     total_payment_nodes = len(related_nodes)
     
     # c. 已回款项目总数量：关联回款=是且实际回款比例=100%
-    paid_nodes = [n for n in related_nodes if n["nodeStatus"] in ("已全额回款", "已提前回款")]
+    paid_nodes = [n for n in related_nodes if n["nodeStatus"] in (config.STATUS_FULL_PAID, config.STATUS_ADVANCE_PAID)]
     total_paid_nodes = len(paid_nodes)
     
     # d. 可提前回款项目总数量：关联回款=是 + canAdvance=是 + 实际回款比例未达100%
-    can_advance_nodes = [n for n in related_nodes if n["nodeStatus"] == "加资源可提前"]
+    can_advance_nodes = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_CAN_ADVANCE]
     total_can_advance = len(can_advance_nodes)
-    
+
     # e. 回款延期项目总数量
-    delayed_nodes = [n for n in related_nodes if n["nodeStatus"] == "延期"]
+    delayed_nodes = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_DELAYED]
     total_delayed = len(delayed_nodes)
     
     # f. 月度回款计划（关联回款=是且实际回款≠100%，按月统计）
@@ -642,10 +644,10 @@ def compute_dashboard(all_nodes):
         "totalPaidNodes": total_paid_nodes,
         "totalCanAdvance": total_can_advance,
         "totalDelayed": total_delayed,
-        "totalReachedCondition": len([n for n in related_nodes if n["nodeStatus"] == "达到回款条件"]),
-        "totalOnTime": len([n for n in related_nodes if n["nodeStatus"] == "正常实施中"]),
-        "totalAdvanceEarly": len([n for n in related_nodes if n["nodeStatus"] == "已提前回款"]),
-        "totalFullPaid": len([n for n in related_nodes if n["nodeStatus"] == "已全额回款"]),
+        "totalReachedCondition": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_REACHED]),
+        "totalOnTime": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_ON_TIME]),
+        "totalAdvanceEarly": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_ADVANCE_PAID]),
+        "totalFullPaid": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_FULL_PAID]),
         # 金额指标（元为单位计算，万为单位展示）
         "totalExpectedPayment": round(total_expected_payment, 2),
         "totalExpectedPaymentWan": round(total_expected_payment / 10000, 2),
@@ -692,12 +694,12 @@ def compute_tier_summary(all_nodes, tier_name):
     remaining = tier_pending_payment
     
     # 6种节点状态统计（使用nodeStatus字段直接匹配）
-    can_advance_nodes = [n for n in related_nodes if n["nodeStatus"] == "加资源可提前"]
-    reached_condition = [n for n in related_nodes if n["nodeStatus"] == "达到回款条件"]
-    advance_early = [n for n in related_nodes if n["nodeStatus"] == "已提前回款"]
-    full_paid = [n for n in related_nodes if n["nodeStatus"] == "已全额回款"]
-    on_time = [n for n in related_nodes if n["nodeStatus"] == "正常实施中"]
-    delayed = [n for n in related_nodes if n["nodeStatus"] == "延期"]
+    can_advance_nodes = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_CAN_ADVANCE]
+    reached_condition = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_REACHED]
+    advance_early = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_ADVANCE_PAID]
+    full_paid = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_FULL_PAID]
+    on_time = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_ON_TIME]
+    delayed = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_DELAYED]
     
     # 月度计划
     monthly = {}
@@ -719,7 +721,7 @@ def compute_tier_summary(all_nodes, tier_name):
         org_stats[org]["expectedTotal"] += n["expectedPayment"]
         org_stats[org]["actualTotal"] += n["actualPayment"]
         org_stats[org]["count"] += 1
-        if n["nodeStatus"] == "延期":
+        if n["nodeStatus"] == config.STATUS_DELAYED:
             org_stats[org]["delayedCount"] += 1
     
     org_summary = {}
@@ -839,7 +841,7 @@ def process_project_overview(sheet_json):
 
         # 按金额确定区间
         sheet_tier = project.get("项目分层", "").strip()
-        if sheet_tier and sheet_tier in ("100万以上", "50-100万", "50万以下"):
+        if sheet_tier and sheet_tier in config.TIER_LABELS:
             amount_tier = sheet_tier
         else:
             amount_tier = assign_tier(project_amount)
@@ -1046,7 +1048,7 @@ def main():
     # === 7. 计算各层级汇总 ===
     print("[INFO] 计算各层级汇总...")
     summary = {}
-    for tier in ["100万以上", "50-100万", "50万以下"]:
+    for tier in config.TIER_LABELS:
         summary[tier] = compute_tier_summary(all_nodes, tier)
 
     # === 8. 构建展示列配置（动态，跟随云文档列名） ===
@@ -1082,7 +1084,7 @@ def main():
     chinese_to_internal = {v: k for k, v in NODE_FIELD_MAP.items()}
     hidden_cols = {"source", "tier", "nodeStatus", "expectedPayment", "actualPayment", "planMonth"}
     display_columns = {}
-    for tier in ["100万以上", "50-100万", "50万以下"]:
+    for tier in config.TIER_LABELS:
         tier_nodes = [n for n in all_nodes if n["tier"] == tier]
         tier_cols = set()
         for n in tier_nodes:
