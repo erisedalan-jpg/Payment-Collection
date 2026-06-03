@@ -52,6 +52,12 @@ pip install playwright && playwright install chromium
 - 同步走 `/api/sync`（SSE 流式进度）；离线导入走 `/api/import`（上传从云文档导出的 xlsx）。
 - 两者**互斥**，不能同时进行。
 
+## 前端（Vue3 + Vite，frontend/）
+- 安装：`cd frontend && npm install`
+- 开发：先 `python server.py`(:8080) 提供 /api 与 /data，再 `cd frontend && npm run dev`(:5173，已代理 /api、/data)
+- 类型同源：改了 `schema.py` 后运行 `cd frontend && npm run gen:types` 重新生成 `src/types/analysis.ts`
+- 测试/构建：`npm run test:run` / `npm run typecheck` / `npm run build`（dist/ 由 Phase C 接入 server.py 与打包）
+
 ## 4. 关键约定（违反会被用户打回，来源：`.clinerules/memories.md`）
 
 - **不使用任何 emoji** 装饰；需要符号时用 `→ ↓ ❌ ✕ ▾`。
@@ -72,7 +78,7 @@ pip install playwright && playwright install chromium
 ## 6. 验证（harness: Verification — 声称完成前必须执行）
 
 ```bash
-bash verify.sh          # 语法编译 + 单元测试，全绿才算 done
+bash verify.sh          # 语法编译 + ruff + pytest + 前端 typecheck/vitest/build，全绿才算 done
 # 或单独跑：
 python -m pytest -q
 ```
