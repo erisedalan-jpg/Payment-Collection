@@ -861,6 +861,25 @@ def _run_script_direct(module_path, module_name, cwd=None):
     return '\n'.join(output_parts)
 
 
+def classify_progress_line(line):
+    """解析子脚本输出的一行，返回 (level, text) 或 None（空行）。
+    level ∈ {'ok','info','warn','error','other'}。
+    保持与既有关键字解析一致：info/warn/error 去掉级别前缀，ok/other 原样。
+    """
+    s = line.strip()
+    if not s:
+        return None
+    if '[OK]' in s:
+        return ('ok', s)
+    if '[INFO]' in s:
+        return ('info', s.replace('[INFO] ', ''))
+    if '[WARN]' in s:
+        return ('warn', s.replace('[WARN] ', ''))
+    if '[ERROR]' in s:
+        return ('error', s.replace('[ERROR] ', ''))
+    return ('other', s)
+
+
 def run_sync():
     """执行数据同步：提取+预处理"""
     global sync_state, sync_url
@@ -957,28 +976,30 @@ def run_sync():
                 
                 sheet_count = 0
                 error_lines = []
-                for line in process.stdout:
-                    line = line.strip()
-                    if not line:
+                for raw_line in process.stdout:
+                    parsed = classify_progress_line(raw_line)
+                    if parsed is None:
                         continue
-                    if '[OK]' in line:
+                    level, text = parsed
+                    full = raw_line.strip()
+                    if level == 'ok':
                         sheet_count += 1
                         progress = 15 + int(sheet_count / 9 * 60)
                         sync_state = {"running": True, "progress": min(progress, 75), "message": f"提取Sheet数据 ({sheet_count}/9)..."}
-                        logger.info(f"[fetch] {line}")
-                    elif '[INFO]' in line:
-                        sync_state = {"running": True, "progress": sync_state["progress"], "message": line.replace('[INFO] ', '')}
-                        logger.info(f"[fetch] {line}")
-                    elif '[WARN]' in line:
-                        logger.warning(f"[fetch] {line}")
-                        error_lines.append(line.replace('[WARN] ', ''))
-                    elif '[ERROR]' in line:
-                        logger.error(f"[fetch] {line}")
-                        error_lines.append(line.replace('[ERROR] ', ''))
+                        logger.info(f"[fetch] {full}")
+                    elif level == 'info':
+                        sync_state = {"running": True, "progress": sync_state["progress"], "message": text}
+                        logger.info(f"[fetch] {full}")
+                    elif level == 'warn':
+                        logger.warning(f"[fetch] {full}")
+                        error_lines.append(text)
+                    elif level == 'error':
+                        logger.error(f"[fetch] {full}")
+                        error_lines.append(text)
                     else:
-                        logger.debug(f"[fetch] {line}")
-                        if any(kw in line for kw in ['Error', 'Exception', 'Traceback', 'error', 'exception', 'traceback', 'Failed', 'failed']):
-                            error_lines.append(line)
+                        logger.debug(f"[fetch] {full}")
+                        if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'exception', 'traceback', 'Failed', 'failed']):
+                            error_lines.append(full)
                 
                 process.wait()
                 if process.returncode != 0:
@@ -1028,22 +1049,27 @@ def run_sync():
             )
             
             preprocess_errors = []
-            for line in process.stdout:
-                line = line.strip()
-                if not line:
+            for raw_line in process.stdout:
+                parsed = classify_progress_line(raw_line)
+                if parsed is None:
                     continue
-                if '[OK]' in line or '[INFO]' in line:
-                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": line.replace('[INFO] ', '').replace('[OK] ', '')}
-                    logger.info(f"[preprocess] {line}")
-                elif '[WARN]' in line:
-                    logger.warning(f"[preprocess] {line}")
-                elif '[ERROR]' in line:
-                    logger.error(f"[preprocess] {line}")
-                    preprocess_errors.append(line.replace('[ERROR] ', ''))
+                level, text = parsed
+                full = raw_line.strip()
+                if level == 'ok':
+                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": text.replace('[OK] ', '')}
+                    logger.info(f"[preprocess] {full}")
+                elif level == 'info':
+                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": text}
+                    logger.info(f"[preprocess] {full}")
+                elif level == 'warn':
+                    logger.warning(f"[preprocess] {full}")
+                elif level == 'error':
+                    logger.error(f"[preprocess] {full}")
+                    preprocess_errors.append(text)
                 else:
-                    logger.debug(f"[preprocess] {line}")
-                    if any(kw in line for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
-                        preprocess_errors.append(line)
+                    logger.debug(f"[preprocess] {full}")
+                    if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
+                        preprocess_errors.append(full)
             
             process.wait()
             if process.returncode != 0:
@@ -1161,22 +1187,27 @@ def run_import(data):
             )
             
             preprocess_errors = []
-            for line in active_process.stdout:
-                line = line.strip()
-                if not line:
+            for raw_line in active_process.stdout:
+                parsed = classify_progress_line(raw_line)
+                if parsed is None:
                     continue
-                if '[OK]' in line or '[INFO]' in line:
-                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": line.replace('[INFO] ', '').replace('[OK] ', '')}
-                    logger.info(f"[import-preprocess] {line}")
-                elif '[WARN]' in line:
-                    logger.warning(f"[import-preprocess] {line}")
-                elif '[ERROR]' in line:
-                    logger.error(f"[import-preprocess] {line}")
-                    preprocess_errors.append(line.replace('[ERROR] ', ''))
+                level, text = parsed
+                full = raw_line.strip()
+                if level == 'ok':
+                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": text.replace('[OK] ', '')}
+                    logger.info(f"[import-preprocess] {full}")
+                elif level == 'info':
+                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": text}
+                    logger.info(f"[import-preprocess] {full}")
+                elif level == 'warn':
+                    logger.warning(f"[import-preprocess] {full}")
+                elif level == 'error':
+                    logger.error(f"[import-preprocess] {full}")
+                    preprocess_errors.append(text)
                 else:
-                    logger.debug(f"[import-preprocess] {line}")
-                    if any(kw in line for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
-                        preprocess_errors.append(line)
+                    logger.debug(f"[import-preprocess] {full}")
+                    if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
+                        preprocess_errors.append(full)
             
             active_process.wait()
             if active_process.returncode != 0:
