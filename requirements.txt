@@ -5,3 +5,4 @@
 #
 # 锁定精确版本：在可用环境里运行 `pip freeze > requirements.lock.txt`
 playwright>=1.40
+pydantic>=2          # 数据契约校验（schema.py）
