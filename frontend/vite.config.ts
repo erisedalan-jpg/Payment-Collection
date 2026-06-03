@@ -18,5 +18,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    alias: {
+      'vue-echarts': fileURLToPath(new URL('./src/__mocks__/vue-echarts.ts', import.meta.url)),
+    },
   },
 })
