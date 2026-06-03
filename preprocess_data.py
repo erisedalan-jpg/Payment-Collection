@@ -7,6 +7,8 @@ import os
 import re
 from datetime import datetime, date, timedelta
 from collections import defaultdict
+import config
+import schema
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -64,7 +66,7 @@ def excel_serial_to_date(val):
     val_str = str(val).strip()
     try:
         num = float(val_str)
-        if 40000 < num < 60000:
+        if config.EXCEL_SERIAL_MIN < num < config.EXCEL_SERIAL_MAX:
             base = datetime(1899, 12, 30)
             return (base + timedelta(days=int(num))).strftime("%Y-%m-%d")
     except:
@@ -79,6 +81,16 @@ def excel_serial_to_date(val):
     if m:
         return f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}"
     return None
+
+def assign_tier(amount):
+    """按项目金额（元）确定分层标签。None 视为 0。"""
+    amt = amount if amount is not None else 0
+    if amt >= config.TIER_ABOVE_1M:
+        return config.TIER_ABOVE_1M_LABEL
+    if amt >= config.TIER_ABOVE_500K:
+        return config.TIER_MID_LABEL
+    return config.TIER_BELOW_500K_LABEL
+
 
 def _clean_text(val):
     """清理文本字段：过滤Excel错误值（如#REF!被解析为负数大数）"""
@@ -235,6 +247,61 @@ def is_future(date_str):
     except:
         return False
 
+def compute_node_status(*, is_payment_related, can_advance, completion_pct,
+                        actual_ratio, is_milestone_achieved, plan_date, now):
+    """计算回款节点状态与延期天数（行为同原 process_below100_nodes 内联逻辑）。
+
+    completion_pct / actual_ratio 为 0~1 小数或 None；now 为参考时间（datetime）。
+    返回 (nodeStatus, delayDays)。
+    """
+    if not is_payment_related:
+        return "", 0
+
+    cp = completion_pct
+    ar = actual_ratio
+
+    def _past(ds):
+        if not ds or len(ds) < 10:
+            return False
+        try:
+            return datetime.strptime(ds[:10], "%Y-%m-%d") < now
+        except Exception:
+            return False
+
+    def _future(ds):
+        if not ds or len(ds) < 10:
+            return False
+        try:
+            return datetime.strptime(ds[:10], "%Y-%m-%d") > now
+        except Exception:
+            return False
+
+    # 步骤1: 加资源可提前
+    if can_advance and (cp is not None and cp < 1.0) and (ar is not None and ar < 1.0):
+        return config.STATUS_CAN_ADVANCE, 0
+    # 步骤2: 达到回款条件
+    if (cp is not None and cp >= 1.0) and is_yes(is_milestone_achieved) and (ar is None or ar < 1.0):
+        return config.STATUS_REACHED, 0
+    # 步骤3: 已提前回款
+    if _future(plan_date) and (ar is not None and ar >= 1.0):
+        return config.STATUS_ADVANCE_PAID, 0
+    # 步骤4: 已全额回款
+    if ar is not None and ar >= 1.0:
+        return config.STATUS_FULL_PAID, 0
+    # 步骤5: 延期
+    if _past(plan_date) and (cp is None or cp < 1.0) and (ar is None or ar < 1.0):
+        delay_days = 0
+        if plan_date:
+            try:
+                plan_d = datetime.strptime(plan_date[:10], "%Y-%m-%d")
+                delay_days = max(0, (now - plan_d).days)
+            except Exception:
+                pass
+        return config.STATUS_DELAYED, delay_days
+    # 步骤6: 正常实施中（兜底）
+    return config.STATUS_ON_TIME, 0
+
+
 # ============================================================
 # 50万/50-100万 回款节点清单处理
 # ============================================================
@@ -314,41 +381,16 @@ def process_below100_nodes(sheet_json, tier_name):
             nodes.append(node)
             continue
 
-        node_status = "正常实施中"  # 兜底
-        delay_days = 0
-        
-        # 步骤1: 加资源可提前
-        # 条件："是否增加资源是否可以提前完成里程碑计划"=是 且 "当前项目完成%"<100% 且 "实际回款比例"<100%
-        if can_advance and (completion_pct is not None and completion_pct < 1.0) and (actual_ratio is not None and actual_ratio < 1.0):
-            node_status = "加资源可提前"
-        # 步骤2: 达到回款条件
-        # 条件："当前项目完成%"=100% 且 "是否已达成里程碑"=是 且 "实际回款比例"<100%
-        elif (completion_pct is not None and completion_pct >= 1.0) and is_yes(is_milestone_achieved) and (actual_ratio is None or actual_ratio < 1.0):
-            node_status = "达到回款条件"
-        # 步骤3: 已提前回款
-        # 条件："该节点计划完成时间">当前时间 且 "实际回款比例">=100%
-        elif is_future(plan_date) and (actual_ratio is not None and actual_ratio >= 1.0):
-            node_status = "已提前回款"
-        # 步骤4: 已全额回款
-        # 条件："实际回款比例">=100%
-        elif actual_ratio is not None and actual_ratio >= 1.0:
-            node_status = "已全额回款"
-        # 步骤5: 延期
-        # 条件："该节点计划完成时间"<当前时间 且 ("当前项目完成%"为空 或 <100%) 且 "实际回款比例"<100%
-        elif is_past(plan_date) and (completion_pct is None or completion_pct < 1.0) and (actual_ratio is None or actual_ratio < 1.0):
-            node_status = "延期"
-            # 仅延期状态时计算延期天数
-            if plan_date:
-                try:
-                    plan_d = datetime.strptime(plan_date[:10], "%Y-%m-%d")
-                    delay_days = max(0, (datetime.now() - plan_d).days)
-                except:
-                    pass
-        # 步骤6: 正常实施中（兜底）
-        # 条件："该节点计划完成时间">=当前时间 且 ("当前项目完成%"为空 或 <100%) 且 "实际回款比例"<100%
-        else:
-            node_status = "正常实施中"
-        
+        node_status, delay_days = compute_node_status(
+            is_payment_related=is_payment_related,
+            can_advance=can_advance,
+            completion_pct=completion_pct,
+            actual_ratio=actual_ratio,
+            is_milestone_achieved=is_milestone_achieved,
+            plan_date=plan_date,
+            now=datetime.now(),
+        )
+
         # 保存所有原始字段
         node = {
             "source": "below100",
@@ -407,7 +449,7 @@ def process_followup_records():
     """解析跟进记录Sheet，按项目编号分组，每个项目取最近5条
     跟进状态重置：节点动作完成时间 <= 今天 且 状态=已解决 → 重置为跟进中
     """
-    followup_data = load_sheet("项目回款跟进记录")
+    followup_data = load_sheet(config.SHEET_FOLLOWUP)
     if not followup_data or len(followup_data) < 2:
         print("[INFO] 跟进记录Sheet无数据或不存在，跳过")
         return {}
@@ -435,7 +477,7 @@ def process_followup_records():
                     # 跟进时间可能包含时分：Excel序列号的小数部分=时分秒
                     try:
                         val = float(str(raw))
-                        if val > 40000:
+                        if val > config.EXCEL_SERIAL_MIN:
                             base = datetime(1899, 12, 30)
                             dt = base + timedelta(days=int(val))
                             if val % 1 > 0:
@@ -799,12 +841,8 @@ def process_project_overview(sheet_json):
         sheet_tier = project.get("项目分层", "").strip()
         if sheet_tier and sheet_tier in ("100万以上", "50-100万", "50万以下"):
             amount_tier = sheet_tier
-        elif project_amount >= 1000000:
-            amount_tier = "100万以上"
-        elif project_amount >= 500000:
-            amount_tier = "50-100万"
         else:
-            amount_tier = "50万以下"
+            amount_tier = assign_tier(project_amount)
         project["amountTier"] = amount_tier
 
         # 兼容旧字段名（用于分类计算）
@@ -949,19 +987,13 @@ def main():
 
     # === 1. 处理合并后的回款节点清单 ===
     print("[INFO] 处理 项目回款节点（里程碑）清单...")
-    sheet = load_sheet("项目回款节点（里程碑）清单")
+    sheet = load_sheet(config.SHEET_PAYMENT_NODES)
     if sheet:
         # 先用 below100 逻辑处理所有行（字段映射一致），统一标记为待修正 tier
         nodes = process_below100_nodes(sheet, "__temp__")
         # 根据实际项目金额重新分配 tier
         for node in nodes:
-            amt = node.get("projectAmount", 0)
-            if amt >= 1000000:
-                node["tier"] = "100万以上"
-            elif amt >= 500000:
-                node["tier"] = "50-100万"
-            else:
-                node["tier"] = "50万以下"
+            node["tier"] = assign_tier(node.get("projectAmount", 0))
         # amountTier 保留 Excel"项目金额分层"列的原始值，不再用金额覆盖
         all_nodes.extend(nodes)
         print(f"  [OK] {len(nodes)} 个节点 (100万以上: {sum(1 for n in nodes if n['tier']=='100万以上')}, 50-100万: {sum(1 for n in nodes if n['tier']=='50-100万')}, 50万以下: {sum(1 for n in nodes if n['tier']=='50万以下')})")
@@ -970,7 +1002,7 @@ def main():
 
     # === 2. 处理项目验收日期Sheet ===
     print("[INFO] 处理 项目验收日期、回款条件信息收集...")
-    overview_sheet = load_sheet("项目验收日期、回款条件信息收集")
+    overview_sheet = load_sheet(config.SHEET_PROJECT_OVERVIEW)
     overview_sheet_headers = []
     if overview_sheet:
         project_overview, naguan_map, naguan_exclude, overview_sheet_headers = process_project_overview(overview_sheet)
@@ -1037,7 +1069,7 @@ def main():
         "remarks2": "备注2", "signUnit": "签约单位",
     }
     # 从云文档 Sheet 获取实际列顺序
-    node_sheet = load_sheet("项目回款节点（里程碑）清单")
+    node_sheet = load_sheet(config.SHEET_PAYMENT_NODES)
     node_sheet_headers = []
     if node_sheet:
         raw_headers, _ = parse_header_and_data(node_sheet)
@@ -1116,14 +1148,9 @@ def main():
         "followupRecords": followup_records,
     }
 
-    # === 10. 保存 ===
-    output_file = f"{OUTPUT_DIR}/analysis_data.js"
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("// 自动生成的分析数据V3 - 合并回款节点清单 + 项目验收日期Sheet\n")
-        f.write(f"// 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write("var ANALYSIS_DATA = ")
-        json.dump(final_data, f, ensure_ascii=False, indent=1)
-        f.write(";\n")
+    # === 10. 保存（校验后输出 JSON）===
+    output_file = schema.validate_and_write_json(final_data, OUTPUT_DIR)
+    print("[OK] 数据已通过 schema 校验")
 
     print(f"\n[INFO] 数据预处理V3完成!")
     print(f"  项目总数(去重): {dashboard['totalProjectCount']}")
