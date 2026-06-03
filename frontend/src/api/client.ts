@@ -28,6 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
+// 注意：泛型 T 是完整响应体类型（含 success 字段等），后端成功响应不做 {data} 包装。
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>

@@ -6,6 +6,8 @@
 
 ## 1. 这是什么
 
+> ⚠️ 重写进行中：前端正由原生 JS 迁移到 `frontend/` 下的 Vue3+Vite+TS（见"前端"节与 PROGRESS.md Phase B）。下方第 1-2 节对旧前端（app.js/analysis_data.js）的描述将在 Phase C 旧版删除后更新；后端数据现已输出 `data/analysis_data.json`（非 .js）。
+
 一个**单机/内网离线**运行的项目回款（收款）跟踪看板工具。后端是纯 Python 标准库的本地 HTTP 服务，前端是原生 HTML/CSS/JS（无构建工具），数据源是 WPS 云文档。可用 PyInstaller 打包成单 exe 分发。
 
 - 当前版本：**V5.9.1**（版本号见 `app.js`，改版本须同步更新，见"约定"）

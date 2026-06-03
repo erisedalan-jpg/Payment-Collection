@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import HomeView from './HomeView.vue'
 import { useDataStore } from '@/stores/data'
 
 beforeEach(() => setActivePinia(createPinia()))
+afterEach(() => vi.unstubAllGlobals())
 
 describe('HomeView', () => {
   it('renders meta lastUpdate and rawNodes count from store', async () => {
@@ -18,7 +19,7 @@ describe('HomeView', () => {
     } as any
     const wrapper = mount(HomeView)
     expect(wrapper.text()).toContain('2026-06-03 10:00')
-    expect(wrapper.text()).toContain('2')  // rawNodes 数
+    expect(wrapper.text()).toContain('回款节点数：2')
   })
 
   it('renders loading state', () => {
@@ -33,6 +34,5 @@ describe('HomeView', () => {
     const wrapper = mount(HomeView) // onMounted 触发 load()，fetch 失败
     await flushPromises()
     expect(wrapper.text()).toContain('数据加载失败')
-    vi.unstubAllGlobals()
   })
 })
