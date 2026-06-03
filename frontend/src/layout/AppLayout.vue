@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
+import FilterBar from './FilterBar.vue'
 </script>
 
 <template>
@@ -9,6 +10,7 @@ import AppSidebar from './AppSidebar.vue'
     <div class="app-body">
       <AppSidebar />
       <main class="app-main">
+        <FilterBar />
         <router-view />
       </main>
     </div>
