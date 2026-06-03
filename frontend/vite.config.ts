@@ -19,6 +19,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     alias: {
+      // vue-echarts 在 jsdom 下走原生自定义元素渲染、需要 Canvas（jsdom 无），
+      // 故测试环境用桩替换；仅 test 生效，生产构建仍用真实 vue-echarts。
       'vue-echarts': fileURLToPath(new URL('./src/__mocks__/vue-echarts.ts', import.meta.url)),
     },
   },
