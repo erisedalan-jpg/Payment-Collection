@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { api } from '@/api/client'
 
 const APP_VERSION = 'V6.0.0' // 单一来源；发版时更新
 
 const store = useDataStore()
-const updateTime = computed(() => store.data?.meta.lastUpdate ?? '-')
 
 async function stopServer() {
   if (!confirm('确认停止本地服务？停止后页面将无法继续使用。')) return
@@ -25,8 +23,11 @@ async function stopServer() {
       <span class="version">{{ APP_VERSION }}</span>
     </div>
     <div class="meta">
-      <span class="sync-dot" /> 数据已同步
-      <span class="date-badge">{{ updateTime }}</span>
+      <template v-if="store.data">
+        <span class="sync-dot" /> 数据已同步
+        <span class="date-badge">{{ store.data.meta.lastUpdate }}</span>
+      </template>
+      <span v-else class="no-data">未加载数据</span>
       <button data-test="stop-server" class="stop-btn" title="停止服务" @click="stopServer">■</button>
     </div>
   </header>
@@ -44,4 +45,5 @@ async function stopServer() {
 .stop-btn { width: 28px; height: 28px; border: 1px solid #e2e8f0; border-radius: 6px;
   background: none; color: #ef4444; cursor: pointer; }
 .stop-btn:hover { border-color: #ef4444; background: #fef2f2; }
+.no-data { color: #94a3b8; font-size: 12px; }
 </style>

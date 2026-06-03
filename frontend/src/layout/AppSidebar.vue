@@ -31,9 +31,9 @@ const ui = useUiStore()
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
     </nav>
-    <button data-test="sidebar-toggle" class="toggle" title="折叠/展开菜单"
-      @click="ui.toggleSidebar()">{{ ui.sidebarCollapsed ? '››' : '‹‹' }}</button>
   </aside>
+  <button data-test="sidebar-toggle" class="sidebar-toggle" title="折叠/展开菜单"
+    @click="ui.toggleSidebar()">{{ ui.sidebarCollapsed ? '››' : '‹‹' }}</button>
 </template>
 
 <style scoped>
@@ -50,6 +50,7 @@ const ui = useUiStore()
 .nav-item:hover, .nav-sub:hover { background: #f1f5f9; }
 .nav-item.active, .nav-sub.active { background: #eef2ff; color: #4f46e5; font-weight: 600; }
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-.toggle { height: 32px; border: none; border-top: 1px solid #e2e8f0; background: #fff;
-  color: #64748b; cursor: pointer; }
+.sidebar-toggle { width: 16px; border: none; border-right: 1px solid #e2e8f0;
+  background: #f8fafc; color: #64748b; cursor: pointer; font-size: 11px; padding: 0; }
+.sidebar-toggle:hover { background: #eef2ff; color: #4f46e5; }
 </style>

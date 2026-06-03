@@ -13,7 +13,10 @@ describe('AppLayout', () => {
   it('renders header, sidebar and routed content', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/', name: 'dashboard', component: { template: '<div class="routed">ROUTED</div>' } }],
+      routes: [
+        { path: '/', name: 'dashboard', component: { template: '<div class="routed">ROUTED</div>' } },
+        { path: '/:pathMatch(.*)*', component: { template: '<div/>' } },
+      ],
     })
     router.push('/')
     await router.isReady()
