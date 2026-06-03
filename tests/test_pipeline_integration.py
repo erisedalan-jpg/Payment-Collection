@@ -55,7 +55,6 @@ def test_tier_summary_status_counts():
 
 
 def test_process_nodes_now_injection_deterministic():
-    from datetime import datetime
     nodes = P.process_below100_nodes(_load_fixture(), "__temp__", now=datetime(2026, 6, 3))
     by_id = {n["projectId"]: n for n in nodes}
     # P2 plan_date 2025-01-10 → 2026-06-03 固定延期天数
