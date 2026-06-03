@@ -306,8 +306,10 @@ def compute_node_status(*, is_payment_related, can_advance, completion_pct,
 # 50万/50-100万 回款节点清单处理
 # ============================================================
 
-def process_below100_nodes(sheet_json, tier_name):
+def process_below100_nodes(sheet_json, tier_name, now=None):
     """处理50万以下和50-100万回款节点清单"""
+    if now is None:
+        now = datetime.now()
     headers, rows = parse_header_and_data(sheet_json)
     
     nodes = []
@@ -388,7 +390,7 @@ def process_below100_nodes(sheet_json, tier_name):
             actual_ratio=actual_ratio,
             is_milestone_achieved=is_milestone_achieved,
             plan_date=plan_date,
-            now=datetime.now(),
+            now=now,
         )
 
         # 保存所有原始字段

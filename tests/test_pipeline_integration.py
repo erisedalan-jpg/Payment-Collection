@@ -1,6 +1,7 @@
 # tests/test_pipeline_integration.py
 import json
 import os
+from datetime import datetime
 
 import preprocess_data as P
 
@@ -51,3 +52,11 @@ def test_tier_summary_status_counts():
     assert s100["delayedCount"] == 0
     assert s50["delayedCount"] == 1        # P2 延期
     assert s50["fullPaidCount"] == 0
+
+
+def test_process_nodes_now_injection_deterministic():
+    from datetime import datetime
+    nodes = P.process_below100_nodes(_load_fixture(), "__temp__", now=datetime(2026, 6, 3))
+    by_id = {n["projectId"]: n for n in nodes}
+    # P2 plan_date 2025-01-10 → 2026-06-03 固定延期天数
+    assert by_id["P2"]["delayDays"] == 509
