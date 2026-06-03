@@ -48,7 +48,7 @@ _（无）_
 ### 🟠 高（后端健壮性）
 - [ ] **H-5** `sync_state/import_state/followup_sync_state` 多线程读写加锁（配合 B-1）。
 - [ ] **H-6** `followup_sync_state` 只增不删，成功后清理，防内存缓慢增长。
-- [ ] **H-7** `server.py:130 _get_node_action_date` 不再用正则扫 2.2MB 的 JS 文本；让 `preprocess_data.py` 额外输出结构化 JSON 供后端直接读。
+- [ ] **H-7** `server.py:130 _get_node_action_date` 不再用正则扫 2.2MB 的 JS 文本；让 `preprocess_data.py` 额外输出结构化 JSON 供后端直接读。 (部分由 A1 完成：已输出结构化 analysis_data.json + schema 校验)
 - [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。
 
 ### 🟡 中（前端架构，较大重构，需在测试保护下分步做）
@@ -69,10 +69,11 @@ _（无）_
 - [x] **HX-4** `init.sh`/`init.bat` 固化环境搭建（venv + 依赖 + playwright + 浏览器检测）
 - [x] **HX-7** 基础设施：`git init` + `.gitignore` + `requirements.txt`/`requirements-dev.txt` + `ruff.toml`（ruff 接入 verify.sh，渐进式规则）
 - [ ] **HX-5** 扩展验证：Playwright 端到端冒烟（页面可加载、看板有数）
-- [ ] **HX-6** 为 `preprocess_data.py` 的计算函数（compute_dashboard 等）补集成测试（需小样本 fixture）。注：compute_* 已接收数据参数=可测，仅 `process_followup_records()` 需先解耦 I/O
+- [ ] **HX-6** 为 `preprocess_data.py` 的计算函数（compute_dashboard 等）补集成测试（需小样本 fixture）。注：compute_* 已接收数据参数=可测，仅 `process_followup_records()` 需先解耦 I/O (部分由 A1 完成：compute_node_status 已单测；计算层 compute_dashboard/tier 集成测试起步)
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
+- [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
-> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 41 项 pytest）。
+> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 62 项 pytest）。
 
 ---
 
