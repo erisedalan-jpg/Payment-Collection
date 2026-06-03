@@ -62,8 +62,9 @@ _（无）_
 
 ### 🟦 Phase B 前端（Vue3+TS 重写）
 - [x] **B1** 前端脚手架与基建：Vue3+Vite+TS 工程、由 schema.py 生成 analysis.ts（类型同源）、统一 API 客户端、数据加载 Pinia store、最小 shell、verify.sh 接入前端检查（typecheck+vitest+build）。
-- [ ] **B2** 布局（header/sidebar/年份·视角 dock）+ 通用组件（DataTable 封装 el-table / ChartBox 封装 vue-echarts / Modal）。
-- [ ] **B3+** 各页面迁移：看板 → 分层五页 → 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
+- [x] **B2** 布局骨架与全页面路由：uiStore（侧边栏折叠持久化）、集中导航配置、全页面路由（占位视图）、AppHeader/AppSidebar/AppLayout，App.vue 接入。
+- [ ] **B3** 筛选与通用组件：filterStore（年份/视角/纳管，取代散落全局 + getFilteredNodes）+ 年份/视角/纳管控件（docks）；通用组件 DataTable（封装 el-table）/ChartBox（封装 vue-echarts）/Modal。
+- [ ] **B4+** 各页面迁移：看板 → 分层五页 → 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警。
 
 ### 🟢 低
