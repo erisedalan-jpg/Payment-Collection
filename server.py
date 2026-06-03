@@ -736,25 +736,33 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             except:
                 pass
 
+def _browser_candidate_paths():
+    """返回 (chrome 路径列表, edge 路径列表)。所有环境变量取值带 '' 默认，避免缺失时崩溃。"""
+    pf = os.environ.get('PROGRAMFILES', '')
+    pf86 = os.environ.get('PROGRAMFILES(X86)', '')
+    local = os.environ.get('LOCALAPPDATA', '')
+    chrome = [
+        os.path.join(pf, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        os.path.join(pf86, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        os.path.join(local, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    ]
+    edge = [
+        os.path.join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        os.path.join(pf86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    ]
+    return chrome, edge
+
+
 def _check_browser_available():
     """检测系统是否安装了可用浏览器（Chrome 或 Edge）
     返回 (可用: bool, 浏览器名称: str)
     """
-    # Windows 下 Chrome 和 Edge 的常见安装路径
-    chrome_paths = [
-        os.path.join(os.environ.get('PROGRAMFILES', ''), 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        os.path.join(os.environ.get('PROGRAMFILES(X86)', ''), 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Google', 'Chrome', 'Application', 'chrome.exe'),
-    ]
-    edge_paths = [
-        os.path.join(os.environ.get('PROGRAMFILES', ''), 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-        os.path.join(os.environ.get('PROGRAMFILES(X86)'), 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-    ]
+    chrome_paths, edge_paths = _browser_candidate_paths()
     for p in chrome_paths:
-        if os.path.isfile(p):
+        if p and os.path.isfile(p):
             return True, 'Google Chrome'
     for p in edge_paths:
-        if os.path.isfile(p):
+        if p and os.path.isfile(p):
             return True, 'Microsoft Edge'
     return False, ''
 
