@@ -43,6 +43,7 @@ if getattr(sys, 'frozen', False):
     os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', '0')
 
 PORT = 8080
+HOST = "127.0.0.1"  # 仅绑定本地回环，避免局域网无认证访问
 # PyInstaller 打包后，BASE_DIR 应为 exe 所在目录而非临时解压目录
 # STATIC_DIR 为静态Web文件目录（打包后从 _MEIPASS 临时目录读取）
 if getattr(sys, 'frozen', False):
@@ -1297,6 +1298,12 @@ def _open_browser():
     threading.Thread(target=_delayed_open, daemon=True).start()
 
 
+def create_server(host=HOST, port=PORT):
+    """创建多线程 HTTP 服务并绑定指定主机。"""
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    return http.server.ThreadingHTTPServer((host, port), CustomHandler)
+
+
 def main():
     logger.info("=" * 50)
     logger.info("项目回款跟踪与管控平台 - 本地服务启动")
@@ -1316,15 +1323,10 @@ def main():
     _kill_port_process(PORT)
     time.sleep(1)
     
-    handler = CustomHandler
-    
-    # 设置 allow_reuse_address 减少端口占用冲突（仅用于TIME_WAIT状态，不能解决多进程同时监听）
-    http.server.HTTPServer.allow_reuse_address = True
-    
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
-            with http.server.HTTPServer(("", PORT), handler) as httpd:
+            with create_server() as httpd:
                 logger.info(f"服务启动成功，监听端口 {PORT}")
                 # 启动后自动打开浏览器
                 _open_browser()
