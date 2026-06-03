@@ -24,5 +24,6 @@ describe('AppLayout', () => {
     expect(wrapper.find('.app-header').exists()).toBe(true)
     expect(wrapper.find('.sidebar').exists()).toBe(true)
     expect(wrapper.find('.routed').exists()).toBe(true)
+    expect(wrapper.find('.filter-bar').exists()).toBe(true)
   })
 })
