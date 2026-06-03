@@ -31,4 +31,12 @@ describe('data store', () => {
     expect(store.data).toBeNull()
     expect(store.error).toContain('404')
   })
+
+  it('records error on network failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+    const store = useDataStore()
+    await store.load()
+    expect(store.data).toBeNull()
+    expect(store.error).toContain('Network down')
+  })
 })

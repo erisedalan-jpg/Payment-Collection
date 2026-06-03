@@ -9,6 +9,7 @@ export const useDataStore = defineStore('data', () => {
   const error = ref<string | null>(null)
 
   async function load() {
+    if (loading.value) return // 进行中则忽略再次调用，防止并发重复加载
     loading.value = true
     error.value = null
     try {
