@@ -27,16 +27,12 @@ export function filterNodes(rawNodes: RawNode[], opts: FilterOpts): RawNode[] {
   if (fy === 'all') return nodes
 
   if (fy.includes('-Q')) {
-    const isUpto = fy.startsWith('upto')
-    const keyPart = isUpto ? fy.slice(4) : fy
+    const keyPart = fy.startsWith('upto') ? fy.slice(4) : fy
     const [qYear, qn] = keyPart.split('-Q')
     const range = Q_RANGE['Q' + qn]
     if (!range) return nodes
     const mStart = `${qYear}-${range[0]}`
     const mEnd = `${qYear}-${range[1]}`
-    if (isUpto) {
-      return nodes.filter((n) => !!n.planMonth && n.planMonth <= mEnd)
-    }
     return nodes.filter((n) => !!n.planMonth && n.planMonth >= mStart && n.planMonth <= mEnd)
   }
 

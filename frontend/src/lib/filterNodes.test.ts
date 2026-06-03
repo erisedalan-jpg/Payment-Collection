@@ -28,8 +28,9 @@ describe('filterNodes', () => {
   it('upto-year is cumulative (<= year-12)', () => {
     expect(filterNodes(NODES, opts({ filterYear: 'upto2026' })).map((n) => n.projectId)).toEqual(['P1', 'P2'])
   })
-  it('upto-quarter behaves like the quarter range', () => {
-    expect(filterNodes(NODES, opts({ filterYear: 'upto2026-Q2' })).map((n) => n.projectId)).toEqual(['P1', 'P2'])
+  it('upto-quarter uses the same exact quarter range as a normal quarter (faithful to app.js)', () => {
+    // upto2026-Q2 → range [2026-04, 2026-06]; P1(2026-02) excluded, P2(2026-05) included
+    expect(filterNodes(NODES, opts({ filterYear: 'upto2026-Q2' })).map((n) => n.projectId)).toEqual(['P2'])
   })
   it('nodes without planMonth are excluded in year filters', () => {
     expect(filterNodes(NODES, opts({ filterYear: '2026' })).some((n) => n.projectId === 'P4')).toBe(false)
