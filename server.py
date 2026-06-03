@@ -167,7 +167,6 @@ def _get_node_action_date(project_id):
 def _write_followup_async(record, cloud_url):
     """异步写入跟进记录到云文档（含进度追踪）"""
     record_id = record.get('记录编号', '')
-    global followup_sync_state
     try:
         # 初始化同步状态追踪
         _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
@@ -723,10 +722,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         qs = self.parse_path()
         record_id = qs.get('recordId', [''])[0]
         if not record_id:
-            # 返回所有正在同步的状态
-            self._json_response({"success": True, "states": followup_sync_state})
+            # 返回所有正在同步的状态（锁内快照，避免与限容清理并发迭代）
+            with _followup_lock:
+                states = dict(followup_sync_state)
+            self._json_response({"success": True, "states": states})
             return
-        state = followup_sync_state.get(record_id, {"status": "unknown", "message": "未找到同步状态"})
+        with _followup_lock:
+            state = followup_sync_state.get(record_id, {"status": "unknown", "message": "未找到同步状态"})
         self._json_response({"success": True, "recordId": record_id, "state": state})
     
     def _json_response(self, data):
