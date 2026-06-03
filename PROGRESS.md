@@ -50,8 +50,9 @@ _（无）_
 - [x] **H-5** `sync_state/import_state/followup_sync_state` 多线程读写加锁（配合 B-1）。（A2 完成：followup_sync_state 加锁；sync_state/import_state 整体重赋值原子）
 - [x] **H-6** `followup_sync_state` 只增不删，成功后清理，防内存缓慢增长。（A2 完成：_set_followup_state 限容）
 - [ ] **H-7** `server.py:130 _get_node_action_date` 不再用正则扫 2.2MB 的 JS 文本；让 `preprocess_data.py` 额外输出结构化 JSON 供后端直接读。 (部分由 A1 完成：已输出结构化 analysis_data.json + schema 校验)
-- [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。
-- [ ] **A3** server.run_sync/run_import 结构化进度协议（退出码/JSON 替代 [OK]/[ERROR] 关键字解析）+ 统一错误响应 {success,code,message}；fetch_yundocs_full.py 抓取健壮性（分块超时/重试）；write_followup.py 串行队列 + JSON 转义（与 H-8 相关）。
+- [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。 (部分由 A3 完成：解析逻辑已提取复用)
+- [x] **A3** server.py API 契约与进度健壮性：统一错误响应 {success,code,message} 收口各 handler；进度解析提取为可测 classify_progress_line（run_sync/run_import 三处循环复用，含 ok/info 合并贴近原逻辑，H-8 部分达成）；跟进云写入串行锁 _write_followup_lock（防 WPS 并发覆盖）。
+- [ ] **A4** Playwright 脚本健壮性（需浏览器/云文档手验）：fetch_yundocs_full.py 抓取分块超时/重试；write_followup.py 把手工引号/换行转义改为 json.dumps；脚本输出改 JSON 行协议（与 classify_progress_line 对接）。
 
 ### 🟡 中（前端架构，较大重构，需在测试保护下分步做）
 - [ ] **M-9** `app.js` 按页面拆分 ES Modules，事件委托替代内联 `onclick`。
@@ -75,7 +76,7 @@ _（无）_
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
 - [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
-> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 70 项 pytest）。
+> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 75 项 pytest）。
 
 ---
 

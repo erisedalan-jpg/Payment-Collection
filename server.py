@@ -89,6 +89,7 @@ sync_url = ""
 import_state = {"running": False, "progress": 0, "message": ""}
 followup_sync_state = {}  # key: 记录编号, value: {status:'syncing'|'success'|'failed', message:''}
 _followup_lock = threading.Lock()
+_write_followup_lock = threading.Lock()  # 云文档写入串行化，防并发覆盖
 _FOLLOWUP_STATE_MAX = 200  # 限制规模，防止只增不删导致内存缓慢增长（H-6）
 
 
@@ -108,6 +109,19 @@ active_process = None
 FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'followup_records.json')
 FOLLOWUP_TYPES = ['电话沟通', '邮件推动', '现场拜访', '内部协调', '合同确认', '里程碑跟进', '回款确认', '其他']
 FOLLOWUP_STATUSES = ['跟进中', '已解决', '暂停跟进', '需升级处理', '已取消']
+
+# ── 统一错误响应 ──
+ERR_VALIDATION = "validation_error"   # 字段校验失败
+ERR_BUSY = "busy"                     # 同步/导入互斥冲突
+ERR_PARSE = "parse_error"             # 请求体解析失败
+ERR_NOT_FOUND = "not_found"           # 记录不存在
+ERR_INTERNAL = "internal_error"       # 其它内部错误
+
+
+def _error_payload(code, message):
+    """统一错误响应体：{success: False, code, message}。"""
+    return {"success": False, "code": code, "message": message}
+
 
 def _load_followup_records():
     """加载本地跟进记录"""
@@ -167,53 +181,54 @@ def _get_node_action_date(project_id):
 def _write_followup_async(record, cloud_url):
     """异步写入跟进记录到云文档（含进度追踪）"""
     record_id = record.get('记录编号', '')
-    try:
-        # 初始化同步状态追踪
-        _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
-        logger.info(f"[followup-sync] {record_id} 开始同步到云文档")
+    with _write_followup_lock:
+        try:
+            # 初始化同步状态追踪
+            _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
+            logger.info(f"[followup-sync] {record_id} 开始同步到云文档")
 
-        write_script, write_cwd = _find_script("write_followup.py")
-        if not write_script:
-            logger.error("写入脚本 write_followup.py 不存在")
-            _set_followup_state(record_id, {"status": "failed", "message": "写入脚本不存在，同步失败"})
-            _update_followup_sync_status(record_id, '同步失败')
-            return
-        if getattr(sys, 'frozen', False):
-            # 打包模式：直接导入运行
-            _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
-            old_argv = sys.argv[:]
-            sys.argv = [write_script, cloud_url, json.dumps(record, ensure_ascii=False)]
-            try:
-                _run_script_direct(write_script, 'write_followup', write_cwd)
-                _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
-                logger.info(f"跟进记录 {record_id} 写入云文档成功")
-                _update_followup_sync_status(record_id, '已同步')
-            except Exception as e:
-                logger.error(f"异步写入云文档失败: {e}")
-                _set_followup_state(record_id, {"status": "failed", "message": f"同步失败: {str(e)[:80]}"})
+            write_script, write_cwd = _find_script("write_followup.py")
+            if not write_script:
+                logger.error("写入脚本 write_followup.py 不存在")
+                _set_followup_state(record_id, {"status": "failed", "message": "写入脚本不存在，同步失败"})
                 _update_followup_sync_status(record_id, '同步失败')
-            finally:
-                sys.argv = old_argv
-        else:
-            # 开发模式：subprocess
-            _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
-            cmd = [sys.executable, '-u', write_script, cloud_url,
-                   json.dumps(record, ensure_ascii=False)]
-            result = subprocess.run(cmd, capture_output=True, text=True,
-                                   cwd=write_cwd, encoding='utf-8', errors='replace', timeout=300)
-            if result.returncode == 0:
-                _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
-                logger.info(f"跟进记录 {record_id} 写入云文档成功")
-                _update_followup_sync_status(record_id, '已同步')
+                return
+            if getattr(sys, 'frozen', False):
+                # 打包模式：直接导入运行
+                _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
+                old_argv = sys.argv[:]
+                sys.argv = [write_script, cloud_url, json.dumps(record, ensure_ascii=False)]
+                try:
+                    _run_script_direct(write_script, 'write_followup', write_cwd)
+                    _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
+                    logger.info(f"跟进记录 {record_id} 写入云文档成功")
+                    _update_followup_sync_status(record_id, '已同步')
+                except Exception as e:
+                    logger.error(f"异步写入云文档失败: {e}")
+                    _set_followup_state(record_id, {"status": "failed", "message": f"同步失败: {str(e)[:80]}"})
+                    _update_followup_sync_status(record_id, '同步失败')
+                finally:
+                    sys.argv = old_argv
             else:
-                err_msg = (result.stderr or result.stdout or '未知错误')[:100]
-                _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步失败: {err_msg}"})
-                logger.error(f"跟进记录写入云文档失败: stderr={result.stderr[:200] if result.stderr else ''} stdout={result.stdout[:200] if result.stdout else ''}")
-                _update_followup_sync_status(record_id, '同步失败')
-    except Exception as e:
-        logger.error(f"异步写入云文档异常: {e}", exc_info=True)
-        _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"})
-        _update_followup_sync_status(record_id, '同步失败')
+                # 开发模式：subprocess
+                _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
+                cmd = [sys.executable, '-u', write_script, cloud_url,
+                       json.dumps(record, ensure_ascii=False)]
+                result = subprocess.run(cmd, capture_output=True, text=True,
+                                       cwd=write_cwd, encoding='utf-8', errors='replace', timeout=300)
+                if result.returncode == 0:
+                    _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
+                    logger.info(f"跟进记录 {record_id} 写入云文档成功")
+                    _update_followup_sync_status(record_id, '已同步')
+                else:
+                    err_msg = (result.stderr or result.stdout or '未知错误')[:100]
+                    _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步失败: {err_msg}"})
+                    logger.error(f"跟进记录写入云文档失败: stderr={result.stderr[:200] if result.stderr else ''} stdout={result.stdout[:200] if result.stdout else ''}")
+                    _update_followup_sync_status(record_id, '同步失败')
+        except Exception as e:
+            logger.error(f"异步写入云文档异常: {e}", exc_info=True)
+            _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"})
+            _update_followup_sync_status(record_id, '同步失败')
 
 def _update_followup_sync_status(record_id, sync_status):
     """更新本地JSON中指定记录的syncStatus字段"""
@@ -426,17 +441,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         global import_state
         # 互斥检查
         if sync_state["running"]:
-            self._json_response({"success": False, "message": "同步正在进行中，请等待完成或停止同步后再导入"})
+            self._json_response(_error_payload(ERR_BUSY, "同步正在进行中，请等待完成或停止同步后再导入"))
             return
         if import_state["running"]:
-            self._json_response({"success": False, "message": "导入正在进行中，请等待完成或停止上传"})
+            self._json_response(_error_payload(ERR_BUSY, "导入正在进行中，请等待完成或停止上传"))
             return
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
         # 启动导入线程
         import_state = {"running": True, "progress": 5, "message": "正在保存数据..."}
@@ -501,34 +516,34 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
-        
+
         # 校验必填字段
         required = ['项目编号', '项目名称', '跟进人', '跟进类型', '跟进内容', '跟进状态']
         for field in required:
             if not data.get(field):
-                self._json_response({"success": False, "message": f"缺少必填字段: {field}"})
+                self._json_response(_error_payload(ERR_VALIDATION, f"缺少必填字段: {field}"))
                 return
-        
+
         # 校验跟进内容长度
         if len(data.get('跟进内容', '')) > 500:
-            self._json_response({"success": False, "message": "跟进内容不能超过500字"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进内容不能超过500字"))
             return
-        
+
         # 校验跟进人长度
         if len(data.get('跟进人', '')) > 20:
-            self._json_response({"success": False, "message": "跟进人姓名不能超过20个字符"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进人姓名不能超过20个字符"))
             return
-        
+
         # 校验跟进类型
         if data.get('跟进类型') not in FOLLOWUP_TYPES:
-            self._json_response({"success": False, "message": f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"))
             return
-        
+
         # 校验跟进状态
         if data.get('跟进状态') not in FOLLOWUP_STATUSES:
-            self._json_response({"success": False, "message": f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"))
             return
         
         # 自动生成记录编号
@@ -577,12 +592,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
 
         record_id = data.get('记录编号', '')
         if not record_id:
-            self._json_response({"success": False, "message": "缺少记录编号"})
+            self._json_response(_error_payload(ERR_VALIDATION, "缺少记录编号"))
             return
 
         # 从本地JSON中删除指定记录
@@ -591,7 +606,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         records = [r for r in records if r.get('记录编号') != record_id]
 
         if len(records) == original_count:
-            self._json_response({"success": False, "message": f"未找到记录: {record_id}"})
+            self._json_response(_error_payload(ERR_NOT_FOUND, f"未找到记录: {record_id}"))
             return
 
         _save_followup_records(records)
@@ -618,26 +633,26 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
         except Exception as e:
-            self._json_response({"success": False, "message": f"请求数据解析失败: {str(e)}"})
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
             return
-        
+
         record_id = data.get('记录编号', '')
         if not record_id:
-            self._json_response({"success": False, "message": "缺少记录编号"})
+            self._json_response(_error_payload(ERR_VALIDATION, "缺少记录编号"))
             return
-        
+
         # 校验可编辑字段
         if data.get('跟进人') and len(data.get('跟进人', '')) > 20:
-            self._json_response({"success": False, "message": "跟进人姓名不能超过20个字符"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进人姓名不能超过20个字符"))
             return
         if data.get('跟进内容') and len(data.get('跟进内容', '')) > 500:
-            self._json_response({"success": False, "message": "跟进内容不能超过500字"})
+            self._json_response(_error_payload(ERR_VALIDATION, "跟进内容不能超过500字"))
             return
         if data.get('跟进类型') and data.get('跟进类型') not in FOLLOWUP_TYPES:
-            self._json_response({"success": False, "message": f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进类型无效，可选: {', '.join(FOLLOWUP_TYPES)}"))
             return
         if data.get('跟进状态') and data.get('跟进状态') not in FOLLOWUP_STATUSES:
-            self._json_response({"success": False, "message": f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"})
+            self._json_response(_error_payload(ERR_VALIDATION, f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"))
             return
         
         # 从本地JSON中查找并更新记录
@@ -656,7 +671,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 break
         
         if not found:
-            self._json_response({"success": False, "message": f"未找到记录: {record_id}"})
+            self._json_response(_error_payload(ERR_NOT_FOUND, f"未找到记录: {record_id}"))
             return
         
         _save_followup_records(records)
@@ -848,6 +863,25 @@ def _run_script_direct(module_path, module_name, cwd=None):
     return '\n'.join(output_parts)
 
 
+def classify_progress_line(line):
+    """解析子脚本输出的一行，返回 (level, text) 或 None（空行）。
+    level ∈ {'ok','info','warn','error','other'}。
+    保持与既有关键字解析一致：info/warn/error 去掉级别前缀，ok/other 原样。
+    """
+    s = line.strip()
+    if not s:
+        return None
+    if '[OK]' in s:
+        return ('ok', s)
+    if '[INFO]' in s:
+        return ('info', s.replace('[INFO] ', ''))
+    if '[WARN]' in s:
+        return ('warn', s.replace('[WARN] ', ''))
+    if '[ERROR]' in s:
+        return ('error', s.replace('[ERROR] ', ''))
+    return ('other', s)
+
+
 def run_sync():
     """执行数据同步：提取+预处理"""
     global sync_state, sync_url
@@ -944,28 +978,30 @@ def run_sync():
                 
                 sheet_count = 0
                 error_lines = []
-                for line in process.stdout:
-                    line = line.strip()
-                    if not line:
+                for raw_line in process.stdout:
+                    parsed = classify_progress_line(raw_line)
+                    if parsed is None:
                         continue
-                    if '[OK]' in line:
+                    level, text = parsed
+                    full = raw_line.strip()
+                    if level == 'ok':
                         sheet_count += 1
                         progress = 15 + int(sheet_count / 9 * 60)
                         sync_state = {"running": True, "progress": min(progress, 75), "message": f"提取Sheet数据 ({sheet_count}/9)..."}
-                        logger.info(f"[fetch] {line}")
-                    elif '[INFO]' in line:
-                        sync_state = {"running": True, "progress": sync_state["progress"], "message": line.replace('[INFO] ', '')}
-                        logger.info(f"[fetch] {line}")
-                    elif '[WARN]' in line:
-                        logger.warning(f"[fetch] {line}")
-                        error_lines.append(line.replace('[WARN] ', ''))
-                    elif '[ERROR]' in line:
-                        logger.error(f"[fetch] {line}")
-                        error_lines.append(line.replace('[ERROR] ', ''))
+                        logger.info(f"[fetch] {full}")
+                    elif level == 'info':
+                        sync_state = {"running": True, "progress": sync_state["progress"], "message": text}
+                        logger.info(f"[fetch] {full}")
+                    elif level == 'warn':
+                        logger.warning(f"[fetch] {full}")
+                        error_lines.append(text)
+                    elif level == 'error':
+                        logger.error(f"[fetch] {full}")
+                        error_lines.append(text)
                     else:
-                        logger.debug(f"[fetch] {line}")
-                        if any(kw in line for kw in ['Error', 'Exception', 'Traceback', 'error', 'exception', 'traceback', 'Failed', 'failed']):
-                            error_lines.append(line)
+                        logger.debug(f"[fetch] {full}")
+                        if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'exception', 'traceback', 'Failed', 'failed']):
+                            error_lines.append(full)
                 
                 process.wait()
                 if process.returncode != 0:
@@ -1015,22 +1051,25 @@ def run_sync():
             )
             
             preprocess_errors = []
-            for line in process.stdout:
-                line = line.strip()
-                if not line:
+            for raw_line in process.stdout:
+                parsed = classify_progress_line(raw_line)
+                if parsed is None:
                     continue
-                if '[OK]' in line or '[INFO]' in line:
-                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": line.replace('[INFO] ', '').replace('[OK] ', '')}
-                    logger.info(f"[preprocess] {line}")
-                elif '[WARN]' in line:
-                    logger.warning(f"[preprocess] {line}")
-                elif '[ERROR]' in line:
-                    logger.error(f"[preprocess] {line}")
-                    preprocess_errors.append(line.replace('[ERROR] ', ''))
+                level, text = parsed
+                full = raw_line.strip()
+                if level in ('ok', 'info'):
+                    msg = full.replace('[INFO] ', '').replace('[OK] ', '')
+                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": msg}
+                    logger.info(f"[preprocess] {full}")
+                elif level == 'warn':
+                    logger.warning(f"[preprocess] {full}")
+                elif level == 'error':
+                    logger.error(f"[preprocess] {full}")
+                    preprocess_errors.append(text)
                 else:
-                    logger.debug(f"[preprocess] {line}")
-                    if any(kw in line for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
-                        preprocess_errors.append(line)
+                    logger.debug(f"[preprocess] {full}")
+                    if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
+                        preprocess_errors.append(full)
             
             process.wait()
             if process.returncode != 0:
@@ -1148,22 +1187,25 @@ def run_import(data):
             )
             
             preprocess_errors = []
-            for line in active_process.stdout:
-                line = line.strip()
-                if not line:
+            for raw_line in active_process.stdout:
+                parsed = classify_progress_line(raw_line)
+                if parsed is None:
                     continue
-                if '[OK]' in line or '[INFO]' in line:
-                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": line.replace('[INFO] ', '').replace('[OK] ', '')}
-                    logger.info(f"[import-preprocess] {line}")
-                elif '[WARN]' in line:
-                    logger.warning(f"[import-preprocess] {line}")
-                elif '[ERROR]' in line:
-                    logger.error(f"[import-preprocess] {line}")
-                    preprocess_errors.append(line.replace('[ERROR] ', ''))
+                level, text = parsed
+                full = raw_line.strip()
+                if level in ('ok', 'info'):
+                    msg = full.replace('[INFO] ', '').replace('[OK] ', '')
+                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": msg}
+                    logger.info(f"[import-preprocess] {full}")
+                elif level == 'warn':
+                    logger.warning(f"[import-preprocess] {full}")
+                elif level == 'error':
+                    logger.error(f"[import-preprocess] {full}")
+                    preprocess_errors.append(text)
                 else:
-                    logger.debug(f"[import-preprocess] {line}")
-                    if any(kw in line for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
-                        preprocess_errors.append(line)
+                    logger.debug(f"[import-preprocess] {full}")
+                    if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
+                        preprocess_errors.append(full)
             
             active_process.wait()
             if active_process.returncode != 0:
