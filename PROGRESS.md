@@ -40,17 +40,18 @@ _（无）_
 ## Backlog（按优先级，来源：2026-06-03 代码评审 + harness 评估）
 
 ### 🔴 严重（小改动、高收益，建议优先）
-- [ ] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。
-- [ ] **B-2** `server.py:1319` 绑定 `127.0.0.1` 而非 `""`：避免局域网无认证访问/触发同步/清空数据。
-- [ ] **B-3** `server.py:751` `os.environ.get('PROGRAMFILES(X86)')` 补默认值 `''`：缺该环境变量时会 TypeError 崩溃。
+- [x] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。（A2 完成：ThreadingHTTPServer + create_server）
+- [x] **B-2** `server.py:1319` 绑定 `127.0.0.1` 而非 `""`：避免局域网无认证访问/触发同步/清空数据。（A2 完成：绑定 127.0.0.1）
+- [x] **B-3** `server.py:751` `os.environ.get('PROGRAMFILES(X86)')` 补默认值 `''`：缺该环境变量时会 TypeError 崩溃。（A2 完成：PROGRAMFILES(X86) 缺省值 + 可测）
 - [ ] **B-4** `index.html:9` 改用本地 `fonts/google-fonts.css`，移除外链 Google Fonts：离线环境消除超时/字体闪烁。
 
 ### 🟠 高（后端健壮性）
-- [ ] **A2-debt** 继续消除硬编码（A1 遗留）：compute_dashboard/compute_tier_summary 中 ~15 处 nodeStatus 字符串改用 config.STATUS_*；tier 迭代/校验改用 config.TIER_LABELS；集成测试 process_below100_nodes 的时间依赖改注入 now。
-- [ ] **H-5** `sync_state/import_state/followup_sync_state` 多线程读写加锁（配合 B-1）。
-- [ ] **H-6** `followup_sync_state` 只增不删，成功后清理，防内存缓慢增长。
+- [x] **A2-debt** 继续消除硬编码（A1 遗留）：compute_dashboard/compute_tier_summary 中 ~15 处 nodeStatus 字符串改用 config.STATUS_*；tier 迭代/校验改用 config.TIER_LABELS；集成测试 process_below100_nodes 的时间依赖改注入 now。（A2 完成：status/tier 去硬编码 + now 注入）
+- [x] **H-5** `sync_state/import_state/followup_sync_state` 多线程读写加锁（配合 B-1）。（A2 完成：followup_sync_state 加锁；sync_state/import_state 整体重赋值原子）
+- [x] **H-6** `followup_sync_state` 只增不删，成功后清理，防内存缓慢增长。（A2 完成：_set_followup_state 限容）
 - [ ] **H-7** `server.py:130 _get_node_action_date` 不再用正则扫 2.2MB 的 JS 文本；让 `preprocess_data.py` 额外输出结构化 JSON 供后端直接读。 (部分由 A1 完成：已输出结构化 analysis_data.json + schema 校验)
 - [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。
+- [ ] **A3** server.run_sync/run_import 结构化进度协议（退出码/JSON 替代 [OK]/[ERROR] 关键字解析）+ 统一错误响应 {success,code,message}；fetch_yundocs_full.py 抓取健壮性（分块超时/重试）；write_followup.py 串行队列 + JSON 转义（与 H-8 相关）。
 
 ### 🟡 中（前端架构，较大重构，需在测试保护下分步做）
 - [ ] **M-9** `app.js` 按页面拆分 ES Modules，事件委托替代内联 `onclick`。
@@ -74,7 +75,7 @@ _（无）_
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
 - [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
-> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 62 项 pytest）。
+> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 70 项 pytest）。
 
 ---
 
