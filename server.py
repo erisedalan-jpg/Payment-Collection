@@ -1055,11 +1055,9 @@ def run_sync():
                     continue
                 level, text = parsed
                 full = raw_line.strip()
-                if level == 'ok':
-                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": text.replace('[OK] ', '')}
-                    logger.info(f"[preprocess] {full}")
-                elif level == 'info':
-                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": text}
+                if level in ('ok', 'info'):
+                    msg = full.replace('[INFO] ', '').replace('[OK] ', '')
+                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": msg}
                     logger.info(f"[preprocess] {full}")
                 elif level == 'warn':
                     logger.warning(f"[preprocess] {full}")
@@ -1193,11 +1191,9 @@ def run_import(data):
                     continue
                 level, text = parsed
                 full = raw_line.strip()
-                if level == 'ok':
-                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": text.replace('[OK] ', '')}
-                    logger.info(f"[import-preprocess] {full}")
-                elif level == 'info':
-                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": text}
+                if level in ('ok', 'info'):
+                    msg = full.replace('[INFO] ', '').replace('[OK] ', '')
+                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": msg}
                     logger.info(f"[import-preprocess] {full}")
                 elif level == 'warn':
                     logger.warning(f"[import-preprocess] {full}")
