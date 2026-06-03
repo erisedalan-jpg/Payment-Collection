@@ -60,6 +60,12 @@ _（无）_
 - [ ] **M-11** 统一 innerHTML 渲染处的转义（140 处），降低 XSS 与重排。
 - [ ] **M-12** `app.js` 清理 24% 空行（Prettier 一遍）。
 
+### 🟦 Phase B 前端（Vue3+TS 重写）
+- [x] **B1** 前端脚手架与基建：Vue3+Vite+TS 工程、由 schema.py 生成 analysis.ts（类型同源）、统一 API 客户端、数据加载 Pinia store、最小 shell、verify.sh 接入前端检查（typecheck+vitest+build）。
+- [ ] **B2** 布局（header/sidebar/年份·视角 dock）+ 通用组件（DataTable 封装 el-table / ChartBox 封装 vue-echarts / Modal）。
+- [ ] **B3+** 各页面迁移：看板 → 分层五页 → 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
+- [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警。
+
 ### 🟢 低
 - [ ] **L-13** 收紧 CORS（去掉 `Access-Control-Allow-Origin: *`）。
 - [ ] **L-14** `index.html:143` 硬编码内网地址改为配置项/留空。
@@ -76,7 +82,7 @@ _（无）_
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
 - [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
-> 验证基线：`bash verify.sh` 三步全绿（py_compile + ruff + 75 项 pytest）。
+> 验证基线：`bash verify.sh` 四步全绿（py_compile + ruff + 75 项 pytest + 前端 typecheck/vitest/build）。
 
 ---
 

@@ -14,7 +14,7 @@ else echo "[FAIL] 未找到 python"; exit 1; fi
 cd "$(dirname "$0")" || exit 1
 fail=0
 
-echo "==> [1/3] 语法编译检查 (py_compile)"
+echo "==> [1/4] 语法编译检查 (py_compile)"
 py_files=$(find . -name '*.py' -not -path './build/*' -not -path './dist/*' -not -path './.venv/*')
 if "$PY" -m py_compile $py_files; then
   echo "    OK: 所有 .py 编译通过"
@@ -22,7 +22,7 @@ else
   echo "    [FAIL] 存在语法错误"; fail=1
 fi
 
-echo "==> [2/3] 静态检查 (ruff，配置见 ruff.toml)"
+echo "==> [2/4] 静态检查 (ruff，配置见 ruff.toml)"
 if "$PY" -c "import ruff" >/dev/null 2>&1 || command -v ruff >/dev/null 2>&1; then
   if "$PY" -m ruff check .; then
     echo "    OK: ruff 通过"
@@ -33,7 +33,7 @@ else
   echo "    [SKIP] 未安装 ruff，跳过。安装：pip install ruff"
 fi
 
-echo "==> [3/3] 单元测试 (pytest)"
+echo "==> [3/4] 单元测试 (pytest)"
 if "$PY" -c "import pytest" >/dev/null 2>&1; then
   if "$PY" -m pytest -q; then
     echo "    OK: 测试通过"
@@ -42,6 +42,19 @@ if "$PY" -c "import pytest" >/dev/null 2>&1; then
   fi
 else
   echo "    [SKIP] 未安装 pytest，跳过测试。安装：pip install pytest"
+fi
+
+echo "==> [4/4] 前端检查 (typecheck + vitest + build)"
+if [ -f frontend/package.json ] && command -v npm >/dev/null 2>&1; then
+  if [ ! -d frontend/node_modules ]; then
+    echo "    [SKIP] frontend/node_modules 不存在，先运行 cd frontend && npm install"
+  elif ( cd frontend && npm run typecheck --silent && npm run test:run --silent && npm run build --silent ); then
+    echo "    OK: 前端检查通过"
+  else
+    echo "    [FAIL] 前端检查未通过"; fail=1
+  fi
+else
+  echo "    [SKIP] 未检测到 frontend 或 npm，跳过前端检查"
 fi
 
 echo "---------------------------------------------"
