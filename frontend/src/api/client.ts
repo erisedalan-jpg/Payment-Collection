@@ -22,6 +22,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new ApiRequestError(`http_${res.status}`, `HTTP ${res.status}`)
   }
+  if (data === null) {
+    throw new ApiRequestError('parse_error', '响应解析失败')
+  }
   return data as T
 }
 

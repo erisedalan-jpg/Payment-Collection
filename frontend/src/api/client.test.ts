@@ -28,6 +28,20 @@ describe('api client', () => {
     await expect(api.get('/api/x')).rejects.toBeInstanceOf(ApiRequestError)
   })
 
+  it('throws parse_error when ok but body is not JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new Error('Unexpected token < in JSON')
+      },
+    }))
+    await expect(api.get('/api/x')).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      code: 'parse_error',
+    })
+  })
+
   it('post sends JSON body', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) })
     vi.stubGlobal('fetch', f)
