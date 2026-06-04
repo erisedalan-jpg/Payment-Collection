@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B14 临期跟进 展开面板/项目列表/跟进标记 完成）
+- 最近更新：2026-06-04（B15 临期跟进 跟进记录 CRUD + 云回写 + 轮询 完成；临期跟进全功能）
 - 维护语言：简体中文
 
 ---
@@ -75,7 +75,7 @@ _（无）_
 - [x] **B12** 回款日历(calendar)：lib/calendar、CalNodeTable、CalGrid、CalendarView，路由 /calendar 接入。
 - [x] **B13** 临期跟进 Signal Board(只读)：lib/followup、FollowupSignalRow、FollowupView，路由 /followup 接入。
 - [x] **B14** 临期跟进：展开面板 + 项目列表 + 跟进标记：stores/fuData(响应式本地标记)、lib/followupProjects、FuNodeTable、FuProjectRow、FollowupExpandModal；信号行可点击开面板，视图改用 fuData store（标记联动看板跟进率）。
-- [ ] **B15** 临期跟进：跟进记录 CRUD(/api/followup/*) + 云文档异步回写 + 同步状态轮询。
+- [x] **B15** 临期跟进：跟进记录 CRUD + 云回写 + 轮询：lib/followupApi、composables/useFollowupSync、FollowupRecordForm、FollowupRecords，嵌入 FuProjectRow。临期跟进页全功能完成。
 - [ ] **B16** 数据管理(data)。
 - [ ] **B17** 区间对比(compare) + 关于(about)。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
@@ -101,6 +101,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B15 完成（2026-06-04）：临期跟进 跟进记录 CRUD + 云回写 + 轮询
+- 分支 **`refactor/b15-followup-records`** 全部 5 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `c9c3a87` / T1 `3299ac4`(followupApi) / T2 `87f6d0d`(useFollowupSync) / T3 `0f58c75`(FollowupRecordForm) / T4 `64030e5`(FollowupRecords) + 本 PROGRESS/嵌入提交。
+- 产物：`lib/followupApi`（类型化 types/list/add/update/delete/syncStatus，基于 api 客户端）、`composables/useFollowupSync`（同步 toast + 轮询，time/poll 注入）、`FollowupRecordForm`（3 只读+5 可编辑+校验）、`FollowupRecords`（列表+增删改+反馈），嵌入 FuProjectRow 展开区。临期跟进页全功能（看板 B13 + 展开/标记 B14 + 记录 CRUD/云同步 B15）。
+- 经规范+质量审查：可合并 ✓，无 Critical/Important。两处子代理小调整均判可接受：(a) 记录编号只读值额外用 span 显示(让 text() 可读)；(b) onSubmit 把 loadRecords 放 finally(成功/失败都重载，操作后回到服务端真实状态，良性差异)。
+- 关键忠实性（已核对 app.js/server.py）：API 路径/方法/编码；轮询状态机(syncing 更新/success 绿 5s/failed 红 8s/超时 8s/本地 4s)；表单只读仅 记录编号/项目编号/项目名称(无 amountTier)、可编辑含"邮件推动"、校验跟进人&内容(≤500)；列表降序+最新详情+历史展开；提交分流 add/update、删除 confirm。新实现还规避了旧 _pollFollowupSyncStatus 超时分支引用未定义 msgEl 的潜在 bug。
+- 范围：cloudUrl 由 B16 数据管理页提供，本期表单不传，后端回退全局 sync_url（已设则云同步、未设则仅本地）。展示从简：toast 组件化、原生表单+内联校验、记录角标等纯样式从简。
+- 整体进度：A1-A3 后端 ✅；B1-B15 前端 ✅（B15 待合并 master）。下一步 B16（数据管理）。
 
 ### ✅ Plan B14 完成（2026-06-04）：临期跟进 展开面板 + 项目列表 + 跟进标记
 - 分支 **`refactor/b14-followup-expand`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。

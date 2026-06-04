@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import FuNodeTable from './FuNodeTable.vue'
+import FollowupRecords from './FollowupRecords.vue'
 import { useFuDataStore } from '@/stores/fuData'
 import type { FuProject } from '@/lib/followupProjects'
 
@@ -42,6 +43,11 @@ defineExpose({ onFlwChange })
     </div>
     <div v-if="open" class="fpr-nodes">
       <FuNodeTable :nodes="project.nodes as Record<string, any>[]" />
+      <FollowupRecords
+        :project-id="project.projectId"
+        :project-name="project.projectName"
+        :default-next-date="(project.nodes[0] as Record<string, any>)?.nextActionDate || ''"
+      />
     </div>
   </div>
 </template>
