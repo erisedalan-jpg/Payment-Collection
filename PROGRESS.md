@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B9 分层页 回款状态(plan) + CF 联动 完成）
+- 最近更新：2026-06-04（B10 回款台账 完成）
 - 维护语言：简体中文
 
 ---
@@ -70,7 +70,9 @@ _（无）_
 - [x] **B7** 分层页外壳 + 回款节点(nodes) + 数据质检(integrity)：lib/cellFormat、tierSummaryBar、TierView（/tier/:tab/:tier）、TierNodesTab、TierIntegrityTab。点亮 nodes×3 + integrity×3 入口。
 - [x] **B8** 分层页：项目总览(projects) + 风险(risk) tab：lib/projectsOverview、lib/riskGroups、format.fmtRatio、ProjectsOverviewTab、RiskTab，TierView 接入分发。点亮 projects×3 + risk×3 入口。
 - [x] **B9** 分层页：回款状态(plan) 6 看板 + CF 筛选联动：lib/crossFilter、stores/crossFilter、lib/planBoards、ColumnFilter、PlanBoard、PlanTab，TierView 接入分发。点亮 plan×3 入口（分层页 5 tab×3 档全通）。
-- [ ] **B10+** 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
+- [x] **B10** 回款台账(ledger)：lib/ledger（纳管-only 数据源/搜索过滤/汇总/分层/状态计数）、LedgerTable（项目表 + CF 列头 + 行展开下钻节点明细）、LedgerView（汇总/状态/分层三条 + 搜索/区间/状态筛选），路由 /ledger 接入。复用 B9 的 CF。
+- [ ] **B11** 项目经理视图(pmview)。
+- [ ] **B12+** 回款日历 → 临期跟进 → 数据管理 → 区间对比/关于。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
@@ -89,11 +91,21 @@ _（无）_
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
 - [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
-> 验证基线：`bash verify.sh` 四步全绿（py_compile + ruff + 75 项 pytest + 前端 typecheck/133 项 vitest/build）。
+> 验证基线：`bash verify.sh` 四步全绿（py_compile + ruff + 75 项 pytest + 前端 typecheck/vitest/build）。
 
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B10 完成（2026-06-04）：回款台账(ledger)
+- 分支 **`refactor/b10-ledger`** 全部 4 任务完成、`verify.sh` 全绿（前端 typecheck/vitest/build），待合并 master。
+- 提交：计划 `556e659` / T1 `55a7c51`(lib/ledger) / T2 `679ed9f`(LedgerTable) + `fdf240b`(下钻收起忠实修正) / T3 `49410d8`(LedgerView) + 本 PROGRESS/路由提交。
+- 产物：`lib/ledger`、`components/LedgerTable`（项目表 + CF 列头 + 行展开下钻"回款节点明细"）、`views/LedgerView`（汇总/状态/分层三条 + 搜索/区间/状态筛选），路由 `/ledger` 由 PageStub 改 LedgerView。CF 复用 B9（单表 ledgerTable，无联动）。
+- 经规范+质量审查：可合并 ✓，无 Critical/Important。审查发现并已修：旧版 filterLedger 每次过滤 `_expandedLedgerIdx=-1`（过滤即收起下钻），新版补 watch(props.projects) 重置 expandedIdx（`fdf240b`）。
+- 关键忠实性（已核对一致）：台账数据源=**纳管-only**（`naguanFilter`，不含年份/视角，对应 `_filteredRawNodes`）；三组指标条基于搜索/区间/状态/CF 过滤后的 displayed 重算；区间过滤按 `nodes.some(tier)`、搜索四字段拼接；按 projectAmount 降序、slice(0,500)；CF 列枚举源=纳管过滤后全部项目 baseProjs；下钻字段与旧一致；待回款列=exp-act、完成率列=exp>0?act/exp:0。
+- 展示从简（已记录，非偏差）：下钻只渲"回款节点明细"（项目全字段横行 + 列可见性 UI 延后 B-opt）；tier/status 徽章配色、导出 Excel 延后 B-opt；CF 修正旧版 `remainAmount`→`remainingAmount` 笔误。
+- 范围：路线图原"台账/PM"已拆分——台账=B10 独立完成；**项目经理视图=B11**；日历/临期跟进/数据管理/对比/关于顺延 B12+。
+- 整体进度：A1-A3 后端 ✅；B1-B10 前端 ✅（B10 待合并 master）。
 
 ### ✅ Plan B9 完成（2026-06-04）：分层页 回款状态(plan) + CF 联动
 - 分支 **`refactor/b9-tier-plan-tab`** 全部 7 任务完成、`verify.sh` 全绿（36 文件 / 133 前端单测 + typecheck + build），待合并 master。
