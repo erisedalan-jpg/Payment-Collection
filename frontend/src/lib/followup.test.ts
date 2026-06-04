@@ -68,6 +68,7 @@ describe('cycleLabel', () => {
     expect(cycleLabel('2027', 2026)).toBe('下一年度')
     expect(cycleLabel('upto2026', 2026)).toBe('至本年度')
     expect(cycleLabel('2026-Q1', 2026)).toBe('本年度')
+    expect(cycleLabel('upto2026-Q1', 2026)).toBe('至本年度') // upto+季度取父年度
   })
 })
 
