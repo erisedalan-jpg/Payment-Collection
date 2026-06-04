@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B15 临期跟进 跟进记录 CRUD + 云回写 + 轮询 完成；临期跟进全功能）
+- 最近更新：2026-06-04（B16 数据管理 质量总览/纳管/清空 完成）
 - 维护语言：简体中文
 
 ---
@@ -76,8 +76,9 @@ _（无）_
 - [x] **B13** 临期跟进 Signal Board(只读)：lib/followup、FollowupSignalRow、FollowupView，路由 /followup 接入。
 - [x] **B14** 临期跟进：展开面板 + 项目列表 + 跟进标记：stores/fuData(响应式本地标记)、lib/followupProjects、FuNodeTable、FuProjectRow、FollowupExpandModal；信号行可点击开面板，视图改用 fuData store（标记联动看板跟进率）。
 - [x] **B15** 临期跟进：跟进记录 CRUD + 云回写 + 轮询：lib/followupApi、composables/useFollowupSync、FollowupRecordForm、FollowupRecords，嵌入 FuProjectRow。临期跟进页全功能完成。
-- [ ] **B16** 数据管理(data)。
-- [ ] **B17** 区间对比(compare) + 关于(about)。
+- [x] **B16** 数据管理：数据质量总览 + 纳管开关 + 清空数据：lib/dataQuality、data store clearBusinessData、DataQualityTable、DataDrillModal、DataView，路由 /data 接入。
+- [ ] **B17** 数据管理：云同步(SSE 进度) + 离线 Excel 导入(上传+轮询)。
+- [ ] **B18** 区间对比(compare) + 关于(about)。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
@@ -101,6 +102,16 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B16 完成（2026-06-04）：数据管理 数据质量总览 + 纳管开关 + 清空数据
+- 分支 **`refactor/b16-data-quality`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `55782e9` / T1 `60750f5`+`a4f6184`(dataQuality，含 ratioOver 忠实修正) / T2 `91ff133`(data store clearBusinessData) / T3 `368aa49`(DataQualityTable) / T4 `e1fa404`(DataDrillModal) / T5 `f9c6ee6`(DataView) + 本 PROGRESS/路由提交。
+- 产物：`lib/dataQuality`（5 检查定义/按档计数/下钻）、`data store clearBusinessData`、`DataQualityTable`（单元格可点下钻）、`DataDrillModal`（Modal+DataTable）、`DataView`（纳管开关+清空+质量总览+下钻），路由 `/data` 接入。
+- 经规范+质量审查：可合并 ✓，无 Critical/Important（2 Minor 可接受：下钻"共 X 条"在 >200 条时显示 200、TIER_LABELS 三处重复）。
+- 执行中一处忠实性修正：T1 子代理为迁就测试把 ratioOver 从 `pctToNum>1` 改成 `Number>1`；根因是计划测试数据用裸数 1.5（pctToNum 把 >1 裸数当百分数除以 100）。已还原为忠实 `pctToNum>1` + 改测试数据为 '150%'（`a4f6184`）。
+- 关键忠实性（已核对 app.js）：数据源全量 rawNodes；5 检查去死检查；比例>100% 用 pctToNum；合计=scope 全量计数；单元格 count>0 下钻；双确认清空+保留平台配置(displayColumns/meta)+best-effort /api/clear-data；纳管开关绑 filterStore 全站联动。
+- 范围：云同步(SSE)/离线导入拆 B17（DataView 留占位说明）。展示从简：tier 徽章配色省略；reloadData 脚本重载改为 store 内存清空。
+- 整体进度：A1-A3 后端 ✅；B1-B16 前端 ✅（B16 待合并 master）。下一步 B17（云同步 SSE + 离线导入）。
 
 ### ✅ Plan B15 完成（2026-06-04）：临期跟进 跟进记录 CRUD + 云回写 + 轮询
 - 分支 **`refactor/b15-followup-records`** 全部 5 任务完成、`verify.sh` 全绿，待合并 master。
