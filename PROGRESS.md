@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B11 项目经理视图 完成）
+- 最近更新：2026-06-04（B12 回款日历 完成）
 - 维护语言：简体中文
 
 ---
@@ -72,7 +72,10 @@ _（无）_
 - [x] **B9** 分层页：回款状态(plan) 6 看板 + CF 筛选联动：lib/crossFilter、stores/crossFilter、lib/planBoards、ColumnFilter、PlanBoard、PlanTab，TierView 接入分发。点亮 plan×3 入口（分层页 5 tab×3 档全通）。
 - [x] **B10** 回款台账(ledger)：lib/ledger（纳管-only 数据源/搜索过滤/汇总/分层/状态计数）、LedgerTable（项目表 + CF 列头 + 行展开下钻节点明细）、LedgerView（汇总/状态/分层三条 + 搜索/区间/状态筛选），路由 /ledger 接入。复用 B9 的 CF。
 - [x] **B11** 项目经理视图(pmview)：lib/pmView（排名聚合/下钻数据/列定义）、PmRankingTable（排名表+行点击下钻）、PmDrilldownModal（Modal+负责项目表+延期节点表）、PmView，路由 /pmview 接入。
-- [ ] **B12+** 回款日历 → 临期跟进 → 数据管理 → 区间对比/关于。
+- [x] **B12** 回款日历(calendar)：lib/calendar、CalNodeTable、CalGrid、CalendarView，路由 /calendar 接入。
+- [ ] **B13** 临期跟进(followup)。
+- [ ] **B14** 数据管理(data)。
+- [ ] **B15** 区间对比(compare) + 关于(about)。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
@@ -96,6 +99,16 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B12 完成（2026-06-04）：回款日历(calendar)
+- 分支 **`refactor/b12-calendar`** 全部 5 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `e2b7c9f` / T1 `23d0c94`+`6f272ab`(calendar 纯函数，含排序忠实修正) / T2 `bda4d27`(CalNodeTable) / T3 `88fc730`(CalGrid) / T4 `de54583`(CalendarView) + 本 PROGRESS/路由提交。
+- 产物：`lib/calendar`（excludePaid/选项/三筛选/仪表卡/日期统计/月网格生成器/列表分组/临期/悬浮文本，11 单测）、`CalNodeTable`（13 列节点表，列表与临期复用）、`CalGrid`（双月网格：配色/角标/title 悬浮/点选）、`CalendarView`（状态+仪表卡+筛选条+网格+列表+临期），路由 `/calendar` 接入。复用 B10 naguanFilter、B8 getNodeRemaining。
+- 经规范+质量审查：可合并 ✓，无 Critical/Important（3 Minor 均可接受：index key、today 时间源、轻微冗余过滤）。
+- 执行中一处忠实性修正：T1 子代理为迁就测试把选项排序从 `.sort()` 改成 `localeCompare('zh')`（拼音序，偏离 app.js）；根因是计划测试数据 orgL4 期望写错（应按 Unicode 序 `['上海','北京']`）。已还原为忠实 `.sort()` + 修正测试（`6f272ab`）。
+- 关键忠实性（已核对一致）：双数据源口径（仪表卡=filteredNodes 年/视角/纳管；网格/列表/临期=naguanFilter+calExcludePaid）；仪表卡"当月"按真实 now、7天[0,7]；网格周一为首/8桶/配色优先级+mixed；列表 selectedDate vs 双月范围/排除已付/分组小计；临期 [now,15]/(now,30] 未满额/maxShow 50-100；日历年月独立于全局年份；now/today 注入可测。
+- 展示从简（已记录，非偏差）：网格富悬浮→title 文本；tier/status 徽章配色、行点击跳转、导出 Excel 延后 B-opt。
+- 整体进度：A1-A3 后端 ✅；B1-B12 前端 ✅（B12 待合并 master）。下一步 B13（临期跟进）。
 
 ### ✅ Plan B11 完成（2026-06-04）：项目经理视图(pmview)
 - 分支 **`refactor/b11-pmview`** 全部 5 任务完成、`verify.sh` 全绿，待合并 master。
