@@ -92,5 +92,22 @@ _（无）_
 
 ## 会话交接备注（Handoff）
 
+### ⏸ 当前进行中（2026-06-04，/compact 前留存）：Plan B7 执行中
+- 分支：**`refactor/b7-tier-pages`**（未合并）。计划：`docs/superpowers/plans/2026-06-04-B7-tier-pages.md`（共 6 任务）。
+- **已完成并提交（Task 1-4，均通过两阶段审查）**：
+  - Task 1 `lib/cellFormat.ts`（`43dc2be`）
+  - Task 2 `dashboardStats.tierSummaryBar`（`d795979`）
+  - Task 3 `TierNodesTab.vue`（`4b38709`）
+  - Task 4 `TierIntegrityTab.vue`（`369ea6e`）
+- **未完成**：
+  - **Task 5（TierView 外壳 + 路由接入）**：⚠️ 已有**未提交**产物在工作树（`frontend/src/views/TierView.vue`、`TierView.test.ts` 未跟踪；`frontend/src/router/index.ts` 已改 `/tier/:tab/:tier`→TierView）——是被中断的实现，**尚未运行测试/typecheck/未审查**。续接时：按计划 Task 5 校验这些文件（`cd frontend && npx vitest run src/views/TierView.test.ts` + `npm run test:run` + typecheck + build），不对则按计划修正，再走规范+质量审查，然后提交。
+  - **Task 6**：收尾（`bash verify.sh` 全绿 + 更新 PROGRESS）。
+  - 之后：最终整体审查 → 合并回 master（`--no-ff`）→ 删分支（按 finishing-a-development-branch）。
+- 执行方式：子代理驱动（subagent-driven-development），每任务两阶段审查（规范→质量）；审查建议需按"忠实移植/数据契约"技术判断取舍，勿盲从。
+- 工作树杂项（无害，勿误提交）：`data/`（生成物，部分 gitignored）、`.vite/`、`node_modules/` 顶层缓存。
+- 整体进度：A1-A3 后端 ✅；B1-B6 前端（基建/布局/筛选/组件/看板）✅ 均已合并 master；B7 进行中；B8(projects/risk)、B9(plan 看板)、B10+(台账/PM/日历/临期跟进/数据管理/对比/关于)、A4(Playwright 脚本)、C(打包) 待做。
+
+### 通用
 - 测试只覆盖了 `preprocess_data.py` 的**纯函数**（解析层）；计算/聚合函数尚无测试（HX-6）。
 - 改 `server.py`/脚本前务必读 `CLAUDE.md` 第 5 节"打包 vs 开发双模式"。
+- 前端忠实移植自旧 `app.js`；改前端计算逻辑前对照旧函数，单测是迁移正确性护栏。
