@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import DashboardView from './DashboardView.vue'
 import { useDataStore } from '@/stores/data'
+import PendingBarChart from '@/components/PendingBarChart.vue'
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 afterEach(() => vi.unstubAllGlobals())
@@ -19,6 +20,9 @@ describe('DashboardView', () => {
     const wrapper = mount(DashboardView)
     expect(wrapper.find('.dash-summary').exists()).toBe(true)
     expect(wrapper.find('.tier-cards').exists()).toBe(true)
+    expect(wrapper.findAllComponents(PendingBarChart).length).toBe(2)
+    expect(wrapper.find('.org-ranking').exists()).toBe(true)
+    expect(wrapper.find('.delayed-top').exists()).toBe(true)
   })
 
   it('renders loading state', () => {
