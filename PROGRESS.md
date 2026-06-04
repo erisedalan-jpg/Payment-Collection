@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B8 分层页 projects/risk 完成）
+- 最近更新：2026-06-04（B9 分层页 回款状态(plan) + CF 联动 完成）
 - 维护语言：简体中文
 
 ---
@@ -69,7 +69,7 @@ _（无）_
 - [x] **B6** 看板首页（图表部分）：lib/dashboardCharts（季度/月度聚合 + 服务组排名 + 延期Top 忠实移植）、PendingBarChart、OrgRanking、DelayedTop，接入 DashboardView。看板首页完成。
 - [x] **B7** 分层页外壳 + 回款节点(nodes) + 数据质检(integrity)：lib/cellFormat、tierSummaryBar、TierView（/tier/:tab/:tier）、TierNodesTab、TierIntegrityTab。点亮 nodes×3 + integrity×3 入口。
 - [x] **B8** 分层页：项目总览(projects) + 风险(risk) tab：lib/projectsOverview、lib/riskGroups、format.fmtRatio、ProjectsOverviewTab、RiskTab，TierView 接入分发。点亮 projects×3 + risk×3 入口。
-- [ ] **B9** 分层页：回款状态(plan) 6 看板（CF 联动）。
+- [x] **B9** 分层页：回款状态(plan) 6 看板 + CF 筛选联动：lib/crossFilter、stores/crossFilter、lib/planBoards、ColumnFilter、PlanBoard、PlanTab，TierView 接入分发。点亮 plan×3 入口（分层页 5 tab×3 档全通）。
 - [ ] **B10+** 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
@@ -89,11 +89,20 @@ _（无）_
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
 - [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
-> 验证基线：`bash verify.sh` 四步全绿（py_compile + ruff + 75 项 pytest + 前端 typecheck/vitest/build）。
+> 验证基线：`bash verify.sh` 四步全绿（py_compile + ruff + 75 项 pytest + 前端 typecheck/133 项 vitest/build）。
 
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B9 完成（2026-06-04）：分层页 回款状态(plan) + CF 联动
+- 分支 **`refactor/b9-tier-plan-tab`** 全部 7 任务完成、`verify.sh` 全绿（36 文件 / 133 前端单测 + typecheck + build），待合并 master。
+- 提交：计划 `dd3054c` / T1 `f25dd9d`(crossFilter 纯函数) / T2 `756a361`(crossFilter store) / T3 `21eba3f`(planBoards) / T4 `28c1ae4`(ColumnFilter) / T5 `3ec5fcb`(PlanBoard) / T6 `de72084`(PlanTab) + 本 PROGRESS/TierView 提交。
+- 架构：把旧全局 `CF` 对象拆三层——纯函数 `lib/crossFilter`(格式化/去重/列过滤) + Pinia `stores/crossFilter`(各表筛选状态 + 联动开关 + 跨表同步) + 组件 `ColumnFilter`(列头▾下拉)；plan 计算纯函数化 `lib/planBoards`(6看板定义/单板统计/汇总求和/状态计数)；`PlanBoard`(单板) + `PlanTab`(汇总条+状态格+工具栏+6看板, 切档重置筛选)；TierView 分发 plan→PlanTab。分层页 5 个 tab×3 档全通。
+- 三组件经规范+质量审查：可合并 ✓，无 Critical/Important（5 Minor 均可读性/B-opt：冗余 as 断言、行 index key、保留未用的 clearAll API）。逐行核对忠实移植：列枚举源=全量关联节点、汇总取 boardAgg 求和、状态计数取 combined(空回退 allNodes)、先按 status 过滤再 CF、slice(0,100)、6 看板顺序配色、navTier 重置。
+- 展示从简取舍（已记录，非偏差）：CF 搜索的"即时自动勾选+即时 apply"简化为搜索仅过滤列表、统一「确定」apply；列可见性设置 UI / 导出 Excel / 状态卡点击下钻滚动+"来自看板下钻"高亮延后 B-opt，状态卡为纯计数展示。
+- 下一步：B10+(台账/PM/日历/临期跟进/数据管理/对比/关于)、A4(Playwright 脚本)、C(打包)。
+- 整体进度：A1-A3 后端 ✅；B1-B9 前端 ✅（B9 待合并 master）。
 
 ### ✅ Plan B8 完成（2026-06-04）：分层页 projects/risk
 - 分支 **`refactor/b8-tier-projects-risk`** 全部 6 任务完成、`verify.sh` 全绿（110 前端单测），待最终整体审查 + 合并 master。

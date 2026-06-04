@@ -63,10 +63,16 @@ describe('TierView', () => {
     expect(wrapper.findComponent({ name: 'TierIntegrityTab' }).exists()).toBe(true)
   })
 
-  it('not-yet-built tab shows placeholder', async () => {
+  it('unknown tab shows placeholder', async () => {
+    seed()
+    const wrapper = await mountAt('/tier/zzz/above1m')
+    expect(wrapper.text()).toContain('建设中')
+  })
+
+  it('plan tab renders PlanTab', async () => {
     seed()
     const wrapper = await mountAt('/tier/plan/above1m')
-    expect(wrapper.text()).toContain('建设中')
+    expect(wrapper.findComponent({ name: 'PlanTab' }).exists()).toBe(true)
   })
 
   it('projects tab renders ProjectsOverviewTab', async () => {
