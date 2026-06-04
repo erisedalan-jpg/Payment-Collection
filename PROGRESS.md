@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B16 数据管理 质量总览/纳管/清空 完成）
+- 最近更新：2026-06-04（B17 数据管理 云同步+离线导入 完成；数据管理页全功能）
 - 维护语言：简体中文
 
 ---
@@ -77,7 +77,7 @@ _（无）_
 - [x] **B14** 临期跟进：展开面板 + 项目列表 + 跟进标记：stores/fuData(响应式本地标记)、lib/followupProjects、FuNodeTable、FuProjectRow、FollowupExpandModal；信号行可点击开面板，视图改用 fuData store（标记联动看板跟进率）。
 - [x] **B15** 临期跟进：跟进记录 CRUD + 云回写 + 轮询：lib/followupApi、composables/useFollowupSync、FollowupRecordForm、FollowupRecords，嵌入 FuProjectRow。临期跟进页全功能完成。
 - [x] **B16** 数据管理：数据质量总览 + 纳管开关 + 清空数据：lib/dataQuality、data store clearBusinessData、DataQualityTable、DataDrillModal、DataView，路由 /data 接入。
-- [ ] **B17** 数据管理：云同步(SSE 进度) + 离线 Excel 导入(上传+轮询)。
+- [x] **B17** 数据管理：云同步(SSE 进度) + 离线 Excel 导入(上传+轮询)：xlsx 依赖、lib/excelImport、useCloudSync、useExcelImport、data store reload、DataView 两卡。数据管理页全功能。
 - [ ] **B18** 区间对比(compare) + 关于(about)。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
@@ -102,6 +102,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B17 完成（2026-06-04）：数据管理 云同步(SSE) + 离线 Excel 导入(上传+轮询)
+- 分支 **`refactor/b17-data-sync-import`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `4c43584` / T1 `9a214af`(xlsx 依赖+data reload) / T2 `c1bbe20`(excelImport) / T3 `501b7b8`(useCloudSync) / T4 `c636721`(useExcelImport) / T5 `8e201d5`(DataView 两卡) + `2855520`(审查修正) + 本 PROGRESS 提交。
+- 产物：新增 `xlsx` 依赖；`lib/excelImport`（扩展名/必需Sheet/字符串矩阵）、`composables/useCloudSync`（SSE 状态机，EventSource 可注入）、`composables/useExcelImport`（读文件/解析/上传/轮询，依赖可注入）、`data store reload`、`DataView` 云同步+离线导入两卡。数据管理页全功能（B16 质量/纳管/清空 + B17 同步/导入）。
+- 经规范+质量审查：发现 1 Critical + Important 并修复——C1：后端互斥拒绝(SSE {running:false,message})被 onerror 覆盖导致原因丢失 → onmessage 处理 running:false 保留 message + onerror 守卫(仅 syncing 才视为中断) + 补测；I2：DataView 模板用嵌套 ref `.value` 易踩坑 → 解构组合式返回值（模板自动解包）。I1(文件未选静默)降 Minor 接受。
+- 关键忠实性（已核对 app.js/server.py）：SSE `/api/sync?url=`、onmessage 进度/100 完成+reload/onerror 中断、stop+/api/stop-sync；导入扩展名+必需 Sheet+字符串矩阵+POST /api/import+轮询 /api/import-status(1s)+stop+/api/stop-import；完成 data.reload 热更新；互斥以后端 busy 返回为准。
+- 展示从简：进度条替代旧 DOM 富文本；reloadData 动态 script→store.reload；time/EventSource/FileReader/XLSX/fetch/poll 注入可测。新增 xlsx 依赖（chunk 增大属已知 B-opt 警告）。
+- 整体进度：A1-A3 后端 ✅；B1-B17 前端 ✅（B17 待合并 master）。仅剩 B18（区间对比 + 关于）。
 
 ### ✅ Plan B16 完成（2026-06-04）：数据管理 数据质量总览 + 纳管开关 + 清空数据
 - 分支 **`refactor/b16-data-quality`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
