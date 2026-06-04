@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import ColumnFilter from './ColumnFilter.vue'
 import { getNodeRemaining } from '@/lib/riskGroups'
 import { fmtYuan, fmtRatio } from '@/lib/format'
@@ -19,6 +19,13 @@ const props = defineProps<{
 }>()
 
 const expandedIdx = ref(-1)
+// 忠实移植 filterLedger 的 _expandedLedgerIdx=-1：过滤导致数据集变化时收起下钻
+watch(
+  () => props.projects,
+  () => {
+    expandedIdx.value = -1
+  },
+)
 function toggle(idx: number) {
   expandedIdx.value = expandedIdx.value === idx ? -1 : idx
 }
