@@ -43,6 +43,17 @@ describe('useCloudSync', () => {
     FakeES.last!.onerror!()
     expect(s.phase.value).toBe('error')
   })
+  it('后端拒绝(running:false) → 错误态并保留其 message，onerror 不覆盖', () => {
+    const s = useCloudSync({ eventSourceCtor: FakeES as any })
+    s.start('http://doc')
+    FakeES.last!.onmessage!({ data: JSON.stringify({ running: false, progress: 0, message: '导入正在进行中' }) })
+    expect(s.phase.value).toBe('error')
+    expect(s.message.value).toBe('导入正在进行中')
+    expect(FakeES.last!.closed).toBe(true)
+    // 随后 onerror 触发也不应覆盖文案
+    FakeES.last!.onerror!()
+    expect(s.message.value).toBe('导入正在进行中')
+  })
   it('stop → 停止态 + 调 stop-sync', () => {
     const fetchFn = vi.fn().mockResolvedValue({})
     const s = useCloudSync({ eventSourceCtor: FakeES as any, fetchFn: fetchFn as any })

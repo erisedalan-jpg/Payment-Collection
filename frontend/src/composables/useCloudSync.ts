@@ -39,12 +39,18 @@ export function useCloudSync(opts: CloudSyncOpts = {}) {
           es?.close()
           phase.value = 'done'
           opts.onDone?.()
+        } else if (d.running === false) {
+          // 后端拒绝（如互斥：导入进行中）→ 保留其 message 置错误态，避免随后 onerror 覆盖
+          es?.close()
+          phase.value = 'error'
         }
       } catch {
         /* 忽略非 JSON 事件 */
       }
     }
     es!.onerror = () => {
+      // 仅在同步进行中才视为连接中断；已完成/已置错误/已停止时忽略，避免覆盖真实文案
+      if (phase.value !== 'syncing') return
       es?.close()
       phase.value = 'error'
       message.value = '同步连接中断，请检查浏览器/云文档地址/网络后重试'
