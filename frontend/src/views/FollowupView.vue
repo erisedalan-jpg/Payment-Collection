@@ -3,28 +3,29 @@ import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import {
-  loadFuData,
   followupDeptStats,
   followupTotals,
   followupQuarters,
   cycleLabel,
 } from '@/lib/followup'
 import { fmtWan } from '@/lib/format'
+import { useFuDataStore } from '@/stores/fuData'
 import FollowupSignalRow from '@/components/FollowupSignalRow.vue'
+import FollowupExpandModal from '@/components/FollowupExpandModal.vue'
 
 const data = useDataStore()
 const filter = useFilterStore()
+const fu = useFuDataStore()
 onMounted(() => {
   if (!data.data) data.load()
 })
 
 const search = ref('')
-const fuData = loadFuData()
 
 const relatedNodes = computed(
   () => filter.filteredNodes.filter((n) => (n as Record<string, any>).isPaymentRelated) as Record<string, any>[],
 )
-const stats = computed(() => followupDeptStats(relatedNodes.value as any, fuData, new Date()))
+const stats = computed(() => followupDeptStats(relatedNodes.value as any, fu.data, new Date()))
 const totals = computed(() => followupTotals(stats.value))
 const quarters = computed(() => followupQuarters(relatedNodes.value as any))
 const prefix = computed(() => cycleLabel(filter.filterYear, new Date().getFullYear()))
@@ -39,6 +40,15 @@ const max = computed(() => ({
   d30: Math.max(1, ...filteredStats.value.map((d) => d.d30)),
   delay: Math.max(1, ...filteredStats.value.map((d) => d.delay)),
 }))
+
+const expandOpen = ref(false)
+const expandDept = ref('')
+const expandWin = ref('')
+function onExpand(e: { dept: string; timeWin: string }) {
+  expandDept.value = e.dept
+  expandWin.value = e.timeWin
+  expandOpen.value = true
+}
 
 const STAT_CARDS = computed(() => [
   { label: '7天内待回款', value: totals.value.urgent, color: '#f97316' },
@@ -99,9 +109,17 @@ const STAT_CARDS = computed(() => [
         :index="i"
         :stat="d"
         :max="max"
+        @expand="onExpand"
       />
       <div v-if="!filteredStats.length" class="fu-empty">暂无数据</div>
     </div>
+
+    <FollowupExpandModal
+      v-model="expandOpen"
+      :dept="expandDept"
+      :time-win="expandWin"
+      :related-nodes="relatedNodes as Record<string, any>[]"
+    />
   </div>
 </template>
 
