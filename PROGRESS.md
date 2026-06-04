@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04
+- 最近更新：2026-06-04（B7 分层页 nodes/integrity 完成）
 - 维护语言：简体中文
 
 ---
@@ -67,8 +67,11 @@ _（无）_
 - [x] **B4** 通用组件：DataTable（封装 el-table：列配置/格式化/排序/截断 tooltip）、ChartBox（封装 vue-echarts + ent 主题）、Modal（封装 el-dialog）；并加 Vitest 的 ResizeObserver/matchMedia 垫片 + vue-echarts 测试桩。
 - [x] **B5** 看板首页（卡片部分）：lib/format + lib/dashboardStats（groupByProject/computeTierStats/computeDashboardSummary 忠实移植）、DashSummaryCards、TierCards、DashboardView 挂到 '/'（替换 HomeView）。
 - [x] **B6** 看板首页（图表部分）：lib/dashboardCharts（季度/月度聚合 + 服务组排名 + 延期Top 忠实移植）、PendingBarChart、OrgRanking、DelayedTop，接入 DashboardView。看板首页完成。
-- [ ] **B7+** 其余页面：分层五页 → 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
-- [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点（待 tier 页 B7+ 后补）。
+- [x] **B7** 分层页外壳 + 回款节点(nodes) + 数据质检(integrity)：lib/cellFormat、tierSummaryBar、TierView（/tier/:tab/:tier）、TierNodesTab、TierIntegrityTab。点亮 nodes×3 + integrity×3 入口。
+- [ ] **B8** 分层页：项目总览(projects) + 风险(risk) tab。
+- [ ] **B9** 分层页：回款状态(plan) 6 看板（CF 联动）。
+- [ ] **B10+** 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
+- [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
 - [ ] **L-13** 收紧 CORS（去掉 `Access-Control-Allow-Origin: *`）。
@@ -92,20 +95,12 @@ _（无）_
 
 ## 会话交接备注（Handoff）
 
-### ⏸ 当前进行中（2026-06-04，/compact 前留存）：Plan B7 执行中
-- 分支：**`refactor/b7-tier-pages`**（未合并）。计划：`docs/superpowers/plans/2026-06-04-B7-tier-pages.md`（共 6 任务）。
-- **已完成并提交（Task 1-4，均通过两阶段审查）**：
-  - Task 1 `lib/cellFormat.ts`（`43dc2be`）
-  - Task 2 `dashboardStats.tierSummaryBar`（`d795979`）
-  - Task 3 `TierNodesTab.vue`（`4b38709`）
-  - Task 4 `TierIntegrityTab.vue`（`369ea6e`）
-- **未完成**：
-  - **Task 5（TierView 外壳 + 路由接入）**：⚠️ 已有**未提交**产物在工作树（`frontend/src/views/TierView.vue`、`TierView.test.ts` 未跟踪；`frontend/src/router/index.ts` 已改 `/tier/:tab/:tier`→TierView）——是被中断的实现，**尚未运行测试/typecheck/未审查**。续接时：按计划 Task 5 校验这些文件（`cd frontend && npx vitest run src/views/TierView.test.ts` + `npm run test:run` + typecheck + build），不对则按计划修正，再走规范+质量审查，然后提交。
-  - **Task 6**：收尾（`bash verify.sh` 全绿 + 更新 PROGRESS）。
-  - 之后：最终整体审查 → 合并回 master（`--no-ff`）→ 删分支（按 finishing-a-development-branch）。
-- 执行方式：子代理驱动（subagent-driven-development），每任务两阶段审查（规范→质量）；审查建议需按"忠实移植/数据契约"技术判断取舍，勿盲从。
-- 工作树杂项（无害，勿误提交）：`data/`（生成物，部分 gitignored）、`.vite/`、`node_modules/` 顶层缓存。
-- 整体进度：A1-A3 后端 ✅；B1-B6 前端（基建/布局/筛选/组件/看板）✅ 均已合并 master；B7 进行中；B8(projects/risk)、B9(plan 看板)、B10+(台账/PM/日历/临期跟进/数据管理/对比/关于)、A4(Playwright 脚本)、C(打包) 待做。
+### ✅ Plan B7 完成（2026-06-04）：分层页 nodes/integrity
+- 分支 **`refactor/b7-tier-pages`** 全部 6 任务完成、`verify.sh` 全绿，已做最终整体审查，待合并 master。
+- 提交：Task1 `43dc2be` / Task2 `d795979` / Task3 `4b38709` / Task4 `369ea6e` / Task5 `a40cc8a`（+测试补强）/ Task6（本提交）。
+- 产物：`lib/cellFormat`、`dashboardStats.tierSummaryBar`、`TierView`（路由 `/tier/:tab/:tier`）、`TierNodesTab`、`TierIntegrityTab`。侧边栏"业务分析"下 nodes×3 + integrity×3 共 6 入口已点亮。
+- 下一步：B8(projects/risk tab)、B9(plan 6 看板)、B10+(台账/PM/日历/临期跟进/数据管理/对比/关于)、A4(Playwright 脚本)、C(打包)。
+- 整体进度：A1-A3 后端 ✅；B1-B7 前端 ✅ 均已（或即将）合并 master。
 
 ### 通用
 - 测试只覆盖了 `preprocess_data.py` 的**纯函数**（解析层）；计算/聚合函数尚无测试（HX-6）。
