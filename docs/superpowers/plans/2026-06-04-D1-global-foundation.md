@@ -14,7 +14,7 @@
 
 ## 文件结构（本计划涉及）
 
-- Create `frontend/src/styles/theme.css` —— 全局 CSS 变量（双主题 + 字号基准）+ 基线 reset + 断点约定注释。
+- Create `frontend/src/styles/theme.css` —— 全局 CSS 变量（双主题 + 字号基准）+ 基线 reset + Element Plus 变量桥接（主色/暗色背景文字边框）+ 排版与字号 rem 令牌（--fs-1..5）+ 滚动条/选区/焦点暗色适配 + 断点约定注释。
 - Create `frontend/src/stores/settings.ts` —— 主题/字号状态、持久化、应用到 `<html>`。
 - Create `frontend/src/stores/settings.test.ts` —— store 单测。
 - Create `frontend/src/components/DisplaySettings.vue` —— 主题/字号分段控件（无 emoji，纯文字）。
@@ -178,13 +178,17 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 `frontend/src/styles/theme.css`：
 
 ```css
-/* 全局主题变量 + 基线 reset。:root 为浅色；html.dark 覆盖为深色。
+/* 全局主题变量 + 基线 reset + Element Plus 桥接 + 排版/字号令牌 + 滚动条适配。
+   :root 为浅色；html.dark 覆盖为深色。
    --fs-base 由 settings store 在运行时写到 <html>；此处给默认值兜底。
-   断点约定（供后续页面用，本文件不强制）：窄屏 <=768px，常规 <=1200px。 */
+   断点约定（供后续页面用，本文件不强制）：窄屏 <=768px，常规 <=1200px。
+   注：本文件须在 main.ts 中于 element-plus 的 index.css 与 dark/css-vars.css 之后引入，
+       使下面对 --el-* 的覆盖按源码顺序生效。 */
 
 :root {
   --fs-base: 15px;
 
+  /* 调色板（浅色） */
   --bg: #eef2f8;
   --card: #ffffff;
   --card2: #fbfcfe;
@@ -198,6 +202,24 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   --danger: #e11d48;
   --warn: #f59e0b;
   --ok: #10b981;
+
+  /* 字号 rem 令牌（随 --fs-base 缩放，供组件引用） */
+  --fs-1: 0.8rem;   /* 标签/角标 */
+  --fs-2: 0.92rem;  /* 次要文字 */
+  --fs-3: 1rem;     /* 正文基准 */
+  --fs-4: 1.2rem;   /* 小标题 */
+  --fs-5: 1.5rem;   /* 大数字/标题 */
+
+  /* Element Plus 桥接：主色用我们的 accent；亮/暗色阶用 color-mix 派生，
+     不支持 color-mix 的浏览器会忽略这些声明、自动回退 EP 内置值（安全降级）。 */
+  --el-color-primary: var(--accent);
+  --el-color-primary-light-3: color-mix(in srgb, var(--accent) 70%, #fff);
+  --el-color-primary-light-5: color-mix(in srgb, var(--accent) 50%, #fff);
+  --el-color-primary-light-7: color-mix(in srgb, var(--accent) 30%, #fff);
+  --el-color-primary-light-8: color-mix(in srgb, var(--accent) 20%, #fff);
+  --el-color-primary-light-9: color-mix(in srgb, var(--accent) 10%, #fff);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--accent) 80%, #000);
+  --el-border-radius-base: 8px;
 }
 
 html.dark {
@@ -214,6 +236,19 @@ html.dark {
   --danger: #fb7185;
   --warn: #fbbf24;
   --ok: #34d399;
+
+  /* EP 暗色：把 EP 自带深灰统一到我们的深蓝调色板 */
+  --el-bg-color: var(--card);
+  --el-bg-color-overlay: var(--card);
+  --el-bg-color-page: var(--bg);
+  --el-fill-color-blank: var(--card);
+  --el-text-color-primary: var(--txt);
+  --el-text-color-regular: var(--sub);
+  --el-text-color-secondary: var(--mut);
+  --el-border-color: var(--line);
+  --el-border-color-light: var(--line);
+  --el-border-color-lighter: var(--line);
+  --el-border-color-extra-light: var(--line);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -224,8 +259,22 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--txt);
+  font-family: Inter, "Noto Sans SC", -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color .15s, color .15s;
 }
+
+/* 选区 / 焦点 */
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 滚动条（暗色适配） */
+* { scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mut); }
 ```
 
 - [ ] **Step 2: 接线 main.ts**
@@ -695,6 +744,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - ③ 字号三档 → FONT_PX/`--fs-base`（Task 1）+ html font-size 吃变量（Task 2）+ DisplaySettings 三档（Task 4）。✓ 说明：现有 px 文本不随之缩放，新组件用 rem——已在 Task 6 PROGRESS 与本节注明，属地基的预期边界，非缺口。
 - 设置入口 → DisplaySettings 挂 AppHeader（Task 4/5）。✓
 - echarts 双主题随主题切换 → Task 3。✓
+- Element Plus 桥接（主色=accent + 暗色 bg/text/border 统一）→ theme.css `--el-*`（Task 2），使 EP 组件暗色与我们深蓝协调；color-mix 不支持时安全回退 EP 内置值。✓
+- 排版 + 字号 rem 令牌（body 字体/抗锯齿 + --fs-1..5 随 --fs-base 缩放）→ Task 2。✓
+- 滚动条/选区/焦点暗色适配 → Task 2。✓
 
 **2. 占位扫描：** 无 TBD / "适当处理" / 省略代码；每个改动步骤均给出完整文件或完整 style 段与确切命令、预期。✓
 
