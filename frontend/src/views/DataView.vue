@@ -1,0 +1,98 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
+import { api } from '@/api/client'
+import { dataQualityRows, dataQualityDrill, DATA_CHECKS } from '@/lib/dataQuality'
+import DataQualityTable from '@/components/DataQualityTable.vue'
+import DataDrillModal from '@/components/DataDrillModal.vue'
+
+const data = useDataStore()
+const filter = useFilterStore()
+onMounted(() => {
+  if (!data.data) data.load()
+})
+
+const TIER_LABELS = ['100万以上', '50-100万', '50万以下']
+
+const rawNodes = computed(() => (data.data?.rawNodes ?? []) as Record<string, any>[])
+const rows = computed(() => dataQualityRows(rawNodes.value as any))
+
+const naguanOn = computed({
+  get: () => filter.naguanOn,
+  set: (v: boolean) => filter.toggleNaguan(v),
+})
+
+const drillOpen = ref(false)
+const drillTitle = ref('')
+const drillNodes = ref<Record<string, any>[]>([])
+function onDrill(e: { checkIdx: number; tierIdx: number }) {
+  drillNodes.value = dataQualityDrill(rawNodes.value as any, e.checkIdx, e.tierIdx) as Record<string, any>[]
+  const tierLabel = e.tierIdx >= 0 ? TIER_LABELS[e.tierIdx] : '全部区间'
+  drillTitle.value = `${tierLabel} - ${DATA_CHECKS[e.checkIdx]?.name || ''}`
+  drillOpen.value = true
+}
+
+const clearState = ref('')
+const clearing = ref(false)
+async function onClear() {
+  if (!window.confirm('确定要清空所有数据吗？\n\n此操作将删除系统中所有已加载的项目和回款数据，清空后需重新同步才能恢复。')) return
+  if (!window.confirm('再次确认：是否清空所有数据？此操作不可撤销！')) return
+  clearing.value = true
+  data.clearBusinessData()
+  try {
+    await api.get('/api/clear-data')
+    clearState.value = '已清空(含数据文件)'
+  } catch {
+    clearState.value = '内存已清空'
+  }
+  clearing.value = false
+  setTimeout(() => {
+    clearState.value = ''
+  }, 2000)
+}
+defineExpose({ onClear })
+</script>
+
+<template>
+  <div class="data-view">
+    <h2 class="dv-title">数据管理</h2>
+
+    <div class="dv-card">
+      <div class="dv-card-head">设置</div>
+      <div class="dv-row">
+        <span class="dv-label">纳管开关</span>
+        <el-switch v-model="naguanOn" />
+        <span class="dv-hint">关闭后不再排除纳管项目（全站联动）</span>
+      </div>
+      <div class="dv-row">
+        <span class="dv-label">清空数据</span>
+        <button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button>
+        <span v-if="clearState" class="dv-clear-state">{{ clearState }}</span>
+      </div>
+      <div class="dv-row dv-note">云同步 / 离线导入将在后续接入（B17）。</div>
+    </div>
+
+    <div class="dv-card">
+      <div class="dv-card-head">数据质量总览</div>
+      <DataQualityTable :rows="rows" @drill="onDrill" />
+    </div>
+
+    <DataDrillModal v-model="drillOpen" :title="drillTitle" :nodes="drillNodes" />
+  </div>
+</template>
+
+<style scoped>
+.data-view { padding: 16px; }
+.dv-title { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 14px; }
+.dv-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 14px; }
+.dv-card-head { font-weight: 700; padding: 10px 16px; border-bottom: 1px solid #f1f5f9; color: #1a1a2e; }
+.dv-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; }
+.dv-label { width: 84px; flex-shrink: 0; color: #475569; font-weight: 600; }
+.dv-hint { font-size: 12px; color: #94a3b8; }
+.dv-note { color: #94a3b8; font-size: 12px; }
+.dv-btn { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
+.dv-btn.danger { color: #ef4444; border-color: #fecaca; }
+.dv-btn:disabled { opacity: 0.5; cursor: default; }
+.dv-clear-state { font-size: 12px; color: #10b981; }
+</style>

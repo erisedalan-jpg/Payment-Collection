@@ -40,3 +40,29 @@ describe('data store', () => {
     expect(store.error).toContain('Network down')
   })
 })
+
+describe('useDataStore.clearBusinessData', () => {
+  it('清空业务数据，保留平台配置', () => {
+    const s = useDataStore()
+    s.data = {
+      meta: { lastUpdate: 'x', totalProjects: 1, totalPaymentNodes: 1 },
+      dashboard: { a: 1 },
+      summary: { b: 2 },
+      rawNodes: [{ projectId: 'P1' }],
+      projectOverview: { projects: [{ projectId: 'P1' }], columns: [{ key: 'projectId' }] },
+      naguanMap: {},
+      naguanExclude: {},
+      displayColumns: { '100万以上': [{ key: 'projectId' }] },
+      followupRecords: {},
+    } as any
+    s.clearBusinessData()
+    expect(s.data!.rawNodes).toEqual([])
+    expect((s.data!.projectOverview as any).projects).toEqual([])
+    expect(s.data!.displayColumns).toBeTruthy()
+    expect((s.data!.projectOverview as any).columns).toHaveLength(1)
+  })
+  it('data 为空时安全', () => {
+    const s = useDataStore()
+    expect(() => s.clearBusinessData()).not.toThrow()
+  })
+})
