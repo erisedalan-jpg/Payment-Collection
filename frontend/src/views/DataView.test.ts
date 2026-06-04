@@ -65,4 +65,20 @@ describe('DataView', () => {
     expect(ds.data!.rawNodes).toEqual([])
     expect(api.get).toHaveBeenCalledWith('/api/clear-data')
   })
+
+  it('渲染云同步与离线导入卡', () => {
+    seed()
+    const w = mount(DataView, { global: { plugins: [ElementPlus] } })
+    expect(w.text()).toContain('云同步')
+    expect(w.text()).toContain('离线 Excel 导入')
+    expect(w.find('input[type="file"]').exists()).toBe(true)
+    expect(w.text()).toContain('项目回款节点（里程碑）清单')
+  })
+
+  it('同步 url 为空点击 → 错误提示，不创建连接', async () => {
+    seed()
+    const w = mount(DataView, { global: { plugins: [ElementPlus] } })
+    await (w.vm as any).onSync()
+    expect(w.text()).toContain('请先输入数据源地址')
+  })
 })

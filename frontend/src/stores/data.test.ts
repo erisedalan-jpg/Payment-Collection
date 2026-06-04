@@ -66,3 +66,15 @@ describe('useDataStore.clearBusinessData', () => {
     expect(() => s.clearBusinessData()).not.toThrow()
   })
 })
+
+describe('useDataStore.reload', () => {
+  it('强制重拉并更新 data', async () => {
+    const s = useDataStore()
+    const fresh = { meta: { lastUpdate: 'new' }, rawNodes: [{ projectId: 'X' }] }
+    const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({ ok: true, json: async () => fresh } as any)
+    await s.reload()
+    expect(s.data!.rawNodes).toEqual([{ projectId: 'X' }])
+    expect((s.data as any).meta.lastUpdate).toBe('new')
+    spy.mockRestore()
+  })
+})
