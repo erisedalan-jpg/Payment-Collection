@@ -16,6 +16,7 @@ describe('ChartBox', () => {
     })
     expect(wrapper.find('.chart-box').exists()).toBe(true)
     expect(wrapper.find('.vchart-stub').text()).toContain('series')
+    expect(wrapper.findComponent({ name: 'VChart' }).props('theme')).toBe('ent')
   })
 
   it('applies the given height', () => {

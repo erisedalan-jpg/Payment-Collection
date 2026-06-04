@@ -14,9 +14,9 @@ const props = withDefaults(
   defineProps<{
     columns: DataColumn[]
     rows: Record<string, any>[]
-    countLabel?: boolean
+    showCount?: boolean
   }>(),
-  { countLabel: true },
+  { showCount: true },
 )
 
 const count = computed(() => props.rows.length)
@@ -24,7 +24,7 @@ const count = computed(() => props.rows.length)
 
 <template>
   <div class="data-table">
-    <div v-if="props.countLabel" class="dt-count">共 {{ count }} 条</div>
+    <div v-if="props.showCount" class="dt-count">共 {{ count }} 条</div>
     <el-table :data="props.rows" border stripe style="width: 100%">
       <el-table-column
         v-for="col in props.columns"

@@ -28,8 +28,8 @@ describe('DataTable', () => {
     expect(wrapper.text()).toContain('¥100')
   })
 
-  it('hides count when countLabel is false', async () => {
-    const wrapper = mount(DataTable, { props: { columns, rows, countLabel: false }, global: { plugins: [ElementPlus] } })
+  it('hides count when showCount is false', async () => {
+    const wrapper = mount(DataTable, { props: { columns, rows, showCount: false }, global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(wrapper.text()).not.toContain('共 2 条')
   })

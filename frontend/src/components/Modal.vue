@@ -11,7 +11,7 @@ defineEmits<{ 'update:modelValue': [boolean] }>()
   <el-dialog
     :model-value="modelValue"
     :title="title"
-    :width="width || '50%'"
+    :width="width ?? '50%'"
     append-to-body
     @update:model-value="$emit('update:modelValue', $event)"
   >
