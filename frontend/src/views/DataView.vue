@@ -6,6 +6,8 @@ import { api } from '@/api/client'
 import { dataQualityRows, dataQualityDrill, DATA_CHECKS } from '@/lib/dataQuality'
 import DataQualityTable from '@/components/DataQualityTable.vue'
 import DataDrillModal from '@/components/DataDrillModal.vue'
+import { useCloudSync } from '@/composables/useCloudSync'
+import { useExcelImport } from '@/composables/useExcelImport'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -51,7 +53,22 @@ async function onClear() {
     clearState.value = ''
   }, 2000)
 }
-defineExpose({ onClear })
+// 云同步
+const syncUrl = ref('')
+const cloudSync = useCloudSync({ onDone: () => data.reload() })
+function onSync() {
+  cloudSync.start(syncUrl.value)
+}
+
+// 离线导入
+const importInput = ref<HTMLInputElement | null>(null)
+const excelImport = useExcelImport({ onDone: () => data.reload() })
+function onPickImport() {
+  const f = importInput.value?.files?.[0]
+  if (!f) return
+  excelImport.importFile(f)
+}
+defineExpose({ onClear, onSync, onPickImport })
 </script>
 
 <template>
@@ -70,7 +87,33 @@ defineExpose({ onClear })
         <button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button>
         <span v-if="clearState" class="dv-clear-state">{{ clearState }}</span>
       </div>
-      <div class="dv-row dv-note">云同步 / 离线导入将在后续接入（B17）。</div>
+    </div>
+
+    <div class="dv-card">
+      <div class="dv-card-head">云同步（WPS 云文档）</div>
+      <div class="dv-row">
+        <el-input v-model="syncUrl" size="small" placeholder="粘贴 WPS 云文档网址" style="flex:1" />
+        <button class="dv-btn" :disabled="cloudSync.phase.value === 'syncing'" @click="onSync">同步最新数据</button>
+        <button v-if="cloudSync.phase.value === 'syncing'" class="dv-btn" @click="cloudSync.stop">停止</button>
+      </div>
+      <div v-if="cloudSync.phase.value !== 'idle'" class="dv-progress">
+        <div class="dv-bar"><div class="dv-bar-fill" :class="cloudSync.phase.value" :style="{ width: cloudSync.progress.value + '%' }"></div></div>
+        <div class="dv-msg" :class="cloudSync.phase.value">{{ cloudSync.message.value }}</div>
+      </div>
+    </div>
+
+    <div class="dv-card">
+      <div class="dv-card-head">离线 Excel 导入</div>
+      <div class="dv-row">
+        <input ref="importInput" type="file" accept=".xlsx,.xls" class="dv-file" />
+        <button class="dv-btn" :disabled="['reading','uploading','processing'].includes(excelImport.phase.value)" @click="onPickImport">离线导入</button>
+        <button v-if="['reading','uploading','processing'].includes(excelImport.phase.value)" class="dv-btn" @click="excelImport.stop">停止</button>
+      </div>
+      <div class="dv-row dv-note">需包含 Sheet 页「项目回款节点（里程碑）清单」</div>
+      <div v-if="excelImport.phase.value !== 'idle'" class="dv-progress">
+        <div class="dv-bar"><div class="dv-bar-fill" :class="excelImport.phase.value" :style="{ width: excelImport.progress.value + '%' }"></div></div>
+        <div class="dv-msg" :class="excelImport.phase.value">{{ excelImport.message.value }}</div>
+      </div>
     </div>
 
     <div class="dv-card">
@@ -95,4 +138,13 @@ defineExpose({ onClear })
 .dv-btn.danger { color: #ef4444; border-color: #fecaca; }
 .dv-btn:disabled { opacity: 0.5; cursor: default; }
 .dv-clear-state { font-size: 12px; color: #10b981; }
+.dv-file { font-size: 12px; }
+.dv-progress { padding: 0 16px 12px; }
+.dv-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.dv-bar-fill { height: 100%; background: #3b82f6; transition: width .3s ease; }
+.dv-bar-fill.done { background: #10b981; }
+.dv-bar-fill.error { background: #ef4444; }
+.dv-msg { font-size: 12px; color: #64748b; margin-top: 6px; }
+.dv-msg.done { color: #10b981; }
+.dv-msg.error { color: #ef4444; }
 </style>
