@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fmt, fmtYuan, fmtWan, pct, pctToNum } from './format'
+import { fmt, fmtYuan, fmtWan, pct, pctToNum, fmtRatio } from './format'
 
 describe('format', () => {
   it('fmtWan divides by 10000, 2 decimals, null→-', () => {
@@ -29,5 +29,21 @@ describe('format', () => {
     expect(pctToNum('空值')).toBeNull()
     expect(pctToNum('')).toBeNull()
     expect(pctToNum(null)).toBeNull()
+  })
+})
+
+describe('fmtRatio', () => {
+  it('null/空值/空串 → nullLabel（默认 -）', () => {
+    expect(fmtRatio(null)).toBe('-')
+    expect(fmtRatio('空值')).toBe('-')
+    expect(fmtRatio('')).toBe('-')
+  })
+  it('指定 nullLabel（如 待上报）', () => {
+    expect(fmtRatio(null, '待上报')).toBe('待上报')
+    expect(fmtRatio('', '待上报')).toBe('待上报')
+  })
+  it('有值 → pct', () => {
+    expect(fmtRatio(0.7)).toBe('70%')
+    expect(fmtRatio('70%')).toBe('70%')
   })
 })

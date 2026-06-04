@@ -36,3 +36,9 @@ export function pctToNum(v: unknown): number | null {
   if (s.includes('%') || num > 1) return num / 100
   return num
 }
+
+/** 比例展示；null/undefined/'空值'/'' → nullLabel（默认 '-'，回款比例列用 '待上报'）。忠实移植 app.js fmtRatio。 */
+export function fmtRatio(v: unknown, nullLabel = '-'): string {
+  if (v === null || v === undefined || v === '空值' || v === '') return nullLabel
+  return pct(v)
+}

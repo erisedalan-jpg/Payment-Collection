@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B7 分层页 nodes/integrity 完成）
+- 最近更新：2026-06-04（B8 分层页 projects/risk 完成）
 - 维护语言：简体中文
 
 ---
@@ -68,7 +68,7 @@ _（无）_
 - [x] **B5** 看板首页（卡片部分）：lib/format + lib/dashboardStats（groupByProject/computeTierStats/computeDashboardSummary 忠实移植）、DashSummaryCards、TierCards、DashboardView 挂到 '/'（替换 HomeView）。
 - [x] **B6** 看板首页（图表部分）：lib/dashboardCharts（季度/月度聚合 + 服务组排名 + 延期Top 忠实移植）、PendingBarChart、OrgRanking、DelayedTop，接入 DashboardView。看板首页完成。
 - [x] **B7** 分层页外壳 + 回款节点(nodes) + 数据质检(integrity)：lib/cellFormat、tierSummaryBar、TierView（/tier/:tab/:tier）、TierNodesTab、TierIntegrityTab。点亮 nodes×3 + integrity×3 入口。
-- [ ] **B8** 分层页：项目总览(projects) + 风险(risk) tab。
+- [x] **B8** 分层页：项目总览(projects) + 风险(risk) tab：lib/projectsOverview、lib/riskGroups、format.fmtRatio、ProjectsOverviewTab、RiskTab，TierView 接入分发。点亮 projects×3 + risk×3 入口。
 - [ ] **B9** 分层页：回款状态(plan) 6 看板（CF 联动）。
 - [ ] **B10+** 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
@@ -95,12 +95,13 @@ _（无）_
 
 ## 会话交接备注（Handoff）
 
-### ✅ Plan B7 完成（2026-06-04）：分层页 nodes/integrity
-- 分支 **`refactor/b7-tier-pages`** 全部 6 任务完成、`verify.sh` 全绿，已做最终整体审查，待合并 master。
-- 提交：Task1 `43dc2be` / Task2 `d795979` / Task3 `4b38709` / Task4 `369ea6e` / Task5 `a40cc8a`（+测试补强）/ Task6（本提交）。
-- 产物：`lib/cellFormat`、`dashboardStats.tierSummaryBar`、`TierView`（路由 `/tier/:tab/:tier`）、`TierNodesTab`、`TierIntegrityTab`。侧边栏"业务分析"下 nodes×3 + integrity×3 共 6 入口已点亮。
-- 下一步：B8(projects/risk tab)、B9(plan 6 看板)、B10+(台账/PM/日历/临期跟进/数据管理/对比/关于)、A4(Playwright 脚本)、C(打包)。
-- 整体进度：A1-A3 后端 ✅；B1-B7 前端 ✅ 均已（或即将）合并 master。
+### ✅ Plan B8 完成（2026-06-04）：分层页 projects/risk
+- 分支 **`refactor/b8-tier-projects-risk`** 全部 6 任务完成、`verify.sh` 全绿（110 前端单测），待最终整体审查 + 合并 master。
+- 提交：Task1 `6229bd1`(fmtRatio) / Task2 `a3c84c0`(projectsOverview) / Task3 `339fe63`(ProjectsOverviewTab) / Task4 `8e2e870`+`30d8ab2`(riskGroups，含忠实性修正) / Task5 `9367f89`(RiskTab) / Task6 `39d632f`(TierView 接入) + 本 PROGRESS 提交。
+- 产物：`lib/projectsOverview`、`lib/riskGroups`、`format.fmtRatio`、`ProjectsOverviewTab`、`RiskTab`，TierView 增加 projects/risk 分发。侧边栏"业务分析"下 projects×3 + risk×3 共 6 入口已点亮（连同 B7 的 nodes/integrity，目前 4 个 tab×3 档已通；仅 plan tab 留 B9）。
+- 执行中一处技术判断：Task4 子代理为迁就测试给 highRisk 加了原版没有的 `projectAmount>0` 条件；根因是计划测试数据 P2/P3 完成率为 0（按忠实逻辑本应入 highRisk）。已还原为忠实实现 + 修正测试数据（`30d8ab2`）。
+- 下一步：B9(plan 回款状态 6 看板，CF 联动)、B10+(台账/PM/日历/临期跟进/数据管理/对比/关于)、A4(Playwright 脚本)、C(打包)。
+- 整体进度：A1-A3 后端 ✅；B1-B8 前端 ✅（B8 待合并 master）。
 
 ### 通用
 - 测试只覆盖了 `preprocess_data.py` 的**纯函数**（解析层）；计算/聚合函数尚无测试（HX-6）。

@@ -68,4 +68,16 @@ describe('TierView', () => {
     const wrapper = await mountAt('/tier/plan/above1m')
     expect(wrapper.text()).toContain('建设中')
   })
+
+  it('projects tab renders ProjectsOverviewTab', async () => {
+    seed()
+    const wrapper = await mountAt('/tier/projects/above1m')
+    expect(wrapper.findComponent({ name: 'ProjectsOverviewTab' }).exists()).toBe(true)
+  })
+
+  it('risk tab renders RiskTab', async () => {
+    seed()
+    const wrapper = await mountAt('/tier/risk/above1m')
+    expect(wrapper.findComponent({ name: 'RiskTab' }).exists()).toBe(true)
+  })
 })
