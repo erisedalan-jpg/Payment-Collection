@@ -4,6 +4,7 @@ import TierView from '@/views/TierView.vue'
 import LedgerView from '@/views/LedgerView.vue'
 import PmView from '@/views/PmView.vue'
 import CalendarView from '@/views/CalendarView.vue'
+import FollowupView from '@/views/FollowupView.vue'
 import PageStub from '@/components/PageStub.vue'
 
 export const router = createRouter({
@@ -11,7 +12,7 @@ export const router = createRouter({
   routes: [
     { path: '/compare', name: 'compare', component: PageStub, meta: { title: '区间对比' } },
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
-    { path: '/followup', name: 'followup', component: PageStub, meta: { title: '临期跟进' } },
+    { path: '/followup', name: 'followup', component: FollowupView, meta: { title: '临期跟进' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
     { path: '/tier/:tab/:tier', name: 'tier', component: TierView, meta: { title: '业务分析' } },
     { path: '/pmview', name: 'pmview', component: PmView, meta: { title: '项目经理视图' } },
