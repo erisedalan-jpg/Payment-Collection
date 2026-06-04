@@ -1,9 +1,21 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import FuProjectRow from './FuProjectRow.vue'
 import { useFuDataStore } from '@/stores/fuData'
+
+// FollowupRecords 展开时会调用后端，mock 掉避免真实请求
+vi.mock('@/lib/followupApi', () => ({
+  followupApi: {
+    types: vi.fn().mockResolvedValue({ 跟进类型: [], 跟进状态: [] }),
+    list: vi.fn().mockResolvedValue({ records: [], total: 0 }),
+    add: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    syncStatus: vi.fn(),
+  },
+}))
 
 beforeEach(() => {
   setActivePinia(createPinia())

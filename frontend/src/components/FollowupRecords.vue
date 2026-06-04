@@ -1,0 +1,178 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { followupApi, type FollowupRecord, type FollowupFormData } from '@/lib/followupApi'
+import { useFollowupSync } from '@/composables/useFollowupSync'
+import FollowupRecordForm from './FollowupRecordForm.vue'
+
+const props = defineProps<{ projectId: string; projectName: string; defaultNextDate?: string }>()
+
+const records = ref<FollowupRecord[]>([])
+const types = ref<string[]>([])
+const statuses = ref<string[]>([])
+const showForm = ref(false)
+const editRecord = ref<FollowupRecord | null>(null)
+const expandedIdx = ref(-1)
+const { toasts, notify } = useFollowupSync()
+
+const latest = computed(() => records.value[0] || null)
+const history = computed(() => records.value.slice(1))
+
+async function loadTypes() {
+  try {
+    const r = await followupApi.types()
+    types.value = r['跟进类型'] || []
+    statuses.value = r['跟进状态'] || []
+  } catch {
+    /* 保留空，表单仍可用默认 */
+  }
+}
+async function loadRecords() {
+  try {
+    const r = await followupApi.list(props.projectId, 20)
+    records.value = (r.records || [])
+      .slice()
+      .sort((a, b) => String(b['跟进时间'] || '').localeCompare(String(a['跟进时间'] || '')))
+  } catch {
+    records.value = []
+  }
+}
+onMounted(async () => {
+  await loadTypes()
+  await loadRecords()
+})
+
+function openAdd() {
+  editRecord.value = null
+  showForm.value = true
+}
+function openEdit(r: FollowupRecord) {
+  editRecord.value = r
+  showForm.value = true
+  expandedIdx.value = -1
+}
+function cancelForm() {
+  showForm.value = false
+  editRecord.value = null
+}
+function toggleHistory(i: number) {
+  expandedIdx.value = expandedIdx.value === i ? -1 : i
+}
+
+async function onSubmit(data: FollowupFormData) {
+  try {
+    const res = data.记录编号 ? await followupApi.update(data) : await followupApi.add(data)
+    showForm.value = false
+    editRecord.value = null
+    notify(res.message, res.记录编号 || data.记录编号 || '')
+  } catch (e: any) {
+    notify('保存失败: ' + (e?.message || ''), '')
+  } finally {
+    await loadRecords()
+  }
+}
+async function onDelete(r: FollowupRecord) {
+  const id = r['记录编号'] || ''
+  if (!id) return
+  if (!window.confirm(`确定要删除此跟进记录吗？\n\n记录编号: ${id}\n删除后无法恢复。`)) return
+  try {
+    const res = await followupApi.remove(id)
+    notify(res.message, id)
+    await loadRecords()
+  } catch (e: any) {
+    notify('删除失败: ' + (e?.message || ''), '')
+  }
+}
+defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
+</script>
+
+<template>
+  <div class="fr">
+    <div class="fr-head">
+      <span class="fr-title">跟进记录</span>
+      <button v-if="!showForm" class="fr-addbtn" @click="openAdd">+ 添加</button>
+    </div>
+
+    <div v-if="latest" class="fr-record">
+      <div class="fr-meta">
+        <span>{{ (latest['跟进时间'] || '').substring(0, 16) }}</span>
+        <span>{{ latest['跟进人'] }}</span>
+        <span>{{ latest['跟进类型'] }}</span>
+      </div>
+      <div class="fr-content">{{ latest['跟进内容'] }}</div>
+      <div class="fr-footer">
+        <span class="fr-status">{{ latest['跟进状态'] }}</span>
+        <span v-if="latest['下次跟进计划日期']" class="fr-next">下次: {{ latest['下次跟进计划日期'] }}</span>
+        <button class="fr-link edit" @click="openEdit(latest!)">编辑</button>
+        <button class="fr-link del" @click="onDelete(latest!)">删除</button>
+      </div>
+    </div>
+
+    <div v-if="history.length" class="fr-history">
+      <span class="fr-hist-label">历史:</span>
+      <button
+        v-for="(r, i) in history"
+        :key="r['记录编号'] || i"
+        class="fr-hist-btn"
+        :class="{ active: expandedIdx === i }"
+        @click="toggleHistory(i)"
+      >
+        {{ (r['跟进时间'] || '').substring(0, 16) }}
+      </button>
+    </div>
+    <div v-if="expandedIdx >= 0 && history[expandedIdx]" class="fr-expanded">
+      <div class="fr-meta">
+        <span>{{ (history[expandedIdx]['跟进时间'] || '').substring(0, 16) }}</span>
+        <span>{{ history[expandedIdx]['跟进人'] }}</span>
+        <span>{{ history[expandedIdx]['跟进类型'] }}</span>
+      </div>
+      <div class="fr-content">{{ history[expandedIdx]['跟进内容'] }}</div>
+      <div class="fr-footer">
+        <span class="fr-status">{{ history[expandedIdx]['跟进状态'] }}</span>
+        <button class="fr-link edit" @click="openEdit(history[expandedIdx])">编辑</button>
+        <button class="fr-link del" @click="onDelete(history[expandedIdx])">删除</button>
+      </div>
+    </div>
+
+    <FollowupRecordForm
+      v-if="showForm"
+      :project-id="projectId"
+      :project-name="projectName"
+      :types="types"
+      :statuses="statuses"
+      :edit-record="editRecord"
+      :default-next-date="defaultNextDate"
+      @submit="onSubmit"
+      @cancel="cancelForm"
+    />
+
+    <div class="fr-toasts">
+      <div v-for="t in toasts" :key="t.id" class="fr-toast" :class="t.status">{{ t.text }}</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.fr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ebe7e2; }
+.fr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.fr-title { font-weight: 700; font-size: 12px; color: #1a1a2e; }
+.fr-addbtn { background: #6366f1; color: #fff; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
+.fr-record, .fr-expanded { background: #fff; border: 1px solid #ebe7e2; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+.fr-expanded { border-color: #6366f1; }
+.fr-meta { display: flex; gap: 10px; font-size: 11px; color: #8c8c9e; margin-bottom: 4px; }
+.fr-content { font-size: 13px; color: #1a1a2e; white-space: pre-wrap; }
+.fr-footer { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 11px; }
+.fr-status { color: #6366f1; }
+.fr-next { color: #8c8c9e; }
+.fr-link { border: none; background: none; cursor: pointer; font-size: 11px; }
+.fr-link.edit { color: #6366f1; margin-left: auto; }
+.fr-link.del { color: #ef4444; }
+.fr-history { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 6px; }
+.fr-hist-label { font-size: 10px; color: #8c8c9e; }
+.fr-hist-btn { border: 1px solid #6366f1; color: #6366f1; background: #fff; border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+.fr-hist-btn.active { background: #6366f1; color: #fff; }
+.fr-toasts { position: fixed; bottom: 24px; right: 24px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; }
+.fr-toast { padding: 10px 16px; background: #fff; border: 1px solid #e2e0dc; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); font-size: 13px; }
+.fr-toast.success { color: #10b981; }
+.fr-toast.failed { color: #ef4444; }
+.fr-toast.local { color: #f59e0b; }
+</style>
