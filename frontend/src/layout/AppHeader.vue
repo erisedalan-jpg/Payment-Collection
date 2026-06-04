@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useDataStore } from '@/stores/data'
 import { api } from '@/api/client'
-
-const APP_VERSION = 'V6.0.0' // 单一来源；发版时更新
+import { APP_VERSION } from '@/version'
 
 const store = useDataStore()
 
