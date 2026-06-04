@@ -59,8 +59,10 @@ const URG = computed(() => [
 
 function batch(v: string | number) {
   if (v === '') return
-  fu.batchSetFlw(projs.value.map((p) => p.projectId), String(v) === '1')
+  // 忠实移植 _fuBatchFlw：作用于该部门全部项目（allProjs），非仅当前时间窗
+  fu.batchSetFlw(allProjs.value.map((p) => p.projectId), String(v) === '1')
 }
+defineExpose({ batch })
 </script>
 
 <template>

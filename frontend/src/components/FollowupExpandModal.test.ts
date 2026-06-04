@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import FollowupExpandModal from './FollowupExpandModal.vue'
+import { useFuDataStore } from '@/stores/fuData'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -41,6 +42,21 @@ describe('FollowupExpandModal', () => {
     })
     await flushPromises()
     expect(w.findAllComponents({ name: 'FuProjectRow' }).length).toBe(1)
+    w.unmount()
+  })
+
+  it('批量标记作用于部门全部项目（含窗口外，忠实 _fuBatchFlw）', async () => {
+    const s = useFuDataStore()
+    const w = mount(FollowupExpandModal, {
+      props: { modelValue: true, dept: 'A部门', timeWin: 'delay', relatedNodes, today },
+      global: { plugins: [ElementPlus] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    ;(w.vm as any).batch('1')
+    // P1(延期,窗口内) 与 P2(窗口外) 都应被标记
+    expect(s.get('P1').flw).toBe(true)
+    expect(s.get('P2').flw).toBe(true)
     w.unmount()
   })
 })
