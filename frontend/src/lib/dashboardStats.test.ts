@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupByProject, computeTierStats, computeDashboardSummary } from './dashboardStats'
+import { groupByProject, computeTierStats, computeDashboardSummary, tierSummaryBar } from './dashboardStats'
 
 const NODES: any[] = [
   { projectId: 'P1', projectName: '甲', tier: '100万以上', orgL4: '北京', projectManager: '张三',
@@ -54,5 +54,21 @@ describe('computeDashboardSummary', () => {
     expect(sum.totalActual).toBe(1000000)
     expect(sum.totalRemaining).toBe(1000000)
     expect(sum.rate).toBe(0.5)
+  })
+})
+
+describe('tierSummaryBar', () => {
+  const NODES: any[] = [
+    { projectId: 'P1', tier: '100万以上', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 1000000, actualPayment: 0, planMonth: '2026-02' },
+    { projectId: 'P2', tier: '100万以上', isPaymentRelated: true, nodeStatus: '已全额回款', expectedPayment: 500000, actualPayment: 500000, planMonth: '2026-03' },
+  ]
+  it('aggregates project-level counts + amounts', () => {
+    const s = tierSummaryBar(NODES)
+    expect(s.projectCount).toBe(2)
+    expect(s.relatedNodeCount).toBe(2)
+    expect(s.totalActual).toBe(500000)
+    expect(s.totalExpected).toBe(1500000)
+    expect(s.rate).toBeCloseTo(1 / 3)
+    expect(s.projDelayed).toBe(1)
   })
 })
