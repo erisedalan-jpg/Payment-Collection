@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
+import DashboardView from '@/views/DashboardView.vue'
 import PageStub from '@/components/PageStub.vue'
 
 export const router = createRouter({
@@ -13,7 +13,7 @@ export const router = createRouter({
     { path: '/pmview', name: 'pmview', component: PageStub, meta: { title: '项目经理视图' } },
     { path: '/data', name: 'data', component: PageStub, meta: { title: '数据管理' } },
     { path: '/about', name: 'about', component: PageStub, meta: { title: '关于产品' } },
-    // catch-all (including '/') renders HomeView and is the canonical 'dashboard' name
-    { path: '/:pathMatch(.*)*', name: 'dashboard', component: HomeView, alias: '/', meta: { title: '看板首页' } },
+    // catch-all (including '/') renders DashboardView and is the canonical 'dashboard' name
+    { path: '/:pathMatch(.*)*', name: 'dashboard', component: DashboardView, alias: '/', meta: { title: '看板首页' } },
   ],
 })
