@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-03
+- 最近更新：2026-06-04
 - 维护语言：简体中文
 
 ---
@@ -65,7 +65,9 @@ _（无）_
 - [x] **B2** 布局骨架与全页面路由：uiStore（侧边栏折叠持久化）、集中导航配置、全页面路由（占位视图）、AppHeader/AppSidebar/AppLayout，App.vue 接入。
 - [x] **B3** 筛选状态与控件：lib/filterNodes（忠实移植 getFilteredNodes）、filterStore（年份/视角/纳管 + filteredNodes/选项派生，取代散落全局）、FilterBar 接入 AppLayout。
 - [x] **B4** 通用组件：DataTable（封装 el-table：列配置/格式化/排序/截断 tooltip）、ChartBox（封装 vue-echarts + ent 主题）、Modal（封装 el-dialog）；并加 Vitest 的 ResizeObserver/matchMedia 垫片 + vue-echarts 测试桩。
-- [ ] **B5+** 各页面迁移（基于 DataTable/ChartBox/Modal + filterStore 落地各页）：看板 → 分层五页 → 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
+- [x] **B5** 看板首页（卡片部分）：lib/format + lib/dashboardStats（groupByProject/computeTierStats/computeDashboardSummary 忠实移植）、DashSummaryCards、TierCards、DashboardView 挂到 '/'（替换 HomeView）。
+- [ ] **B6** 看板首页（图表部分）：季度/月度待回款图（ChartBox）、服务组回款达成排名、延期 Top10。
+- [ ] **B7+** 其余页面：分层五页 → 台账/PM → 日历 → 临期跟进 → 数据管理 → 区间对比/关于。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现。
 
 ### 🟢 低
