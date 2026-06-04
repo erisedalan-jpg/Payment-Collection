@@ -32,3 +32,10 @@ schema.json
 # ── 系统 ──
 .DS_Store
 Thumbs.db
+
+# ── 工具产物 ──
+# brainstorming 可视化草图（本机临时）
+.superpowers/
+.vite/
+# 根级 node_modules（若有）
+/node_modules/
