@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B17 数据管理 云同步+离线导入 完成；数据管理页全功能）
+- 最近更新：2026-06-04（B18 区间对比 + 关于 完成；Phase B 前端重写收官，B1-B18 全部完成）
 - 维护语言：简体中文
 
 ---
@@ -78,7 +78,7 @@ _（无）_
 - [x] **B15** 临期跟进：跟进记录 CRUD + 云回写 + 轮询：lib/followupApi、composables/useFollowupSync、FollowupRecordForm、FollowupRecords，嵌入 FuProjectRow。临期跟进页全功能完成。
 - [x] **B16** 数据管理：数据质量总览 + 纳管开关 + 清空数据：lib/dataQuality、data store clearBusinessData、DataQualityTable、DataDrillModal、DataView，路由 /data 接入。
 - [x] **B17** 数据管理：云同步(SSE 进度) + 离线 Excel 导入(上传+轮询)：xlsx 依赖、lib/excelImport、useCloudSync、useExcelImport、data store reload、DataView 两卡。数据管理页全功能。
-- [ ] **B18** 区间对比(compare) + 关于(about)。
+- [x] **B18** 区间对比(compare) + 关于(about)：version.ts 版本号单一来源、lib/compare（按档统计+四图表数据+服务组排名）、CompareCards、CompareView、AboutView，路由 /compare、/about 接入并移除 PageStub。Phase B 前端重写收官。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
@@ -102,6 +102,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B18 完成（2026-06-04）：区间对比(compare) + 关于(about) —— Phase B 前端重写收官
+- 分支 **`refactor/b18-compare-about`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 / T1 `6ccf956`(version.ts 单一来源+AppHeader) / T2 `4f977cd`(lib/compare) / T3 `7d2e702`(CompareCards) / T4 `7522665`(CompareView) / T5 `26d2d8a`(AboutView) + 路由接入/PROGRESS 提交。
+- 产物：`version.ts`（APP_VERSION/RELEASE_DATE 单一来源，AppHeader 接入，满足"版本号单一来源"约定）、`lib/compare`（compareTierStats 按档统计 + compareProgressSeries/StatusSeries/TrendSeries 三图数据 + compareOrgRanks 服务组 TOP5/BOTTOM5，8 单测）、`CompareCards`（三档卡片）、`CompareView`（卡片+3 ChartBox+HTML 排名榜）、`AboutView`（信息网格+版本+meta.lastUpdate+功能说明）；路由 /compare、/about 由 PageStub 改真实视图（PageStub 已无引用）。
+- 经规范+质量审查（逐项核对 app.js initCompare 3164-3400 / initAbout 3859-3949）：可合并 ✓，无 Critical/Important（3 Minor 可接受：About 版本号去掉冗余小写 v 前缀更合理、卡片头部颜色展示从简、透传后端字段用索引签名+as any 与全项目风格一致）。
+- 两处对 app.js 既有缺陷的"忠实但修正"（已记录，非偏差）：(1) 进度图"已回款"系列改裸数值——app.js 误用 fmt() 千分位字符串致 ECharts 无法解析；(2) compareStatusSeries 保留 6 状态全命中后不可达的兜底分支（无害、最大化忠实）。
+- 关键忠实性（已核对一致）：数据源 = 后端预计算 summary/dashboard.orgRanking/rawNodes，**不经** filterStore（年/视角/纳管），与 app.js 一致；卡片 5 指标与色阈（完成率>=.8/.5、延期率>.2/.1）；状态图 6 状态映射与配色；趋势图 monthlyPlan 键并集/升序/过滤 <= '2027-12'；排名 slice(0,5)/slice(-5).reverse()/max(...,1)、bar 与 rate 色阈 .45/.3、名称>8 裁剪、金额 fmtYuan(actualTotalWan)（app.js fmtW=fmtYuan，594）；About 版本 V6.0.0、发布日期 2026-06-02、作者、数据来源、数据更新=meta.lastUpdate||'-'。
+- 整体进度：A1-A3 后端 ✅；**B1-B18 前端全部完成 ✅（B18 待合并 master）。Phase B 前端重写收官**。后续可推进 C（dist 接入 server.py + 打包）、A4（Playwright 脚本健壮性）、B-opt（构建拆包/列筛选/导出等）。
 
 ### ✅ Plan B17 完成（2026-06-04）：数据管理 云同步(SSE) + 离线 Excel 导入(上传+轮询)
 - 分支 **`refactor/b17-data-sync-import`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
