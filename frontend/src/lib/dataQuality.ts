@@ -24,11 +24,9 @@ export const DATA_CHECKS: DataCheck[] = [
     severity: 'h',
     scope: 'related',
     pred: (n) => {
-      if (n.actualPaymentRatio === null || n.actualPaymentRatio === undefined || n.actualPaymentRatio === '') return false
-      const raw = Number(n.actualPaymentRatio)
-      if (isNaN(raw)) return false
-      // actualPaymentRatio 存储为 0~1 小数（0.5=50%）或裸百分数（50=50%），>1 均表示超过100%
-      return raw > 1
+      // 忠实移植 app.js: pctToNum(actualPaymentRatio)!==null && >1
+      const v = pctToNum(n.actualPaymentRatio)
+      return v !== null && v > 1
     },
   },
 ]

@@ -3,7 +3,7 @@ import { DATA_CHECKS, dataQualityRows, dataQualityDrill } from './dataQuality'
 
 const NODES: any[] = [
   { projectId: 'P1', tier: '100万以上', projectAmount: 0, projectManager: '张', orgL4: '北京', isPaymentRelated: true, actualPaymentRatio: null },
-  { projectId: 'P2', tier: '100万以上', projectAmount: 100, projectManager: '', orgL4: '', isPaymentRelated: true, actualPaymentRatio: 1.5 },
+  { projectId: 'P2', tier: '100万以上', projectAmount: 100, projectManager: '', orgL4: '', isPaymentRelated: true, actualPaymentRatio: '150%' },
   { projectId: 'P3', tier: '50万以下', projectAmount: 50, projectManager: '李', orgL4: '上海', isPaymentRelated: false, actualPaymentRatio: null },
 ]
 
