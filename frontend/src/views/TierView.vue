@@ -10,6 +10,7 @@ import TierNodesTab from '@/components/TierNodesTab.vue'
 import TierIntegrityTab from '@/components/TierIntegrityTab.vue'
 import ProjectsOverviewTab from '@/components/ProjectsOverviewTab.vue'
 import RiskTab from '@/components/RiskTab.vue'
+import PlanTab from '@/components/PlanTab.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -41,6 +42,7 @@ const rateColor = (r: number) => (r >= 0.8 ? '#10b981' : r >= 0.5 ? '#f59e0b' : 
 
     <TierNodesTab v-if="tab === 'nodes'" :tier="tier" />
     <ProjectsOverviewTab v-else-if="tab === 'projects'" :tier="tier" />
+    <PlanTab v-else-if="tab === 'plan'" :tier="tier" />
     <RiskTab v-else-if="tab === 'risk'" :tier="tier" />
     <TierIntegrityTab v-else-if="tab === 'integrity'" :tier="tier" />
     <div v-else class="tier-stub">「{{ tab }}」页签建设中（{{ tier }}）</div>
