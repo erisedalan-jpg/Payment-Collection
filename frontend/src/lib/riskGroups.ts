@@ -47,7 +47,7 @@ export function riskGroups(tierNodes: RawNode[], now: Date): RiskGroups {
   const canAdvance = related.filter((n) => (n as Record<string, any>).nodeStatus === '加资源可提前')
 
   const highRisk = groupByProject(tierNodes)
-    .filter((p) => p.paymentRatio !== null && p.paymentRatio < 0.3 && (p.projectAmount || 0) > 0)
+    .filter((p) => p.paymentRatio !== null && p.paymentRatio < 0.3)
     .sort((a, b) => (b.projectAmount || 0) - (a.projectAmount || 0))
     .slice(0, 10)
 
