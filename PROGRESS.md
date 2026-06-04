@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B10 回款台账 完成）
+- 最近更新：2026-06-04（B11 项目经理视图 完成）
 - 维护语言：简体中文
 
 ---
@@ -71,7 +71,7 @@ _（无）_
 - [x] **B8** 分层页：项目总览(projects) + 风险(risk) tab：lib/projectsOverview、lib/riskGroups、format.fmtRatio、ProjectsOverviewTab、RiskTab，TierView 接入分发。点亮 projects×3 + risk×3 入口。
 - [x] **B9** 分层页：回款状态(plan) 6 看板 + CF 筛选联动：lib/crossFilter、stores/crossFilter、lib/planBoards、ColumnFilter、PlanBoard、PlanTab，TierView 接入分发。点亮 plan×3 入口（分层页 5 tab×3 档全通）。
 - [x] **B10** 回款台账(ledger)：lib/ledger（纳管-only 数据源/搜索过滤/汇总/分层/状态计数）、LedgerTable（项目表 + CF 列头 + 行展开下钻节点明细）、LedgerView（汇总/状态/分层三条 + 搜索/区间/状态筛选），路由 /ledger 接入。复用 B9 的 CF。
-- [ ] **B11** 项目经理视图(pmview)。
+- [x] **B11** 项目经理视图(pmview)：lib/pmView（排名聚合/下钻数据/列定义）、PmRankingTable（排名表+行点击下钻）、PmDrilldownModal（Modal+负责项目表+延期节点表）、PmView，路由 /pmview 接入。
 - [ ] **B12+** 回款日历 → 临期跟进 → 数据管理 → 区间对比/关于。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
@@ -96,6 +96,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B11 完成（2026-06-04）：项目经理视图(pmview)
+- 分支 **`refactor/b11-pmview`** 全部 5 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `4bd121d` / T1 `a05a9c9`(lib/pmView) / T2 `52ea719`(PmRankingTable) / T3 `45d7143`(PmDrilldownModal) / T4 `ee018c9`(PmView) + 本 PROGRESS/路由提交。
+- 产物：`lib/pmView`（pmRanking 排名聚合 / pmDrilldown 下钻 / PM_PROJ_COLS+PM_DELAY_COLS）、`PmRankingTable`（排名表 + 行点击 select + 高亮）、`PmDrilldownModal`（复用 Modal + 两张 DataTable）、`PmView`（搜索 + 展开态 + 装配），路由 `/pmview` 由 PageStub 改 PmView。复用 B10 naguanFilter、groupByProject、B4 Modal/DataTable。
+- 经规范+质量审查：可合并 ✓，无 Critical/Important（4 Minor 均可接受：as any 断言、保留完成率配色属多做无害）。
+- 关键忠实性（已核对一致）：排名表聚合 **全量 rawNodes**（无纳管/年份/视角）、`totalAmount` 逐节点累加 projectAmount、未指定默认、完成率降序；下钻用 **纳管-only**（naguanFilter）+ groupByProject + 延期过滤 + slice(0,100)；列定义 8+8 与旧一致；行点击切换收起。
+- 展示从简（已记录，非偏差）：下钻列可见性 UI、tier/status 徽章配色延后 B-opt；旧全屏遮罩改 Modal(el-dialog width 90%)。
+- 整体进度：A1-A3 后端 ✅；B1-B11 前端 ✅（B11 待合并 master）。下一步 B12（回款日历）。
 
 ### ✅ Plan B10 完成（2026-06-04）：回款台账(ledger)
 - 分支 **`refactor/b10-ledger`** 全部 4 任务完成、`verify.sh` 全绿（前端 typecheck/vitest/build），待合并 master。
