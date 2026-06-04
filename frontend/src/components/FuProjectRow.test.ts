@@ -10,11 +10,12 @@ beforeEach(() => {
   localStorage.clear()
 })
 
+// 测试 fixture：nodes 简化，类型用 any 规避 RawNode 必填字段（不影响行为断言）
 const project = {
   projectId: 'P1', projectName: '甲项目', projectManager: '张', orgL4: '北京', projectAmount: 1000000,
   projectAmountWan: 100, earliestPlanDate: '2026-06-10', completion: '0.8', nodeStatuses: ['延期', '正常实施中'],
   nodes: [{ nodeName: 'N1', actualPaymentRatio: 0.2, nodeStatus: '延期' }], flw: false,
-}
+} as any
 
 describe('FuProjectRow', () => {
   it('渲染名称/元信息，点击展开节点表', async () => {
