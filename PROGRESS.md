@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B13 临期跟进 Signal Board 只读看板 完成）
+- 最近更新：2026-06-04（B14 临期跟进 展开面板/项目列表/跟进标记 完成）
 - 维护语言：简体中文
 
 ---
@@ -74,9 +74,10 @@ _（无）_
 - [x] **B11** 项目经理视图(pmview)：lib/pmView（排名聚合/下钻数据/列定义）、PmRankingTable（排名表+行点击下钻）、PmDrilldownModal（Modal+负责项目表+延期节点表）、PmView，路由 /pmview 接入。
 - [x] **B12** 回款日历(calendar)：lib/calendar、CalNodeTable、CalGrid、CalendarView，路由 /calendar 接入。
 - [x] **B13** 临期跟进 Signal Board(只读)：lib/followup、FollowupSignalRow、FollowupView，路由 /followup 接入。
-- [ ] **B14** 临期跟进：行展开面板 + 跟进记录 CRUD(/api/followup/*) + 云文档异步回写 + 同步状态轮询。
-- [ ] **B15** 数据管理(data)。
-- [ ] **B16** 区间对比(compare) + 关于(about)。
+- [x] **B14** 临期跟进：展开面板 + 项目列表 + 跟进标记：stores/fuData(响应式本地标记)、lib/followupProjects、FuNodeTable、FuProjectRow、FollowupExpandModal；信号行可点击开面板，视图改用 fuData store（标记联动看板跟进率）。
+- [ ] **B15** 临期跟进：跟进记录 CRUD(/api/followup/*) + 云文档异步回写 + 同步状态轮询。
+- [ ] **B16** 数据管理(data)。
+- [ ] **B17** 区间对比(compare) + 关于(about)。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
@@ -100,6 +101,16 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B14 完成（2026-06-04）：临期跟进 展开面板 + 项目列表 + 跟进标记
+- 分支 **`refactor/b14-followup-expand`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `a648b41` / T1 `5f38130`(fuData store) / T2 `98b0d4e`(followupProjects) / T3 `9c916a9`(FuNodeTable) / T4 `87e618d`+`6644c71`(FuProjectRow,含fixture类型修正) / T5 `485789e`+`df78902`(FollowupExpandModal,含批量作用域忠实修正) + 本 PROGRESS/接入提交。
+- 产物：`stores/fuData`（本地标记升级为**响应式** Pinia store，标记切换联动看板/面板）、`lib/followupProjects`（部门项目聚合/档位过滤/紧迫度/下拉/待跟进节点）、`FuNodeTable`（9 列待跟进节点表）、`FuProjectRow`（项目卡+节点表展开+标记切换）、`FollowupExpandModal`（左统计+右项目列表）；FollowupSignalRow 部门名/档位条可点击→开面板；FollowupView 改用 fuData store。复用 B4 Modal。
+- 经规范+质量审查：发现 1 个 Important 并修复——批量标记旧版作用于**部门全部项目**(`_fuDeptProjects`)，初版误用 window 过滤后的 projs；已改 `allProjs` + 补测（`df78902`）。其余 Minor 可接受（节点表 index key、紧迫度条高度）。
+- 一处有意简化（已确认非回归）：左侧跟进率恒基于 window 项目集，不随下拉(flw/noflw)变化——比旧 `_updateFuLeftStats`(切到"已跟进"跳 100%) 更合理；右列表仍受下拉影响。
+- 关键忠实性（已核对一致）：数据源 filteredNodes.filter(isPaymentRelated)；部门项目聚合(金额万/最早日期/最大完成率/flw)；档位 delay/d7/d15/d30(planDate>=today&&ratio<1)；紧迫度延期优先；下拉 all/flw/noflw/7d/15d；项目集=window 节点 projectId 集；节点表过滤+9 列；标记写 fu_data 持久化并联动看板（即 B13 跟进率为 0 的写入侧）；today 注入。
+- 范围（两步拆分第 1 步）：本期读+本地标记；**B15=跟进记录 CRUD(/api/followup/*)+云回写+轮询**。展示从简：记录区/添加编辑删除/下钻跳转拆 B15；环形 SVG→大号百分数；"跟进动态"菜单省略；全屏侧滑→Modal。
+- 整体进度：A1-A3 后端 ✅；B1-B14 前端 ✅（B14 待合并 master）。下一步 B15。
 
 ### ✅ Plan B13 完成（2026-06-04）：临期跟进 Signal Board(只读看板)
 - 分支 **`refactor/b13-followup-board`** 全部 4 任务完成、`verify.sh` 全绿，待合并 master。

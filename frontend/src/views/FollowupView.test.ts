@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import FollowupView from './FollowupView.vue'
@@ -8,6 +8,9 @@ import { useDataStore } from '@/stores/data'
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
+})
+afterEach(() => {
+  document.body.innerHTML = ''
 })
 
 function seed() {
@@ -45,5 +48,14 @@ describe('FollowupView', () => {
     const input = w.find('input')
     await input.setValue('A部门')
     expect(w.findAllComponents({ name: 'FollowupSignalRow' }).length).toBe(1)
+  })
+
+  it('点击部门信号行打开展开面板', async () => {
+    seed()
+    const w = mount(FollowupView, { global: { plugins: [ElementPlus] }, attachTo: document.body })
+    await w.find('.sig-dept.clickable').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('项目列表')
+    w.unmount()
   })
 })

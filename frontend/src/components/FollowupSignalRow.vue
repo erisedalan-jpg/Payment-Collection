@@ -7,6 +7,8 @@ const props = defineProps<{
   max: { d7: number; d15: number; d30: number; delay: number }
 }>()
 
+const emit = defineEmits<{ expand: [{ dept: string; timeWin: string }] }>()
+
 const BARS = [
   { key: 'd7', flw: 'd7flw', color: '#f97316' },
   { key: 'd15', flw: 'd15flw', color: '#f59e0b' },
@@ -26,12 +28,17 @@ const maxVal = (b: { key: string }) => (props.max as Record<string, any>)[b.key]
 <template>
   <div class="sig-row">
     <div class="sig-rank" :style="{ color: rankColor(index) }">{{ index + 1 }}</div>
-    <div class="sig-dept">
+    <div class="sig-dept clickable" @click="emit('expand', { dept: stat.name, timeWin: '' })">
       <div class="sig-dept-name">{{ stat.name }}</div>
       <div class="sig-dept-count">共{{ stat.total }}个项目</div>
     </div>
     <div class="sig-bars">
-      <div v-for="b in BARS" :key="b.key" class="sig-bar-group">
+      <div
+        v-for="b in BARS"
+        :key="b.key"
+        class="sig-bar-group clickable"
+        @click="emit('expand', { dept: stat.name, timeWin: b.key })"
+      >
         <div class="sig-bar-line">
           <div class="sig-bar-wrap">
             <div class="sig-bar-fill" :style="{ width: barW(val(b), maxVal(b)) + '%', background: b.color }"></div>
@@ -58,4 +65,6 @@ const maxVal = (b: { key: string }) => (props.max as Record<string, any>)[b.key]
 .sig-bar-num { font-weight: 800; font-size: 13px; min-width: 22px; text-align: right; }
 .sig-bar-sub { font-size: 11px; color: #8c8c9e; text-align: center; }
 .sig-rate { text-align: center; font-weight: 800; font-size: 14px; }
+.clickable { cursor: pointer; }
+.clickable:hover { background: #f8fafc; border-radius: 6px; }
 </style>
