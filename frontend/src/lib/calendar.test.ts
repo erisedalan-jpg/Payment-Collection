@@ -30,8 +30,9 @@ describe('calFilterOptions', () => {
       { isPaymentRelated: true, planDate: '2026-06-11', orgL3: 'A', orgL4: '北京', projectManager: '张' },
       { isPaymentRelated: false, planDate: '2026-06-12', orgL3: 'Z' },
     ] as any)
+    // 忠实移植 app.js 的 [...set].sort()（Unicode 序）：上(U+4E0A)<北(U+5317)；张(U+5F20)<李(U+674E)
     expect(o.orgL3).toEqual(['A', 'B'])
-    expect(o.orgL4).toEqual(['北京', '上海'])
+    expect(o.orgL4).toEqual(['上海', '北京'])
     expect(o.pm).toEqual(['张', '李'])
   })
 })

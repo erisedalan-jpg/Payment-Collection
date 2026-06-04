@@ -30,8 +30,7 @@ export function calFilterOptions(nodes: RawNode[]): { orgL3: string[]; orgL4: st
     if (n.orgL4) l4.add(n.orgL4)
     if (n.projectManager) pm.add(n.projectManager)
   }
-  const zhSort = (a: string, b: string) => a.localeCompare(b, 'zh')
-  return { orgL3: [...l3].sort(zhSort), orgL4: [...l4].sort(zhSort), pm: [...pm].sort(zhSort) }
+  return { orgL3: [...l3].sort(), orgL4: [...l4].sort(), pm: [...pm].sort() }
 }
 
 /** 应用 orgL3/orgL4/PM 三筛选。 */
