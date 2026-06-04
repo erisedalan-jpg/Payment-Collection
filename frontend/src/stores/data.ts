@@ -36,5 +36,17 @@ export const useDataStore = defineStore('data', () => {
     }
   }
 
-  return { data, loading, error, load, clearBusinessData }
+  /** 强制重拉 analysis_data.json（绕过 loading 守卫 + 时间戳防缓存）。忠实移植 reloadData 的数据热更新。 */
+  async function reload() {
+    error.value = null
+    try {
+      const res = await fetch('/data/analysis_data.json?t=' + Date.now())
+      if (!res.ok) throw new Error(`加载数据失败 HTTP ${res.status}`)
+      data.value = (await res.json()) as AnalysisData
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : String(e)
+    }
+  }
+
+  return { data, loading, error, load, clearBusinessData, reload }
 })
