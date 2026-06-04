@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B12 回款日历 完成）
+- 最近更新：2026-06-04（B13 临期跟进 Signal Board 只读看板 完成）
 - 维护语言：简体中文
 
 ---
@@ -73,9 +73,10 @@ _（无）_
 - [x] **B10** 回款台账(ledger)：lib/ledger（纳管-only 数据源/搜索过滤/汇总/分层/状态计数）、LedgerTable（项目表 + CF 列头 + 行展开下钻节点明细）、LedgerView（汇总/状态/分层三条 + 搜索/区间/状态筛选），路由 /ledger 接入。复用 B9 的 CF。
 - [x] **B11** 项目经理视图(pmview)：lib/pmView（排名聚合/下钻数据/列定义）、PmRankingTable（排名表+行点击下钻）、PmDrilldownModal（Modal+负责项目表+延期节点表）、PmView，路由 /pmview 接入。
 - [x] **B12** 回款日历(calendar)：lib/calendar、CalNodeTable、CalGrid、CalendarView，路由 /calendar 接入。
-- [ ] **B13** 临期跟进(followup)。
-- [ ] **B14** 数据管理(data)。
-- [ ] **B15** 区间对比(compare) + 关于(about)。
+- [x] **B13** 临期跟进 Signal Board(只读)：lib/followup、FollowupSignalRow、FollowupView，路由 /followup 接入。
+- [ ] **B14** 临期跟进：行展开面板 + 跟进记录 CRUD(/api/followup/*) + 云文档异步回写 + 同步状态轮询。
+- [ ] **B15** 数据管理(data)。
+- [ ] **B16** 区间对比(compare) + 关于(about)。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
 ### 🟢 低
@@ -99,6 +100,16 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan B13 完成（2026-06-04）：临期跟进 Signal Board(只读看板)
+- 分支 **`refactor/b13-followup-board`** 全部 4 任务完成、`verify.sh` 全绿，待合并 master。
+- 提交：计划 `4dff615` / T1 `da3cb18`(lib/followup) / T2 `e1a1a3d`(FollowupSignalRow) / T3 `47a2699`(FollowupView) + `317938e`(cycleLabel 分支测试补充) + 本 PROGRESS/路由提交。
+- 产物：`lib/followup`（部门信号统计/总计/季度聚合/本地标记 loadFuData/周期标签，6 单测）、`FollowupSignalRow`（4 档进度条 + 跟进率）、`FollowupView`（季度概览 4 卡 + 6 统计卡 + 部门搜索 + 信号板），路由 `/followup` 接入。
+- 经规范+质量审查：可合并 ✓，无 Critical/Important（5 Minor 可接受：cycleLabel 分支序等价已补测、fuData 非响应式属 B13 接受范围、as any 类型逃逸）。
+- 关键忠实性（已核对一致）：数据源 filteredNodes.filter(isPaymentRelated)；部门 orgL4||未分配；延期 delay++ 后不 return 继续档位；档位前提 planDate>=today && ratio<1，diff ≤7/≤15/≤30 互斥；排序 delay→d7→d15→d30；6 卡公式含 totalNotFlw=max(0,signalBase-totalFlw)；季度分桶+项目去重；进度条 max 取自搜索后 filteredStats；today 注入可测。
+- 范围拆分：临期跟进页含两大子系统——B13=只读看板已完成；**B14=行展开面板 + 跟进记录 CRUD(/api/followup/*) + 云文档异步回写 + 同步状态轮询**（首个写操作 + 后端联动）。看板"已跟进/跟进率"来自 localStorage['fu_data']，其写入在 B14；故 B13 阶段跟进率通常为 0（忠实读取，B14 接入后自动反映）。
+- 展示从简（已记录，非偏差）：信号行点击展开、"跟进动态"菜单延后 B14（本期行不可点击）；季度标题纯样式细节从简。
+- 整体进度：A1-A3 后端 ✅；B1-B13 前端 ✅（B13 待合并 master）。下一步 B14（临期跟进 CRUD + 云回写）。
 
 ### ✅ Plan B12 完成（2026-06-04）：回款日历(calendar)
 - 分支 **`refactor/b12-calendar`** 全部 5 任务完成、`verify.sh` 全绿，待合并 master。
