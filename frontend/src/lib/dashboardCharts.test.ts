@@ -47,6 +47,12 @@ describe('rankByOrg', () => {
     const r = rankByOrg(NODES, '50-100万', 'actualTotal')
     expect(r.map((o) => o.org)).toEqual(['上海'])
   })
+  it('sorts by achievementRate when requested', () => {
+    // 北京: 600000/1000000 = 0.6; 上海: 200000/800000 = 0.25 → 北京 first by rate
+    const r = rankByOrg(NODES, '', 'achievementRate')
+    expect(r[0].org).toBe('北京')
+    expect(r[0].achievementRate).toBeGreaterThan(r[1].achievementRate)
+  })
 })
 
 describe('delayedTopProjects', () => {
@@ -55,5 +61,15 @@ describe('delayedTopProjects', () => {
     expect(r.length).toBe(1)
     expect(r[0].projectId).toBe('P1')
     expect(r[0].maxDelay).toBe(30)
+  })
+  it('truncates to the given limit', () => {
+    const many: any[] = []
+    for (let i = 0; i < 15; i++) {
+      many.push({ projectId: `D${i}`, projectName: `延期${i}`, tier: '100万以上', orgL4: '北京', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 100000, actualPayment: 0, delayDays: i + 1, planMonth: '2025-01' })
+    }
+    const r = delayedTopProjects(many, 10)
+    expect(r.length).toBe(10)
+    // 按 delayDays 降序，最大 delayDays=15 (D14) 在首位
+    expect(r[0].projectId).toBe('D14')
   })
 })
