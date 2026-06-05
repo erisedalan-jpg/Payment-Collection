@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-04（B18 区间对比 + 关于 完成；Phase B 前端重写收官，B1-B18 全部完成）
+- 最近更新：2026-06-05（Plan D1 全局地基完成：明暗双主题 + 字号三档 + 响应式基线；Phase D 前端展示重构启动）
 - 维护语言：简体中文
 
 ---
@@ -81,6 +81,19 @@ _（无）_
 - [x] **B18** 区间对比(compare) + 关于(about)：version.ts 版本号单一来源、lib/compare（按档统计+四图表数据+服务组排名）、CompareCards、CompareView、AboutView，路由 /compare、/about 接入并移除 PageStub。Phase B 前端重写收官。
 - [ ] **B-opt** 前端构建优化（Element Plus 按需导入 / manualChunks 拆包，解决 ~1MB chunk 警告）；npm audit 处理 json-schema-to-typescript 的 dev 依赖告警；DataTable 的 Excel 导出 + 列枚举筛选弹窗待页面需要时实现；看板图表点击钻取弹窗 + 延期项点击跳转项目节点；分层页列可见性持久化 UI、CF 列枚举筛选、Excel 导出、nodeStatus/tier 徽章配色、行点击钻取。
 
+### 🟪 Phase D 前端展示重构（设计见 docs/superpowers/specs/2026-06-04-phase-d-frontend-redesign-design.md）
+- [x] **D1** 全局地基：CSS 变量双主题（明/暗）+ settings store（字号三档 + 持久化）+ DisplaySettings 入口 + ECharts 双主题 + theme.css（EP 变量桥接/字号 rem 令牌/滚动条·选区·焦点适配）+ 外壳变量化。
+- [ ] **D2** 全局项目详情面板（projectDetail store / ProjectDetailDrawer）+ 上下文跳转机制（navContext）。
+- [ ] **D3** 看板首页重做（指标 + 统一档位条 + 服务组排名跳转 + 月/季趋势切换 + 延期天数/金额切换 + 详情面板接入）。
+- [ ] **D4** 多维看板·单维核心（lib/pivot + BoardView），吸收 区间对比 + 项目经理视图，删旧入口/路由。
+- [ ] **D5** 多维看板·双维交叉。
+- [ ] **D6** 多维看板·N 维透视表。
+- [ ] **D7** 回款日历重做 A（富日格 + 选中日明细 + 主题适配 + 字号放大）。
+- [ ] **D8** 回款日历 B（议程列表视图切换）。
+- [ ] **D9** 回款日历 C（年度热力条 + 月度下钻）。
+- [ ] **D10** 业务分析三档整合（/analysis/:tab 单页 + 档位筛选/列徽章，删 15 入口）。
+- 范围外（形态稳定后单独排）：C 打包（dist 接入 server.py + PyInstaller）、A4 Playwright 脚本健壮性、销售维度（需数据源补列）。
+
 ### 🟢 低
 - [ ] **L-13** 收紧 CORS（去掉 `Access-Control-Allow-Origin: *`）。
 - [ ] **L-14** `index.html:143` 硬编码内网地址改为配置项/留空。
@@ -102,6 +115,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D1 完成（2026-06-05）：全局地基（明暗主题 + 字号三档 + 响应式基线）—— Phase D 启动
+- 分支 **`refactor/d1-global-foundation`** 全部 6 任务完成、`verify.sh` 全绿（72 前端文件 / 273 单测 + typecheck + build），待合并 master。
+- 提交：T1 `0ddcd50`(settings store) / T2 `ba25259`(theme.css + main 接线) / T3 `78915d1`(ECharts 双主题 + ChartBox) / T4 `b8afafa`(DisplaySettings) / T5 `5ff1437`(AppHeader 挂载 + 外壳变量化) + 本 PROGRESS 提交。
+- 产物：`stores/settings`（theme/fontScale + localStorage 持久化 + 写 `<html>.dark` 与 `--fs-base`，4 单测）、`styles/theme.css`（明/暗变量体系 + EP 变量桥接[主色=accent、暗色 bg/text/border 统一]+ 字号 rem 令牌 --fs-1..5 + 滚动条/选区/焦点适配 + box-sizing reset）、`charts/echartsTheme`（新增 'ent-dark'）、`ChartBox`（getActivePinia 守卫 + 随 settings.theme 选主题，3 单测）、`components/DisplaySettings`（主题/字号分段控件，无 emoji，3 单测）、`main.ts`（引入 EP 暗色 css-vars + theme.css + settings.init）、外壳 AppHeader/AppLayout/AppSidebar 颜色改吃变量。
+- 设计取舍（已记录）：浅色 ECharts 主题保持原名 `'ent'`，新增 `'ent-dark'`，且 ChartBox 用 `getActivePinia()` 守卫无 pinia 时回退浅色——既让暗色生效又不破坏既有图表测试（全部仍取 'ent'）。EP 主色色阶用 color-mix 派生，不支持的浏览器安全回退 EP 内置值。
+- 范围边界：D1 立地基（变量 + 控件 + 机制）；既有 px 文本不随字号档缩放，新组件用 rem，各页 D3-D10 重做时逐步转 rem。响应式仅基线（reset + 断点约定注释），各页具体响应式在其 plan 落地。
+- 待人工目检（不阻塞合并）：启动后切换明/暗主题与字号三档、刷新保持、各页无 JS 报错——自动门禁已覆盖核心（settings 单测验证 dark class 与 --fs-base）。
+- 整体进度：Phase B 前端 ✅；**Phase D 启动，D1 完成（待合并 master）**。下一步 D2（全局项目详情面板 + 上下文跳转）。
 
 ### ✅ Plan B18 完成（2026-06-04）：区间对比(compare) + 关于(about) —— Phase B 前端重写收官
 - 分支 **`refactor/b18-compare-about`** 全部 6 任务完成、`verify.sh` 全绿，待合并 master。
