@@ -20,5 +20,5 @@ import FilterBar from './FilterBar.vue'
 <style scoped>
 .app-layout { display: flex; flex-direction: column; height: 100vh; }
 .app-body { display: flex; flex: 1; min-height: 0; }
-.app-main { flex: 1; overflow: auto; background: #f8fafc; }
+.app-main { flex: 1; overflow: auto; background: var(--bg); }
 </style>
