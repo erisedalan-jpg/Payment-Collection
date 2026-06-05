@@ -37,20 +37,20 @@ const ui = useUiStore()
 </template>
 
 <style scoped>
-.sidebar { width: 220px; border-right: 1px solid #e2e8f0; background: #fff;
+.sidebar { width: 220px; border-right: 1px solid var(--line); background: var(--card);
   display: flex; flex-direction: column; transition: width .15s; overflow: hidden; }
 .sidebar.collapsed { width: 0; border-right: none; }
 .sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 0; }
 .section { margin-bottom: 14px; }
-.section-label { font-size: 11px; color: #94a3b8; padding: 4px 18px; font-weight: 600; }
-.group-label { font-size: 12px; color: #64748b; padding: 6px 18px 2px; }
+.section-label { font-size: 11px; color: var(--mut); padding: 4px 18px; font-weight: 600; }
+.group-label { font-size: 12px; color: var(--sub); padding: 6px 18px 2px; }
 .nav-item, .nav-sub { display: flex; align-items: center; gap: 8px; padding: 7px 18px;
-  font-size: 13px; color: #334155; text-decoration: none; }
+  font-size: 13px; color: var(--txt); text-decoration: none; }
 .nav-sub { padding-left: 30px; font-size: 12px; }
-.nav-item:hover, .nav-sub:hover { background: #f1f5f9; }
-.nav-item.active, .nav-sub.active { background: #eef2ff; color: #4f46e5; font-weight: 600; }
+.nav-item:hover, .nav-sub:hover { background: var(--card2); }
+.nav-item.active, .nav-sub.active { background: var(--bg); color: var(--accent); font-weight: 600; }
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-.sidebar-toggle { width: 16px; border: none; border-right: 1px solid #e2e8f0;
-  background: #f8fafc; color: #64748b; cursor: pointer; font-size: 11px; padding: 0; }
-.sidebar-toggle:hover { background: #eef2ff; color: #4f46e5; }
+.sidebar-toggle { width: 16px; border: none; border-right: 1px solid var(--line);
+  background: var(--card2); color: var(--sub); cursor: pointer; font-size: 11px; padding: 0; }
+.sidebar-toggle:hover { background: var(--bg); color: var(--accent); }
 </style>
