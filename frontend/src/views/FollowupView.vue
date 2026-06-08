@@ -51,12 +51,12 @@ function onExpand(e: { dept: string; timeWin: string }) {
 }
 
 const STAT_CARDS = computed(() => [
-  { label: '7天内待回款', value: totals.value.urgent, color: '#f97316' },
-  { label: '8~15天内待回款', value: totals.value.d15, color: '#f59e0b' },
-  { label: '16~30天内待回款', value: totals.value.d30, color: '#3b82f6' },
-  { label: '延期', value: totals.value.delayed, color: '#dc2626' },
-  { label: '已跟进', value: totals.value.totalFlw, color: '#10b981' },
-  { label: '待跟进', value: totals.value.totalNotFlw, color: '#8c8c9e' },
+  { label: '7天内待回款', value: totals.value.urgent, color: 'var(--c-urgent)' },
+  { label: '8~15天内待回款', value: totals.value.d15, color: 'var(--c-pending)' },
+  { label: '16~30天内待回款', value: totals.value.d30, color: 'var(--accent)' },
+  { label: '延期', value: totals.value.delayed, color: 'var(--danger)' },
+  { label: '已跟进', value: totals.value.totalFlw, color: 'var(--c-paid)' },
+  { label: '待跟进', value: totals.value.totalNotFlw, color: 'var(--mut)' },
 ])
 </script>
 
@@ -125,30 +125,30 @@ const STAT_CARDS = computed(() => [
 
 <style scoped>
 .fu-view { padding: 16px; }
-.fu-title { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 14px; }
-.fu-quarters-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; }
-.fu-q-header { font-weight: 700; padding: 10px 16px; border-bottom: 1px solid #f1f5f9; color: #6366f1; }
+.fu-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 14px; }
+.fu-quarters-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
+.fu-q-header { font-weight: 700; padding: 10px 16px; border-bottom: 1px solid var(--line); color: var(--accent); }
 .fu-q-row { display: flex; gap: 12px; padding: 10px 16px; flex-wrap: wrap; }
-.fu-q-cell { flex: 1; min-width: 180px; text-align: center; padding: 10px 6px; background: #fafbfc; border-radius: 8px; border: 1px solid #ebe7e2; }
-.fu-q-name { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
-.fu-q-sub { font-size: 10px; color: #8c8c9e; }
-.fu-q-main { font-size: 20px; font-weight: 800; color: #3b82f6; }
+.fu-q-cell { flex: 1; min-width: 180px; text-align: center; padding: 10px 6px; background: var(--card2); border-radius: 8px; border: 1px solid var(--line); }
+.fu-q-name { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 4px; }
+.fu-q-sub { font-size: 10px; color: var(--mut); }
+.fu-q-main { font-size: 20px; font-weight: 800; color: var(--accent); }
 .fu-q-amts { display: flex; gap: 8px; margin-top: 4px; justify-content: center; }
-.fu-q-amt-label { font-size: 9px; color: #8c8c9e; }
+.fu-q-amt-label { font-size: 9px; color: var(--mut); }
 .fu-q-amt { font-size: 12px; font-weight: 700; }
-.fu-q-amt.red { color: #ef4444; }
-.fu-q-amt.green { color: #10b981; }
+.fu-q-amt.red { color: var(--danger); }
+.fu-q-amt.green { color: var(--c-paid); }
 .fu-cards { display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
-.fu-card { flex: 1; min-width: 120px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; padding: 18px 14px; }
-.fu-card-label { font-size: 11px; color: #8c8c9e; margin-bottom: 4px; }
+.fu-card { flex: 1; min-width: 120px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; text-align: center; padding: 18px 14px; }
+.fu-card-label { font-size: 11px; color: var(--mut); margin-bottom: 4px; }
 .fu-card-val { font-size: 28px; font-weight: 800; }
 .fu-search { margin-bottom: 12px; }
-.fu-board { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-.fu-board-header { font-weight: 700; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
-.fu-board-hint { font-size: 10px; color: #8c8c9e; font-weight: 400; margin-left: 12px; }
-.fu-board-cols { display: grid; grid-template-columns: 40px 160px 1fr 70px; gap: 12px; padding: 8px 14px; font-size: 12px; color: #8c8c9e; font-weight: 600; background: #fafbfc; }
+.fu-board { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.fu-board-header { font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.fu-board-hint { font-size: 10px; color: var(--mut); font-weight: 400; margin-left: 12px; }
+.fu-board-cols { display: grid; grid-template-columns: 40px 160px 1fr 70px; gap: 12px; padding: 8px 14px; font-size: 12px; color: var(--mut); font-weight: 600; background: var(--card2); }
 .bc-rank, .bc-rate { text-align: center; }
 .bc-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .bc-bars span { white-space: nowrap; }
-.fu-empty { padding: 30px; text-align: center; color: #94a3b8; }
+.fu-empty { padding: 30px; text-align: center; color: var(--mut); }
 </style>

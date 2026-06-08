@@ -47,6 +47,7 @@
   --c-remaining: var(--danger); /* 待回款缺口 */
   --c-delayed: var(--danger);   /* 延期 */
   --c-plan: var(--accent);      /* 计划回款 */
+  --c-urgent: #f97316;          /* 7天内到期(橙)，介于 pending(黄) 与 delayed(红) */
   /* 彩色填充上的反白前景（文字/图标），两主题恒为白 */
   --on-accent: #ffffff;
 }
@@ -65,6 +66,7 @@ html.dark {
   --danger: #fb7185;
   --warn: #fbbf24;
   --ok: #34d399;
+  --c-urgent: #fb923c;          /* 7天内到期(橙)，暗色下提亮 */
 
   /* EP 暗色：把 EP 自带深灰统一到我们的深蓝调色板 */
   --el-bg-color: var(--card);
