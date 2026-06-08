@@ -6,6 +6,7 @@ import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { PLAN_BOARDS, boardStats, planSummaryTotals, planStatusCounts } from '@/lib/planBoards'
 import { fmtWan, pct } from '@/lib/format'
+import { TIERS } from '@/nav'
 import PlanBoard from './PlanBoard.vue'
 
 const props = defineProps<{ tier: string }>()
@@ -18,15 +19,19 @@ const tableIds = PLAN_BOARDS.map((_, i) => `planBoard_${i}`)
 const allNodes = computed(
   () =>
     filter.filteredNodes.filter(
-      (n) => n.tier === props.tier && (n as Record<string, any>).isPaymentRelated,
+      (n) => (props.tier === '' || n.tier === props.tier) && (n as Record<string, any>).isPaymentRelated,
     ) as Record<string, any>[],
 )
 
 const columns = computed(() => {
-  const cols = (data.data?.displayColumns as Record<string, any[]> | undefined)?.[props.tier] ?? []
-  return cols
+  const cols = (data.data?.displayColumns as Record<string, any[]> | undefined)?.[props.tier] ?? (data.data?.displayColumns as Record<string, any[]> | undefined)?.[TIERS[0].label] ?? []
+  const mapped = cols
     .filter((c) => c.visible !== false)
     .map((c) => ({ key: c.key as string, label: c.label as string }))
+  if (props.tier === '') {
+    return [{ key: 'tier', label: '档位' }, ...mapped]
+  }
+  return mapped
 })
 
 const boards = computed(() =>
@@ -44,7 +49,7 @@ const counts = computed(() =>
   planStatusCounts((combined.value.length > 0 ? combined.value : allNodes.value) as any),
 )
 
-const rateColor = (r: number) => (r >= 0.8 ? '#10b981' : r >= 0.5 ? '#f59e0b' : '#ef4444')
+const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(--c-pending)' : 'var(--danger)')
 
 // 忠实移植 navTier 的 CF._filters={} 重置：进入页面/切换档位时清空本页 6 看板筛选
 function resetFilters() {
@@ -57,19 +62,19 @@ watch(() => props.tier, resetFilters)
 <template>
   <div class="plan-tab">
     <div class="summary-bar">
-      <div class="sb-item"><div class="sb-label">节点计划回款金额(万)</div><div class="sb-val" style="color:#3b82f6">{{ fmtWan(totals.totalExp) }}</div></div>
+      <div class="sb-item"><div class="sb-label">节点计划回款金额(万)</div><div class="sb-val" style="color:var(--accent)">{{ fmtWan(totals.totalExp) }}</div></div>
       <div class="sb-item"><div class="sb-label">节点已回款金额(万)</div><div class="sb-val green">{{ fmtWan(totals.totalAct) }}</div></div>
       <div class="sb-item"><div class="sb-label">节点待回款金额(万)</div><div class="sb-val red">{{ fmtWan(totals.totalRem) }}</div></div>
       <div class="sb-item"><div class="sb-label">完成率</div><div class="sb-val" :style="{ color: rateColor(totals.rate) }">{{ pct(totals.rate) }}</div></div>
     </div>
 
     <div class="status-grid">
-      <div class="st-card"><div class="st-label">加资源可提前</div><div class="st-val" style="color:#4f46e5">{{ counts.canAdvance }}</div></div>
-      <div class="st-card"><div class="st-label">达到回款条件</div><div class="st-val" style="color:#f59e0b">{{ counts.reachedCondition }}</div></div>
-      <div class="st-card"><div class="st-label">已提前回款</div><div class="st-val" style="color:#059669">{{ counts.advance }}</div></div>
-      <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:#10b981">{{ counts.fullPaid }}</div></div>
-      <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:#ef4444">{{ counts.delayed }}</div></div>
-      <div class="st-card"><div class="st-label">正常实施中</div><div class="st-val" style="color:#3b82f6">{{ counts.onTime }}</div></div>
+      <div class="st-card"><div class="st-label">加资源可提前</div><div class="st-val" style="color:var(--accent)">{{ counts.canAdvance }}</div></div>
+      <div class="st-card"><div class="st-label">达到回款条件</div><div class="st-val" style="color:var(--c-pending)">{{ counts.reachedCondition }}</div></div>
+      <div class="st-card"><div class="st-label">已提前回款</div><div class="st-val" style="color:var(--c-paid)">{{ counts.advance }}</div></div>
+      <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:var(--c-paid)">{{ counts.fullPaid }}</div></div>
+      <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:var(--danger)">{{ counts.delayed }}</div></div>
+      <div class="st-card"><div class="st-label">正常实施中</div><div class="st-val" style="color:var(--accent)">{{ counts.onTime }}</div></div>
     </div>
 
     <div class="toolbar">
@@ -119,26 +124,26 @@ watch(() => props.tier, resetFilters)
 }
 .sb-item,
 .st-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--card);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
 }
 .sb-label,
 .st-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--mut);
 }
 .sb-val {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--txt);
 }
 .sb-val.green {
-  color: #10b981;
+  color: var(--c-paid);
 }
 .sb-val.red {
-  color: #ef4444;
+  color: var(--danger);
 }
 .st-val {
   font-size: 20px;
