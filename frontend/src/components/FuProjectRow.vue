@@ -53,12 +53,11 @@ defineExpose({ onFlwChange })
 </template>
 
 <style scoped>
-.fpr { padding: 14px; border: 1px solid #ebe7e2; border-left: 4px solid #f59e0b; border-radius: 8px; margin-bottom: 10px; }
-.fpr.flw { border-left-color: #10b981; }
+.fpr { padding: 14px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; }
 .fpr-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-.fpr-name { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; color: #0f172a; }
+.fpr-name { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; color: var(--txt); }
 .fpr-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
-.fpr-btn { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; color: #475569; }
-.fpr-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: #8c8c9e; }
-.fpr-nodes { margin-top: 6px; padding-left: 8px; border-left: 2px solid #e2e8f0; }
+.fpr-btn { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; color: var(--sub); }
+.fpr-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--mut); }
+.fpr-nodes { margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--line); }
 </style>
