@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-05（Plan D1 全局地基完成：明暗双主题 + 字号三档 + 响应式基线；Phase D 前端展示重构启动）
+- 最近更新：2026-06-05（Plan D2 全局项目详情面板完成；Phase D：D1-D2 已完成）
 - 维护语言：简体中文
 
 ---
@@ -83,7 +83,7 @@ _（无）_
 
 ### 🟪 Phase D 前端展示重构（设计见 docs/superpowers/specs/2026-06-04-phase-d-frontend-redesign-design.md）
 - [x] **D1** 全局地基：CSS 变量双主题（明/暗）+ settings store（字号三档 + 持久化）+ DisplaySettings 入口 + ECharts 双主题 + theme.css（EP 变量桥接/字号 rem 令牌/滚动条·选区·焦点适配）+ 外壳变量化。
-- [ ] **D2** 全局项目详情面板（projectDetail store / ProjectDetailDrawer）+ 上下文跳转机制（navContext）。
+- [x] **D2** 全局项目详情面板（projectDetail store + buildProjectDetail + ProjectDetailDrawer，AppLayout 全局挂载）。上下文跳转(navContext)按 YAGNI 挪到 D4（有真实消费者时）；各页"点项目→唤起面板"接入随 D3/D4/D7。
 - [ ] **D3** 看板首页重做（指标 + 统一档位条 + 服务组排名跳转 + 月/季趋势切换 + 延期天数/金额切换 + 详情面板接入）。
 - [ ] **D4** 多维看板·单维核心（lib/pivot + BoardView），吸收 区间对比 + 项目经理视图，删旧入口/路由。
 - [ ] **D5** 多维看板·双维交叉。
@@ -115,6 +115,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D2 完成（2026-06-05）：全局项目详情面板
+- 分支 **`refactor/d2-project-detail-panel`** 全部 4 任务完成、`verify.sh` 全绿（前端 +5 单测），待合并 master。
+- 提交：T1 `49544a8`(lib/projectDetail) / T2 `53e296d`(projectDetail store) / T3 `184f5a0`(ProjectDetailDrawer) / T4 AppLayout 挂载 + 本 PROGRESS。
+- 产物：`lib/projectDetail`（buildProjectDetail：复用 groupByProject，按 projectId 从全量 rawNodes 聚合项目 + 其全部节点，2 单测）、`stores/projectDetail`（全局单例 openId/open/close/visible，1 单测）、`components/ProjectDetailDrawer`（el-drawer：12 项汇总网格 + 节点明细 DataTable + 空态，颜色吃 D1 主题变量，2 单测）、`AppLayout` 全局挂载一次。
+- 范围（按 YAGNI，已记录非缺口）：本计划仅交付面板地基；**navContext 上下文跳转挪到 D4**（目标路由 /board 尚不存在、无现存消费者）；各页"点项目→唤起面板"接入随 D3（看板延期项）/D4（多维看板下钻）/D7（日历选中日）；§4.2 的"跟进记录嵌入"未纳入（复用 followup 重组件、偏离快速下钻定位），记为后续可选增强。
+- 数据源口径：详情用全量 rawNodes（不经纳管/年份/视角），展示项目完整面貌。
+- 执行中一处测试修正（非组件偏差）：el-table 行在 jsdom 异步渲染，组件测试加 `await flushPromises()`（与现有 DataTable.test 同款），组件保持逐字。
+- 整体进度：Phase D：**D1-D2 完成（D2 待合并 master）**。下一步 D3（看板首页重做）。
 
 ### ✅ Plan D1 完成（2026-06-05）：全局地基（明暗主题 + 字号三档 + 响应式基线）—— Phase D 启动
 - 分支 **`refactor/d1-global-foundation`** 全部 6 任务完成、`verify.sh` 全绿（72 前端文件 / 273 单测 + typecheck + build），待合并 master。

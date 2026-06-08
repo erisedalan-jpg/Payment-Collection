@@ -2,6 +2,7 @@
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import FilterBar from './FilterBar.vue'
+import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
 </script>
 
 <template>
@@ -14,6 +15,7 @@ import FilterBar from './FilterBar.vue'
         <router-view />
       </main>
     </div>
+    <ProjectDetailDrawer />
   </div>
 </template>
 
