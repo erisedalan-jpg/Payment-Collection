@@ -58,7 +58,7 @@ const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(-
     <div v-if="showSummaryBar" class="summary-bar">
       <div class="sb-item"><div class="sb-label">回款节点数</div><div class="sb-val">{{ summary.relatedNodeCount }}</div></div>
       <div class="sb-item"><div class="sb-label">已回款总金额(万)</div><div class="sb-val paid">{{ fmtWan(summary.totalActual) }}</div></div>
-      <div class="sb-item"><div class="sb-label">待回款总金额(万)</div><div class="sb-val danger">{{ fmtWan(summary.totalExpected - summary.totalActual) }}</div></div>
+      <div class="sb-item"><div class="sb-label">待回款总金额(万)</div><div class="sb-val remaining">{{ fmtWan(summary.totalExpected - summary.totalActual) }}</div></div>
       <div class="sb-item"><div class="sb-label">完成率</div><div class="sb-val" :style="{ color: rateColor(summary.rate) }">{{ pct(summary.rate) }}</div></div>
       <div class="sb-item"><div class="sb-label">加资源可提前</div><div class="sb-val accent">{{ summary.projCanAdvance }}</div></div>
       <div class="sb-item"><div class="sb-label">达到回款条件</div><div class="sb-val pending">{{ summary.projReachedCondition }}</div></div>
@@ -89,6 +89,7 @@ const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(-
 .sb-val { font-size: var(--fs-4); font-weight: 700; color: var(--txt); }
 .sb-val.paid { color: var(--c-paid); }
 .sb-val.danger { color: var(--danger); }
+.sb-val.remaining { color: var(--c-remaining); }
 .sb-val.pending { color: var(--c-pending); }
 .sb-val.accent { color: var(--accent); }
 .av-stub { padding: 40px; text-align: center; color: var(--mut); }

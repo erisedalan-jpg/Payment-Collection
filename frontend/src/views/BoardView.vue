@@ -267,7 +267,7 @@ defineExpose({ drillOpen })
 .bv-body:hover { background: var(--card2); }
 .bv-c-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
 .bv-paid { color: var(--c-paid); }
-.bv-remain { color: var(--c-pending); }
+.bv-remain { color: var(--c-remaining); }
 .bv-danger { color: var(--danger); font-weight: 700; }
 .bv-empty { color: var(--mut); padding: 16px; text-align: center; }
 </style>
