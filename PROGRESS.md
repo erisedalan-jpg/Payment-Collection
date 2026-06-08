@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D5 多维看板双维交叉完成；Phase D：D1-D2-D2.5-D3-D4-D5 已完成）
+- 最近更新：2026-06-08（Plan D5.5 目检打磨完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5 已完成）
 - 维护语言：简体中文
 
 ---
@@ -87,6 +87,7 @@ _（无）_
 - [x] **D2.5** 审计地基修复（D3 前，来源 /impeccable audit）：P1 暗色 token 化（仅留存共享组件/页面：DataTable/ColumnFilter/FilterBar + 台账/数据管理/关于/临期跟进全链，共 16 文件）+ v-activate 键盘激活指令（全局注册，下钻入口键盘可达）+ theme.css `--mut` 对比度达 WCAG AA + 语义状态色/反白色/--c-urgent token；P2 `.u-grid-auto` 自适应栅格工具 + 去 side-stripe 彩色左边框。**延后给 D3–D10 在重做时按同套 token 映射+v-activate 处理的文件**：Dashboard 系(D3)、Compare/Pm 系(D4 删除)、Calendar 系(D7-9)、Analysis tab 系 Tier*/Plan*/Risk/ProjectsOverview(D10)。
 - [x] **D3** 看板首页重做：6 指标(DashMetrics) + 统一档位条(TierStrip) + 服务组排名(OrgRanking，排序切换;带筛选跳 /board 留 D4) + 待回款趋势(TrendCard 月/季切换) + 延期 Top(DelayTopCard 天数/金额切换 + 点项目开 D2 详情面板) + SegToggle 共享分段控件;lib 增延期项目数与延期按金额排序。删除旧 DashSummaryCards/TierCards/DelayedTop。
 - [x] **D4** 多维看板·单维核心：`lib/pivot`(DIMENSIONS 6维 + groupByDims，分桶→groupByProject 算指标，N维可扩展) + `BoardView`(/board：维度/排序切换 + ECharts 对比图 + 排名表行下钻) + `BoardDrilldownModal`(组内项目→D2 详情面板) + `lib/navContext.goBoard` + DataTable 加 row-click/clickable + OrgRanking 行接入跳转。删除 compare/pmview 整链(14 文件)与 /compare /pmview 路由;侧栏新增「分析·多维看板」。双维/N维留 D5/D6。
+- [x] **D5.5** 目检打磨：echartsTheme 补全明/暗坐标轴·网格·tooltip(暗色图表可读);字号档位跨度 14/15/16→13/15/17(切换可感知);TierStrip 重设计为三档回款进度条(完成率条+已回/计划+延期，点档下钻 BoardDrilldownModal→D2 详情)。回款日历暗色按既定延后 D7-D9;ECharts 画布文字缩放未做。
 - [x] **D5** 多维看板·双维交叉：lib/pivot 增 `METRICS` + `crossMatrix`(行×列透视，保留每格 PivotGroup);BoardView 加「次维度/指标」SegToggle，交叉模式渲染 `BoardMatrix`(矩阵表) + 可加性指标堆叠图，单元格点击复用 BoardDrilldownModal → D2 详情;次维度=无时维持 D4 单维。
 - [ ] **D6** 多维看板·N 维透视表。
 - [ ] **D7** 回款日历重做 A（富日格 + 选中日明细 + 主题适配 + 字号放大）。
@@ -116,6 +117,13 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D5.5 完成（2026-06-08）：目检打磨（图表暗色 / 字号跨度 / 档位概览）
+- 来源：D5 合并后 /board 与首页目检反馈。分支 **`refactor/d5.5-polish`**，计划 `docs/superpowers/plans/2026-06-08-D5.5-darkmode-fontscale-tierstrip-polish.md`，4 任务全完成、`verify.sh` 全绿。
+- 产物：① echartsTheme 明/暗两套补全 categoryAxis/valueAxis(axisLine/axisLabel/splitLine) + tooltip 颜色 → 暗色图表坐标轴/网格/提示可读;② settings.FONT_PX 13/15/17 拉大跨度（rem 令牌缩放更明显），settings.test 同步;③ TierStrip 重设计为三档回款进度条（每档 完成率条[色按健康度] + 已回/计划万 + 延期数，点档 v-activate → BoardDrilldownModal 列该档项目 → 点项目开 D2 详情）。
+- controller 修正：TierStrip 现内嵌 BoardDrilldownModal(el-dialog/el-table)，DashboardView.test 未装 ElementPlus 报错 → 该测试 stub BoardDrilldownModal。
+- 已知延后/未做：回款日历暗色（D7-D9 整页重写时一并）;ECharts 画布文字随字号缩放;旧页(台账/跟进)字号 px 债（后续统一）。
+- 整体进度：Phase D：**D1-D2-D2.5-D3-D4-D5-D5.5 完成（D5.5 待合并 master）**。下一步 D6（N 维透视表）或 D7（回款日历重做 A）。
 
 ### ✅ Plan D5 完成（2026-06-08）：多维看板·双维交叉
 - 分支 **`refactor/d5-multidim-board-cross`**，计划 `docs/superpowers/plans/2026-06-08-D5-multidim-board-cross.md`，4 任务全完成、`verify.sh` 全绿。
