@@ -163,9 +163,9 @@ export function pivotTable(
     rowMap.set(rk, rowVals)
     colMap.set(ck, colVals)
     ;(index[rk] ||= {})[ck] = g
-    const v = g[metricKey] as number
-    rowTot[rk] = (rowTot[rk] || 0) + v
-    colTot[ck] = (colTot[ck] || 0) + v
+    const mv = g[metricKey] as number
+    rowTot[rk] = (rowTot[rk] || 0) + mv
+    colTot[ck] = (colTot[ck] || 0) + mv
   }
   const rowKeys = [...rowMap.keys()].sort((a, b) => rowTot[b] - rowTot[a])
   const colKeys = [...colMap.keys()].sort((a, b) => colTot[b] - colTot[a])
