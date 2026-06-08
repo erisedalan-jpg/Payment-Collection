@@ -279,3 +279,25 @@ export function calDayTooltipText(dd: CalDayData): string {
   const parts = TOOLTIP_LABELS.filter(([k]) => dd[k] > 0).map(([k, label]) => `${label} ${dd[k]}`)
   return parts.join('，') + `，合计 ${dd.total}`
 }
+
+export interface CalAgendaGroup {
+  date: string
+  nodes: RawNode[]
+  subRemaining: number
+}
+/** 议程列表：按 planDate(到日) 分组、日期升序，每组待回款小计(元)。输入应为已筛选的节点。 */
+export function calAgendaGroups(nodes: RawNode[]): CalAgendaGroup[] {
+  const map: Record<string, RawNode[]> = {}
+  for (const raw of nodes) {
+    const d = String((raw as N).planDate || '').slice(0, 10)
+    if (!d) continue
+    ;(map[d] ||= []).push(raw)
+  }
+  return Object.keys(map)
+    .sort()
+    .map((d) => ({
+      date: d,
+      nodes: map[d],
+      subRemaining: map[d].reduce((s, n) => s + getNodeRemaining(n as N), 0),
+    }))
+}
