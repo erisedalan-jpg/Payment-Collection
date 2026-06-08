@@ -13,10 +13,12 @@ import {
   calListGroups,
   calUpcoming,
   calAgendaGroups,
+  calYearHeat,
   type CalFilters,
 } from '@/lib/calendar'
 import { fmtWan } from '@/lib/format'
 import SegToggle from '@/components/SegToggle.vue'
+import CalYearHeat from '@/components/CalYearHeat.vue'
 import CalGrid from '@/components/CalGrid.vue'
 import CalDayDetail from '@/components/CalDayDetail.vue'
 import CalAgenda from '@/components/CalAgenda.vue'
@@ -55,14 +57,14 @@ const naguanNodes = computed(
 
 const options = computed(() => calFilterOptions(naguanNodes.value as any))
 const dashboard = computed(() => calDashboardStats(filter.filteredNodes as any, calFilters.value, new Date()))
-const gridDateData = computed(() =>
-  calDateData(
-    applyCalFilters(
-      calExcludePaid(naguanNodes.value.filter((n) => n.isPaymentRelated && n.planDate) as any),
-      calFilters.value,
-    ),
+const gridNodes = computed(() =>
+  applyCalFilters(
+    calExcludePaid(naguanNodes.value.filter((n) => n.isPaymentRelated && n.planDate) as any),
+    calFilters.value,
   ),
 )
+const gridDateData = computed(() => calDateData(gridNodes.value))
+const yearHeat = computed(() => calYearHeat(gridNodes.value as any, state.year))
 const listNodes = computed(() =>
   calListNodes(naguanNodes.value as any, calFilters.value, {
     year: state.year,
@@ -110,6 +112,10 @@ function nextMonth() {
 function onSelectDay(ds: string) {
   state.selectedDate = state.selectedDate === ds ? '' : ds
 }
+function onSelectMonth(m: number) {
+  state.month = m
+  state.selectedDate = ''
+}
 function clearFilters() {
   state.filterOrgL3 = ''
   state.filterOrgL4 = ''
@@ -150,6 +156,8 @@ function clearFilters() {
       </el-select>
       <el-button size="small" @click="clearFilters">清除所有筛选</el-button>
     </div>
+
+    <CalYearHeat :cells="yearHeat" :active-month="state.month" @select="onSelectMonth" />
 
     <div class="cal-viewbar">
       <SegToggle v-model="view" :options="VIEW_OPTS" />
