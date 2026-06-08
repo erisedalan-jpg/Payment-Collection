@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D9 回款日历 C 完成，日历三件套收口；Phase D：…-D9 已完成，仅余 D10）
+- 最近更新：2026-06-08（Plan D10 业务分析三档整合完成；**Phase D 前端重构全部完成**）
 - 维护语言：简体中文
 
 ---
@@ -93,7 +93,7 @@ _（无）_
 - [x] **D7** 回款日历重做 A：CalGrid 富日格(日号/笔数/待回款金额/状态点) + CalDayDetail 选中日明细(状态分组,点项目→D2 详情) + CalNodeTable token+行下钻 + CalendarView 整页 token 化(**补日历暗色**)+字号放大;lib/calendar 增每日待回款金额。议程列表(B)留 D8、年度热力条(C)留 D9。
 - [x] **D8** 回款日历 B：lib/calendar 增 `calAgendaGroups`(按日期升序分组+每日小计);新增 `CalAgenda`(议程列表，复用 CalNodeTable 行下钻);CalendarView 加「网格/议程列表」SegToggle 视图切换。年度热力条(C)留 D9。
 - [x] **D9** 回款日历 C：lib/calendar 增 `calYearHeat`(年度12月待回款汇总);新增 `CalYearHeat`(12月热力条，强度 color-mix tint，点月聚焦);CalendarView 抽 gridNodes 共享 + 接入热力条 + 月度下钻联动。回款日历 A/B/C 三件套收口。
-- [ ] **D10** 业务分析三档整合（/analysis/:tab 单页 + 档位筛选/列徽章，删 15 入口）。
+- [x] **D10** 业务分析三档整合：AnalysisView(/analysis/:tab) tab 条 + 档位筛选(默认全部+3档) + nodes 汇总条;5 个 tab 支持全部档(4 个跨档过滤、数据质检跨档 concat[带档位标签])+ token 化(补暗色)+ 全部档档位列;filterOverviewProjects 空 tier=全部;删 /tier 路由 + TierView，侧栏「业务分析」收成 5 个 /analysis 链接(替代 15 入口)。
 - 范围外（形态稳定后单独排）：C 打包（dist 接入 server.py + PyInstaller）、A4 Playwright 脚本健壮性、销售维度（需数据源补列）。
 
 ### 🟢 低
@@ -117,6 +117,14 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D10 完成（2026-06-08）：业务分析三档整合 —— Phase D 收尾
+- 分支 **`refactor/d10-analysis-consolidation`**，计划 `docs/superpowers/plans/2026-06-08-D10-analysis-consolidation.md`，5 任务全完成、`verify.sh` 全绿。
+- 产物：`AnalysisView`(/analysis/:tab：RouterLink tab 条 + 档位 SegToggle[全部+3档,默认全部] + nodes 汇总条);5 个 tab 组件(ProjectsOverview/TierNodes/Plan/Risk/TierIntegrity)支持 tier=''全部(4 个跨档、TierNodes/Plan 列用首档 displayColumns 回退、数据质检跨档 concat incompleteData[带 _tier+档位列])+ 全 token 化(补 D2.5 延后暗色)+ 全部档前置「档位」列;`filterOverviewProjects` 空 tier=全部。删 /tier 路由 + TierView(+test);nav 加 ANALYSIS_TAB_LINKS;侧栏「业务分析」由 15 入口收成 5 个 /analysis 链接。
+- 计算口径忠实：复用既有 lib 未改算法。Task2 由 5 个并行子代理实现、controller 统一 grep/typecheck/测试后提交。
+- **Phase D（前端展示重构）全部完成**：D1 地基 / D2 详情面板 / D2.5 审计修复 / D3 看板首页 / D4-D6 多维看板(单/双/N 维) / D5.5 打磨 / D7-D9 回款日历(网格/议程/热力条) / D10 业务分析整合。
+- 范围外剩余（PROGRESS Backlog 另列，非 Phase D）：C 打包(dist 接入 server.py + PyInstaller)、A4 Playwright 脚本健壮性、旧页字号 px 债、ECharts 画布字号缩放、多维看板行=列同维度互斥。
+- 整体进度：Phase D **全部完成（D10 待合并 master）**。
 
 ### ✅ Plan D9 完成（2026-06-08）：回款日历 C（年度热力条 + 月度下钻联动）
 - 分支 **`refactor/d9-calendar-redo-c`**，计划 `docs/superpowers/plans/2026-06-08-D9-calendar-redo-c.md`，4 任务全完成、`verify.sh` 全绿。
