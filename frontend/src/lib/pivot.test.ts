@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DIMENSIONS, DIM_BY_KEY, groupByDims, METRICS, crossMatrix } from './pivot'
+import { DIMENSIONS, DIM_BY_KEY, groupByDims, METRICS, crossMatrix, pivotTable } from './pivot'
 
 const NODES: any[] = [
   // 项目 P1（北京/张三/100万以上）两节点：计划 100+50 万，已回 60+0 万，一节点延期
@@ -55,5 +55,34 @@ describe('crossMatrix 双维透视', () => {
     expect(m.cells[0]).toEqual([600000, 100000])
     expect(m.cells[1]).toEqual([0, 300000])
     expect(m.index['北京']['100万以上'].projects.length).toBe(1)
+  })
+})
+
+describe('pivotTable 多行多列透视', () => {
+  const PX: any[] = [
+    { projectId: 'A', orgL4: '北京', projectManager: '张三', tier: '100万以上', isPaymentRelated: true, nodeStatus: '正常实施中', expectedPayment: 1000000, actualPayment: 600000 },
+    { projectId: 'B', orgL4: '北京', projectManager: '李四', tier: '50万以下', isPaymentRelated: true, nodeStatus: '正常实施中', expectedPayment: 200000, actualPayment: 100000 },
+    { projectId: 'C', orgL4: '上海', projectManager: '王五', tier: '50万以下', isPaymentRelated: true, nodeStatus: '正常实施中', expectedPayment: 400000, actualPayment: 300000 },
+  ]
+
+  it('行=orgL4×projectManager、列=tier、指标=已回款', () => {
+    const p = pivotTable(PX, ['orgL4', 'projectManager'], ['tier'], 'actualAmount')
+    expect(p.rowDimLabels).toEqual(['服务组(L4)', '项目经理'])
+    expect(p.colDimLabels).toEqual(['金额档位'])
+    expect(p.rows.map((r) => r.tuple)).toEqual([
+      ['北京', '张三'],
+      ['上海', '王五'],
+      ['北京', '李四'],
+    ])
+    expect(p.cols.map((c) => c.label)).toEqual(['100万以上', '50万以下'])
+    expect(p.cells[0]).toEqual([600000, 0])
+    expect(p.index['北京 / 张三']['100万以上'].projects.length).toBe(1)
+  })
+
+  it('无列维度时列为单列「合计」', () => {
+    const p = pivotTable(PX, ['orgL4'], [], 'actualAmount')
+    expect(p.cols.map((c) => c.label)).toEqual(['合计'])
+    expect(p.rows.map((r) => r.tuple)).toEqual([['北京'], ['上海']])
+    expect(p.cells).toEqual([[700000], [300000]])
   })
 })

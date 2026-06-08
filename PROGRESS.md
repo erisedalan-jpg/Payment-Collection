@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D5.5 目检打磨完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5 已完成）
+- 最近更新：2026-06-08（Plan D6 多维看板 N 维透视表完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5-D6 已完成）
 - 维护语言：简体中文
 
 ---
@@ -89,7 +89,7 @@ _（无）_
 - [x] **D4** 多维看板·单维核心：`lib/pivot`(DIMENSIONS 6维 + groupByDims，分桶→groupByProject 算指标，N维可扩展) + `BoardView`(/board：维度/排序切换 + ECharts 对比图 + 排名表行下钻) + `BoardDrilldownModal`(组内项目→D2 详情面板) + `lib/navContext.goBoard` + DataTable 加 row-click/clickable + OrgRanking 行接入跳转。删除 compare/pmview 整链(14 文件)与 /compare /pmview 路由;侧栏新增「分析·多维看板」。双维/N维留 D5/D6。
 - [x] **D5.5** 目检打磨：echartsTheme 补全明/暗坐标轴·网格·tooltip(暗色图表可读);字号档位跨度 14/15/16→13/15/17(切换可感知);TierStrip 重设计为三档回款进度条(完成率条+已回/计划+延期，点档下钻 BoardDrilldownModal→D2 详情)。回款日历暗色按既定延后 D7-D9;ECharts 画布文字缩放未做。
 - [x] **D5** 多维看板·双维交叉：lib/pivot 增 `METRICS` + `crossMatrix`(行×列透视，保留每格 PivotGroup);BoardView 加「次维度/指标」SegToggle，交叉模式渲染 `BoardMatrix`(矩阵表) + 可加性指标堆叠图，单元格点击复用 BoardDrilldownModal → D2 详情;次维度=无时维持 D4 单维。
-- [ ] **D6** 多维看板·N 维透视表。
+- [x] **D6** 多维看板·N 维透视表：lib/pivot 增 `pivotTable`(多行多列);新增 `DimPicker`(有序多选)/`PivotTable`;BoardView 引入「排名/交叉/透视」三模式，透视=自选行×列+指标(列空→单列合计)，点格下钻该交叉组项目→D2 详情。cross 由 secondDim 隐式触发改为显式 mode 门控。
 - [ ] **D7** 回款日历重做 A（富日格 + 选中日明细 + 主题适配 + 字号放大）。
 - [ ] **D8** 回款日历 B（议程列表视图切换）。
 - [ ] **D9** 回款日历 C（年度热力条 + 月度下钻）。
@@ -117,6 +117,13 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D6 完成（2026-06-08）：多维看板·N 维透视表
+- 分支 **`refactor/d6-multidim-board-pivot`**，计划 `docs/superpowers/plans/2026-06-08-D6-multidim-board-pivot.md`，5 任务全完成、`verify.sh` 全绿。
+- 产物：`lib/pivot.pivotTable(nodes,rowDims[],colDims[],metricKey)`(对 [...rowDims,...colDims] 分组后透视成 rows/cols/cells+index;列空→单列「合计」;行列按指标合计降序);`DimPicker`(有序多选 chips，点加/删、显序号);`PivotTable`(行元组多列+列组合表头+数值格，有数据格 v-activate 可点 cell-click);`BoardView` 重写为「排名/交叉/透视」三模式（显式 mode SegToggle），透视模式 = 行/列 DimPicker + 指标 SegToggle + PivotTable，格点击复用 openDrill→BoardDrilldownModal→D2 详情。
+- 模式重构：原 cross 由 `secondDim!==''` 隐式触发，改为显式 `mode` 门控;single/cross 计算逻辑不变，D5 cross 测试更新为"先切交叉模式再选次维度"。
+- YAGNI：透视无小计/总计行;列表头用组合标签(`a / b`)非合并多层;透视不出 N×N 图(表格为主)。
+- 整体进度：Phase D：**D1-D2-D2.5-D3-D4-D5-D5.5-D6 完成（D6 待合并 master）**。多维看板三层(单维/双维/N维)收口。下一步 D7（回款日历重做 A，含日历暗色）。
 
 ### ✅ Plan D5.5 完成（2026-06-08）：目检打磨（图表暗色 / 字号跨度 / 档位概览）
 - 来源：D5 合并后 /board 与首页目检反馈。分支 **`refactor/d5.5-polish`**，计划 `docs/superpowers/plans/2026-06-08-D5.5-darkmode-fontscale-tierstrip-polish.md`，4 任务全完成、`verify.sh` 全绿。
