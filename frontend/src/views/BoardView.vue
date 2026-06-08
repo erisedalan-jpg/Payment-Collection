@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { DIMENSIONS, groupByDims, type PivotGroup } from '@/lib/pivot'
+import { DIMENSIONS, groupByDims, crossMatrix, METRICS, METRIC_BY_KEY, type PivotGroup } from '@/lib/pivot'
 import { fmtWan, pct } from '@/lib/format'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
+import BoardMatrix from '@/components/BoardMatrix.vue'
 import BoardDrilldownModal from '@/components/BoardDrilldownModal.vue'
 
 const route = useRoute()
@@ -26,6 +27,61 @@ const initDim = typeof route.query.dim === 'string' && DIMENSIONS.some((d) => d.
   : 'orgL4'
 const dimKey = ref(initDim)
 const sortKey = ref('actualAmount')
+
+const secondDim = ref('')
+const metricKey = ref<(typeof METRICS)[number]['key']>('actualAmount')
+
+const SECOND_OPTS = computed(() => [
+  { value: '', label: '无' },
+  ...DIMENSIONS.filter((d) => d.key !== dimKey.value).map((d) => ({ value: d.key, label: d.label })),
+])
+const METRIC_OPTS = METRICS.map((m) => ({ value: m.key, label: m.label }))
+
+// 主维度变化时若与次维度撞车则清空次维度
+watch(dimKey, () => {
+  if (secondDim.value === dimKey.value) secondDim.value = ''
+})
+
+const crossOn = computed(() => secondDim.value !== '')
+
+const matrix = computed(() =>
+  crossOn.value ? crossMatrix(filter.filteredNodes, dimKey.value, secondDim.value, metricKey.value) : null,
+)
+
+const metricKind = computed(() => METRIC_BY_KEY[metricKey.value].kind)
+const metricFormat = computed(() => {
+  const kind = metricKind.value
+  return (v: number) => (kind === 'money' ? fmtWan(v) : kind === 'rate' ? pct(v) : String(v))
+})
+
+// 交叉堆叠图：仅可加性指标（金额/计数）；比例类不出图
+const crossChartOption = computed(() => {
+  const m = matrix.value
+  if (!m || metricKind.value === 'rate') return null
+  const rows = m.rows.slice(0, 15)
+  const div = metricKind.value === 'money' ? 10000 : 1
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { type: 'scroll', top: 0 },
+    grid: { left: 60, right: 20, top: 30, bottom: 70 },
+    xAxis: { type: 'category', data: rows, axisLabel: { interval: 0, rotate: 30 } },
+    yAxis: { type: 'value', name: metricKind.value === 'money' ? '金额(万)' : '数量' },
+    series: m.cols.map((cv) => ({
+      name: cv,
+      type: 'bar',
+      stack: 'cross',
+      data: rows.map((rv) => {
+        const g = m.index[rv]?.[cv]
+        return g ? +((g[metricKey.value] as number) / div).toFixed(2) : 0
+      }),
+    })),
+  }
+})
+
+function onCellClick({ row, col }: { row: string; col: string }) {
+  const g = matrix.value?.index[row]?.[col]
+  if (g) openDrill(g)
+}
 
 const groups = computed<PivotGroup[]>(() => {
   const gs = groupByDims(filter.filteredNodes, [dimKey.value])
@@ -66,11 +122,34 @@ defineExpose({ drillOpen })
           <SegToggle v-model="dimKey" :options="DIM_OPTS" />
         </div>
         <div class="bv-ctl">
-          <span class="bv-ctl-label">排序</span>
-          <SegToggle v-model="sortKey" :options="SORT_OPTS" />
+          <span class="bv-ctl-label">次维度</span>
+          <SegToggle v-model="secondDim" :options="SECOND_OPTS" />
+        </div>
+        <div class="bv-ctl">
+          <span class="bv-ctl-label">{{ crossOn ? '指标' : '排序' }}</span>
+          <SegToggle v-if="crossOn" v-model="metricKey" :options="METRIC_OPTS" />
+          <SegToggle v-else v-model="sortKey" :options="SORT_OPTS" />
         </div>
       </div>
 
+      <template v-if="crossOn">
+        <section v-if="crossChartOption" class="bv-card">
+          <h3 class="bv-title">{{ METRIC_BY_KEY[metricKey].label }} 交叉堆叠（行 Top 15）</h3>
+          <ChartBox :option="crossChartOption" height="320px" />
+        </section>
+        <section class="bv-card">
+          <h3 class="bv-title">交叉矩阵（点击单元格下钻）</h3>
+          <BoardMatrix
+            :matrix="matrix!"
+            :row-label="DIM_OPTS.find((d) => d.value === dimKey)?.label || ''"
+            :col-label="SECOND_OPTS.find((d) => d.value === secondDim)?.label || ''"
+            :format="metricFormat"
+            @cell-click="onCellClick"
+          />
+        </section>
+      </template>
+
+      <template v-else>
       <section class="bv-card">
         <h3 class="bv-title">已回款 / 待回款对比（Top {{ top.length }}）</h3>
         <ChartBox :option="chartOption" height="320px" />
@@ -103,6 +182,7 @@ defineExpose({ drillOpen })
           <div v-if="!groups.length" class="bv-empty">暂无数据</div>
         </div>
       </section>
+      </template>
 
       <BoardDrilldownModal
         v-model="drillOpen"
