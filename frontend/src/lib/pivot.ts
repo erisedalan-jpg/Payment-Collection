@@ -71,3 +71,54 @@ export function groupByDims(nodes: RawNode[], dimKeys: string[]): PivotGroup[] {
   })
   return groups.sort((a, b) => b.actualAmount - a.actualAmount)
 }
+
+export interface MetricDef {
+  key: 'actualAmount' | 'expectedAmount' | 'remainingAmount' | 'completionRate' | 'projectCount' | 'delayedCount'
+  label: string
+  kind: 'money' | 'count' | 'rate'
+}
+
+export const METRICS: MetricDef[] = [
+  { key: 'actualAmount', label: '已回款', kind: 'money' },
+  { key: 'expectedAmount', label: '计划回款', kind: 'money' },
+  { key: 'remainingAmount', label: '待回款', kind: 'money' },
+  { key: 'completionRate', label: '完成率', kind: 'rate' },
+  { key: 'projectCount', label: '项目数', kind: 'count' },
+  { key: 'delayedCount', label: '延期数', kind: 'count' },
+]
+
+export const METRIC_BY_KEY: Record<string, MetricDef> = Object.fromEntries(
+  METRICS.map((m) => [m.key, m]),
+)
+
+export interface CrossMatrix {
+  rows: string[]
+  cols: string[]
+  cells: number[][]
+  index: Record<string, Record<string, PivotGroup>>
+}
+
+/** 双维透视：行=rowDim 取值、列=colDim 取值、格=所选指标值（无该交叉组则 0）。
+ *  行/列按各自指标合计降序。index 保留每格 PivotGroup 供下钻。 */
+export function crossMatrix(
+  nodes: RawNode[],
+  rowDim: string,
+  colDim: string,
+  metricKey: MetricDef['key'],
+): CrossMatrix {
+  const groups = groupByDims(nodes, [rowDim, colDim])
+  const index: Record<string, Record<string, PivotGroup>> = {}
+  const rowTotals: Record<string, number> = {}
+  const colTotals: Record<string, number> = {}
+  for (const g of groups) {
+    const [rv, cv] = g.values
+    const val = g[metricKey] as number
+    ;(index[rv] ||= {})[cv] = g
+    rowTotals[rv] = (rowTotals[rv] || 0) + val
+    colTotals[cv] = (colTotals[cv] || 0) + val
+  }
+  const rows = Object.keys(rowTotals).sort((a, b) => rowTotals[b] - rowTotals[a])
+  const cols = Object.keys(colTotals).sort((a, b) => colTotals[b] - colTotals[a])
+  const cells = rows.map((rv) => cols.map((cv) => (index[rv]?.[cv]?.[metricKey] as number) ?? 0))
+  return { rows, cols, cells, index }
+}
