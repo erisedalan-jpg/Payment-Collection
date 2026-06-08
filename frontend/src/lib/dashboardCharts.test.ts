@@ -73,3 +73,21 @@ describe('delayedTopProjects', () => {
     expect(r[0].projectId).toBe('D14')
   })
 })
+
+describe('delayedTopProjects sortBy', () => {
+  const dnodes = [
+    { projectId: 'A', projectName: '延期A', tier: '100万以上', orgL4: 'X', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 2200000, actualPayment: 0, delayDays: 15, planMonth: '2026-01' },
+    { projectId: 'B', projectName: '延期B', tier: '50万以下', orgL4: 'Y', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 400000, actualPayment: 0, delayDays: 40, planMonth: '2026-02' },
+  ] as any
+
+  it('默认按天数降序', () => {
+    const r = delayedTopProjects(dnodes, 10)
+    expect(r.map((p) => p.projectId)).toEqual(['B', 'A'])
+  })
+
+  it('按金额降序（remainingAmount）', () => {
+    const r = delayedTopProjects(dnodes, 10, 'amount')
+    expect(r.map((p) => p.projectId)).toEqual(['A', 'B'])
+    expect(r[0].remainingAmount).toBe(2200000)
+  })
+})
