@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { RawNode } from '@/types/analysis'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useDataStore } from '@/stores/data'
 import { buildProjectDetail } from '@/lib/projectDetail'
@@ -19,7 +20,7 @@ const visible = computed({
 
 const detail = computed(() =>
   pd.openId
-    ? buildProjectDetail((data.data?.rawNodes ?? []) as never, pd.openId)
+    ? buildProjectDetail((data.data?.rawNodes ?? []) as RawNode[], pd.openId)
     : { project: null, nodes: [] },
 )
 
