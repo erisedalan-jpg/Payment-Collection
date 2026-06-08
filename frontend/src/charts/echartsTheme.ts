@@ -14,7 +14,21 @@ registerTheme(ENT_THEME, {
   color: PALETTE,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: 'Inter, "Noto Sans SC", sans-serif', color: '#1f2a3d' },
+  title: { textStyle: { color: '#1f2a3d' } },
   legend: { textStyle: { color: '#5b6b85' } },
+  categoryAxis: {
+    axisLine: { lineStyle: { color: '#d4dbe8' } },
+    axisTick: { lineStyle: { color: '#d4dbe8' } },
+    axisLabel: { color: '#5b6b85' },
+    splitLine: { show: false, lineStyle: { color: '#eef2f8' } },
+  },
+  valueAxis: {
+    axisLine: { lineStyle: { color: '#d4dbe8' } },
+    axisTick: { lineStyle: { color: '#d4dbe8' } },
+    axisLabel: { color: '#5b6b85' },
+    splitLine: { lineStyle: { color: '#e6eaf2' } },
+  },
+  tooltip: { backgroundColor: '#ffffff', borderColor: '#e6eaf2', textStyle: { color: '#1f2a3d' } },
 })
 
 // 'ent-dark'：深色
@@ -23,5 +37,19 @@ registerTheme(ENT_THEME_DARK, {
   color: PALETTE,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: 'Inter, "Noto Sans SC", sans-serif', color: '#e6edf7' },
+  title: { textStyle: { color: '#e6edf7' } },
   legend: { textStyle: { color: '#8aa0c0' } },
+  categoryAxis: {
+    axisLine: { lineStyle: { color: '#28385a' } },
+    axisTick: { lineStyle: { color: '#28385a' } },
+    axisLabel: { color: '#8aa0c0' },
+    splitLine: { show: false, lineStyle: { color: '#1f2c44' } },
+  },
+  valueAxis: {
+    axisLine: { lineStyle: { color: '#28385a' } },
+    axisTick: { lineStyle: { color: '#28385a' } },
+    axisLabel: { color: '#8aa0c0' },
+    splitLine: { lineStyle: { color: '#1f2c44' } },
+  },
+  tooltip: { backgroundColor: '#111c30', borderColor: '#1f2c44', textStyle: { color: '#e6edf7' } },
 })
