@@ -16,6 +16,7 @@ import {
 } from '@/lib/calendar'
 import { fmtWan } from '@/lib/format'
 import CalGrid from '@/components/CalGrid.vue'
+import CalDayDetail from '@/components/CalDayDetail.vue'
 import CalNodeTable from '@/components/CalNodeTable.vue'
 
 const data = useDataStore()
@@ -69,27 +70,25 @@ const listNodes = computed(() =>
 const listGroups = computed(() => calListGroups(listNodes.value))
 const upcoming = computed(() => calUpcoming(naguanNodes.value as any, calFilters.value, new Date()))
 
-const listTitle = computed(() => (state.selectedDate ? `${state.selectedDate} 回款节点` : '当月回款节点'))
+const listTitle = computed(() => (state.selectedDate ? `${state.selectedDate} 回款节点` : '当月/次月回款节点'))
 
-function prevYear() {
-  state.year--
-}
-function nextYear() {
-  state.year++
-}
+const DASH = computed(() => [
+  { label: '当月待回款(万)', value: fmtWan(dashboard.value.mRemaining), cls: 'danger' },
+  { label: '当月已回款(万)', value: fmtWan(dashboard.value.mActual), cls: 'paid' },
+  { label: '7天内到期', value: String(dashboard.value.upcoming7), cls: 'pending' },
+  { label: '当月回款节点', value: String(dashboard.value.mCount), cls: 'accent' },
+  { label: '延期节点', value: String(dashboard.value.delayed), cls: 'danger' },
+])
+
+function prevYear() { state.year-- }
+function nextYear() { state.year++ }
 function prevMonth() {
   state.month--
-  if (state.month < 0) {
-    state.month = 11
-    state.year--
-  }
+  if (state.month < 0) { state.month = 11; state.year-- }
 }
 function nextMonth() {
   state.month++
-  if (state.month > 11) {
-    state.month = 0
-    state.year++
-  }
+  if (state.month > 11) { state.month = 0; state.year++ }
 }
 function onSelectDay(ds: string) {
   state.selectedDate = state.selectedDate === ds ? '' : ds
@@ -106,11 +105,10 @@ function clearFilters() {
     <h2 class="cal-title">回款日历</h2>
 
     <div class="cal-dash">
-      <div class="cd-card"><div class="cd-label">当月待回款(万)</div><div class="cd-val" style="color:#ef4444">{{ fmtWan(dashboard.mRemaining) }}</div></div>
-      <div class="cd-card"><div class="cd-label">当月已回款(万)</div><div class="cd-val" style="color:#10b981">{{ fmtWan(dashboard.mActual) }}</div></div>
-      <div class="cd-card"><div class="cd-label">7天内到期</div><div class="cd-val" style="color:#f59e0b">{{ dashboard.upcoming7 }}</div></div>
-      <div class="cd-card"><div class="cd-label">当月回款节点</div><div class="cd-val" style="color:#3b82f6">{{ dashboard.mCount }}</div></div>
-      <div class="cd-card"><div class="cd-label">延期节点</div><div class="cd-val" style="color:#ef4444">{{ dashboard.delayed }}</div></div>
+      <div v-for="c in DASH" :key="c.label" class="cd-card">
+        <div class="cd-label">{{ c.label }}</div>
+        <div class="cd-val" :class="c.cls">{{ c.value }}</div>
+      </div>
     </div>
 
     <div class="cal-filterbar">
@@ -144,27 +142,17 @@ function clearFilters() {
       @select="onSelectDay"
     />
 
-    <div class="cal-list">
-      <div class="cal-list-title">{{ listTitle }}</div>
-      <div v-if="!listGroups.length" class="cal-empty">暂无回款节点</div>
-      <div v-for="g in listGroups" :key="g.key" class="cal-list-group">
-        <div class="cal-group-header" :style="{ borderLeftColor: g.color }">
-          <span :style="{ color: g.color }">{{ g.key }}</span>
-          <span class="cal-group-sub">{{ g.nodes.length }}个节点，待回款小计 {{ fmtWan(g.subRemaining) }}万</span>
-        </div>
-        <CalNodeTable :nodes="g.nodes as Record<string, any>[]" />
-      </div>
-    </div>
+    <CalDayDetail :title="listTitle" :groups="listGroups" />
 
     <div class="cal-upcoming">
       <div class="cal-up-title">即将到期回款节点</div>
       <div class="cal-up-row">
         <div class="cal-up-panel">
-          <div class="cal-up-header orange">15天内到期</div>
+          <div class="cal-up-header pending">15天内到期</div>
           <CalNodeTable :nodes="upcoming.up15 as Record<string, any>[]" :max-show="50" />
         </div>
         <div class="cal-up-panel">
-          <div class="cal-up-header blue">30天内到期</div>
+          <div class="cal-up-header accent">30天内到期</div>
           <CalNodeTable :nodes="upcoming.up30 as Record<string, any>[]" :max-show="100" />
         </div>
       </div>
@@ -174,26 +162,25 @@ function clearFilters() {
 
 <style scoped>
 .cal-view { padding: 16px; }
-.cal-title { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 14px; }
+.cal-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 14px; }
 .cal-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 14px; }
-.cd-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 10px; text-align: center; }
-.cd-label { font-size: 11px; color: #8c8c9e; margin-bottom: 4px; }
-.cd-val { font-size: 24px; font-weight: 800; }
+.cd-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 10px; text-align: center; }
+.cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: 4px; }
+.cd-val { font-size: var(--fs-5); font-weight: 800; color: var(--txt); }
+.cd-val.danger { color: var(--danger); }
+.cd-val.paid { color: var(--c-paid); }
+.cd-val.pending { color: var(--c-pending); }
+.cd-val.accent { color: var(--accent); }
 .cal-filterbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .cal-nav { display: inline-flex; align-items: center; gap: 6px; }
-.cal-arrow { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-weight: 900; color: #475569; }
-.cal-navlabel { font-size: 14px; font-weight: 700; color: #0f172a; min-width: 48px; text-align: center; }
-.cal-list { margin-top: 18px; }
-.cal-list-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
-.cal-empty { color: #94a3b8; text-align: center; padding: 20px; }
-.cal-list-group { margin-bottom: 14px; }
-.cal-group-header { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 8px 12px; border-left: 3px solid #94a3b8; background: #f8fafc; font-size: 13px; }
-.cal-group-sub { color: #334155; font-size: 12px; font-weight: 400; }
+.cal-arrow { border: 1px solid var(--line); background: var(--card); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-weight: 900; color: var(--sub); }
+.cal-arrow:hover { background: var(--card2); color: var(--accent); }
+.cal-navlabel { font-size: var(--fs-2); font-weight: 700; color: var(--txt); min-width: 48px; text-align: center; }
 .cal-upcoming { margin-top: 22px; }
-.cal-up-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+.cal-up-title { font-size: var(--fs-4); font-weight: 800; color: var(--txt); margin-bottom: 12px; }
 .cal-up-row { display: flex; gap: 16px; flex-wrap: wrap; }
-.cal-up-panel { flex: 1; min-width: 320px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-.cal-up-header { color: #fff; font-weight: 700; font-size: 13px; padding: 8px 12px; }
-.cal-up-header.orange { background: #f59e0b; }
-.cal-up-header.blue { background: #3b82f6; }
+.cal-up-panel { flex: 1; min-width: 320px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.cal-up-header { color: var(--on-accent); font-weight: 700; font-size: var(--fs-2); padding: 8px 12px; }
+.cal-up-header.pending { background: var(--c-pending); }
+.cal-up-header.accent { background: var(--accent); }
 </style>

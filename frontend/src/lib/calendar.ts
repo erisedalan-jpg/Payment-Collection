@@ -90,6 +90,7 @@ export interface CalDayData {
   reachedCondition: number
   fullPaid: number
   pending: number
+  remaining: number
 }
 /** 忠实移植 renderCalPage 的 _calPageDateData：按日期统计各状态计数（输入应为 related&&planDate 节点）。 */
 export function calDateData(nodes: RawNode[]): Record<string, CalDayData> {
@@ -99,9 +100,10 @@ export function calDateData(nodes: RawNode[]): Record<string, CalDayData> {
     if (!n.isPaymentRelated || !n.planDate) continue
     const d = String(n.planDate).slice(0, 10)
     if (!map[d])
-      map[d] = { total: 0, delayed: 0, onTime: 0, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0 }
+      map[d] = { total: 0, delayed: 0, onTime: 0, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0, remaining: 0 }
     const dd = map[d]
     dd.total++
+    dd.remaining += getNodeRemaining(n)
     const s = n.nodeStatus
     if (s === '延期') dd.delayed++
     else if (s === '正常实施中') dd.onTime++
@@ -122,6 +124,7 @@ export interface CalCell {
   isWeekend: boolean
   statusClass: string
   count: number
+  remaining: number
 }
 /** 忠实移植 buildMonthHtml 的格子计算（含上/下月补位）；statusClass 取状态优先级或 mixed。today 注入。 */
 export function calMonthGrid(
@@ -136,7 +139,7 @@ export function calMonthGrid(
   const dim = new Date(year, month + 1, 0).getDate()
   const prevDim = new Date(year, month, 0).getDate()
   for (let i = 0; i < startOff; i++)
-    cells.push({ day: prevDim - startOff + i + 1, dateStr: '', otherMonth: true, isToday: false, isWeekend: false, statusClass: '', count: 0 })
+    cells.push({ day: prevDim - startOff + i + 1, dateStr: '', otherMonth: true, isToday: false, isWeekend: false, statusClass: '', count: 0, remaining: 0 })
   for (let d = 1; d <= dim; d++) {
     const ds = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0')
     const dowD = new Date(year, month, d).getDay()
@@ -163,12 +166,12 @@ export function calMonthGrid(
       else if (dd.fullPaid > 0) statusClass = 'fullpaid'
       else statusClass = 'pending'
     }
-    cells.push({ day: d, dateStr: ds, otherMonth: false, isToday, isWeekend, statusClass, count })
+    cells.push({ day: d, dateStr: ds, otherMonth: false, isToday, isWeekend, statusClass, count, remaining: dd ? dd.remaining : 0 })
   }
   const total = startOff + dim
   const rem = total % 7 === 0 ? 0 : 7 - (total % 7)
   for (let i = 1; i <= rem; i++)
-    cells.push({ day: i, dateStr: '', otherMonth: true, isToday: false, isWeekend: false, statusClass: '', count: 0 })
+    cells.push({ day: i, dateStr: '', otherMonth: true, isToday: false, isWeekend: false, statusClass: '', count: 0, remaining: 0 })
   return cells
 }
 
