@@ -301,3 +301,24 @@ export function calAgendaGroups(nodes: RawNode[]): CalAgendaGroup[] {
       subRemaining: map[d].reduce((s, n) => s + getNodeRemaining(n as N), 0),
     }))
 }
+
+export interface CalYearHeatCell {
+  month: number
+  remaining: number
+  count: number
+}
+/** 年度热力：指定年的 12 个月各自待回款金额合计(元)与节点数。输入应为已筛选的节点。 */
+export function calYearHeat(nodes: RawNode[], year: number): CalYearHeatCell[] {
+  const out: CalYearHeatCell[] = Array.from({ length: 12 }, (_, m) => ({ month: m, remaining: 0, count: 0 }))
+  for (const raw of nodes) {
+    const n = raw as N
+    const pd = String(n.planDate || '')
+    if (pd.length < 7) continue
+    if (parseInt(pd.slice(0, 4)) !== year) continue
+    const m = parseInt(pd.slice(5, 7)) - 1
+    if (m < 0 || m > 11) continue
+    out[m].remaining += getNodeRemaining(n)
+    out[m].count++
+  }
+  return out
+}
