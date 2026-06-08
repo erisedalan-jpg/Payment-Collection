@@ -122,3 +122,62 @@ export function crossMatrix(
   const cells = rows.map((rv) => cols.map((cv) => (index[rv]?.[cv]?.[metricKey] as number) ?? 0))
   return { rows, cols, cells, index }
 }
+
+export interface PivotRow {
+  tuple: string[]
+  key: string
+}
+export interface PivotCol {
+  label: string
+  key: string
+}
+export interface PivotResult {
+  rowDimLabels: string[]
+  colDimLabels: string[]
+  rows: PivotRow[]
+  cols: PivotCol[]
+  cells: number[][]
+  index: Record<string, Record<string, PivotGroup>>
+}
+
+/** 多行多列透视：行=rowDims 组合、列=colDims 组合、格=metric;按行/列指标合计降序。
+ *  colDims 为空时列退化为单列「合计」。index 保留每格 PivotGroup 供下钻。 */
+export function pivotTable(
+  nodes: RawNode[],
+  rowDims: string[],
+  colDims: string[],
+  metricKey: MetricDef['key'],
+): PivotResult {
+  const rn = rowDims.length
+  const full = groupByDims(nodes, [...rowDims, ...colDims])
+  const index: Record<string, Record<string, PivotGroup>> = {}
+  const rowMap = new Map<string, string[]>()
+  const colMap = new Map<string, string[]>()
+  const rowTot: Record<string, number> = {}
+  const colTot: Record<string, number> = {}
+  for (const g of full) {
+    const rowVals = g.values.slice(0, rn)
+    const colVals = g.values.slice(rn)
+    const rk = rowVals.join(' / ')
+    const ck = colVals.join(' / ')
+    rowMap.set(rk, rowVals)
+    colMap.set(ck, colVals)
+    ;(index[rk] ||= {})[ck] = g
+    const v = g[metricKey] as number
+    rowTot[rk] = (rowTot[rk] || 0) + v
+    colTot[ck] = (colTot[ck] || 0) + v
+  }
+  const rowKeys = [...rowMap.keys()].sort((a, b) => rowTot[b] - rowTot[a])
+  const colKeys = [...colMap.keys()].sort((a, b) => colTot[b] - colTot[a])
+  const rows: PivotRow[] = rowKeys.map((k) => ({ key: k, tuple: rowMap.get(k)! }))
+  const cols: PivotCol[] = colKeys.map((k) => ({ key: k, label: colDims.length ? k : '合计' }))
+  const cells = rows.map((r) => cols.map((c) => (index[r.key]?.[c.key]?.[metricKey] as number) ?? 0))
+  return {
+    rowDimLabels: rowDims.map((d) => DIM_BY_KEY[d]?.label ?? d),
+    colDimLabels: colDims.map((d) => DIM_BY_KEY[d]?.label ?? d),
+    rows,
+    cols,
+    cells,
+    index,
+  }
+}
