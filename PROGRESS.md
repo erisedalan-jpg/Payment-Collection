@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D7 回款日历重做 A 完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5-D6-D7 已完成）
+- 最近更新：2026-06-08（Plan D8 回款日历 B 完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5-D6-D7-D8 已完成）
 - 维护语言：简体中文
 
 ---
@@ -91,7 +91,7 @@ _（无）_
 - [x] **D5** 多维看板·双维交叉：lib/pivot 增 `METRICS` + `crossMatrix`(行×列透视，保留每格 PivotGroup);BoardView 加「次维度/指标」SegToggle，交叉模式渲染 `BoardMatrix`(矩阵表) + 可加性指标堆叠图，单元格点击复用 BoardDrilldownModal → D2 详情;次维度=无时维持 D4 单维。
 - [x] **D6** 多维看板·N 维透视表：lib/pivot 增 `pivotTable`(多行多列);新增 `DimPicker`(有序多选)/`PivotTable`;BoardView 引入「排名/交叉/透视」三模式，透视=自选行×列+指标(列空→单列合计)，点格下钻该交叉组项目→D2 详情。cross 由 secondDim 隐式触发改为显式 mode 门控。
 - [x] **D7** 回款日历重做 A：CalGrid 富日格(日号/笔数/待回款金额/状态点) + CalDayDetail 选中日明细(状态分组,点项目→D2 详情) + CalNodeTable token+行下钻 + CalendarView 整页 token 化(**补日历暗色**)+字号放大;lib/calendar 增每日待回款金额。议程列表(B)留 D8、年度热力条(C)留 D9。
-- [ ] **D8** 回款日历 B（议程列表视图切换）。
+- [x] **D8** 回款日历 B：lib/calendar 增 `calAgendaGroups`(按日期升序分组+每日小计);新增 `CalAgenda`(议程列表，复用 CalNodeTable 行下钻);CalendarView 加「网格/议程列表」SegToggle 视图切换。年度热力条(C)留 D9。
 - [ ] **D9** 回款日历 C（年度热力条 + 月度下钻）。
 - [ ] **D10** 业务分析三档整合（/analysis/:tab 单页 + 档位筛选/列徽章，删 15 入口）。
 - 范围外（形态稳定后单独排）：C 打包（dist 接入 server.py + PyInstaller）、A4 Playwright 脚本健壮性、销售维度（需数据源补列）。
@@ -117,6 +117,13 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D8 完成（2026-06-08）：回款日历 B（议程列表视图切换）
+- 分支 **`refactor/d8-calendar-redo-b`**，计划 `docs/superpowers/plans/2026-06-08-D8-calendar-redo-b.md`，4 任务全完成、`verify.sh` 全绿。
+- 产物：`lib/calendar.calAgendaGroups(nodes)`(按 planDate 升序分组 + 每日待回款小计);`CalAgenda.vue`(议程列表：每日 header + 复用 CalNodeTable 行点击下钻 D2 详情);`CalendarView` 加 `view`(grid/agenda) SegToggle，网格态=CalGrid+CalDayDetail(D7)、议程态=CalAgenda(数据源 calListNodes 双月、selectedDate 强制空、独立于网格选日)。
+- 计算口径忠实：复用 calListNodes/getNodeRemaining。CalendarView.test 加议程切换用例。
+- YAGNI：年度热力条(C)留 D9。
+- 整体进度：Phase D：**…D7-D8 完成（D8 待合并 master）**。下一步 D9（回款日历 C：年度热力条 + 月度下钻联动）。
 
 ### ✅ Plan D7 完成（2026-06-08）：回款日历重做 A（富日格 + 选中日明细 + 日历暗色）
 - 分支 **`refactor/d7-calendar-redo-a`**，计划 `docs/superpowers/plans/2026-06-08-D7-calendar-redo-a.md`，6 任务全完成、`verify.sh` 全绿。
