@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D6 多维看板 N 维透视表完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5-D6 已完成）
+- 最近更新：2026-06-08（Plan D7 回款日历重做 A 完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5-D6-D7 已完成）
 - 维护语言：简体中文
 
 ---
@@ -90,7 +90,7 @@ _（无）_
 - [x] **D5.5** 目检打磨：echartsTheme 补全明/暗坐标轴·网格·tooltip(暗色图表可读);字号档位跨度 14/15/16→13/15/17(切换可感知);TierStrip 重设计为三档回款进度条(完成率条+已回/计划+延期，点档下钻 BoardDrilldownModal→D2 详情)。回款日历暗色按既定延后 D7-D9;ECharts 画布文字缩放未做。
 - [x] **D5** 多维看板·双维交叉：lib/pivot 增 `METRICS` + `crossMatrix`(行×列透视，保留每格 PivotGroup);BoardView 加「次维度/指标」SegToggle，交叉模式渲染 `BoardMatrix`(矩阵表) + 可加性指标堆叠图，单元格点击复用 BoardDrilldownModal → D2 详情;次维度=无时维持 D4 单维。
 - [x] **D6** 多维看板·N 维透视表：lib/pivot 增 `pivotTable`(多行多列);新增 `DimPicker`(有序多选)/`PivotTable`;BoardView 引入「排名/交叉/透视」三模式，透视=自选行×列+指标(列空→单列合计)，点格下钻该交叉组项目→D2 详情。cross 由 secondDim 隐式触发改为显式 mode 门控。
-- [ ] **D7** 回款日历重做 A（富日格 + 选中日明细 + 主题适配 + 字号放大）。
+- [x] **D7** 回款日历重做 A：CalGrid 富日格(日号/笔数/待回款金额/状态点) + CalDayDetail 选中日明细(状态分组,点项目→D2 详情) + CalNodeTable token+行下钻 + CalendarView 整页 token 化(**补日历暗色**)+字号放大;lib/calendar 增每日待回款金额。议程列表(B)留 D8、年度热力条(C)留 D9。
 - [ ] **D8** 回款日历 B（议程列表视图切换）。
 - [ ] **D9** 回款日历 C（年度热力条 + 月度下钻）。
 - [ ] **D10** 业务分析三档整合（/analysis/:tab 单页 + 档位筛选/列徽章，删 15 入口）。
@@ -117,6 +117,14 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D7 完成（2026-06-08）：回款日历重做 A（富日格 + 选中日明细 + 日历暗色）
+- 分支 **`refactor/d7-calendar-redo-a`**，计划 `docs/superpowers/plans/2026-06-08-D7-calendar-redo-a.md`，6 任务全完成、`verify.sh` 全绿。
+- 产物：`lib/calendar` CalDayData/CalCell 增 `remaining`(每日待回款金额)、calDateData/calMonthGrid 同步;`CalGrid` 重写为富日格(日号 + 状态点[色按 statusClass] + N笔 + X万，色用语义 token 经 color-mix tint，有节点日 v-activate 可选中);`CalNodeTable` token 化 + 行 v-activate 点击 → projectDetail.open;`CalDayDetail` 新建(选中日/当月按状态分组 + 复用 CalNodeTable);`CalendarView` 重写(仪表卡/导航/筛选/临期全 token 化 + 字号放大 + 接入新组件)。
+- **日历暗色补齐**：D2.5 审计延后的 CalendarView/CalGrid/CalNodeTable 硬编码色随重写全部 token 化，日历区 rg 零残留硬编码 hex。
+- 计算口径忠实：全复用 lib/calendar，仅加每日金额。CalendarView.test 全量挂载断言仍通过(未改)。
+- YAGNI：议程列表视图切换(B)留 D8、年度热力条(C)留 D9。
+- 整体进度：Phase D：**D1-D2-D2.5-D3-D4-D5-D5.5-D6-D7 完成（D7 待合并 master）**。下一步 D8（回款日历 B：议程列表视图切换）。
 
 ### ✅ Plan D6 完成（2026-06-08）：多维看板·N 维透视表
 - 分支 **`refactor/d6-multidim-board-pivot`**，计划 `docs/superpowers/plans/2026-06-08-D6-multidim-board-pivot.md`，5 任务全完成、`verify.sh` 全绿。
