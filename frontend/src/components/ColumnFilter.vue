@@ -75,12 +75,12 @@ function clear() {
         列筛选 <span class="cf-count">({{ visibleUniques.length }}个值)</span>
       </div>
       <el-input v-model="search" size="small" placeholder="搜索筛选选项..." clearable />
-      <label class="cf-row cf-all">
+      <label v-activate class="cf-row cf-all">
         <el-checkbox :model-value="allChecked" @change="(v: any) => toggleAll(!!v)" />
         全选/取消全选
       </label>
       <div class="cf-list">
-        <label v-for="u in visibleUniques" :key="u.display" class="cf-row" :title="u.display">
+        <label v-for="u in visibleUniques" :key="u.display" v-activate class="cf-row" :title="u.display">
           <el-checkbox
             :model-value="selected.has(u.display)"
             @change="(v: any) => toggle(u.display, !!v)"
@@ -107,26 +107,26 @@ function clear() {
   border-radius: 3px;
   cursor: pointer;
   font-size: 10px;
-  color: #cbd5e1;
+  color: var(--mut);
   vertical-align: middle;
 }
 .cf-icon:hover,
 .cf-icon.active {
-  color: #4f46e5;
-  background: #eef2ff;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .cf-title {
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 6px;
-  color: #0f172a;
+  color: var(--txt);
 }
 .cf-count {
-  color: #94a3b8;
+  color: var(--mut);
   font-weight: 400;
 }
 .cf-all {
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--line);
   margin: 6px 0;
   padding-bottom: 4px;
 }

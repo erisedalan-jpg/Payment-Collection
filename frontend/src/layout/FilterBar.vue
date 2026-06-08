@@ -64,8 +64,8 @@ const mode = computed({
 
 <style scoped>
 .filter-bar { display: flex; align-items: center; gap: 16px; padding: 8px 18px;
-  border-bottom: 1px solid #e2e8f0; background: #fff; font-size: 13px; color: #475569; }
+  border-bottom: 1px solid var(--line); background: var(--card); font-size: 13px; color: var(--sub); }
 .fb-item { display: inline-flex; align-items: center; gap: 6px; }
-.fb-item select { padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+.fb-item select { padding: 4px 8px; border: 1px solid var(--line2); border-radius: 6px; font-size: 13px; }
 .naguan { margin-left: auto; }
 </style>
