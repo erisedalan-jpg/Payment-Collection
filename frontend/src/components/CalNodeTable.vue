@@ -2,11 +2,13 @@
 import { computed } from 'vue'
 import { fmtYuan, fmtRatio } from '@/lib/format'
 import { getNodeRemaining } from '@/lib/riskGroups'
+import { useProjectDetailStore } from '@/stores/projectDetail'
 
 const props = withDefaults(defineProps<{ nodes: Record<string, any>[]; maxShow?: number }>(), {
   maxShow: 100,
 })
 const rows = computed(() => props.nodes.slice(0, props.maxShow))
+const pd = useProjectDetailStore()
 </script>
 
 <template>
@@ -30,11 +32,11 @@ const rows = computed(() => props.nodes.slice(0, props.maxShow))
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(n, i) in rows" :key="i">
+        <tr v-for="(n, i) in rows" :key="i" v-activate class="cnt-row" @click="pd.open(n.projectId)">
           <td>{{ n.projectId }}</td>
           <td :title="n.projectName || ''">{{ n.projectName || '-' }}</td>
           <td class="r">{{ fmtYuan(n.projectAmount) }}</td>
-          <td class="r" style="color:#ef4444">{{ fmtYuan(getNodeRemaining(n)) }}</td>
+          <td class="r remain">{{ fmtYuan(getNodeRemaining(n)) }}</td>
           <td>{{ n.tier }}</td>
           <td>{{ n.orgL4 || '-' }}</td>
           <td>{{ n.projectManager || '-' }}</td>
@@ -53,10 +55,10 @@ const rows = computed(() => props.nodes.slice(0, props.maxShow))
 
 <style scoped>
 .cnt-wrap { overflow-x: auto; }
-.cnt-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cnt-table { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
 .cnt-table th,
 .cnt-table td {
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--line);
   padding: 6px 8px;
   text-align: left;
   white-space: nowrap;
@@ -64,7 +66,10 @@ const rows = computed(() => props.nodes.slice(0, props.maxShow))
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cnt-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.cnt-table th { background: var(--card2); color: var(--sub); font-weight: 600; }
 .cnt-table th.r, .cnt-table td.r { text-align: right; font-family: var(--font-mono, monospace); }
-.cnt-count { font-size: 12px; color: #94a3b8; padding: 6px 0; }
+.cnt-table td.remain { color: var(--danger); }
+.cnt-row { cursor: pointer; }
+.cnt-row:hover { background: var(--card2); }
+.cnt-count { font-size: var(--fs-1); color: var(--mut); padding: 6px 0; }
 </style>
