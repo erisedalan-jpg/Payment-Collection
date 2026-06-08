@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D10 业务分析三档整合完成；**Phase D 前端重构全部完成**）
+- 最近更新：2026-06-08（Plan E1 P0 一致性修复完成；Phase D 前端重构全部完成）
 - 维护语言：简体中文
 
 ---
@@ -117,6 +117,12 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan E1 完成（2026-06-08）：P0 一致性修复
+- 分支 **`refactor/e1-consistency-fixes`**，`verify.sh` 全绿（75 pytest + 299 前端 vitest + typecheck + build）。
+- 产物：① FilterBar 字号改用 `var(--fs-1)` token（去掉硬编码 `0.85rem`），暗色 select 加 `background: var(--c-bg-2)` 深底，confirm 按钮对齐 token；② DashMetrics 待回款指标（原 `--c-accent`，青色）改为 `var(--c-remaining)`；③ BoardView 待回款列 `color:var(--c-pending)`（橙）改为 `var(--c-remaining)`；④ AnalysisView 待回款汇总条语义类由 `.remaining`（红）与 `.danger`（红）重叠改为拆分 `.remaining`=待回款 / `.danger`=延期，两者颜色正确区分。
+- Plan E1 P0 一致性修复完成：FilterBar 字号 token 化(--fs-1) + select 暗色背景；待回款错色(DashMetrics 青/BoardView 橙)统一为 --c-remaining，AnalysisView 待回款语义类(remaining)与延期(danger)拆分。已正确红色的 .sb-val.red/PlanBoard 硬编码 #ef4444 处本期未动，记入 backlog 待语义化。
+- 需人工目检（无法自动验证）：暗色下 FilterBar select 深底、字号三档生效、首页/board/analysis 待回款均红色。
 
 ### ✅ Plan D10 完成（2026-06-08）：业务分析三档整合 —— Phase D 收尾
 - 分支 **`refactor/d10-analysis-consolidation`**，计划 `docs/superpowers/plans/2026-06-08-D10-analysis-consolidation.md`，5 任务全完成、`verify.sh` 全绿。
