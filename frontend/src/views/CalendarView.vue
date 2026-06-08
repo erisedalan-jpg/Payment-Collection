@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { naguanFilter } from '@/lib/ledger'
@@ -12,11 +12,14 @@ import {
   calListNodes,
   calListGroups,
   calUpcoming,
+  calAgendaGroups,
   type CalFilters,
 } from '@/lib/calendar'
 import { fmtWan } from '@/lib/format'
+import SegToggle from '@/components/SegToggle.vue'
 import CalGrid from '@/components/CalGrid.vue'
 import CalDayDetail from '@/components/CalDayDetail.vue'
+import CalAgenda from '@/components/CalAgenda.vue'
 import CalNodeTable from '@/components/CalNodeTable.vue'
 
 const data = useDataStore()
@@ -71,6 +74,20 @@ const listGroups = computed(() => calListGroups(listNodes.value))
 const upcoming = computed(() => calUpcoming(naguanNodes.value as any, calFilters.value, new Date()))
 
 const listTitle = computed(() => (state.selectedDate ? `${state.selectedDate} 回款节点` : '当月/次月回款节点'))
+
+const view = ref('grid')
+const VIEW_OPTS = [
+  { value: 'grid', label: '网格' },
+  { value: 'agenda', label: '议程列表' },
+]
+const agendaNodes = computed(() =>
+  calListNodes(naguanNodes.value as any, calFilters.value, {
+    year: state.year,
+    month: state.month,
+    selectedDate: '',
+  }),
+)
+const agendaGroups = computed(() => calAgendaGroups(agendaNodes.value))
 
 const DASH = computed(() => [
   { label: '当月待回款(万)', value: fmtWan(dashboard.value.mRemaining), cls: 'danger' },
@@ -134,15 +151,23 @@ function clearFilters() {
       <el-button size="small" @click="clearFilters">清除所有筛选</el-button>
     </div>
 
-    <CalGrid
-      :year="state.year"
-      :month="state.month"
-      :date-data="gridDateData"
-      :selected-date="state.selectedDate"
-      @select="onSelectDay"
-    />
+    <div class="cal-viewbar">
+      <SegToggle v-model="view" :options="VIEW_OPTS" />
+    </div>
 
-    <CalDayDetail :title="listTitle" :groups="listGroups" />
+    <template v-if="view === 'grid'">
+      <CalGrid
+        :year="state.year"
+        :month="state.month"
+        :date-data="gridDateData"
+        :selected-date="state.selectedDate"
+        @select="onSelectDay"
+      />
+      <CalDayDetail :title="listTitle" :groups="listGroups" />
+    </template>
+    <template v-else>
+      <CalAgenda :groups="agendaGroups" />
+    </template>
 
     <div class="cal-upcoming">
       <div class="cal-up-title">即将到期回款节点</div>
@@ -172,6 +197,7 @@ function clearFilters() {
 .cd-val.pending { color: var(--c-pending); }
 .cd-val.accent { color: var(--accent); }
 .cal-filterbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.cal-viewbar { margin-bottom: 12px; }
 .cal-nav { display: inline-flex; align-items: center; gap: 6px; }
 .cal-arrow { border: 1px solid var(--line); background: var(--card); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-weight: 900; color: var(--sub); }
 .cal-arrow:hover { background: var(--card2); color: var(--accent); }
