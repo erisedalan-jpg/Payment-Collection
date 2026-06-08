@@ -72,3 +72,15 @@ describe('tierSummaryBar', () => {
     expect(s.projDelayed).toBe(1)
   })
 })
+
+describe('computeDashboardSummary delayedProjects', () => {
+  const opts = { naguanOn: false, naguanExclude: {}, viewMode: 'global' as const, viewL4: '', viewPM: '' }
+  it('统计回款状态为「延期」的项目数', () => {
+    const nodes = [
+      { projectId: 'P1', tier: '100万以上', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 100, actualPayment: 0, planMonth: '2026-01' },
+      { projectId: 'P2', tier: '50万以下', isPaymentRelated: true, nodeStatus: '已全额回款', expectedPayment: 100, actualPayment: 100, planMonth: '2026-02' },
+    ] as any
+    const s = computeDashboardSummary(nodes, [{ projectId: 'P1' }, { projectId: 'P2' }], opts)
+    expect(s.delayedProjects).toBe(1)
+  })
+})
