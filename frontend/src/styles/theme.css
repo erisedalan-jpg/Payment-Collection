@@ -16,7 +16,7 @@
   --line2: #d4dbe8;
   --txt: #1f2a3d;
   --sub: #5b6b85;
-  --mut: #93a1b8;
+  --mut: #64748b;
   --accent: #2563eb;
   --cyan: #0891b2;
   --danger: #e11d48;
@@ -40,6 +40,15 @@
   --el-color-primary-light-9: color-mix(in srgb, var(--accent) 10%, #fff);
   --el-color-primary-dark-2: color-mix(in srgb, var(--accent) 80%, #000);
   --el-border-radius-base: 8px;
+
+  /* 语义状态色（回款语义；引用调色板，随主题自动切换） */
+  --c-paid: var(--ok);          /* 已回款 */
+  --c-pending: var(--warn);     /* 待回款/警示 */
+  --c-remaining: var(--danger); /* 待回款缺口 */
+  --c-delayed: var(--danger);   /* 延期 */
+  --c-plan: var(--accent);      /* 计划回款 */
+  /* 彩色填充上的反白前景（文字/图标），两主题恒为白 */
+  --on-accent: #ffffff;
 }
 
 html.dark {
@@ -50,7 +59,7 @@ html.dark {
   --line2: #28385a;
   --txt: #e6edf7;
   --sub: #8aa0c0;
-  --mut: #5d728f;
+  --mut: #8595ad;
   --accent: #3b82f6;
   --cyan: #22d3ee;
   --danger: #fb7185;
@@ -95,3 +104,11 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--mut); }
+
+/* 自适应栅格：无断点自动换列，--col-min 控制单列最小宽，供卡片/指标区复用。
+   断点约定（页面按需用 @media）：窄屏 <=768px，常规 <=1200px。 */
+.u-grid-auto {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(var(--col-min, 200px), 1fr));
+}
