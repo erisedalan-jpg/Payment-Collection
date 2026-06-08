@@ -111,9 +111,14 @@ export interface DelayedProject {
   orgL4: string
   tier: string
   maxDelay: number
+  remainingAmount: number
 }
 
-export function delayedTopProjects(nodes: RawNode[], limit = 10): DelayedProject[] {
+export function delayedTopProjects(
+  nodes: RawNode[],
+  limit = 10,
+  sortBy: 'delay' | 'amount' = 'delay',
+): DelayedProject[] {
   const projs = groupByProject(nodes).filter((p) => p.paymentStatus === '延期')
   const withDelay = projs.map((p) => {
     let maxDelay = 0
@@ -121,8 +126,17 @@ export function delayedTopProjects(nodes: RawNode[], limit = 10): DelayedProject
       const d = (n as Record<string, any>).delayDays || 0
       if (d > maxDelay) maxDelay = d
     }
-    return { projectId: p.projectId, projectName: p.projectName, orgL4: p.orgL4, tier: p.tier, maxDelay }
+    return {
+      projectId: p.projectId,
+      projectName: p.projectName,
+      orgL4: p.orgL4,
+      tier: p.tier,
+      maxDelay,
+      remainingAmount: p.remainingAmount,
+    }
   })
-  withDelay.sort((a, b) => b.maxDelay - a.maxDelay)
+  withDelay.sort((a, b) =>
+    sortBy === 'amount' ? b.remainingAmount - a.remainingAmount : b.maxDelay - a.maxDelay,
+  )
   return withDelay.slice(0, limit)
 }

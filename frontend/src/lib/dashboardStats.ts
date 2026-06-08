@@ -142,6 +142,7 @@ export interface DashSummary {
   totalActual: number
   totalRemaining: number
   rate: number
+  delayedProjects: number
 }
 
 export function computeDashboardSummary(
@@ -159,6 +160,7 @@ export function computeDashboardSummary(
   const relatedNodeCount = nodes.filter((n) => (n as Record<string, any>).isPaymentRelated).length
   const totalExpected = projs.reduce((s, p) => s + (p.expectedPayment || 0), 0)
   const totalActual = projs.reduce((s, p) => s + (p.actualPayment || 0), 0)
+  const delayedProjects = projs.filter((p) => p.paymentStatus === '延期').length
   return {
     relatedNodeCount,
     totalProjects,
@@ -166,6 +168,7 @@ export function computeDashboardSummary(
     totalActual,
     totalRemaining: totalExpected - totalActual,
     rate: totalExpected > 0 ? totalActual / totalExpected : 0,
+    delayedProjects,
   }
 }
 

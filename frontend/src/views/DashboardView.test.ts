@@ -3,13 +3,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import DashboardView from './DashboardView.vue'
 import { useDataStore } from '@/stores/data'
-import PendingBarChart from '@/components/PendingBarChart.vue'
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('DashboardView', () => {
-  it('renders summary cards and tier cards sections', () => {
+  it('渲染指标与四张卡片', () => {
     const ds = useDataStore()
     ds.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
@@ -17,25 +16,25 @@ describe('DashboardView', () => {
       projectOverview: { projects: [{ projectId: 'P1' }], columns: [] },
       naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
     } as any
-    const wrapper = mount(DashboardView)
-    expect(wrapper.find('.dash-summary').exists()).toBe(true)
-    expect(wrapper.find('.tier-cards').exists()).toBe(true)
-    expect(wrapper.findAllComponents(PendingBarChart).length).toBe(2)
-    expect(wrapper.find('.org-ranking').exists()).toBe(true)
-    expect(wrapper.find('.delayed-top').exists()).toBe(true)
+    const w = mount(DashboardView)
+    expect(w.find('.dash-metrics').exists()).toBe(true)
+    expect(w.find('.tier-strip').exists()).toBe(true)
+    expect(w.find('.org-ranking').exists()).toBe(true)
+    expect(w.find('.trend-card').exists()).toBe(true)
+    expect(w.find('.delay-top-card').exists()).toBe(true)
   })
 
-  it('renders loading state', () => {
+  it('渲染加载态', () => {
     const ds = useDataStore()
-    ds.loading = true // load() 的并发守卫使 onMounted 的 load() 直接返回，保持 loading
-    const wrapper = mount(DashboardView)
-    expect(wrapper.text()).toContain('加载中')
+    ds.loading = true
+    const w = mount(DashboardView)
+    expect(w.text()).toContain('加载中')
   })
 
-  it('renders error state after a failed load', async () => {
+  it('加载失败渲染错误态', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => null }))
-    const wrapper = mount(DashboardView) // onMounted 触发 load()，fetch 失败 → error
+    const w = mount(DashboardView)
     await flushPromises()
-    expect(wrapper.text()).toContain('数据加载失败')
+    expect(w.text()).toContain('数据加载失败')
   })
 })

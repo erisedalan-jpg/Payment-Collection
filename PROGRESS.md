@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D2.5 审计地基修复完成；Phase D：D1-D2-D2.5 已完成）
+- 最近更新：2026-06-08（Plan D3 看板首页重做完成；Phase D：D1-D2-D2.5-D3 已完成）
 - 维护语言：简体中文
 
 ---
@@ -85,7 +85,7 @@ _（无）_
 - [x] **D1** 全局地基：CSS 变量双主题（明/暗）+ settings store（字号三档 + 持久化）+ DisplaySettings 入口 + ECharts 双主题 + theme.css（EP 变量桥接/字号 rem 令牌/滚动条·选区·焦点适配）+ 外壳变量化。
 - [x] **D2** 全局项目详情面板（projectDetail store + buildProjectDetail + ProjectDetailDrawer，AppLayout 全局挂载）。上下文跳转(navContext)按 YAGNI 挪到 D4（有真实消费者时）；各页"点项目→唤起面板"接入随 D3/D4/D7。
 - [x] **D2.5** 审计地基修复（D3 前，来源 /impeccable audit）：P1 暗色 token 化（仅留存共享组件/页面：DataTable/ColumnFilter/FilterBar + 台账/数据管理/关于/临期跟进全链，共 16 文件）+ v-activate 键盘激活指令（全局注册，下钻入口键盘可达）+ theme.css `--mut` 对比度达 WCAG AA + 语义状态色/反白色/--c-urgent token；P2 `.u-grid-auto` 自适应栅格工具 + 去 side-stripe 彩色左边框。**延后给 D3–D10 在重做时按同套 token 映射+v-activate 处理的文件**：Dashboard 系(D3)、Compare/Pm 系(D4 删除)、Calendar 系(D7-9)、Analysis tab 系 Tier*/Plan*/Risk/ProjectsOverview(D10)。
-- [ ] **D3** 看板首页重做（指标 + 统一档位条 + 服务组排名跳转 + 月/季趋势切换 + 延期天数/金额切换 + 详情面板接入）。
+- [x] **D3** 看板首页重做：6 指标(DashMetrics) + 统一档位条(TierStrip) + 服务组排名(OrgRanking，排序切换;带筛选跳 /board 留 D4) + 待回款趋势(TrendCard 月/季切换) + 延期 Top(DelayTopCard 天数/金额切换 + 点项目开 D2 详情面板) + SegToggle 共享分段控件;lib 增延期项目数与延期按金额排序。删除旧 DashSummaryCards/TierCards/DelayedTop。
 - [ ] **D4** 多维看板·单维核心（lib/pivot + BoardView），吸收 区间对比 + 项目经理视图，删旧入口/路由。
 - [ ] **D5** 多维看板·双维交叉。
 - [ ] **D6** 多维看板·N 维透视表。
@@ -116,6 +116,14 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D3 完成（2026-06-08）：看板首页重做
+- 分支 **`refactor/d3-dashboard-home-rebuild`**，计划 `docs/superpowers/plans/2026-06-08-D3-dashboard-home-rebuild.md`，10 任务全完成、`verify.sh` 全绿。
+- 布局（草图 home-v2）：6 指标行 → 档位条(1.3fr)/服务组排名(1fr) → 趋势卡(1.3fr)/延期Top(1fr)，全用主题 token、随窗口自适应、暗色生效。
+- 产物：`lib/dashboardStats`(+延期项目数)、`lib/dashboardCharts`(delayedTopProjects 加 sortBy='amount' + remainingAmount);新组件 `SegToggle`(共享分段控件)、`DashMetrics`、`TierStrip`、`TrendCard`(月/季)、`DelayTopCard`(天数/金额 + 接 D2 详情面板);重写 `OrgRanking`、`DashboardView`;删除 `DashSummaryCards`/`TierCards`/`DelayedTop`(+测试)。
+- 计算口径忠实：月/季聚合、服务组排名、延期 Top 均复用既有纯函数，仅小幅派生(均有 Vitest)。
+- YAGNI 延后：OrgRanking「点行→带筛选跳多维看板」依赖 `/board` 与 `navContext`(D4)，本期行不可点、留 D4 接入(与 D2 同款)。延期 Top「点项目开详情面板」已全量接入 D2 面板。
+- 整体进度：Phase D：**D1-D2-D2.5-D3 完成（D3 待合并 master）**。下一步 D4（多维看板·单维核心 + lib/pivot + 吸收 compare/pmview + navContext 落地）。
 
 ### ✅ Plan D2.5 完成（2026-06-08）：审计地基修复（D3 前）
 - 来源：对已合并的 D1/D2 界面跑 `/impeccable audit`（全局新装 skill：impeccable + design-taste-frontend）。审计得分 11/20，根因=旧 app.js 内联样式逐字移植致颜色写死、交互用 div@click、对比度沿用旧值。用户决策：三条 P1 全做（对比度单列）、暗色 token 化仅迁留存共享组件、P2 做自适应基线+去 side-stripe。
