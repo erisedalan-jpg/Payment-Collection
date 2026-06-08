@@ -11,6 +11,7 @@ import {
   calUpcoming,
   calDayTooltipText,
   calAgendaGroups,
+  calYearHeat,
 } from './calendar'
 
 const NOW = new Date('2026-06-04T00:00:00')
@@ -147,5 +148,22 @@ describe('calAgendaGroups', () => {
     expect(g[0].nodes).toHaveLength(2)
     expect(g[0].subRemaining).toBe(100000)
     expect(g[1].subRemaining).toBe(80000)
+  })
+})
+
+describe('calYearHeat', () => {
+  it('按月汇总指定年的待回款金额与笔数', () => {
+    const cells = calYearHeat([
+      { planDate: '2026-06-10', expectedPayment: 100000, actualPayment: 0 },
+      { planDate: '2026-06-20', expectedPayment: 50000, actualPayment: 20000 },
+      { planDate: '2026-08-01', expectedPayment: 80000, actualPayment: 0 },
+      { planDate: '2025-06-01', expectedPayment: 999999, actualPayment: 0 },
+    ] as any, 2026)
+    expect(cells).toHaveLength(12)
+    expect(cells[5].month).toBe(5)
+    expect(cells[5].remaining).toBe(130000)
+    expect(cells[5].count).toBe(2)
+    expect(cells[7].remaining).toBe(80000)
+    expect(cells[0].remaining).toBe(0)
   })
 })

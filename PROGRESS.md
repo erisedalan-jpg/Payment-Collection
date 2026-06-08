@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D8 回款日历 B 完成；Phase D：D1-D2-D2.5-D3-D4-D5-D5.5-D6-D7-D8 已完成）
+- 最近更新：2026-06-08（Plan D9 回款日历 C 完成，日历三件套收口；Phase D：…-D9 已完成，仅余 D10）
 - 维护语言：简体中文
 
 ---
@@ -92,7 +92,7 @@ _（无）_
 - [x] **D6** 多维看板·N 维透视表：lib/pivot 增 `pivotTable`(多行多列);新增 `DimPicker`(有序多选)/`PivotTable`;BoardView 引入「排名/交叉/透视」三模式，透视=自选行×列+指标(列空→单列合计)，点格下钻该交叉组项目→D2 详情。cross 由 secondDim 隐式触发改为显式 mode 门控。
 - [x] **D7** 回款日历重做 A：CalGrid 富日格(日号/笔数/待回款金额/状态点) + CalDayDetail 选中日明细(状态分组,点项目→D2 详情) + CalNodeTable token+行下钻 + CalendarView 整页 token 化(**补日历暗色**)+字号放大;lib/calendar 增每日待回款金额。议程列表(B)留 D8、年度热力条(C)留 D9。
 - [x] **D8** 回款日历 B：lib/calendar 增 `calAgendaGroups`(按日期升序分组+每日小计);新增 `CalAgenda`(议程列表，复用 CalNodeTable 行下钻);CalendarView 加「网格/议程列表」SegToggle 视图切换。年度热力条(C)留 D9。
-- [ ] **D9** 回款日历 C（年度热力条 + 月度下钻）。
+- [x] **D9** 回款日历 C：lib/calendar 增 `calYearHeat`(年度12月待回款汇总);新增 `CalYearHeat`(12月热力条，强度 color-mix tint，点月聚焦);CalendarView 抽 gridNodes 共享 + 接入热力条 + 月度下钻联动。回款日历 A/B/C 三件套收口。
 - [ ] **D10** 业务分析三档整合（/analysis/:tab 单页 + 档位筛选/列徽章，删 15 入口）。
 - 范围外（形态稳定后单独排）：C 打包（dist 接入 server.py + PyInstaller）、A4 Playwright 脚本健壮性、销售维度（需数据源补列）。
 
@@ -117,6 +117,13 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D9 完成（2026-06-08）：回款日历 C（年度热力条 + 月度下钻联动）
+- 分支 **`refactor/d9-calendar-redo-c`**，计划 `docs/superpowers/plans/2026-06-08-D9-calendar-redo-c.md`，4 任务全完成、`verify.sh` 全绿。
+- 产物：`lib/calendar.calYearHeat(nodes,year)`(年度12月待回款金额合计+笔数);`CalYearHeat.vue`(12月热力条，强度按金额 color-mix(accent) tint，当前月高亮，有金额月 v-activate 可点 emit select);`CalendarView` 抽 `gridNodes`(网格/热力条同源) + 接入 CalYearHeat(顶部) + onSelectMonth 点月聚焦(设 state.month、清 selectedDate)。
+- 计算口径忠实：复用 getNodeRemaining;热力条与网格同源同筛选。CalendarView.test 加点月聚焦用例(断言 CalGrid month prop=5)。
+- **回款日历 A(网格 D7)/B(议程 D8)/C(热力条 D9) 三件套收口。**
+- 整体进度：Phase D：**…D9 完成（D9 待合并 master），仅余 D10**（业务分析三档整合，Phase D 收尾）。
 
 ### ✅ Plan D8 完成（2026-06-08）：回款日历 B（议程列表视图切换）
 - 分支 **`refactor/d8-calendar-redo-b`**，计划 `docs/superpowers/plans/2026-06-08-D8-calendar-redo-b.md`，4 任务全完成、`verify.sh` 全绿。

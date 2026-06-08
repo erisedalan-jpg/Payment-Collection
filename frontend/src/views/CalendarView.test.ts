@@ -45,4 +45,12 @@ describe('CalendarView', () => {
     expect(w.find('.cag').exists()).toBe(true)
     expect(w.find('.cal-grid-row').exists()).toBe(false)
   })
+
+  it('点击年度热力条某月聚焦该月', async () => {
+    seed()
+    const w = mount(CalendarView, { global: { plugins: [ElementPlus] } })
+    expect(w.find('.cyh').exists()).toBe(true)
+    await w.findAll('.cyh-cell')[5].trigger('click')
+    expect(w.findComponent({ name: 'CalGrid' }).props('month')).toBe(5)
+  })
 })
