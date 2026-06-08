@@ -3,11 +3,13 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { DIMENSIONS, groupByDims, crossMatrix, METRICS, METRIC_BY_KEY, type PivotGroup } from '@/lib/pivot'
+import { DIMENSIONS, groupByDims, crossMatrix, pivotTable, METRICS, METRIC_BY_KEY, type PivotGroup } from '@/lib/pivot'
 import { fmtWan, pct } from '@/lib/format'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
+import DimPicker from '@/components/DimPicker.vue'
 import BoardMatrix from '@/components/BoardMatrix.vue'
+import PivotTable from '@/components/PivotTable.vue'
 import BoardDrilldownModal from '@/components/BoardDrilldownModal.vue'
 
 const route = useRoute()
@@ -15,6 +17,12 @@ const data = useDataStore()
 const filter = useFilterStore()
 
 const DIM_OPTS = DIMENSIONS.map((d) => ({ value: d.key, label: d.label }))
+const METRIC_OPTS = METRICS.map((m) => ({ value: m.key, label: m.label }))
+const MODE_OPTS = [
+  { value: 'single', label: '排名' },
+  { value: 'cross', label: '交叉' },
+  { value: 'pivot', label: '透视' },
+]
 const SORT_OPTS = [
   { value: 'actualAmount', label: '已回款' },
   { value: 'completionRate', label: '完成率' },
@@ -22,39 +30,60 @@ const SORT_OPTS = [
   { value: 'delayedCount', label: '延期数' },
 ]
 
-const initDim = typeof route.query.dim === 'string' && DIMENSIONS.some((d) => d.key === route.query.dim)
-  ? (route.query.dim as string)
-  : 'orgL4'
+const initDim =
+  typeof route.query.dim === 'string' && DIMENSIONS.some((d) => d.key === route.query.dim)
+    ? (route.query.dim as string)
+    : 'orgL4'
+
+const mode = ref('single')
 const dimKey = ref(initDim)
 const sortKey = ref('actualAmount')
-
 const secondDim = ref('')
 const metricKey = ref<(typeof METRICS)[number]['key']>('actualAmount')
+const rowDims = ref<string[]>([initDim])
+const colDims = ref<string[]>([])
 
 const SECOND_OPTS = computed(() => [
   { value: '', label: '无' },
   ...DIMENSIONS.filter((d) => d.key !== dimKey.value).map((d) => ({ value: d.key, label: d.label })),
 ])
-const METRIC_OPTS = METRICS.map((m) => ({ value: m.key, label: m.label }))
 
-// 主维度变化时若与次维度撞车则清空次维度
 watch(dimKey, () => {
   if (secondDim.value === dimKey.value) secondDim.value = ''
 })
 
-const crossOn = computed(() => secondDim.value !== '')
+// ---- 单维 ----
+const groups = computed<PivotGroup[]>(() => {
+  const gs = groupByDims(filter.filteredNodes, [dimKey.value])
+  const k = sortKey.value as keyof PivotGroup
+  return [...gs].sort((a, b) => (b[k] as number) - (a[k] as number))
+})
+const top = computed(() => groups.value.slice(0, 15))
+const chartOption = computed(() => ({
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['已回款', '待回款'], top: 0 },
+  grid: { left: 60, right: 20, top: 30, bottom: 60 },
+  xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
+  yAxis: { type: 'value', name: '金额(万)' },
+  series: [
+    { name: '已回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.actualAmount / 10000).toFixed(2)), itemStyle: { color: '#10B981' } },
+    { name: '待回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.remainingAmount / 10000).toFixed(2)), itemStyle: { color: '#F59E0B' } },
+  ],
+}))
 
-const matrix = computed(() =>
-  crossOn.value ? crossMatrix(filter.filteredNodes, dimKey.value, secondDim.value, metricKey.value) : null,
-)
-
+// ---- 共用指标格式 ----
 const metricKind = computed(() => METRIC_BY_KEY[metricKey.value].kind)
 const metricFormat = computed(() => {
   const kind = metricKind.value
   return (v: number) => (kind === 'money' ? fmtWan(v) : kind === 'rate' ? pct(v) : String(v))
 })
 
-// 交叉堆叠图：仅可加性指标（金额/计数）；比例类不出图
+// ---- 交叉 ----
+const matrix = computed(() =>
+  mode.value === 'cross' && secondDim.value
+    ? crossMatrix(filter.filteredNodes, dimKey.value, secondDim.value, metricKey.value)
+    : null,
+)
 const crossChartOption = computed(() => {
   const m = matrix.value
   if (!m || metricKind.value === 'rate') return null
@@ -78,36 +107,27 @@ const crossChartOption = computed(() => {
   }
 })
 
-function onCellClick({ row, col }: { row: string; col: string }) {
-  const g = matrix.value?.index[row]?.[col]
-  if (g) openDrill(g)
-}
+// ---- 透视 ----
+const pivot = computed(() =>
+  mode.value === 'pivot' && rowDims.value.length
+    ? pivotTable(filter.filteredNodes, rowDims.value, colDims.value, metricKey.value)
+    : null,
+)
 
-const groups = computed<PivotGroup[]>(() => {
-  const gs = groupByDims(filter.filteredNodes, [dimKey.value])
-  const k = sortKey.value as keyof PivotGroup
-  return [...gs].sort((a, b) => (b[k] as number) - (a[k] as number))
-})
-
-const top = computed(() => groups.value.slice(0, 15))
-
-const chartOption = computed(() => ({
-  tooltip: { trigger: 'axis' },
-  legend: { data: ['已回款', '待回款'], top: 0 },
-  grid: { left: 60, right: 20, top: 30, bottom: 60 },
-  xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
-  yAxis: { type: 'value', name: '金额(万)' },
-  series: [
-    { name: '已回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.actualAmount / 10000).toFixed(2)), itemStyle: { color: '#10B981' } },
-    { name: '待回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.remainingAmount / 10000).toFixed(2)), itemStyle: { color: '#F59E0B' } },
-  ],
-}))
-
+// ---- 下钻（共用） ----
 const drillOpen = ref(false)
 const drillGroup = ref<PivotGroup | null>(null)
 function openDrill(g: PivotGroup) {
   drillGroup.value = g
   drillOpen.value = true
+}
+function onCellClick({ row, col }: { row: string; col: string }) {
+  const g = matrix.value?.index[row]?.[col]
+  if (g) openDrill(g)
+}
+function onPivotCellClick({ rowKey, colKey }: { rowKey: string; colKey: string }) {
+  const g = pivot.value?.index[rowKey]?.[colKey]
+  if (g) openDrill(g)
 }
 defineExpose({ drillOpen })
 </script>
@@ -118,21 +138,83 @@ defineExpose({ drillOpen })
     <template v-else>
       <div class="bv-toolbar">
         <div class="bv-ctl">
-          <span class="bv-ctl-label">维度</span>
-          <SegToggle v-model="dimKey" :options="DIM_OPTS" />
+          <span class="bv-ctl-label">模式</span>
+          <SegToggle v-model="mode" :options="MODE_OPTS" />
         </div>
-        <div class="bv-ctl">
-          <span class="bv-ctl-label">次维度</span>
-          <SegToggle v-model="secondDim" :options="SECOND_OPTS" />
-        </div>
-        <div class="bv-ctl">
-          <span class="bv-ctl-label">{{ crossOn ? '指标' : '排序' }}</span>
-          <SegToggle v-if="crossOn" v-model="metricKey" :options="METRIC_OPTS" />
-          <SegToggle v-else v-model="sortKey" :options="SORT_OPTS" />
-        </div>
+
+        <template v-if="mode === 'single'">
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">维度</span>
+            <SegToggle v-model="dimKey" :options="DIM_OPTS" />
+          </div>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">排序</span>
+            <SegToggle v-model="sortKey" :options="SORT_OPTS" />
+          </div>
+        </template>
+
+        <template v-else-if="mode === 'cross'">
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">维度</span>
+            <SegToggle v-model="dimKey" :options="DIM_OPTS" />
+          </div>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">次维度</span>
+            <SegToggle v-model="secondDim" :options="SECOND_OPTS" />
+          </div>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">指标</span>
+            <SegToggle v-model="metricKey" :options="METRIC_OPTS" />
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">行维度</span>
+            <DimPicker v-model="rowDims" :options="DIM_OPTS" />
+          </div>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">列维度</span>
+            <DimPicker v-model="colDims" :options="DIM_OPTS" />
+          </div>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">指标</span>
+            <SegToggle v-model="metricKey" :options="METRIC_OPTS" />
+          </div>
+        </template>
       </div>
 
-      <template v-if="crossOn">
+      <!-- 单维 -->
+      <template v-if="mode === 'single'">
+        <section class="bv-card">
+          <h3 class="bv-title">已回款 / 待回款对比（Top {{ top.length }}）</h3>
+          <ChartBox :option="chartOption" height="320px" />
+        </section>
+        <section class="bv-card">
+          <h3 class="bv-title">分组排名（点击行下钻该组项目）</h3>
+          <div class="bv-table">
+            <div class="bv-row bv-head">
+              <span class="bv-c-name">{{ DIM_OPTS.find((d) => d.value === dimKey)?.label }}</span>
+              <span>项目数</span><span>计划回款(万)</span><span>已回款(万)</span><span>待回款(万)</span>
+              <span>完成率</span><span>延期</span><span>延期率</span>
+            </div>
+            <div v-for="g in groups" :key="g.key" v-activate class="bv-row bv-body" @click="openDrill(g)">
+              <span class="bv-c-name" :title="g.key">{{ g.key }}</span>
+              <span>{{ g.projectCount }}</span>
+              <span>{{ fmtWan(g.expectedAmount) }}</span>
+              <span class="bv-paid">{{ fmtWan(g.actualAmount) }}</span>
+              <span class="bv-remain">{{ fmtWan(g.remainingAmount) }}</span>
+              <span>{{ pct(g.completionRate) }}</span>
+              <span :class="{ 'bv-danger': g.delayedCount > 0 }">{{ g.delayedCount }}</span>
+              <span>{{ pct(g.delayRate) }}</span>
+            </div>
+            <div v-if="!groups.length" class="bv-empty">暂无数据</div>
+          </div>
+        </section>
+      </template>
+
+      <!-- 交叉 -->
+      <template v-else-if="mode === 'cross'">
         <section v-if="crossChartOption" class="bv-card">
           <h3 class="bv-title">{{ METRIC_BY_KEY[metricKey].label }} 交叉堆叠（行 Top 15）</h3>
           <ChartBox :option="crossChartOption" height="320px" />
@@ -140,48 +222,24 @@ defineExpose({ drillOpen })
         <section class="bv-card">
           <h3 class="bv-title">交叉矩阵（点击单元格下钻）</h3>
           <BoardMatrix
-            :matrix="matrix!"
+            v-if="matrix"
+            :matrix="matrix"
             :row-label="DIM_OPTS.find((d) => d.value === dimKey)?.label || ''"
             :col-label="SECOND_OPTS.find((d) => d.value === secondDim)?.label || ''"
             :format="metricFormat"
             @cell-click="onCellClick"
           />
+          <div v-else class="bv-empty">请选择次维度</div>
         </section>
       </template>
 
+      <!-- 透视 -->
       <template v-else>
-      <section class="bv-card">
-        <h3 class="bv-title">已回款 / 待回款对比（Top {{ top.length }}）</h3>
-        <ChartBox :option="chartOption" height="320px" />
-      </section>
-
-      <section class="bv-card">
-        <h3 class="bv-title">分组排名（点击行下钻该组项目）</h3>
-        <div class="bv-table">
-          <div class="bv-row bv-head">
-            <span class="bv-c-name">{{ DIM_OPTS.find((d) => d.value === dimKey)?.label }}</span>
-            <span>项目数</span><span>计划回款(万)</span><span>已回款(万)</span><span>待回款(万)</span>
-            <span>完成率</span><span>延期</span><span>延期率</span>
-          </div>
-          <div
-            v-for="g in groups"
-            :key="g.key"
-            v-activate
-            class="bv-row bv-body"
-            @click="openDrill(g)"
-          >
-            <span class="bv-c-name" :title="g.key">{{ g.key }}</span>
-            <span>{{ g.projectCount }}</span>
-            <span>{{ fmtWan(g.expectedAmount) }}</span>
-            <span class="bv-paid">{{ fmtWan(g.actualAmount) }}</span>
-            <span class="bv-remain">{{ fmtWan(g.remainingAmount) }}</span>
-            <span>{{ pct(g.completionRate) }}</span>
-            <span :class="{ 'bv-danger': g.delayedCount > 0 }">{{ g.delayedCount }}</span>
-            <span>{{ pct(g.delayRate) }}</span>
-          </div>
-          <div v-if="!groups.length" class="bv-empty">暂无数据</div>
-        </div>
-      </section>
+        <section class="bv-card">
+          <h3 class="bv-title">透视表 · {{ METRIC_BY_KEY[metricKey].label }}（点击单元格下钻）</h3>
+          <PivotTable v-if="pivot" :pivot="pivot" :format="metricFormat" @cell-click="onPivotCellClick" />
+          <div v-else class="bv-empty">请选择至少一个行维度</div>
+        </section>
       </template>
 
       <BoardDrilldownModal
