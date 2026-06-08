@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-05（Plan D2 全局项目详情面板完成；Phase D：D1-D2 已完成）
+- 最近更新：2026-06-08（Plan D2.5 审计地基修复完成；Phase D：D1-D2-D2.5 已完成）
 - 维护语言：简体中文
 
 ---
@@ -84,6 +84,7 @@ _（无）_
 ### 🟪 Phase D 前端展示重构（设计见 docs/superpowers/specs/2026-06-04-phase-d-frontend-redesign-design.md）
 - [x] **D1** 全局地基：CSS 变量双主题（明/暗）+ settings store（字号三档 + 持久化）+ DisplaySettings 入口 + ECharts 双主题 + theme.css（EP 变量桥接/字号 rem 令牌/滚动条·选区·焦点适配）+ 外壳变量化。
 - [x] **D2** 全局项目详情面板（projectDetail store + buildProjectDetail + ProjectDetailDrawer，AppLayout 全局挂载）。上下文跳转(navContext)按 YAGNI 挪到 D4（有真实消费者时）；各页"点项目→唤起面板"接入随 D3/D4/D7。
+- [x] **D2.5** 审计地基修复（D3 前，来源 /impeccable audit）：P1 暗色 token 化（仅留存共享组件/页面：DataTable/ColumnFilter/FilterBar + 台账/数据管理/关于/临期跟进全链，共 16 文件）+ v-activate 键盘激活指令（全局注册，下钻入口键盘可达）+ theme.css `--mut` 对比度达 WCAG AA + 语义状态色/反白色/--c-urgent token；P2 `.u-grid-auto` 自适应栅格工具 + 去 side-stripe 彩色左边框。**延后给 D3–D10 在重做时按同套 token 映射+v-activate 处理的文件**：Dashboard 系(D3)、Compare/Pm 系(D4 删除)、Calendar 系(D7-9)、Analysis tab 系 Tier*/Plan*/Risk/ProjectsOverview(D10)。
 - [ ] **D3** 看板首页重做（指标 + 统一档位条 + 服务组排名跳转 + 月/季趋势切换 + 延期天数/金额切换 + 详情面板接入）。
 - [ ] **D4** 多维看板·单维核心（lib/pivot + BoardView），吸收 区间对比 + 项目经理视图，删旧入口/路由。
 - [ ] **D5** 多维看板·双维交叉。
@@ -115,6 +116,14 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D2.5 完成（2026-06-08）：审计地基修复（D3 前）
+- 来源：对已合并的 D1/D2 界面跑 `/impeccable audit`（全局新装 skill：impeccable + design-taste-frontend）。审计得分 11/20，根因=旧 app.js 内联样式逐字移植致颜色写死、交互用 div@click、对比度沿用旧值。用户决策：三条 P1 全做（对比度单列）、暗色 token 化仅迁留存共享组件、P2 做自适应基线+去 side-stripe。
+- 分支 **`refactor/d2.5-audit-foundation`**，计划 `docs/superpowers/plans/2026-06-08-D2.5-audit-foundation.md`，10 任务全完成、`verify.sh` 全绿（前端 282 测试，新增 v-activate 4 测试）。
+- 产物：① `theme.css` `--mut` 浅 #64748b(4.76:1)/暗 #8595ad(5.48:1) 达 AA + 语义 token（--c-paid/--c-pending/--c-remaining/--c-delayed/--c-plan/--on-accent/--c-urgent）+ `.u-grid-auto` 自适应栅格工具;② `directives/activate.ts` v-activate 指令（补 role/tabindex + Enter/Space 合成 click，main.ts + vitest.setup 双注册）;③ 16 个留存文件硬编码 hex 按语义映射为 token，暗色模式在这些页面生效;④ 下钻入口（台账行/质检单元/信号行/列筛选行）挂 v-activate;⑤ 去 LedgerView/FuProjectRow 的 side-stripe 彩色左边框。
+- 关键修正（controller 复核）：子代理把"7天内(橙#f97316)"误并入 var(--danger)，与 FollowupView 图例"橙色7天…红色延期"自相矛盾;新增 `--c-urgent`(橙) token 并修 STAT_CARDS/BARS/URG 三处，保留四档紧急度区分。
+- **交棒**：延后文件（Dashboard/Compare/Pm/Calendar/Analysis-tab 系）的 token 化+键盘可达+side-stripe，由 D3–D10 各自重做时按本计划同套"颜色 Token 映射表 + v-activate 模式"处理（映射表见计划文档）。
+- 整体进度：Phase D：**D1-D2-D2.5 完成（D2.5 待合并 master）**。下一步 D3（看板首页重做）。
 
 ### ✅ Plan D2 完成（2026-06-05）：全局项目详情面板
 - 分支 **`refactor/d2-project-detail-panel`** 全部 4 任务完成、`verify.sh` 全绿（前端 +5 单测），待合并 master。
