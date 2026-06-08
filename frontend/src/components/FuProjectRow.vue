@@ -16,7 +16,7 @@ defineExpose({ onFlwChange })
 </script>
 
 <template>
-  <div class="fpr" :class="{ flw: project.flw }">
+  <div class="fpr">
     <div class="fpr-head">
       <div class="fpr-name">{{ project.projectName }}</div>
       <div class="fpr-actions">

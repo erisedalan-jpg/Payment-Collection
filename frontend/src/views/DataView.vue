@@ -147,7 +147,7 @@ defineExpose({ onClear, onSync, onPickImport })
 .dv-hint { font-size: 12px; color: var(--mut); }
 .dv-note { color: var(--mut); font-size: 12px; }
 .dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
-.dv-btn.danger { color: var(--danger); border-color: var(--danger); }
+.dv-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .dv-btn:disabled { opacity: 0.5; cursor: default; }
 .dv-clear-state { font-size: 12px; color: var(--c-paid); }
 .dv-file { font-size: 12px; }

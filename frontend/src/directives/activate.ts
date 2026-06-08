@@ -9,8 +9,10 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-export const vActivate: Directive<HTMLElement> = {
-  mounted(el) {
+// 绑定值显式为 false 时跳过（用于条件可点击的单元/行，避免给无动作元素加焦点）。
+export const vActivate: Directive<HTMLElement, boolean | undefined> = {
+  mounted(el, binding) {
+    if (binding.value === false) return
     if (!el.hasAttribute('role')) el.setAttribute('role', 'button')
     if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0')
     el.addEventListener('keydown', onKey)

@@ -34,6 +34,22 @@ describe('v-activate', () => {
     expect((w.vm as unknown as { onClick: ReturnType<typeof vi.fn> }).onClick).toHaveBeenCalledTimes(1)
   })
 
+  it('绑定值为 false 时不补 role/tabindex、不响应键盘', async () => {
+    const Off = {
+      template: `<div class="hit" v-activate="false" @click="onClick">x</div>`,
+      setup() {
+        const onClick = vi.fn()
+        return { onClick }
+      },
+    }
+    const w = mount(Off, { global: { directives: { activate: vActivate } } })
+    const el = w.get('.hit')
+    expect(el.attributes('role')).toBeUndefined()
+    expect(el.attributes('tabindex')).toBeUndefined()
+    await el.trigger('keydown', { key: 'Enter' })
+    expect((w.vm as unknown as { onClick: ReturnType<typeof vi.fn> }).onClick).not.toHaveBeenCalled()
+  })
+
   it('不覆盖已有的 role/tabindex', () => {
     const Custom = {
       template: `<div class="hit" role="link" tabindex="2" v-activate @click="() => {}">x</div>`,

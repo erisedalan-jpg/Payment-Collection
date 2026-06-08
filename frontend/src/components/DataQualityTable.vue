@@ -29,7 +29,7 @@ const cellColor = (count: number, s: Severity) => (count > 0 ? sevColor(s) : 'va
           class="dq-cell c"
           :class="{ clickable: v > 0 }"
           :style="{ color: cellColor(v, r.severity) }"
-          v-activate
+          v-activate="v > 0"
           @click="v > 0 && emit('drill', { checkIdx: ci, tierIdx: ti })"
         >
           {{ v }}
@@ -38,7 +38,7 @@ const cellColor = (count: number, s: Severity) => (count > 0 ? sevColor(s) : 'va
           class="dq-cell c total"
           :class="{ clickable: r.total > 0 }"
           :style="{ color: cellColor(r.total, r.severity) }"
-          v-activate
+          v-activate="r.total > 0"
           @click="r.total > 0 && emit('drill', { checkIdx: ci, tierIdx: -1 })"
         >
           {{ r.total }}
