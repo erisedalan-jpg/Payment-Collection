@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardView from '@/views/DashboardView.vue'
-import TierView from '@/views/TierView.vue'
+import AnalysisView from '@/views/AnalysisView.vue'
 import LedgerView from '@/views/LedgerView.vue'
 import BoardView from '@/views/BoardView.vue'
 import CalendarView from '@/views/CalendarView.vue'
@@ -15,7 +15,7 @@ export const router = createRouter({
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
     { path: '/followup', name: 'followup', component: FollowupView, meta: { title: '临期跟进' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
-    { path: '/tier/:tab/:tier', name: 'tier', component: TierView, meta: { title: '业务分析' } },
+    { path: '/analysis/:tab', name: 'analysis', component: AnalysisView, meta: { title: '业务分析' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理' } },
     { path: '/about', name: 'about', component: AboutView, meta: { title: '关于产品' } },
     // catch-all (including '/') renders DashboardView and is the canonical 'dashboard' name

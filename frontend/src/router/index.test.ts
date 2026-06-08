@@ -15,11 +15,11 @@ describe('router', () => {
     expect((a.matched[0].components?.default as any).__name).toBe('AboutView')
   })
 
-  it('resolves tier pages with tab + tier params', () => {
-    const r = router.resolve('/tier/plan/above1m')
+  it('resolves analysis pages with tab param', () => {
+    const r = router.resolve('/analysis/plan')
     expect(r.matched.length).toBeGreaterThan(0)
+    expect(r.name).toBe('analysis')
     expect(r.params.tab).toBe('plan')
-    expect(r.params.tier).toBe('above1m')
   })
 
   it('unknown path falls back to dashboard', () => {

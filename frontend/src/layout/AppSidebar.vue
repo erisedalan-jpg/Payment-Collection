@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
-import { OVERVIEW_LINKS, ANALYSIS_LINKS, TOOL_LINKS, TIER_TABS, TIERS } from '@/nav'
+import { OVERVIEW_LINKS, ANALYSIS_LINKS, ANALYSIS_TAB_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 </script>
@@ -22,13 +22,8 @@ const ui = useUiStore()
 
       <div class="section">
         <div class="section-label">业务分析</div>
-        <div v-for="t in TIER_TABS" :key="t.tab" class="group">
-          <div class="group-label">{{ t.label }}</div>
-          <RouterLink v-for="tier in TIERS" :key="tier.slug"
-            :to="`/tier/${t.tab}/${tier.slug}`" class="nav-sub" active-class="active">
-            <span class="dot" :style="{ background: tier.color }" />{{ tier.label }}
-          </RouterLink>
-        </div>
+        <RouterLink v-for="link in ANALYSIS_TAB_LINKS" :key="link.to" :to="link.to"
+          class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
       <div class="section">
