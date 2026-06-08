@@ -139,24 +139,24 @@ defineExpose({ onClear, onSync, onPickImport })
 
 <style scoped>
 .data-view { padding: 16px; }
-.dv-title { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 14px; }
-.dv-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 14px; }
-.dv-card-head { font-weight: 700; padding: 10px 16px; border-bottom: 1px solid #f1f5f9; color: #1a1a2e; }
+.dv-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 14px; }
+.dv-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; }
+.dv-card-head { font-weight: 700; padding: 10px 16px; border-bottom: 1px solid var(--line); color: var(--txt); }
 .dv-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; }
-.dv-label { width: 84px; flex-shrink: 0; color: #475569; font-weight: 600; }
-.dv-hint { font-size: 12px; color: #94a3b8; }
-.dv-note { color: #94a3b8; font-size: 12px; }
-.dv-btn { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
-.dv-btn.danger { color: #ef4444; border-color: #fecaca; }
+.dv-label { width: 84px; flex-shrink: 0; color: var(--sub); font-weight: 600; }
+.dv-hint { font-size: 12px; color: var(--mut); }
+.dv-note { color: var(--mut); font-size: 12px; }
+.dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
+.dv-btn.danger { color: var(--danger); border-color: var(--danger); }
 .dv-btn:disabled { opacity: 0.5; cursor: default; }
-.dv-clear-state { font-size: 12px; color: #10b981; }
+.dv-clear-state { font-size: 12px; color: var(--c-paid); }
 .dv-file { font-size: 12px; }
 .dv-progress { padding: 0 16px 12px; }
-.dv-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-.dv-bar-fill { height: 100%; background: #3b82f6; transition: width .3s ease; }
-.dv-bar-fill.done { background: #10b981; }
-.dv-bar-fill.error { background: #ef4444; }
-.dv-msg { font-size: 12px; color: #64748b; margin-top: 6px; }
-.dv-msg.done { color: #10b981; }
-.dv-msg.error { color: #ef4444; }
+.dv-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.dv-bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.dv-bar-fill.done { background: var(--c-paid); }
+.dv-bar-fill.error { background: var(--danger); }
+.dv-msg { font-size: 12px; color: var(--mut); margin-top: 6px; }
+.dv-msg.done { color: var(--c-paid); }
+.dv-msg.error { color: var(--danger); }
 </style>
