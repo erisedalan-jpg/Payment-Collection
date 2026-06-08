@@ -38,3 +38,16 @@ describe('projectsOverviewSummary', () => {
     expect(s.delayed).toBe(1)
   })
 })
+
+describe('filterOverviewProjects 空 tier=全部', () => {
+  const projs = [
+    { projectId: 'A', amountTier: '100万以上' },
+    { projectId: 'B', amountTier: '50万以下' },
+  ] as any
+  it('空 tier 返回全部（仅纳管过滤）', () => {
+    expect(filterOverviewProjects(projs, '', false, {}).map((p: any) => p.projectId)).toEqual(['A', 'B'])
+  })
+  it('指定 tier 仍按档过滤', () => {
+    expect(filterOverviewProjects(projs, '50万以下', false, {}).map((p: any) => p.projectId)).toEqual(['B'])
+  })
+})
