@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useFilterStore } from '@/stores/filter'
 import { rankByOrg } from '@/lib/dashboardCharts'
+import { goBoard } from '@/lib/navContext'
 import { fmtWan, pct } from '@/lib/format'
 import SegToggle from './SegToggle.vue'
 
 const filter = useFilterStore()
+const router = useRouter()
 const sortBy = ref('actualTotal')
 const SORT_OPTS = [
   { value: 'actualTotal', label: '已回款' },
@@ -20,7 +23,6 @@ const maxActual = computed(() => Math.max(1, ...ranked.value.map((o) => o.actual
 function rateColor(r: number): string {
   return r >= 0.45 ? 'var(--c-paid)' : r >= 0.3 ? 'var(--c-pending)' : 'var(--danger)'
 }
-// 行点击「带筛选跳多维看板」依赖 /board 与 navContext（D4），本期行不可点，留 D4 接入。
 </script>
 
 <template>
@@ -29,7 +31,13 @@ function rateColor(r: number): string {
       <h3 class="or-title">服务组达成排名</h3>
       <SegToggle v-model="sortBy" :options="SORT_OPTS" />
     </div>
-    <div v-for="(o, i) in ranked" :key="o.org" class="rank-item">
+    <div
+      v-for="(o, i) in ranked"
+      :key="o.org"
+      v-activate
+      class="rank-item"
+      @click="goBoard(router, 'orgL4')"
+    >
       <span class="rank-no">{{ i + 1 }}</span>
       <span class="rank-name" :title="o.org">{{ o.org }}</span>
       <span class="rank-bar-wrap">
@@ -46,7 +54,8 @@ function rateColor(r: number): string {
 .org-ranking { }
 .or-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .or-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0; }
-.rank-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: var(--fs-2); }
+.rank-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: var(--fs-2); cursor: pointer; border-radius: 6px; }
+.rank-item:hover { background: var(--card2); }
 .rank-no { width: 20px; text-align: center; color: var(--mut); }
 .rank-name { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
 .rank-bar-wrap { flex: 1; background: var(--card2); border-radius: 4px; height: 10px; overflow: hidden; }

@@ -3,15 +3,15 @@ import { router } from './index'
 
 describe('router', () => {
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/compare', '/calendar', '/followup', '/ledger', '/pmview', '/data', '/about']) {
+    for (const path of ['/', '/board', '/calendar', '/followup', '/ledger', '/data', '/about']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })
 
-  it('compare / about 解析到真实视图（非占位 PageStub）', () => {
-    const c = router.resolve('/compare')
+  it('board / about 解析到真实视图（非占位 PageStub）', () => {
+    const b = router.resolve('/board')
     const a = router.resolve('/about')
-    expect((c.matched[0].components?.default as any).__name).toBe('CompareView')
+    expect((b.matched[0].components?.default as any).__name).toBe('BoardView')
     expect((a.matched[0].components?.default as any).__name).toBe('AboutView')
   })
 

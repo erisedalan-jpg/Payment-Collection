@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import OrgRanking from './OrgRanking.vue'
 import { useDataStore } from '@/stores/data'
+
+const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
@@ -35,5 +38,13 @@ describe('OrgRanking', () => {
     await w.get('[data-test="seg-achievementRate"]').trigger('click')
     const items = w.findAll('.rank-item')
     expect(items[0].text()).toContain('北京服务组')
+  })
+
+  it('点击排名行跳转 /board（orgL4 维度）', async () => {
+    seed()
+    pushSpy.mockClear()
+    const w = mount(OrgRanking)
+    await w.findAll('.rank-item')[0].trigger('click')
+    expect(pushSpy).toHaveBeenCalledWith({ path: '/board', query: { dim: 'orgL4' } })
   })
 })

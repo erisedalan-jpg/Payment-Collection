@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan D3 看板首页重做完成；Phase D：D1-D2-D2.5-D3 已完成）
+- 最近更新：2026-06-08（Plan D4 多维看板单维核心完成；Phase D：D1-D2-D2.5-D3-D4 已完成）
 - 维护语言：简体中文
 
 ---
@@ -86,7 +86,7 @@ _（无）_
 - [x] **D2** 全局项目详情面板（projectDetail store + buildProjectDetail + ProjectDetailDrawer，AppLayout 全局挂载）。上下文跳转(navContext)按 YAGNI 挪到 D4（有真实消费者时）；各页"点项目→唤起面板"接入随 D3/D4/D7。
 - [x] **D2.5** 审计地基修复（D3 前，来源 /impeccable audit）：P1 暗色 token 化（仅留存共享组件/页面：DataTable/ColumnFilter/FilterBar + 台账/数据管理/关于/临期跟进全链，共 16 文件）+ v-activate 键盘激活指令（全局注册，下钻入口键盘可达）+ theme.css `--mut` 对比度达 WCAG AA + 语义状态色/反白色/--c-urgent token；P2 `.u-grid-auto` 自适应栅格工具 + 去 side-stripe 彩色左边框。**延后给 D3–D10 在重做时按同套 token 映射+v-activate 处理的文件**：Dashboard 系(D3)、Compare/Pm 系(D4 删除)、Calendar 系(D7-9)、Analysis tab 系 Tier*/Plan*/Risk/ProjectsOverview(D10)。
 - [x] **D3** 看板首页重做：6 指标(DashMetrics) + 统一档位条(TierStrip) + 服务组排名(OrgRanking，排序切换;带筛选跳 /board 留 D4) + 待回款趋势(TrendCard 月/季切换) + 延期 Top(DelayTopCard 天数/金额切换 + 点项目开 D2 详情面板) + SegToggle 共享分段控件;lib 增延期项目数与延期按金额排序。删除旧 DashSummaryCards/TierCards/DelayedTop。
-- [ ] **D4** 多维看板·单维核心（lib/pivot + BoardView），吸收 区间对比 + 项目经理视图，删旧入口/路由。
+- [x] **D4** 多维看板·单维核心：`lib/pivot`(DIMENSIONS 6维 + groupByDims，分桶→groupByProject 算指标，N维可扩展) + `BoardView`(/board：维度/排序切换 + ECharts 对比图 + 排名表行下钻) + `BoardDrilldownModal`(组内项目→D2 详情面板) + `lib/navContext.goBoard` + DataTable 加 row-click/clickable + OrgRanking 行接入跳转。删除 compare/pmview 整链(14 文件)与 /compare /pmview 路由;侧栏新增「分析·多维看板」。双维/N维留 D5/D6。
 - [ ] **D5** 多维看板·双维交叉。
 - [ ] **D6** 多维看板·N 维透视表。
 - [ ] **D7** 回款日历重做 A（富日格 + 选中日明细 + 主题适配 + 字号放大）。
@@ -116,6 +116,15 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan D4 完成（2026-06-08）：多维看板·单维核心
+- 分支 **`refactor/d4-multidim-board-single`**，计划 `docs/superpowers/plans/2026-06-08-D4-multidim-board-single.md`，10 任务全完成、`verify.sh` 全绿。
+- 产物：`lib/pivot`（`DIMENSIONS` 6 维[orgL4/orgL3/projectManager/projectType/signUnit/tier] + `groupByDims(nodes,dimKeys[])`：按维度取值分桶→每桶 `groupByProject` 算 项目数/计划/已回/待回/完成率/延期数/延期率 + 保留 projects 供下钻;N 维可扩展，本期单维）;`lib/navContext.goBoard(router,dim)`;`BoardView`(/board：维度 SegToggle + 排序 SegToggle + ChartBox 堆叠对比图 + 自定义排名表，行 v-activate 点击下钻);`BoardDrilldownModal`（Modal+DataTable 列项目，行点击 → D2 `projectDetail.open`）;`DataTable` 加可选 `row-click`/`clickable`;`OrgRanking` 行点击 `goBoard(router,'orgL4')`。
+- 删除（被吸收）：CompareView/CompareCards/lib·compare、PmView/PmRankingTable/PmDrilldownModal/lib·pmView 及各自测试（14 文件）;路由去 /compare /pmview;侧栏去「区间对比/项目经理视图」，加「分析·多维看板」。
+- 计算口径忠实：pivot 复用 groupByProject（dim=tier 即旧 compare、dim=projectManager 即旧 pmview 的口径），未改算法。
+- YAGNI 延后：双维交叉(D5)/N 维透视表(D6);navContext 暂一个消费者(OrgRanking)，年/视角靠全局 filter 自动跨页保留。
+- 执行中 controller 修正：pivot 测试数据初版让「已全额回款」与「延期」同项目（前者优先级更高致项目非延期），改为「正常实施中」+「延期」才正确判延期;BoardView/BoardDrilldownModal/OrgRanking 测试改用 `vi.mock('vue-router')` 与 stub/ElementPlus 处理组合式 API 与 el-table teleport。
+- 整体进度：Phase D：**D1-D2-D2.5-D3-D4 完成（D4 待合并 master）**。下一步 D5（多维看板·双维交叉）。
 
 ### ✅ Plan D3 完成（2026-06-08）：看板首页重做
 - 分支 **`refactor/d3-dashboard-home-rebuild`**，计划 `docs/superpowers/plans/2026-06-08-D3-dashboard-home-rebuild.md`，10 任务全完成、`verify.sh` 全绿。

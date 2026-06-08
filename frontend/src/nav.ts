@@ -19,14 +19,16 @@ export const TIER_TABS: TierTab[] = [
 
 export const OVERVIEW_LINKS: NavLink[] = [
   { label: '看板首页', to: '/' },
-  { label: '区间对比', to: '/compare' },
   { label: '回款日历', to: '/calendar' },
   { label: '临期跟进', to: '/followup' },
   { label: '回款台账', to: '/ledger' },
 ]
 
+export const ANALYSIS_LINKS: NavLink[] = [
+  { label: '多维看板', to: '/board' },
+]
+
 export const TOOL_LINKS: NavLink[] = [
-  { label: '项目经理视图', to: '/pmview' },
   { label: '数据管理', to: '/data' },
   { label: '关于产品', to: '/about' },
 ]

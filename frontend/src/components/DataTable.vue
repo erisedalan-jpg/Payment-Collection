@@ -15,9 +15,12 @@ const props = withDefaults(
     columns: DataColumn[]
     rows: Record<string, any>[]
     showCount?: boolean
+    clickable?: boolean
   }>(),
-  { showCount: true },
+  { showCount: true, clickable: false },
 )
+
+const emit = defineEmits<{ 'row-click': [Record<string, any>] }>()
 
 const count = computed(() => props.rows.length)
 </script>
@@ -25,7 +28,14 @@ const count = computed(() => props.rows.length)
 <template>
   <div class="data-table">
     <div v-if="props.showCount" class="dt-count">共 {{ count }} 条</div>
-    <el-table :data="props.rows" border stripe style="width: 100%">
+    <el-table
+      :data="props.rows"
+      border
+      stripe
+      style="width: 100%"
+      :row-class-name="props.clickable ? 'dt-clickable-row' : ''"
+      @row-click="(row: Record<string, any>) => emit('row-click', row)"
+    >
       <el-table-column
         v-for="col in props.columns"
         :key="col.key"
@@ -46,4 +56,5 @@ const count = computed(() => props.rows.length)
 <style scoped>
 .data-table { width: 100%; }
 .dt-count { font-size: 12px; color: var(--mut); margin: 4px 0; }
+:deep(.dt-clickable-row) { cursor: pointer; }
 </style>
