@@ -20,21 +20,20 @@ function seed() {
 }
 
 describe('OrgRanking', () => {
-  it('renders ranked orgs with amount and rate', () => {
+  it('渲染服务组排名（金额与达成率）', () => {
     seed()
-    const wrapper = mount(OrgRanking)
-    const text = wrapper.text()
+    const w = mount(OrgRanking)
+    const text = w.text()
     expect(text).toContain('北京服务组')
     expect(text).toContain('上海一服务组')
     expect(text).toContain('60%')
   })
 
-  it('tier filter restricts orgs', async () => {
+  it('切到达成率排序：北京(60%) 在 上海(25%) 之前', async () => {
     seed()
-    const wrapper = mount(OrgRanking)
-    await wrapper.get('[data-test="rank-tier"]').setValue('50-100万')
-    const text = wrapper.text()
-    expect(text).toContain('上海一服务组')
-    expect(text).not.toContain('北京服务组')
+    const w = mount(OrgRanking)
+    await w.get('[data-test="seg-achievementRate"]').trigger('click')
+    const items = w.findAll('.rank-item')
+    expect(items[0].text()).toContain('北京服务组')
   })
 })
