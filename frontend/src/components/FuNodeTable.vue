@@ -39,9 +39,9 @@ const COLS = [
 .fnt-wrap { overflow-x: auto; }
 .fnt-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0; }
 .fnt-table th, .fnt-table td {
-  padding: 5px 6px; border: 1px solid #ebe7e2; text-align: left; white-space: nowrap;
+  padding: 5px 6px; border: 1px solid var(--line); text-align: left; white-space: nowrap;
   max-width: 200px; overflow: hidden; text-overflow: ellipsis;
 }
-.fnt-table th { background: #fafbfc; color: #475569; font-weight: 600; }
-.fnt-empty { font-size: 13px; color: #8c8c9e; padding: 8px 0; }
+.fnt-table th { background: var(--card2); color: var(--sub); font-weight: 600; }
+.fnt-empty { font-size: 13px; color: var(--mut); padding: 8px 0; }
 </style>

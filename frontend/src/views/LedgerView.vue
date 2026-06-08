@@ -56,8 +56,8 @@ const summary = computed(() => ledgerSummary(displayed.value as any))
 const tierStats = computed(() => ledgerTierStats(displayed.value as any))
 const statusCounts = computed(() => ledgerStatusCounts(displayed.value as any))
 
-const rateColor = (r: number) => (r >= 0.8 ? '#10b981' : r >= 0.5 ? '#f59e0b' : '#ef4444')
-const tierColor = (t: string) => (t === '100万以上' ? '#ef4444' : t === '50-100万' ? '#f59e0b' : '#10b981')
+const rateColor = (r: number) =>
+  r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(--c-pending)' : 'var(--danger)'
 
 const columns = [
   { key: 'projectId', label: '项目编号' },
@@ -90,19 +90,19 @@ const columns = [
 
     <div class="summary-bar">
       <div class="sb-item"><div class="sb-label">项目总数</div><div class="sb-val">{{ summary.projectCount }}</div></div>
-      <div class="sb-item"><div class="sb-label">计划回款总金额(万)</div><div class="sb-val" style="color:#3b82f6">{{ fmtWan(summary.totalExp) }}</div></div>
+      <div class="sb-item"><div class="sb-label">计划回款总金额(万)</div><div class="sb-val" style="color:var(--accent)">{{ fmtWan(summary.totalExp) }}</div></div>
       <div class="sb-item"><div class="sb-label">已回款总金额(万)</div><div class="sb-val green">{{ fmtWan(summary.totalAct) }}</div></div>
       <div class="sb-item"><div class="sb-label">待回款总金额(万)</div><div class="sb-val red">{{ fmtWan(summary.totalRem) }}</div></div>
       <div class="sb-item"><div class="sb-label">完成率</div><div class="sb-val" :style="{ color: rateColor(summary.rate) }">{{ pct(summary.rate) }}</div></div>
     </div>
 
     <div class="status-row">
-      <div class="st-card"><div class="st-label">加资源可提前</div><div class="st-val" style="color:#4f46e5">{{ statusCounts.canAdvance }}</div></div>
-      <div class="st-card"><div class="st-label">达到回款条件</div><div class="st-val" style="color:#f59e0b">{{ statusCounts.reachedCondition }}</div></div>
-      <div class="st-card"><div class="st-label">已提前回款</div><div class="st-val" style="color:#059669">{{ statusCounts.advance }}</div></div>
-      <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:#10b981">{{ statusCounts.fullPaid }}</div></div>
-      <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:#ef4444">{{ statusCounts.delayed }}</div></div>
-      <div class="st-card"><div class="st-label">正常实施中</div><div class="st-val" style="color:#3b82f6">{{ statusCounts.onTime }}</div></div>
+      <div class="st-card"><div class="st-label">加资源可提前</div><div class="st-val" style="color:var(--accent)">{{ statusCounts.canAdvance }}</div></div>
+      <div class="st-card"><div class="st-label">达到回款条件</div><div class="st-val" style="color:var(--c-pending)">{{ statusCounts.reachedCondition }}</div></div>
+      <div class="st-card"><div class="st-label">已提前回款</div><div class="st-val" style="color:var(--c-paid)">{{ statusCounts.advance }}</div></div>
+      <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:var(--c-paid)">{{ statusCounts.fullPaid }}</div></div>
+      <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:var(--danger)">{{ statusCounts.delayed }}</div></div>
+      <div class="st-card"><div class="st-label">正常实施中</div><div class="st-val" style="color:var(--accent)">{{ statusCounts.onTime }}</div></div>
     </div>
 
     <div class="tier-cards">
@@ -110,13 +110,12 @@ const columns = [
         v-for="ts in tierStats"
         :key="ts.tier"
         class="tier-card"
-        :style="{ borderLeftColor: tierColor(ts.tier) }"
       >
         <div class="tc-name">{{ ts.tier }}</div>
         <div class="tc-metrics">
-          <span>项目数 <b style="color:#4f46e5">{{ ts.count }}</b></span>
-          <span>计划回款金额 <b style="color:#3b82f6">{{ fmtYuan(ts.expWan) }}万</b></span>
-          <span>待回款金额 <b style="color:#ef4444">{{ fmtYuan(ts.remWan) }}万</b></span>
+          <span>项目数 <b style="color:var(--accent)">{{ ts.count }}</b></span>
+          <span>计划回款金额 <b style="color:var(--accent)">{{ fmtYuan(ts.expWan) }}万</b></span>
+          <span>待回款金额 <b style="color:var(--danger)">{{ fmtYuan(ts.remWan) }}万</b></span>
         </div>
       </div>
     </div>
@@ -151,18 +150,18 @@ const columns = [
 
 <style scoped>
 .ledger-view { padding: 16px; }
-.lv-title { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 14px; }
+.lv-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 14px; }
 .summary-bar, .status-row { display: grid; gap: 10px; margin-bottom: 12px; }
 .summary-bar { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .status-row { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-.sb-item, .st-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
-.sb-label, .st-label { font-size: 12px; color: #64748b; }
-.sb-val { font-size: 18px; font-weight: 700; color: #0f172a; }
-.sb-val.green { color: #10b981; } .sb-val.red { color: #ef4444; }
+.sb-item, .st-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.sb-label, .st-label { font-size: 12px; color: var(--mut); }
+.sb-val { font-size: 18px; font-weight: 700; color: var(--txt); }
+.sb-val.green { color: var(--c-paid); } .sb-val.red { color: var(--danger); }
 .st-val { font-size: 20px; font-weight: 700; }
 .tier-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.tier-card { flex: 1; min-width: 200px; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border-left: 3px solid #94a3b8; }
-.tc-name { font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 6px; }
+.tier-card { flex: 1; min-width: 200px; padding: 12px 16px; background: var(--card2); border-radius: 8px; border: 1px solid var(--line); }
+.tc-name { font-weight: 700; font-size: 13px; color: var(--txt); margin-bottom: 6px; }
 .tc-metrics { display: flex; gap: 16px; font-size: 12px; flex-wrap: wrap; }
 .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

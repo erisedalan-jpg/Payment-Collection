@@ -45,5 +45,5 @@ const count = computed(() => props.rows.length)
 
 <style scoped>
 .data-table { width: 100%; }
-.dt-count { font-size: 12px; color: #94a3b8; margin: 4px 0; }
+.dt-count { font-size: 12px; color: var(--mut); margin: 4px 0; }
 </style>

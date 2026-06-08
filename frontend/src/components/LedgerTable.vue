@@ -50,7 +50,7 @@ function cell(row: Record<string, any>, col: LedgerCol) {
       </thead>
       <tbody>
         <template v-for="(p, idx) in projects.slice(0, 500)" :key="p.projectId">
-          <tr class="lt-row" :class="{ expanded: expandedIdx === idx }" @click="toggle(idx)">
+          <tr v-activate class="lt-row" :class="{ expanded: expandedIdx === idx }" @click="toggle(idx)">
             <td v-for="col in columns" :key="col.key" :title="String(p[col.key] ?? '')">
               {{ cell(p, col) }}
             </td>
@@ -97,7 +97,7 @@ function cell(row: Record<string, any>, col: LedgerCol) {
 .ledger-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .ledger-table th,
 .ledger-table td {
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--line);
   padding: 6px 8px;
   text-align: left;
   white-space: nowrap;
@@ -105,17 +105,17 @@ function cell(row: Record<string, any>, col: LedgerCol) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ledger-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.ledger-table th { background: var(--card2); color: var(--sub); font-weight: 600; }
 .lt-row { cursor: pointer; }
-.lt-row:hover { background: #f8fafc; }
-.lt-row.expanded { background: #eef2ff; }
-.lt-detail-row > td { background: #f8fafc; white-space: normal; max-width: none; }
-.lt-detail { padding: 14px; border: 2px solid #eef2ff; border-radius: 8px; background: #fff; }
-.lt-detail-title { font-weight: 700; color: #0f172a; margin-bottom: 10px; }
-.lt-detail-id { margin-left: 12px; font-size: 12px; color: #94a3b8; font-weight: 400; }
-.lt-nodes-title { font-weight: 700; color: #4f46e5; font-size: 13px; margin-bottom: 8px; }
+.lt-row:hover { background: var(--card2); }
+.lt-row.expanded { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.lt-detail-row > td { background: var(--card2); white-space: normal; max-width: none; }
+.lt-detail { padding: 14px; border: 2px solid color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 8px; background: var(--card); }
+.lt-detail-title { font-weight: 700; color: var(--txt); margin-bottom: 10px; }
+.lt-detail-id { margin-left: 12px; font-size: 12px; color: var(--mut); font-weight: 400; }
+.lt-nodes-title { font-weight: 700; color: var(--accent); font-size: 13px; margin-bottom: 8px; }
 .lt-node-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.lt-node-table th { background: #f1f5f9; }
-.lt-nodes-empty { color: #94a3b8; font-size: 12px; }
-.lt-count { font-size: 12px; color: #94a3b8; padding: 6px 0; }
+.lt-node-table th { background: var(--line); }
+.lt-nodes-empty { color: var(--mut); font-size: 12px; }
+.lt-count { font-size: 12px; color: var(--mut); padding: 6px 0; }
 </style>

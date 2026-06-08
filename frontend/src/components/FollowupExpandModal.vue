@@ -42,7 +42,7 @@ const projCount = computed(() => projs.value.length)
 const nodeCount = computed(() => windowNodes.value.length)
 const flwCount = computed(() => projs.value.filter((p) => p.flw).length)
 const flwRate = computed(() => (projCount.value > 0 ? Math.round((flwCount.value / projCount.value) * 100) : 0))
-const rateColor = computed(() => (flwRate.value >= 80 ? '#10b981' : flwRate.value >= 50 ? '#f59e0b' : '#ef4444'))
+const rateColor = computed(() => (flwRate.value >= 80 ? 'var(--c-paid)' : flwRate.value >= 50 ? 'var(--c-pending)' : 'var(--danger)'))
 const timeLabel = computed(
   () =>
     ((
@@ -51,10 +51,10 @@ const timeLabel = computed(
 )
 const maxU = computed(() => Math.max(urgency.value.delay, urgency.value.d7, urgency.value.d15, urgency.value.d30, 1))
 const URG = computed(() => [
-  { label: '已延期', count: urgency.value.delay, color: '#dc2626' },
-  { label: '7天内到期', count: urgency.value.d7, color: '#f97316' },
-  { label: '8~15天到期', count: urgency.value.d15, color: '#f59e0b' },
-  { label: '16~30天到期', count: urgency.value.d30, color: '#3b82f6' },
+  { label: '已延期', count: urgency.value.delay, color: 'var(--danger)' },
+  { label: '7天内到期', count: urgency.value.d7, color: 'var(--c-urgent)' },
+  { label: '8~15天到期', count: urgency.value.d15, color: 'var(--c-pending)' },
+  { label: '16~30天到期', count: urgency.value.d30, color: 'var(--accent)' },
 ])
 
 function batch(v: string | number) {
@@ -114,23 +114,23 @@ defineExpose({ batch })
 .fe-body { display: flex; gap: 16px; }
 .fe-left { width: 240px; flex-shrink: 0; }
 .fe-right { flex: 1; min-width: 0; }
-.fe-sum { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+.fe-sum { font-size: 14px; font-weight: 700; color: var(--txt); margin-bottom: 12px; }
 .fe-rate { font-size: 32px; font-weight: 900; text-align: center; margin-bottom: 12px; }
-.fe-rate span { display: block; font-size: 12px; color: #8c8c9e; font-weight: 400; }
+.fe-rate span { display: block; font-size: 12px; color: var(--mut); font-weight: 400; }
 .fe-cards { display: flex; gap: 10px; margin-bottom: 16px; }
 .fe-c { flex: 1; text-align: center; padding: 12px 8px; border-radius: 8px; }
 .fe-c b { font-size: 18px; display: block; }
 .fe-c span { font-size: 12px; font-weight: 600; }
-.fe-c.red { background: #fef2f2; color: #ef4444; }
-.fe-c.green { background: #ecfdf5; color: #10b981; }
-.fe-urg-title { font-size: 13px; font-weight: 600; color: #8c8c9e; margin-bottom: 8px; }
+.fe-c.red { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.fe-c.green { background: color-mix(in srgb, var(--c-paid) 12%, transparent); color: var(--c-paid); }
+.fe-urg-title { font-size: 13px; font-weight: 600; color: var(--mut); margin-bottom: 8px; }
 .fe-urg { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-.fe-urg-label { font-size: 12px; color: #8c8c9e; width: 76px; flex-shrink: 0; text-align: right; }
-.fe-urg-bar { flex: 1; height: 10px; background: #f1f5f9; border-radius: 5px; overflow: hidden; }
+.fe-urg-label { font-size: 12px; color: var(--mut); width: 76px; flex-shrink: 0; text-align: right; }
+.fe-urg-bar { flex: 1; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
 .fe-urg-bar > div { height: 100%; border-radius: 5px; }
-.fe-urg-num { font-size: 13px; font-weight: 700; color: #1a1a2e; min-width: 20px; text-align: right; }
-.fe-label { font-size: 13px; font-weight: 600; color: #475569; margin: 12px 0 6px; }
+.fe-urg-num { font-size: 13px; font-weight: 700; color: var(--txt); min-width: 20px; text-align: right; }
+.fe-label { font-size: 13px; font-weight: 600; color: var(--sub); margin: 12px 0 6px; }
 .fe-r-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
-.fe-r-count { font-size: 11px; color: #8c8c9e; margin-bottom: 16px; }
-.fe-empty { text-align: center; padding: 30px; color: #8c8c9e; }
+.fe-r-count { font-size: 11px; color: var(--mut); margin-bottom: 16px; }
+.fe-empty { text-align: center; padding: 30px; color: var(--mut); }
 </style>

@@ -50,12 +50,12 @@ const FEATURES = [
 <style scoped>
 .about-view { padding: 24px; max-width: 720px; }
 .about-head { margin-bottom: 24px; }
-.about-name { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-.about-ver { font-size: 14px; color: #94a3b8; }
-.about-grid { display: grid; grid-template-columns: 120px 1fr; gap: 12px 16px; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
-.about-k { color: #64748b; font-weight: 600; }
-.about-v { color: #1f2937; }
-.about-feat-box { margin-top: 24px; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 12px; color: #64748b; }
-.about-feat-title { font-weight: 700; margin-bottom: 8px; color: #334155; }
+.about-name { font-size: 20px; font-weight: 800; color: var(--txt); margin-bottom: 4px; }
+.about-ver { font-size: 14px; color: var(--mut); }
+.about-grid { display: grid; grid-template-columns: 120px 1fr; gap: 12px 16px; font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+.about-k { color: var(--mut); font-weight: 600; }
+.about-v { color: var(--txt); }
+.about-feat-box { margin-top: 24px; padding: 16px; background: var(--card2); border-radius: 8px; font-size: 12px; color: var(--mut); }
+.about-feat-title { font-weight: 700; margin-bottom: 8px; color: var(--sub); }
 .about-features { list-style: disc; padding-left: 20px; line-height: 2; margin: 0; }
 </style>

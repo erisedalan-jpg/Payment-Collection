@@ -91,15 +91,15 @@ function submit() {
 </template>
 
 <style scoped>
-.frf { background: #fafbfc; border: 1px solid #ebe7e2; border-radius: 8px; padding: 12px; margin-top: 8px; }
-.frf-title { font-weight: 700; font-size: 13px; color: #1a1a2e; margin-bottom: 8px; }
+.frf { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 8px; }
+.frf-title { font-weight: 700; font-size: 13px; color: var(--txt); margin-bottom: 8px; }
 .frf-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
-.frf-row label { width: 84px; flex-shrink: 0; color: #475569; }
-.frf-row input, .frf-row select, .frf-row textarea { flex: 1; padding: 4px 8px; border: 1px solid #e2e0dc; border-radius: 4px; font-size: 12px; box-sizing: border-box; }
-.frf-row input[readonly] { background: #f5f5f4; color: #8c8c9e; cursor: default; }
-.frf-hint { font-size: 11px; color: #8c8c9e; margin: 2px 0 6px 92px; }
-.frf-error { color: #ef4444; font-size: 12px; margin: 4px 0; }
+.frf-row label { width: 84px; flex-shrink: 0; color: var(--sub); }
+.frf-row input, .frf-row select, .frf-row textarea { flex: 1; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; box-sizing: border-box; }
+.frf-row input[readonly] { background: var(--card2); color: var(--mut); cursor: default; }
+.frf-hint { font-size: 11px; color: var(--mut); margin: 2px 0 6px 92px; }
+.frf-error { color: var(--danger); font-size: 12px; margin: 4px 0; }
 .frf-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.frf-btn { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 4px 14px; font-size: 12px; cursor: pointer; color: #475569; }
-.frf-btn.primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+.frf-btn { border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 4px 14px; font-size: 12px; cursor: pointer; color: var(--sub); }
+.frf-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

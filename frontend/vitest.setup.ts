@@ -1,4 +1,9 @@
 import { vi } from 'vitest'
+import { config } from '@vue/test-utils'
+import { vActivate } from './src/directives/activate'
+
+// 全局注册自定义指令，使组件测试 mount 时能解析模板里的 v-activate
+config.global.directives = { ...(config.global.directives ?? {}), activate: vActivate }
 
 // el-table / el-dialog 等依赖 ResizeObserver（jsdom 无）
 class ResizeObserverStub {
