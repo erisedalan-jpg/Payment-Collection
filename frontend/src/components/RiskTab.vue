@@ -8,26 +8,32 @@ import { fmtYuan, fmtRatio, pct } from '@/lib/format'
 const props = defineProps<{ tier: string; now?: Date }>()
 const filter = useFilterStore()
 
-const tierNodes = computed(() => filter.filteredNodes.filter((n) => n.tier === props.tier))
+const tierNodes = computed(() => filter.filteredNodes.filter((n) => props.tier === '' || n.tier === props.tier))
 const groups = computed(() => riskGroups(tierNodes.value, props.now ?? new Date()))
 
-const nodeCols: DataColumn[] = [
-  { key: 'projectId', label: '项目编号' },
-  { key: 'projectName', label: '项目名称' },
-  { key: 'planDate', label: '计划日期' },
-  { key: 'remaining', label: '待回款(元)', formatter: (_v, row) => fmtYuan(getNodeRemaining(row)) },
-  { key: 'actualPaymentRatio', label: '实际比例', formatter: (v) => fmtRatio(v, '待上报') },
-  { key: 'orgL4', label: '服务组' },
-]
+const nodeCols = computed<DataColumn[]>(() => {
+  const base: DataColumn[] = [
+    { key: 'projectId', label: '项目编号' },
+    { key: 'projectName', label: '项目名称' },
+    { key: 'planDate', label: '计划日期' },
+    { key: 'remaining', label: '待回款(元)', formatter: (_v, row) => fmtYuan(getNodeRemaining(row)) },
+    { key: 'actualPaymentRatio', label: '实际比例', formatter: (v) => fmtRatio(v, '待上报') },
+    { key: 'orgL4', label: '服务组' },
+  ]
+  return props.tier === '' ? [{ key: 'tier', label: '档位' }, ...base] : base
+})
 
-const highRiskCols: DataColumn[] = [
-  { key: 'projectId', label: '项目编号' },
-  { key: 'projectName', label: '项目名称' },
-  { key: 'projectAmount', label: '项目金额(元)', formatter: (v) => fmtYuan(v as number) },
-  { key: 'remainingAmount', label: '待回款金额(元)', formatter: (v) => fmtYuan(v as number) },
-  { key: 'paymentRatio', label: '完成率', formatter: (v) => pct(v) },
-  { key: 'orgL4', label: '服务组' },
-]
+const highRiskCols = computed<DataColumn[]>(() => {
+  const base: DataColumn[] = [
+    { key: 'projectId', label: '项目编号' },
+    { key: 'projectName', label: '项目名称' },
+    { key: 'projectAmount', label: '项目金额(元)', formatter: (v) => fmtYuan(v as number) },
+    { key: 'remainingAmount', label: '待回款金额(元)', formatter: (v) => fmtYuan(v as number) },
+    { key: 'paymentRatio', label: '完成率', formatter: (v) => pct(v) },
+    { key: 'orgL4', label: '服务组' },
+  ]
+  return props.tier === '' ? [{ key: 'tier', label: '档位' }, ...base] : base
+})
 </script>
 
 <template>
@@ -49,8 +55,8 @@ const highRiskCols: DataColumn[] = [
 
 <style scoped>
 .risk-tab { padding: 12px 16px; display: flex; flex-direction: column; gap: 16px; }
-.risk-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+.risk-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
 .rc-header { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
-.rc-header.orange { color: #f59e0b; } .rc-header.primary { color: #4f46e5; } .rc-header.red { color: #ef4444; }
-.rc-sub { font-weight: 400; font-size: 12px; color: #94a3b8; margin-left: 6px; }
+.rc-header.orange { color: var(--c-pending); } .rc-header.primary { color: var(--accent); } .rc-header.red { color: var(--danger); }
+.rc-sub { font-weight: 400; font-size: 12px; color: var(--mut); margin-left: 6px; }
 </style>

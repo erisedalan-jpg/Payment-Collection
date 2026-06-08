@@ -11,7 +11,7 @@ function makeRouter() {
     routes: [
       { path: '/', name: 'dashboard', component: { template: '<div/>' } },
       { path: '/ledger', name: 'ledger', component: { template: '<div/>' } },
-      { path: '/tier/:tab/:tier', name: 'tier', component: { template: '<div/>' } },
+      { path: '/analysis/:tab', name: 'analysis', component: { template: '<div/>' } },
       { path: '/:pathMatch(.*)*', component: { template: '<div/>' } },
     ],
   })

@@ -28,6 +28,14 @@ export const ANALYSIS_LINKS: NavLink[] = [
   { label: '多维看板', to: '/board' },
 ]
 
+export const ANALYSIS_TAB_LINKS: NavLink[] = [
+  { label: '项目总览', to: '/analysis/projects' },
+  { label: '回款节点', to: '/analysis/nodes' },
+  { label: '回款状态', to: '/analysis/plan' },
+  { label: '风险项目', to: '/analysis/risk' },
+  { label: '数据质检', to: '/analysis/integrity' },
+]
+
 export const TOOL_LINKS: NavLink[] = [
   { label: '数据管理', to: '/data' },
   { label: '关于产品', to: '/about' },

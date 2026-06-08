@@ -11,7 +11,8 @@ export function filterOverviewProjects(
 ): OverviewProject[] {
   return projects.filter((p) => {
     if (naguanOn && naguanExclude && naguanExclude[p.projectId as string]) return false
-    return p.amountTier === tier
+    if (tier && p.amountTier !== tier) return false
+    return true
   })
 }
 
