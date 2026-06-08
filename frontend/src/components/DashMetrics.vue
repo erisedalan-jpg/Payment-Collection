@@ -46,7 +46,7 @@ const metrics = computed(() => {
 .dm-k { font-size: var(--fs-1); color: var(--mut); }
 .dm-v { font-size: var(--fs-5); font-weight: 800; margin-top: 4px; color: var(--txt); }
 .dm-v.paid { color: var(--c-paid); }
-.dm-v.remain { color: var(--cyan); }
+.dm-v.remain { color: var(--c-remaining); }
 .dm-v.pending { color: var(--c-pending); }
 .dm-v.danger { color: var(--danger); }
 </style>
