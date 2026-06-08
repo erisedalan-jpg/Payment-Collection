@@ -46,4 +46,24 @@ describe('BoardView', () => {
     await w.findAll('.bv-body')[0].trigger('click')
     expect((w.vm as any).drillOpen).toBe(true)
   })
+
+  it('选择次维度进入交叉模式并渲染矩阵', async () => {
+    seed()
+    const w = mount(BoardView, { global: { stubs: { BoardDrilldownModal: true } } })
+    // seg-tier 在「维度」与「次维度」两组都存在，取最后一个=次维度
+    const tierBtns = w.findAll('[data-test="seg-tier"]')
+    await tierBtns[tierBtns.length - 1].trigger('click')
+    expect(w.find('.bm').exists()).toBe(true)
+    expect(w.text()).toContain('北京')
+    expect(w.text()).toContain('100万以上')
+  })
+
+  it('交叉模式点击数据格打开下钻', async () => {
+    seed()
+    const w = mount(BoardView, { global: { stubs: { BoardDrilldownModal: true } } })
+    const tierBtns = w.findAll('[data-test="seg-tier"]')
+    await tierBtns[tierBtns.length - 1].trigger('click')
+    await w.find('.bm-cell.bm-click').trigger('click')
+    expect((w.vm as any).drillOpen).toBe(true)
+  })
 })
