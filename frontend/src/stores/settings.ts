@@ -8,7 +8,7 @@ const THEME_KEY = 'theme'
 const FONT_KEY = 'font_scale'
 
 // 字号档位 → 根字号（rem 基准）；新组件用 rem，切档即整体缩放。
-export const FONT_PX: Record<FontScale, string> = { sm: '14px', md: '15px', lg: '16px' }
+export const FONT_PX: Record<FontScale, string> = { sm: '13px', md: '15px', lg: '17px' }
 
 export const useSettingsStore = defineStore('settings', () => {
   const theme = ref<Theme>((localStorage.getItem(THEME_KEY) as Theme) || 'light')

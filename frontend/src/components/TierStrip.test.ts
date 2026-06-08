@@ -7,31 +7,34 @@ import { useDataStore } from '@/stores/data'
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
 describe('TierStrip', () => {
-  it('按档位渲染段与图例', () => {
+  it('每档渲染一条进度行并显示完成率', () => {
     const ds = useDataStore()
     ds.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
       rawNodes: [
-        { projectId: 'P1', tier: '100万以上', isPaymentRelated: true, nodeStatus: '延期', projectAmount: 2000000, expectedPayment: 1000000, actualPayment: 0, planMonth: '2026-02' },
-        { projectId: 'P2', tier: '50万以下', isPaymentRelated: true, nodeStatus: '已全额回款', projectAmount: 300000, expectedPayment: 300000, actualPayment: 300000, planMonth: '2026-03' },
+        { projectId: 'P1', tier: '100万以上', isPaymentRelated: true, nodeStatus: '正常实施中', projectAmount: 2000000, expectedPayment: 1000000, actualPayment: 600000, planMonth: '2026-02' },
       ],
       projectOverview: { projects: [], columns: [] },
       naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
     } as any
-    const w = mount(TierStrip)
-    expect(w.findAll('.ts-seg').length).toBe(3)
+    const w = mount(TierStrip, { global: { stubs: { BoardDrilldownModal: true } } })
+    expect(w.findAll('.ts-row').length).toBe(3)
     expect(w.text()).toContain('100万以上')
-    expect(w.find('.ts-empty').exists()).toBe(false)
+    expect(w.text()).toContain('60%')
   })
 
-  it('无项目时显示空态', () => {
+  it('点击档位行打开下钻', async () => {
     const ds = useDataStore()
     ds.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
-      rawNodes: [], projectOverview: { projects: [], columns: [] },
+      rawNodes: [
+        { projectId: 'P1', tier: '100万以上', isPaymentRelated: true, nodeStatus: '正常实施中', expectedPayment: 1000000, actualPayment: 600000, planMonth: '2026-02' },
+      ],
+      projectOverview: { projects: [], columns: [] },
       naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
     } as any
-    const w = mount(TierStrip)
-    expect(w.find('.ts-empty').exists()).toBe(true)
+    const w = mount(TierStrip, { global: { stubs: { BoardDrilldownModal: true } } })
+    await w.findAll('.ts-row')[0].trigger('click')
+    expect((w.vm as any).drillOpen).toBe(true)
   })
 })
