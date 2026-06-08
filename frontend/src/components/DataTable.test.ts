@@ -34,3 +34,19 @@ describe('DataTable', () => {
     expect(wrapper.text()).not.toContain('共 2 条')
   })
 })
+
+describe('DataTable row-click', () => {
+  it('点击行 emit row-click 携带行数据', async () => {
+    const w = mount(DataTable, {
+      props: {
+        columns: [{ key: 'projectId', label: '编号' }],
+        rows: [{ projectId: 'P1' }],
+        clickable: true,
+      },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    await w.find('.el-table__row').trigger('click')
+    expect(w.emitted('row-click')?.[0]?.[0]).toMatchObject({ projectId: 'P1' })
+  })
+})
