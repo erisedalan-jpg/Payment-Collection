@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
-import { OVERVIEW_LINKS, TOOL_LINKS, TIER_TABS, TIERS } from '@/nav'
+import { OVERVIEW_LINKS, ANALYSIS_LINKS, TOOL_LINKS, TIER_TABS, TIERS } from '@/nav'
 
 const ui = useUiStore()
 </script>
@@ -11,6 +11,12 @@ const ui = useUiStore()
       <div class="section">
         <div class="section-label">概览</div>
         <RouterLink v-for="link in OVERVIEW_LINKS" :key="link.to" :to="link.to"
+          class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+      </div>
+
+      <div class="section">
+        <div class="section-label">分析</div>
+        <RouterLink v-for="link in ANALYSIS_LINKS" :key="link.to" :to="link.to"
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
 

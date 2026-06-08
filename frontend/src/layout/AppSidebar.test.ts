@@ -30,9 +30,12 @@ describe('AppSidebar', () => {
     const wrapper = mount(AppSidebar, { global: { plugins: [router] } })
     const text = wrapper.text()
     expect(text).toContain('看板首页')
+    expect(text).toContain('多维看板')
     expect(text).toContain('回款台账')
     expect(text).toContain('项目总览')
     expect(text).toContain('数据管理')
+    expect(text).not.toContain('区间对比')
+    expect(text).not.toContain('项目经理视图')
   })
 
   it('toggle button flips uiStore collapsed', async () => {
