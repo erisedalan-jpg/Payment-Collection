@@ -64,24 +64,26 @@ describe('calDashboardStats', () => {
 })
 
 describe('calDateData', () => {
-  it('按日期统计状态桶', () => {
+  it('按日期统计状态桶 + 待回款金额合计', () => {
     const m = calDateData([
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '延期' },
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '正常实施中' },
+      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '延期', expectedPayment: 100000, actualPayment: 0 },
+      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '正常实施中', expectedPayment: 60000, actualPayment: 20000 },
     ] as any)
     expect(m['2026-06-10'].total).toBe(2)
     expect(m['2026-06-10'].delayed).toBe(1)
     expect(m['2026-06-10'].onTime).toBe(1)
+    expect(m['2026-06-10'].remaining).toBe(140000)
   })
 })
 
 describe('calMonthGrid', () => {
   it('生成含补位的格子，命中日带 count 与状态色', () => {
-    const dateData = { '2026-06-10': { total: 2, delayed: 1, onTime: 1, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0 } }
+    const dateData = { '2026-06-10': { total: 2, delayed: 1, onTime: 1, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0, remaining: 140000 } }
     const cells = calMonthGrid(2026, 5, dateData as any, NOW)
     const c10 = cells.find((c) => c.dateStr === '2026-06-10')!
     expect(c10.count).toBe(2)
     expect(c10.statusClass).toBe('mixed')
+    expect(c10.remaining).toBe(140000)
     const c4 = cells.find((c) => c.dateStr === '2026-06-04')!
     expect(c4.isToday).toBe(true)
     expect(cells.length % 7).toBe(0)
