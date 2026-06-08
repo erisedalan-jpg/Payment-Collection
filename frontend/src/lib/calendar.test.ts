@@ -10,6 +10,7 @@ import {
   calListGroups,
   calUpcoming,
   calDayTooltipText,
+  calAgendaGroups,
 } from './calendar'
 
 const NOW = new Date('2026-06-04T00:00:00')
@@ -132,5 +133,19 @@ describe('calDayTooltipText', () => {
     expect(t).toContain('延期 2')
     expect(t).toContain('正常实施中 1')
     expect(t).toContain('合计 3')
+  })
+})
+
+describe('calAgendaGroups', () => {
+  it('按日期升序分组 + 每日待回款小计', () => {
+    const g = calAgendaGroups([
+      { planDate: '2026-07-05', expectedPayment: 100000, actualPayment: 20000 },
+      { planDate: '2026-06-10', expectedPayment: 100000, actualPayment: 0 },
+      { planDate: '2026-06-10', expectedPayment: 50000, actualPayment: 50000 },
+    ] as any)
+    expect(g.map((x) => x.date)).toEqual(['2026-06-10', '2026-07-05'])
+    expect(g[0].nodes).toHaveLength(2)
+    expect(g[0].subRemaining).toBe(100000)
+    expect(g[1].subRemaining).toBe(80000)
   })
 })

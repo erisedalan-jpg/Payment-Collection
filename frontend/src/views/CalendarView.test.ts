@@ -37,4 +37,12 @@ describe('CalendarView', () => {
     expect(w.findComponent({ name: 'CalGrid' }).exists()).toBe(true)
     expect(w.text()).toContain('即将到期回款节点')
   })
+
+  it('切到议程列表视图渲染 CalAgenda', async () => {
+    seed()
+    const w = mount(CalendarView, { global: { plugins: [ElementPlus] } })
+    await w.get('[data-test="seg-agenda"]').trigger('click')
+    expect(w.find('.cag').exists()).toBe(true)
+    expect(w.find('.cal-grid-row').exists()).toBe(false)
+  })
 })
