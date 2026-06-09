@@ -17,7 +17,7 @@ const sig = computed(() => dashboardSignals(filter.filteredNodes, todayStr()))
 const cards = computed(() => [
   { k: '本月需回款(万)', v: fmtWan(sig.value.monthDue), cls: 'remaining', to: '/calendar' },
   { k: '7天内临期', v: String(sig.value.due7Count), cls: 'urgent', to: '/calendar' },
-  { k: '延期额(万)', v: fmtWan(sig.value.delayed), cls: 'remaining', to: '/analysis/risk' },
+  { k: '延期额(万)', v: fmtWan(sig.value.delayed), cls: 'delayed', to: '/analysis/risk' },
   { k: '待跟进', v: String(sig.value.toFollowupCount), cls: 'accent', to: '/followup' },
 ])
 </script>
@@ -38,6 +38,7 @@ const cards = computed(() => [
 .ds-k { font-size: var(--fs-1); color: var(--mut); }
 .ds-v { font-size: var(--fs-5); font-weight: 800; margin-top: 4px; color: var(--txt); }
 .ds-card.remaining .ds-v { color: var(--c-remaining); }
+.ds-card.delayed .ds-v { color: var(--c-delayed); }
 .ds-card.urgent .ds-v { color: var(--c-urgent); }
 .ds-card.accent .ds-v { color: var(--accent); }
 </style>

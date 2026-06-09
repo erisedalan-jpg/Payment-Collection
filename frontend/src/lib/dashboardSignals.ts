@@ -37,6 +37,7 @@ export function dashboardSignals(nodes: RawNode[], today: string): DashSignal {
 
   for (const node of nodes) {
     const n = node as Record<string, any>
+    if (!n.isPaymentRelated) continue
     const rem = getNodeRemaining(n)
 
     if (n.planMonth === month && rem > 0) monthDue += rem

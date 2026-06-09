@@ -50,4 +50,10 @@ describe('dashboardSignals', () => {
     expect(s.due7Count).toBe(1)
     expect(s.toFollowupCount).toBe(1)
   })
+
+  it('非回款关联节点(isPaymentRelated=false)不计入任何信号', () => {
+    const node = { projectId: 'P', tier: '100万以上', isPaymentRelated: false, planMonth: '2026-06', planDate: '2026-06-12', nodeStatus: '延期', expectedPayment: 50000, actualPayment: 0, followupRecords: [] } as any
+    const s = dashboardSignals([node], TODAY)
+    expect(s).toEqual({ monthDue: 0, due7Count: 0, delayed: 0, toFollowupCount: 0 })
+  })
 })
