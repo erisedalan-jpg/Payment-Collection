@@ -80,13 +80,12 @@ describe('useDataStore.reload', () => {
 })
 
 describe('useDataStore load 防缓存', () => {
-  beforeEach(() => setActivePinia(createPinia()))
   it('load() 拉取 URL 带防缓存参数 ?t=', async () => {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }))
     vi.stubGlobal('fetch', fetchMock as any)
     const store = useDataStore()
     await store.load()
-    const url = (fetchMock.mock.calls as unknown as string[][])[0][0]
+    const url = fetchMock.mock.lastCall![0] as string
     expect(url.startsWith('/data/analysis_data.json?t=')).toBe(true)
   })
 })
