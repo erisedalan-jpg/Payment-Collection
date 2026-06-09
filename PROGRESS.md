@@ -5,7 +5,7 @@
 > 配套机器可读清单见 `feature_list.json`。
 
 - 当前版本：**V5.9.1**
-- 最近更新：2026-06-08（Plan E1 P0 一致性修复完成；Phase D 前端重构全部完成）
+- 最近更新：2026-06-09（Plan E2 首页待办速览信号行完成）
 - 维护语言：简体中文
 
 ---
@@ -117,6 +117,11 @@ _（无）_
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan E2 完成（2026-06-09）：首页待办速览信号行
+- 分支 **`refactor/e2-dashboard-signals`**，`verify.sh` 全绿。
+- 产物：① `lib/dashboardSignals.ts` 纯函数算 4 信号（本月需回款/7天临期/延期额/待跟进，today 注入、复用 getNodeRemaining、过滤 isPaymentRelated、延期额防负值）；② `components/DashSignals.vue` 用 RouterLink 卡片导流（/calendar、/calendar、/analysis/risk、/followup），token 化（remaining/urgent/delayed/accent）；③ DashboardView 在 DashMetrics 之上接入。
+- 设计说明：金额信号 lib 返回元、组件用 fmtWan 统一（与 DashMetrics 一致）；卡片用 RouterLink 原生键盘可达，未叠加 v-activate（避免双触发）；延期额用语义 token --c-delayed。
 
 ### ✅ Plan E1 完成（2026-06-08）：P0 一致性修复
 - 分支 **`refactor/e1-consistency-fixes`**，`verify.sh` 全绿（75 pytest + 299 前端 vitest + typecheck + build）。
