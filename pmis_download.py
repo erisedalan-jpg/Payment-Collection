@@ -3,6 +3,7 @@
 进度用 [INFO]/[OK]/[ERROR] 标记输出,供 server 解析为 SSE。
 fetch 可注入便于测试;默认用 urllib(标准库,无新依赖)。"""
 from __future__ import annotations
+import json
 import os
 import sys
 from typing import Callable, Dict, List
@@ -43,12 +44,14 @@ def run_downloads(links: Dict[str, str], pmis_dir: str,
             print(f"[OK] 已下载 {item['name']}")
         except Exception as e:
             print(f"[ERROR] 下载失败 {item['name']}: {e}")
+            # 清理可能的截断残留文件,避免 preprocess 后续读到坏 xlsx
+            if os.path.exists(dest):
+                os.remove(dest)
     print(f"[OK] PMIS 下载完成 {ok}/{len(plan)}")
     return ok
 
 
 def load_links(links_path: str) -> Dict[str, str]:
-    import json
     if os.path.exists(links_path):
         with open(links_path, "r", encoding="utf-8") as f:
             data = json.load(f)
