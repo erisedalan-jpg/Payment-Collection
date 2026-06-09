@@ -119,12 +119,16 @@ def _risk_by_pid(rows: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
 def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
               risk_i: Dict, source: str) -> Dict[str, Any]:
     """将四张表的索引合并为单个项目的维度 dict。"""
-    b = base_i.get(pid, {}); c = center_i.get(pid, {}); s = status_i.get(pid, {})
+    b = base_i.get(pid, {})
+    c = center_i.get(pid, {})
+    s = status_i.get(pid, {})
     cost = derive_cost(s, c)
     risk = derive_risk(risk_i.get(pid, []))
-    ucf = parse_close_fraction(s.get("未关闭风险数量")) if s else None
+    ucf = parse_close_fraction(s.get("未关闭风险数量"))
     if ucf is not None:
         risk["未关闭风险数"] = ucf
+    pause_raw = b.get("是否暂停")
+    paused = (str(pause_raw).strip() == "是") if pause_raw else None
     return {
         "matched": True, "source": source,
         "cost": cost,
@@ -137,7 +141,7 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
         "risk": risk,
         "status": {
             "项目状态": (b.get("项目状态") or s.get("项目状态") or None),
-            "是否暂停": (("是" in str(b.get("是否暂停") or "")) if b.get("是否暂停") else None),
+            "是否暂停": paused,
             "评级": (s.get("项目评级") or None),
             "评分": parse_pmis_money(b.get("项目评分")),
         },
