@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { useDataStore } from '@/stores/data'
@@ -14,6 +14,7 @@ describe('DataQualityView', () => {
     setActivePinia(createPinia())
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })) as any)
   })
+  afterEach(() => vi.unstubAllGlobals())
 
   it('数据未加载时提示加载/后端', () => {
     seed(null)
