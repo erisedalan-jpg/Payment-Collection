@@ -107,6 +107,7 @@ class QualitySummary(_Base):
     matchedActive: int = 0
     matchedClosed: int = 0
     unmatched: int = 0
+    lastPmisUpdate: str = ''
 
 
 class DataQuality(_Base):
