@@ -1143,8 +1143,7 @@ def main():
         if rnum is not None and rnum > 1:
             dirty.append({"type": "回款比例>1", "projectId": n.get("projectId", ""),
                           "field": "actualPaymentRatio", "value": n.get("actualPaymentRatio")})
-    project_pmis, data_quality = pmis.load_project_pmis(pmis_dir, pay_projects)
-    data_quality["dirty"] = dirty
+    project_pmis, data_quality = pmis.load_project_pmis(pmis_dir, pay_projects, dirty=dirty)
     if data_quality["summary"]["pmisProvided"]:
         print(f"  [OK] PMIS 命中在建 {data_quality['summary']['matchedActive']} / "
               f"已关闭 {data_quality['summary']['matchedClosed']} / 未匹配 {data_quality['summary']['unmatched']}")
