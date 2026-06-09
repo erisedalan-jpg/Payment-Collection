@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AboutView from './AboutView.vue'
-import { useDataStore } from '@/stores/data'
 import { APP_VERSION } from '@/version'
 
 describe('AboutView', () => {
@@ -19,11 +18,9 @@ describe('AboutView', () => {
     expect(t).toContain('WPS云文档')
   })
 
-  it('数据更新取 meta.lastUpdate；缺失显示 -', () => {
-    const store = useDataStore()
-    store.data = { meta: { lastUpdate: '2026-05-30' } } as any
+  it('不展示"数据更新"行(已移至 DataView)', () => {
     const w = mount(AboutView)
-    expect(w.text()).toContain('2026-05-30')
+    expect(w.text()).not.toContain('数据更新')
   })
 
   it('渲染功能说明列表（至少若干条）', () => {
