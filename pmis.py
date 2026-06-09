@@ -61,7 +61,9 @@ def read_pmis_sheet(path: str) -> List[Dict[str, Any]]:
         for i, h in enumerate(headers):
             if h:
                 d[h] = raw[i] if i < len(raw) else None
-        out.append(d)
+        # 跳过全空行(合并单元格/分隔/翻页标题行会产生),避免幽灵记录
+        if any(v is not None for v in d.values()):
+            out.append(d)
     return out
 
 
@@ -77,7 +79,7 @@ def derive_cost(status_row: Dict[str, Any], center_row: Dict[str, Any]) -> Dict[
     overrun_keys = [k for k in center_row if "超支" in k]
     overrun = None
     if overrun_keys:
-        overrun = any("是" in str(center_row.get(k) or "") for k in overrun_keys)
+        overrun = any(str(center_row.get(k) or "").strip() == "是" for k in overrun_keys)
     return {"总预算": total, "核算": used, "剩余预算": remain, "消耗比": ratio,
             "超支": overrun, "成本状态": (status_row.get("成本状态") or None)}
 

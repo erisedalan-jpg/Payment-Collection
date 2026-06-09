@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """pmis.py 纯函数单元测试。不依赖 input/ 真文件——用内存 dict 或 tmp_path 生成的小 xlsx。"""
+import openpyxl
 import pytest
 import pmis as M
 
@@ -40,9 +41,6 @@ class TestParseCloseFraction:
         assert M.parse_close_fraction("") is None
     def test_plain_int(self):
         assert M.parse_close_fraction("4") == 4
-
-
-import openpyxl
 
 
 def _make_xlsx(dir_path, name, headers, rows):
