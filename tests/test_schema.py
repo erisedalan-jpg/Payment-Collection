@@ -67,7 +67,8 @@ class TestPmisSchema:
                                      "cost": {"消耗比": 0.5}, "progress": {}, "risk": {},
                                      "status": {}, "customer": {}}}
         d["dataQuality"] = {"summary": {"pmisProvided": True, "joinRate": 0.98,
-                                        "matchedActive": 1, "matchedClosed": 0, "unmatched": 0},
+                                        "matchedActive": 1, "matchedClosed": 0, "unmatched": 0,
+                                        "lastPmisUpdate": "2026-06-09 10:00"},
                             "themes": [], "unmatched": [], "backfill": [],
                             "conflicts": [], "dirty": []}
         m = schema.AnalysisData.model_validate(d)
@@ -77,3 +78,4 @@ class TestPmisSchema:
         assert m.projectPmis["SS-1"].cost.消耗比 == 0.5
         assert m.dataQuality.summary.joinRate == pytest.approx(0.98)
         assert m.dataQuality.summary.matchedActive == 1
+        assert m.dataQuality.summary.lastPmisUpdate == "2026-06-09 10:00"

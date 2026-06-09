@@ -61,6 +61,7 @@ export type Joinrate = number;
 export type Matchedactive = number;
 export type Matchedclosed = number;
 export type Unmatched = number;
+export type Lastpmisupdate = string;
 export type Themes = {
   [k: string]: unknown;
 }[];
@@ -208,5 +209,6 @@ export interface QualitySummary {
   matchedActive?: Matchedactive;
   matchedClosed?: Matchedclosed;
   unmatched?: Unmatched;
+  lastPmisUpdate?: Lastpmisupdate;
   [k: string]: unknown;
 }

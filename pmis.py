@@ -42,6 +42,23 @@ def parse_close_fraction(val) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
+def pmis_data_time(pmis_dir: str) -> str:
+    """input/pmis 下 xlsx 的最大修改时间,格式 'YYYY-MM-DD HH:MM';无目录/无文件返回 ''。"""
+    import datetime
+    if not os.path.isdir(pmis_dir):
+        return ''
+    mtimes = []
+    for fn in os.listdir(pmis_dir):
+        if fn.lower().endswith('.xlsx'):
+            try:
+                mtimes.append(os.path.getmtime(os.path.join(pmis_dir, fn)))
+            except OSError:
+                pass
+    if not mtimes:
+        return ''
+    return datetime.datetime.fromtimestamp(max(mtimes)).strftime('%Y-%m-%d %H:%M')
+
+
 def read_pmis_sheet(path: str) -> List[Dict[str, Any]]:
     """读 PMIS xlsx(表头第 2 行)为 list[dict]。文件不存在返回 []。"""
     if not os.path.exists(path):
@@ -305,7 +322,9 @@ def load_project_pmis(pmis_dir: str, payment_projects_or_ids, dirty=None,
     pay_ids = {str(p.get("projectId") or "").strip() for p in pay_projects if p.get("projectId")}
 
     if not os.path.isdir(pmis_dir):
-        return {}, compute_data_quality({}, pay_projects, dirty)
+        dq = compute_data_quality({}, pay_projects, dirty)
+        dq['summary']['lastPmisUpdate'] = ''
+        return {}, dq
 
     def read_group(files):
         g = {}
@@ -316,7 +335,10 @@ def load_project_pmis(pmis_dir: str, payment_projects_or_ids, dirty=None,
     active = read_group(config.PMIS_FILES_ACTIVE)
     closed = read_group(config.PMIS_FILES_CLOSED)
     if not any(active.values()) and not any(closed.values()):
-        return {}, compute_data_quality({}, pay_projects, dirty)
+        dq = compute_data_quality({}, pay_projects, dirty)
+        dq['summary']['lastPmisUpdate'] = pmis_data_time(pmis_dir)
+        return {}, dq
     project_pmis = build_project_pmis(active, closed, pay_ids)
     dq = compute_data_quality(project_pmis, pay_projects, dirty)
+    dq['summary']['lastPmisUpdate'] = pmis_data_time(pmis_dir)
     return project_pmis, dq
