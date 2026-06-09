@@ -136,3 +136,26 @@ class TestBuildProjectPmis:
         assert pm["SS-2"]["status"]["是否暂停"] is False
         # status 表分式分子(3)覆盖 risk 记录推导值(1)
         assert pm["SS-2"]["risk"]["未关闭风险数"] == 3
+
+
+class TestComputeDataQuality:
+    def test_unmatched_and_summary(self):
+        project_pmis = {"SS-1": {"matched": True, "source": "在建",
+                                 "cost": {"成本状态": None, "消耗比": 0.5},
+                                 "progress": {"完工进展": None}, "status": {"项目状态": "实施中"}}}
+        pay_projects = [
+            {"projectId": "SS-1", "projectName": "甲"},
+            {"projectId": "SS-9", "projectName": "乙"},
+            {"projectId": "SF-2", "projectName": "丙售前"},
+        ]
+        project_pmis["SS-9"] = {"matched": True, "source": "已关闭",
+                                "cost": {"成本状态": "正常", "消耗比": 1.0},
+                                "progress": {"完工进展": 1.0}, "status": {"项目状态": "已结项"}}
+        dq = M.compute_data_quality(project_pmis, pay_projects)
+        assert dq["summary"]["matchedActive"] == 1
+        assert dq["summary"]["matchedClosed"] == 1
+        assert dq["summary"]["unmatched"] == 1
+        kinds = {u["projectId"]: u["kind"] for u in dq["unmatched"]}
+        assert kinds == {"SF-2": "SF售前"}
+        bf = {b["projectId"] for b in dq["backfill"]}
+        assert "SS-1" in bf
