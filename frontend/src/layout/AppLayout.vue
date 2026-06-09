@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import FilterBar from './FilterBar.vue'
 import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
+const route = useRoute()
+const showFilter = computed(() => !route.meta?.hideFilter)
 </script>
 
 <template>
@@ -11,7 +15,7 @@ import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
     <div class="app-body">
       <AppSidebar />
       <main class="app-main">
-        <FilterBar />
+        <FilterBar v-if="showFilter" />
         <router-view />
       </main>
     </div>
