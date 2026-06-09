@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V6.2.0**
-- 最近更新：2026-06-09（U1 前端统一完成，V6.2.0）
+- 当前版本：**V6.3.0**
+- 最近更新：2026-06-09（U2 数据管理页重构完成，V6.3.0）
 - 维护语言：简体中文
 
 ---
@@ -123,6 +123,11 @@ _（无）_
 - S1 双域数据地基完成：PMIS 七表(在建+已关闭)摄取 + 按 projectId join(覆盖约 98%，未匹配 8 全为售前 SF) + projectPmis/dataQuality 入库 + 数据治理视图(记分卡/未匹配/回填/冲突/脏值，可导出) + PMIS 在线下载(链接持久化 data/pmis_links.json)/离线放置(input/pmis/)。已关闭仅作回款补充(∩回款约 158)，不做历史看板。后续：P 项目域看板、S2 回款×项目详情(PMIS-主)、S3 多角色看板。
 - backlog(S1 遗留小项)：① 前端 analysis.ts 中 PMIS Optional 字段经 json-schema-to-typescript 生成 46 个 NoName 别名(可编译，纯生成产物，后续可用 pydantic Field(title=...) 优化)；② 数据治理视图主题/未匹配等集合为 Dict[str,Any] 松类型，前端以局部 any 消费(如需强类型需补前端 item 接口)；③ spec 提到的 `lastPmisUpdate`(上次下载时间)未实现——`pmis_download` 未写时间戳、`dataQuality.summary` 未含该字段、视图未展示;当前无消费方,留待 S2/P 需要时补(写入 data/pmis_links.json + summary)。
 - 手工端到端烟雾测试（需用户执行）：将 7 张 PMIS xlsx 放入 input/pmis/，运行 sync/import 或 python preprocess_data.py，打开 /governance → 期望 join≈98%、命中在建≈462/已关闭≈158/未匹配≈8，导出正常；input/pmis/ 为空时页面显示"未提供 PMIS"，回款各页不受影响。
+
+### ✅ Plan U2 完成（2026-06-09）：数据管理页重构（V6.3.0）
+- 分支 **`feat/u2-data-mgmt`**，7 任务全完成、`verify.sh` 全绿（py_compile + ruff + 125 pytest + 323 vitest + typecheck + build）。
+- U2 数据管理页重构完成:获取(云同步/离线导入/PMIS下载/PMIS上传)与更新(/api/reprocess)解耦,一键「更新数据」重处理;PMIS 离线多选上传(/api/pmis/upload 原始字节);数据更新时间分源(数据处理时间 + PMIS 数据时间 lastPmisUpdate)移至数据管理页,关于页去除;删除数据质量总览卡;FilterBar 仅分析页显示(data/governance/about 隐藏)。纳管开关保留(后续单独调整)。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → 数据管理页呈现 获取/更新/设置 三段;获取(云同步/导入/PMIS下载/上传)完成后提示"请点[更新数据]";点[更新数据]→治理页数据刷新;/data /governance /about 无筛选条;关于页无"数据更新"行;顶部分源时间可见。
 
 ### ✅ Plan U1 完成（2026-06-09）：前端统一（V6.2.0）
 - 分支 **`feat/u1-frontend-unify`**，6 任务全完成、`verify.sh` 全绿（py_compile + ruff + 117 pytest + 321 vitest + typecheck + build）。
