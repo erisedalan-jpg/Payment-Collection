@@ -47,10 +47,14 @@ def read_pmis_sheet(path: str) -> List[Dict[str, Any]]:
     if not os.path.exists(path):
         return []
     import openpyxl
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    ws = wb.active
-    all_rows = list(ws.iter_rows(values_only=True))
-    wb.close()
+    try:
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        ws = wb.active
+        all_rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+    except Exception:
+        # 文件损坏/加密/格式异常等不应阻断回款主流程,降级为空表
+        return []
     hr = config.PMIS_HEADER_ROW
     if len(all_rows) < hr:
         return []
@@ -296,14 +300,15 @@ def load_project_pmis(pmis_dir: str, payment_projects_or_ids,
         pay_projects = list(payment_projects_or_ids)
     pay_ids = {str(p.get("projectId") or "").strip() for p in pay_projects if p.get("projectId")}
 
+    if not os.path.isdir(pmis_dir):
+        return {}, compute_data_quality({}, pay_projects)
+
     def read_group(files):
         g = {}
         for key, fname in files.items():
             g[key] = read_pmis_sheet(os.path.join(pmis_dir, fname))
         return g
 
-    if not os.path.isdir(pmis_dir):
-        return {}, compute_data_quality({}, pay_projects)
     active = read_group(config.PMIS_FILES_ACTIVE)
     closed = read_group(config.PMIS_FILES_CLOSED)
     if not any(active.values()) and not any(closed.values()):
