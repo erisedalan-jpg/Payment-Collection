@@ -157,5 +157,10 @@ class TestComputeDataQuality:
         assert dq["summary"]["unmatched"] == 1
         kinds = {u["projectId"]: u["kind"] for u in dq["unmatched"]}
         assert kinds == {"SF-2": "SF售前"}
-        bf = {b["projectId"] for b in dq["backfill"]}
+        assert dq["summary"]["pmisProvided"] is True
+        assert dq["summary"]["joinRate"] == round(2 / 3, 4)
+        assert dq["conflicts"] == M.PMIS_CONFLICTS
+        assert dq["dirty"] == []
+        bf = {b["projectId"]: b["missingFields"] for b in dq["backfill"]}
         assert "SS-1" in bf
+        assert "完工进展" in bf["SS-1"] and "成本状态" in bf["SS-1"]
