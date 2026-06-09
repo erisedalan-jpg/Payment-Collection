@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V6.1.0**
-- 最近更新：2026-06-09（S1 双域数据地基完成，V6.1.0）
+- 当前版本：**V6.2.0**
+- 最近更新：2026-06-09（U1 前端统一完成，V6.2.0）
 - 维护语言：简体中文
 
 ---
@@ -123,6 +123,11 @@ _（无）_
 - S1 双域数据地基完成：PMIS 七表(在建+已关闭)摄取 + 按 projectId join(覆盖约 98%，未匹配 8 全为售前 SF) + projectPmis/dataQuality 入库 + 数据治理视图(记分卡/未匹配/回填/冲突/脏值，可导出) + PMIS 在线下载(链接持久化 data/pmis_links.json)/离线放置(input/pmis/)。已关闭仅作回款补充(∩回款约 158)，不做历史看板。后续：P 项目域看板、S2 回款×项目详情(PMIS-主)、S3 多角色看板。
 - backlog(S1 遗留小项)：① 前端 analysis.ts 中 PMIS Optional 字段经 json-schema-to-typescript 生成 46 个 NoName 别名(可编译，纯生成产物，后续可用 pydantic Field(title=...) 优化)；② 数据治理视图主题/未匹配等集合为 Dict[str,Any] 松类型，前端以局部 any 消费(如需强类型需补前端 item 接口)；③ spec 提到的 `lastPmisUpdate`(上次下载时间)未实现——`pmis_download` 未写时间戳、`dataQuality.summary` 未含该字段、视图未展示;当前无消费方,留待 S2/P 需要时补(写入 data/pmis_links.json + summary)。
 - 手工端到端烟雾测试（需用户执行）：将 7 张 PMIS xlsx 放入 input/pmis/，运行 sync/import 或 python preprocess_data.py，打开 /governance → 期望 join≈98%、命中在建≈462/已关闭≈158/未匹配≈8，导出正常；input/pmis/ 为空时页面显示"未提供 PMIS"，回款各页不受影响。
+
+### ✅ Plan U1 完成（2026-06-09）：前端统一（V6.2.0）
+- 分支 **`feat/u1-frontend-unify`**，6 任务全完成、`verify.sh` 全绿（py_compile + ruff + 117 pytest + 321 vitest + typecheck + build）。
+- U1 前端统一完成:后端服务 frontend/dist + Vue Router SPA 回退(should_spa_fallback/_serve_spa_index,/data 路由用带斜杠前缀区分);删除旧版原生 UI(index.html/app.js/style.css/lib 图表库);后端改读 analysis_data.json(nextActionDate + 清空数据);数据治理页防缓存(load 加 ?t=)+ 空态三态诊断,修复治理页空白;打包内置 dist。修了 translate_path 基准(STATIC_DIR→WEB_ROOT)导致 /data 加载 404 的 bug。后续 U2:数据管理页重构 + 三处质量面整合。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → 打开后端地址 → 首页即 Vue 应用；直接访问/刷新 `/governance`、`/data` 不 404；数据治理页显示数据（PMIS 已放置时；否则显"未提供 PMIS"，非空白）。
 
 ### ✅ Plan E2 完成（2026-06-09）：首页待办速览信号行
 - 分支 **`refactor/e2-dashboard-signals`**，`verify.sh` 全绿。
