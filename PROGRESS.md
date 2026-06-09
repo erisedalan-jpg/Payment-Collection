@@ -128,6 +128,7 @@ _（无）_
 - 分支 **`feat/u2-data-mgmt`**，7 任务全完成、`verify.sh` 全绿（py_compile + ruff + 125 pytest + 323 vitest + typecheck + build）。
 - U2 数据管理页重构完成:获取(云同步/离线导入/PMIS下载/PMIS上传)与更新(/api/reprocess)解耦,一键「更新数据」重处理;PMIS 离线多选上传(/api/pmis/upload 原始字节);数据更新时间分源(数据处理时间 + PMIS 数据时间 lastPmisUpdate)移至数据管理页,关于页去除;删除数据质量总览卡;FilterBar 仅分析页显示(data/governance/about 隐藏)。纳管开关保留(后续单独调整)。
 - 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → 数据管理页呈现 获取/更新/设置 三段;获取(云同步/导入/PMIS下载/上传)完成后提示"请点[更新数据]";点[更新数据]→治理页数据刷新;/data /governance /about 无筛选条;关于页无"数据更新"行;顶部分源时间可见。
+- backlog(U2 遗留小项)：互斥单向——`/api/reprocess` 会拒绝 sync/import/pmis 进行中的请求,但 sync/import/pmis 三个 handler 未反向检查 reprocess 进行中(与既有 pairwise 松互斥一致,且受单线程 HTTPServer 限制,影响有限);后续做全互斥时一并收紧。
 
 ### ✅ Plan U1 完成（2026-06-09）：前端统一（V6.2.0）
 - 分支 **`feat/u1-frontend-unify`**，6 任务全完成、`verify.sh` 全绿（py_compile + ruff + 117 pytest + 321 vitest + typecheck + build）。
