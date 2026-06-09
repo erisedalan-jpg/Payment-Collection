@@ -29,3 +29,19 @@ NODE_STATUSES = [
     STATUS_CAN_ADVANCE, STATUS_REACHED, STATUS_ADVANCE_PAID,
     STATUS_FULL_PAID, STATUS_DELAYED, STATUS_ON_TIME,
 ]
+
+# ── PMIS 数据(项目域)──
+PMIS_DIRNAME = "pmis"  # 位于 input/pmis/
+# 在建四表 + 已关闭三表(风险无已关闭变体);键=逻辑名,值=固定文件名
+PMIS_FILES_ACTIVE = {
+    "center": "项目中心.xlsx",
+    "base": "项目基础信息数据.xlsx",
+    "status": "项目状态信息数据.xlsx",
+    "risk": "项目风险数据.xlsx",
+}
+PMIS_FILES_CLOSED = {
+    "center": "项目中心-已关闭.xlsx",
+    "base": "项目基础信息数据-已关闭.xlsx",
+    "status": "项目状态信息数据-已关闭.xlsx",
+}
+PMIS_HEADER_ROW = 2  # PMIS 表表头在第 2 行(第 1 行为合并标题)
