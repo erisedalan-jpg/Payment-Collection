@@ -9,6 +9,7 @@ from datetime import datetime, date, timedelta
 from collections import defaultdict
 import config
 import schema
+import pmis
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -1130,6 +1131,26 @@ def main():
         pid = node.get("projectId", "")
         node["followupRecords"] = followup_records.get(pid, [])
 
+    # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
+    print("[INFO] 摄取 PMIS 项目域数据...")
+    pmis_dir = os.path.join(BASE_DIR, "input", config.PMIS_DIRNAME)
+    pay_projects = [{"projectId": n.get("projectId", ""), "projectName": n.get("projectName", "")}
+                    for n in all_nodes]
+    # 回款侧脏值:实际回款比例 > 1
+    dirty = []
+    for n in all_nodes:
+        rnum = _get_ratio_num(n.get("actualPaymentRatio"))
+        if rnum is not None and rnum > 1:
+            dirty.append({"type": "回款比例>1", "projectId": n.get("projectId", ""),
+                          "field": "actualPaymentRatio", "value": n.get("actualPaymentRatio")})
+    project_pmis, data_quality = pmis.load_project_pmis(pmis_dir, pay_projects)
+    data_quality["dirty"] = dirty
+    if data_quality["summary"]["pmisProvided"]:
+        print(f"  [OK] PMIS 命中在建 {data_quality['summary']['matchedActive']} / "
+              f"已关闭 {data_quality['summary']['matchedClosed']} / 未匹配 {data_quality['summary']['unmatched']}")
+    else:
+        print("  [WARN] 未提供 PMIS 数据(input/pmis/ 为空),数据治理视图将提示去获取")
+
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {
@@ -1148,6 +1169,8 @@ def main():
         "naguanExclude": {k: v for k, v in naguan_exclude.items()},
         "displayColumns": display_columns,
         "followupRecords": followup_records,
+        "projectPmis": project_pmis,
+        "dataQuality": data_quality,
     }
 
     # === 10. 保存（校验后输出 JSON）===
