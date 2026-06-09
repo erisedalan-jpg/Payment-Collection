@@ -3,6 +3,7 @@
 纯函数为主(解析/join/派生/质量),文件读取(openpyxl)集中在 read_pmis_sheet/load_project_pmis。
 PMIS 缺失要优雅降级,不抛错、不阻断回款主流程。"""
 from __future__ import annotations
+import datetime
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -44,7 +45,6 @@ def parse_close_fraction(val) -> Optional[int]:
 
 def pmis_data_time(pmis_dir: str) -> str:
     """input/pmis 下 xlsx 的最大修改时间,格式 'YYYY-MM-DD HH:MM';无目录/无文件返回 ''。"""
-    import datetime
     if not os.path.isdir(pmis_dir):
         return ''
     mtimes = []

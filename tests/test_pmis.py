@@ -193,6 +193,7 @@ class TestLoadProjectPmis:
         pm, dq = M.load_project_pmis(str(tmp_path / "nope"), {"SS-1"})
         assert pm == {}
         assert dq["summary"]["pmisProvided"] is False
+        assert dq["summary"]["lastPmisUpdate"] == ''
 
     def test_reads_files(self, tmp_path):
         d = tmp_path / "pmis"
@@ -206,6 +207,7 @@ class TestLoadProjectPmis:
         pm, dq = M.load_project_pmis(str(d), {"SS-1"})
         assert "SS-1" in pm
         assert dq["summary"]["pmisProvided"] is True
+        assert len(dq["summary"]["lastPmisUpdate"]) == 16
 
     def test_empty_sheets_graceful(self, tmp_path):
         d = tmp_path / "pmis"
