@@ -869,7 +869,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
             return
         length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length) if length else b''
+        if length <= 0:
+            # 空内容不落地,避免写出 0 字节坏文件却报成功
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
+            return
+        body = self.rfile.read(length)
         pmis_dir = os.path.join(BASE_DIR, 'input', config.PMIS_DIRNAME)
         os.makedirs(pmis_dir, exist_ok=True)
         with open(os.path.join(pmis_dir, name), 'wb') as f:
