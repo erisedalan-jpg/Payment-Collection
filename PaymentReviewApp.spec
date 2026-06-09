@@ -54,19 +54,19 @@ a = Analysis(
     pathex=[BASE],
     binaries=pw_binaries,
     datas=[
-        # ── 前端核心文件 ──
-        ('index.html', '.'),
-        ('style.css', '.'),
-        ('app.js', '.'),
+        # ── 前端构建产物（Vue3+Vite，U1 迁移后替代旧 index.html/style.css/app.js/lib） ──
+        ('frontend/dist', 'dist'),
         # ── 图标/Logo ──
         ('app_icon.ico', '.'),
         ('app_logo.png', '.'),
-        # ── JS 库 ──
-        ('lib', 'lib'),
         # ── 字体（Web 字体文件） ──
         ('fonts', 'fonts'),
         # ── 后端脚本 ──
         ('preprocess_data.py', '.'),
+        ('pmis.py', '.'),
+        ('pmis_download.py', '.'),
+        ('config.py', '.'),
+        ('schema.py', '.'),
         ('fetch_yundocs_full.py', '.'),
         ('sync_data.bat', '.'),
         # ── 启停脚本 ──
