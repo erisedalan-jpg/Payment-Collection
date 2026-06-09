@@ -67,6 +67,14 @@ class TestReadPmisSheet:
     def test_missing_file_returns_empty(self, tmp_path):
         assert M.read_pmis_sheet(str(tmp_path / "nope.xlsx")) == []
 
+    def test_reads_all_rows_not_truncated(self, tmp_path):
+        # 回归:read_pmis_sheet 不得截断行(曾因 read_only 按不可靠 dimension 截断,真实 WPS 文件 911 行只读出 1 行)
+        rows_in = [{"项目编号": f"P-{i}", "项目名称": f"项目{i}"} for i in range(30)]
+        p = _make_xlsx(str(tmp_path), "many.xlsx", ["项目编号", "项目名称"], rows_in)
+        out = M.read_pmis_sheet(p)
+        assert len(out) == 30
+        assert out[0]["项目编号"] == "P-0" and out[29]["项目编号"] == "P-29"
+
 
 class TestDeriveCost:
     def test_consume_ratio_and_overrun(self):
