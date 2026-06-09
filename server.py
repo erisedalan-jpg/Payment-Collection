@@ -1039,6 +1039,7 @@ def run_reprocess():
                 old_argv = sys.argv[:]
                 sys.argv = [preprocess_script]
                 _run_script_direct(preprocess_script, 'preprocess_data', pcwd)
+                logger.info("数据更新完成(直接模式)")
             except SystemExit as e:
                 if e.code and e.code != 0:
                     reprocess_state = {"running": False, "progress": 0, "message": f"更新失败(退出码:{e.code})"}
@@ -1063,7 +1064,10 @@ def run_reprocess():
                 if level in ('ok', 'info'):
                     reprocess_state = {"running": True, "progress": min(reprocess_state["progress"] + 5, 95),
                                        "message": raw.strip().replace('[INFO] ', '').replace('[OK] ', '')}
+                elif level == 'warn':
+                    logger.warning(f"[reprocess] {raw.strip()}")
                 elif level == 'error':
+                    logger.error(f"[reprocess] {raw.strip()}")
                     errs.append(text)
             process.wait()
             if process.returncode != 0:
@@ -1080,7 +1084,7 @@ def run_reprocess():
 
 
 def run_sync():
-    """执行数据同步：提取+预处理"""
+    """执行数据同步：仅抓取 WPS 云文档到 yundocs_data(不预处理,处理由"更新数据"触发)"""
     global sync_state, sync_url
     
     try:
@@ -1224,7 +1228,7 @@ def run_sync():
         sync_state["running"] = False
 
 def run_pmis_download():
-    """执行 PMIS 数据下载，下载后立即重跑预处理使 PMIS 数据并入 analysis_data。
+    """执行 PMIS 数据下载到 input/pmis/(不预处理,处理由"更新数据"触发)。
     frozen/dev 双路径：打包模式进程内直接执行，开发模式 subprocess 解析进度。
     """
     global pmis_state, active_process
@@ -1273,7 +1277,7 @@ def _terminate_active_process():
             active_process = None
 
 def run_import(data):
-    """执行离线导入：保存JSON → 运行预处理脚本"""
+    """执行离线导入：仅保存上传的 sheets 到 yundocs_data(不预处理,处理由"更新数据"触发)"""
     global import_state, active_process
     
     try:
