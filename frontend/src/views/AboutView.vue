@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useDataStore } from '@/stores/data'
 import { APP_VERSION, RELEASE_DATE } from '@/version'
-
-const data = useDataStore()
-const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 
 const FEATURES = [
   '按项目金额区间（100万以上 / 50-100万 / 50万以下）分级管理',
@@ -35,7 +30,6 @@ const FEATURES = [
       <div class="about-k">发布日期</div><div class="about-v">{{ RELEASE_DATE }}</div>
       <div class="about-k">作者</div><div class="about-v">交付中心-交付实施三部-阿童木</div>
       <div class="about-k">数据来源</div><div class="about-v">WPS云文档 - 项目回款节点清单</div>
-      <div class="about-k">数据更新</div><div class="about-v">{{ lastUpdate }}</div>
     </div>
 
     <div class="about-feat-box">
