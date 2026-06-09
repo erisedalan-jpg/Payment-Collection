@@ -7,6 +7,7 @@ import CalendarView from '@/views/CalendarView.vue'
 import FollowupView from '@/views/FollowupView.vue'
 import DataView from '@/views/DataView.vue'
 import AboutView from '@/views/AboutView.vue'
+import DataQualityView from '@/views/DataQualityView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +18,7 @@ export const router = createRouter({
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
     { path: '/analysis/:tab', name: 'analysis', component: AnalysisView, meta: { title: '业务分析' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理' } },
+    { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理' } },
     { path: '/about', name: 'about', component: AboutView, meta: { title: '关于产品' } },
     // catch-all (including '/') renders DashboardView and is the canonical 'dashboard' name
     { path: '/:pathMatch(.*)*', name: 'dashboard', component: DashboardView, alias: '/', meta: { title: '看板首页' } },
