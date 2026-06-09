@@ -92,3 +92,35 @@ class TestDeriveRisk:
     def test_empty(self):
         risk = M.derive_risk([])
         assert risk["风险记录数"] == 0 and risk["最高等级"] is None
+
+
+class TestBuildProjectPmis:
+    def _tables(self):
+        active = {
+            "base": [{"项目编号": "SS-1", "项目名称": "甲", "最终客户": "客A", "项目状态": "实施中"}],
+            "center": [{"项目编号": "SS-1", "是否人工成本超支": "是"}],
+            "status": [{"项目编号": "SS-1", "项目总预算（元）": "1000", "项目核算（元）": "500",
+                        "项目累计完工进展百分比": "80%", "未关闭风险数量": "1/2"}],
+            "risk": [{"项目编号": "SS-1", "风险等级": "高", "风险状态": "已识别"}],
+        }
+        closed = {
+            "base": [{"项目编号": "SS-9", "项目名称": "乙", "项目状态": "已结项"},
+                     {"项目编号": "SS-OUT", "项目名称": "丙"}],
+            "center": [{"项目编号": "SS-9"}],
+            "status": [{"项目编号": "SS-9", "项目总预算（元）": "200", "项目核算（元）": "200"}],
+        }
+        return active, closed
+
+    def test_active_full_and_closed_filtered(self):
+        active, closed = self._tables()
+        pay_ids = {"SS-1", "SS-9", "SS-FREE"}  # SS-FREE 不在 PMIS;SS-OUT 在已关闭但不在回款
+        pm = M.build_project_pmis(active, closed, pay_ids)
+        assert "SS-1" in pm and pm["SS-1"]["matched"] is True
+        assert pm["SS-1"]["source"] == "在建"
+        assert pm["SS-1"]["cost"]["消耗比"] == pytest.approx(0.5)
+        assert pm["SS-1"]["progress"]["完工进展"] == pytest.approx(0.8)
+        assert pm["SS-1"]["risk"]["最高等级"] == "高"
+        assert pm["SS-1"]["customer"]["最终客户"] == "客A"
+        assert "SS-9" in pm and pm["SS-9"]["source"] == "已关闭"
+        assert "SS-OUT" not in pm
+        assert "SS-FREE" not in pm
