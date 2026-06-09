@@ -38,5 +38,5 @@ def parse_close_fraction(val) -> Optional[int]:
     if val is None or str(val).strip() == "":
         return None
     s = str(val).strip()
-    m = re.match(r"\s*(\d+)", s)
+    m = re.match(r"(\d+)", s)
     return int(m.group(1)) if m else None
