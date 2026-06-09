@@ -54,6 +54,12 @@ else:
     STATIC_DIR = BASE_DIR
 PARENT_DIR = os.path.dirname(BASE_DIR)
 
+# 前端 Web 根:打包态用内置 dist,开发态用 frontend/dist
+if getattr(sys, 'frozen', False):
+    WEB_ROOT = os.path.join(STATIC_DIR, 'dist')
+else:
+    WEB_ROOT = os.path.join(BASE_DIR, 'frontend', 'dist')
+
 # ─── 日志配置 ───────────────────────────────────────────────
 LOG_DIR = os.path.join(BASE_DIR, 'log')
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -157,28 +163,27 @@ def _get_next_record_num(today_str):
                 pass
     return max_num + 1
 
+def node_action_date_from_data(data: dict, project_id: str) -> str:
+    """从 analysis_data.json 的数据结构里,取某项目首个非空 nextActionDate。"""
+    try:
+        for n in data.get('rawNodes', []):
+            if str(n.get('projectId', '')) == str(project_id) and n.get('nextActionDate'):
+                return n.get('nextActionDate')
+    except Exception:  # rawNodes 元素格式异常(非 dict 等)时防御性返回空
+        return ''
+    return ''
+
 def _get_node_action_date(project_id):
-    """从analysis_data.js中读取项目的节点动作完成时间"""
-    data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
+    """从 analysis_data.json 读取项目的节点动作完成时间(nextActionDate)。"""
+    data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
     if not os.path.exists(data_file):
         return ''
     try:
         with open(data_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-        # 尝试从JS中提取项目数据
-        import re
-        # 查找包含该项目编号的节点数据
-        pattern = rf'projectId\s*:\s*["\']?{re.escape(project_id)}["\']?'
-        if re.search(pattern, content):
-            # 尝试提取 nextActionDate 或类似字段
-            # 在preprocess_data.py输出中查找
-            action_pattern = rf'projectId\s*:\s*["\']?{re.escape(project_id)}["\']?[^}}]*?nextActionDate\s*:\s*["\']([^"\']+)["\']'
-            m = re.search(action_pattern, content, re.DOTALL)
-            if m:
-                return m.group(1)
-        return ''
+            data = json.load(f)
     except Exception:
         return ''
+    return node_action_date_from_data(data, project_id)
 
 def _write_followup_async(record, cloud_url):
     """异步写入跟进记录到云文档（含进度追踪）"""
@@ -245,19 +250,31 @@ def _update_followup_sync_status(record_id, sync_status):
     except Exception as e:
         logger.error(f"[followup-sync] 更新syncStatus失败: {e}")
 
+def should_spa_fallback(path: str) -> bool:
+    """判断 GET 路径是否应回退到 dist/index.html(Vue Router history 模式)。
+    /api/、/data/、/yundocs_data/ 子路径不回退(后端接口/数据文件);带文件扩展名的(静态资源)不回退;
+    其余视为前端路由回退(注意 /data 本身是 Vue 路由"数据管理",需回退,故用带斜杠前缀区分)。"""
+    if any(path.startswith(p) for p in ('/api/', '/data/', '/yundocs_data/')):
+        return False
+    last = path.rsplit('/', 1)[-1]
+    if '.' in last:
+        return False
+    return True
+
+
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        # 默认使用 STATIC_DIR 服务静态文件（打包后从 _MEIPASS，开发时与 BASE_DIR 相同）
-        super().__init__(*args, directory=STATIC_DIR, **kwargs)
+        # 默认使用 WEB_ROOT 服务静态文件（打包后为 _MEIPASS/dist，开发时为 frontend/dist）
+        super().__init__(*args, directory=WEB_ROOT, **kwargs)
     
     def translate_path(self, path):
-        """重写路径转换：静态文件优先从 STATIC_DIR 查找，数据文件从 BASE_DIR 查找"""
-        # 先按默认逻辑从 STATIC_DIR 解析
+        """重写路径转换：静态文件优先从 WEB_ROOT 查找，数据文件从 BASE_DIR 查找"""
+        # 先按默认逻辑从 WEB_ROOT 解析（super 的 directory 即 WEB_ROOT）
         static_path = super().translate_path(path)
         if os.path.exists(static_path):
             return static_path
-        # 如果 STATIC_DIR 中找不到，尝试从 BASE_DIR 查找（data/, yundocs_data/ 等运行时数据）
-        rel = os.path.relpath(static_path, STATIC_DIR)
+        # 如果 WEB_ROOT 中找不到，尝试从 BASE_DIR 查找（data/, yundocs_data/ 等运行时数据）
+        rel = os.path.relpath(static_path, WEB_ROOT)
         base_path = os.path.join(BASE_DIR, rel)
         if os.path.exists(base_path):
             return base_path
@@ -309,8 +326,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         else:
+            translated = self.translate_path(parsed.path)
+            if os.path.isfile(translated):
+                super().do_GET()
+                return
+            if should_spa_fallback(parsed.path):
+                self._serve_spa_index()
+                return
             super().do_GET()
-    
+
     def _serve_static_with_charset(self):
         """服务静态文件并强制添加 charset=utf-8"""
         try:
@@ -338,7 +362,27 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(content)
         except Exception as e:
             self.send_error(500, str(e))
-    
+
+    def _serve_spa_index(self):
+        """回退到 Vue SPA 入口 dist/index.html，支持 Vue Router history 模式。"""
+        index_path = os.path.join(WEB_ROOT, 'index.html')
+        if not os.path.isfile(index_path):
+            msg = '前端尚未构建。请运行: cd frontend && npm run build'
+            body = msg.encode('utf-8')
+            self.send_response(503)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        with open(index_path, 'rb') as f:
+            content = f.read()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
     def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path == '/api/import':
@@ -402,8 +446,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(sync_state).encode('utf-8'))
     
     def handle_clear_data(self):
-        """删除业务数据文件 data/analysis_data.js 及原始提取数据目录 yundocs_data/"""
-        data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
+        """删除业务数据文件 data/analysis_data.json 及原始提取数据目录 yundocs_data/"""
+        data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
+        legacy_js = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
         yundocs_dir = os.path.join(BASE_DIR, 'yundocs_data')
         result = {"success": False, "message": ""}
         msgs = []
@@ -416,6 +461,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 msgs.append(f"分析数据文件删除失败: {str(e)}")
         else:
             msgs.append("分析数据文件不存在")
+        # 清理可能遗留的旧版数据文件
+        if os.path.exists(legacy_js):
+            try:
+                os.remove(legacy_js)
+            except Exception:
+                pass
         # 删除原始提取数据目录
         if os.path.exists(yundocs_dir):
             try:
