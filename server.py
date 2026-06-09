@@ -781,15 +781,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         try:
             payload = json.loads(body.decode('utf-8'))
             links = payload.get('links', {})
-        except Exception:
-            links = {}
+        except Exception as e:
+            # 解析失败：返回错误，不覆盖已有配置文件（与 handle_followup_add 一致）
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
+            return
         os.makedirs(os.path.join(BASE_DIR, 'data'), exist_ok=True)
         with open(self._pmis_links_path(), 'w', encoding='utf-8') as f:
             json.dump({"links": links}, f, ensure_ascii=False, indent=2)
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.end_headers()
-        self.wfile.write(json.dumps({"ok": True}).encode('utf-8'))
+        self._json_response({"ok": True})
 
     def handle_pmis_download(self):
         """GET /api/pmis/download - 启动 PMIS 下载，SSE 流式返回进度"""
@@ -1158,7 +1157,7 @@ def run_pmis_download():
     """执行 PMIS 数据下载，下载后立即重跑预处理使 PMIS 数据并入 analysis_data。
     frozen/dev 双路径：打包模式进程内直接执行，开发模式 subprocess 解析进度。
     """
-    global pmis_state
+    global pmis_state, active_process
     try:
         pmis_state = {"running": True, "progress": 10, "message": "开始下载 PMIS 数据..."}
         script, cwd = _find_script("pmis_download.py")
@@ -1169,18 +1168,18 @@ def run_pmis_download():
             # 打包模式：进程内直接执行
             _run_script_direct(script, 'pmis_download', cwd)
         else:
-            # 开发模式：子进程，解析 [OK]/[ERROR] 进度
-            proc = subprocess.Popen([sys.executable, script], cwd=cwd,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                    text=True, encoding='utf-8', errors='replace')
-            for line in proc.stdout:
+            # 开发模式：子进程，注册到 active_process 使其可被 _terminate_active_process 中断
+            active_process = subprocess.Popen([sys.executable, script], cwd=cwd,
+                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                              text=True, encoding='utf-8', errors='replace')
+            for line in active_process.stdout:
                 parsed = classify_progress_line(line)
                 if parsed:
                     _level, text = parsed
                     pmis_state = {"running": True,
                                   "progress": min(pmis_state["progress"] + 10, 90),
                                   "message": text}
-            proc.wait()
+            active_process.wait()
         # 下载后立即重跑预处理，使 PMIS 数据并入 analysis_data
         preprocess_script, pcwd = _find_script("preprocess_data.py")
         if preprocess_script:
@@ -1188,11 +1187,22 @@ def run_pmis_download():
             if getattr(sys, 'frozen', False):
                 _run_script_direct(preprocess_script, 'preprocess_data', pcwd)
             else:
-                subprocess.run([sys.executable, preprocess_script], cwd=pcwd)
-        pmis_state = {"running": False, "progress": 100, "message": "PMIS 下载并预处理完成"}
+                # 开发模式：检查预处理返回码（与 run_import 一致）
+                result = subprocess.run([sys.executable, preprocess_script], cwd=pcwd)
+                if result.returncode != 0:
+                    pmis_state = {"running": False, "progress": 0,
+                                  "message": f"预处理失败（返回码: {result.returncode}）"}
+                    logger.error(f"PMIS 预处理失败，返回码: {result.returncode}")
+                    return
+        pmis_state = {"running": True, "progress": 100, "message": "PMIS 下载并预处理完成"}
+        logger.info("PMIS 下载并预处理完成")
     except Exception as e:
         logger.error(f"PMIS 下载失败: {e}")
         pmis_state = {"running": False, "progress": 0, "message": f"下载失败: {e}"}
+    finally:
+        active_process = None
+        time.sleep(3)
+        pmis_state["running"] = False
 
 
 def _terminate_active_process():
