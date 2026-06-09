@@ -94,3 +94,79 @@ def derive_risk(risk_recs: List[Dict[str, Any]]) -> Dict[str, Any]:
     top = max((lv for lv in levels if lv in _RISK_RANK), key=lambda x: _RISK_RANK[x], default=None)
     return {"未关闭风险数": n - closed, "风险记录数": n, "最高等级": top,
             "闭环率": (closed / n) if n else None}
+
+
+def _index_by_pid(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """将行列表按项目编号索引为 dict(重复 pid 保留首条)。"""
+    idx: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        pid = r.get("项目编号")
+        if pid not in (None, ""):
+            idx.setdefault(str(pid).strip(), r)
+    return idx
+
+
+def _risk_by_pid(rows: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """将风险行列表按项目编号聚合为 dict[pid → list[row]]。"""
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        pid = r.get("项目编号")
+        if pid not in (None, ""):
+            out.setdefault(str(pid).strip(), []).append(r)
+    return out
+
+
+def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
+              risk_i: Dict, source: str) -> Dict[str, Any]:
+    """将四张表的索引合并为单个项目的维度 dict。"""
+    b = base_i.get(pid, {}); c = center_i.get(pid, {}); s = status_i.get(pid, {})
+    cost = derive_cost(s, c)
+    risk = derive_risk(risk_i.get(pid, []))
+    ucf = parse_close_fraction(s.get("未关闭风险数量")) if s else None
+    if ucf is not None:
+        risk["未关闭风险数"] = ucf
+    return {
+        "matched": True, "source": source,
+        "cost": cost,
+        "progress": {
+            "完工进展": parse_pmis_pct(s.get("项目累计完工进展百分比")),
+            "里程碑进度状态": (s.get("里程碑进度状态") or None),
+            "项目阶段": (s.get("项目阶段") or c.get("项目阶段") or None),
+            "计划终验": (c.get("计划终验时间") or s.get("合同目标终验时间") or None),
+        },
+        "risk": risk,
+        "status": {
+            "项目状态": (b.get("项目状态") or s.get("项目状态") or None),
+            "是否暂停": (("是" in str(b.get("是否暂停") or "")) if b.get("是否暂停") else None),
+            "评级": (s.get("项目评级") or None),
+            "评分": parse_pmis_money(b.get("项目评分")),
+        },
+        "customer": {
+            "最终客户": (b.get("最终客户") or None),
+            "合同编号": (b.get("合同编号") or None),
+            "签约形式": (b.get("签约形式分类") or None),
+            "行业": (b.get("行业中类") or None),
+            "合同总额": parse_pmis_money(b.get("合同总额（元）")),
+        },
+    }
+
+
+def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
+                       closed: Dict[str, List[Dict[str, Any]]],
+                       payment_project_ids: set) -> Dict[str, Dict[str, Any]]:
+    """在建全量入库;已关闭仅收 ∩ 回款。优先在建(同 pid 不被已关闭覆盖)。"""
+    a_base = _index_by_pid(active.get("base", []))
+    a_center = _index_by_pid(active.get("center", []))
+    a_status = _index_by_pid(active.get("status", []))
+    a_risk = _risk_by_pid(active.get("risk", []))
+    out: Dict[str, Dict[str, Any]] = {}
+    for pid in a_base.keys() | a_center.keys() | a_status.keys():
+        out[pid] = _assemble(pid, a_base, a_center, a_status, a_risk, "在建")
+    c_base = _index_by_pid(closed.get("base", []))
+    c_center = _index_by_pid(closed.get("center", []))
+    c_status = _index_by_pid(closed.get("status", []))
+    c_risk = _risk_by_pid(closed.get("risk", []))
+    for pid in (c_base.keys() | c_center.keys() | c_status.keys()):
+        if pid in payment_project_ids and pid not in out:
+            out[pid] = _assemble(pid, c_base, c_center, c_status, c_risk, "已关闭")
+    return out
