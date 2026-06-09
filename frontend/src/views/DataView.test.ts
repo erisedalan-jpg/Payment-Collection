@@ -11,6 +11,15 @@ vi.mock('@/api/client', () => ({
 }))
 import { api } from '@/api/client'
 
+// pmis.loadLinks() 在 onMounted 中发起相对 URL fetch，在 JSDOM 测试环境中无 base URL 会报错，
+// 用 stubGlobal 阻止真实请求
+vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+  if (typeof url === 'string' && url.includes('/api/pmis/')) {
+    return { ok: true, json: async () => ({ links: {} }) }
+  }
+  throw new Error(`fetch not mocked for ${url}`)
+}))
+
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
