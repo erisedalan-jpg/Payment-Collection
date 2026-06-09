@@ -13,7 +13,7 @@ export const useDataStore = defineStore('data', () => {
     loading.value = true
     error.value = null
     try {
-      const res = await fetch('/data/analysis_data.json')
+      const res = await fetch('/data/analysis_data.json?t=' + Date.now())
       if (!res.ok) throw new Error(`加载数据失败 HTTP ${res.status}`)
       data.value = (await res.json()) as AnalysisData
     } catch (e) {
