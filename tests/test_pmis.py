@@ -185,3 +185,11 @@ class TestLoadProjectPmis:
         pm, dq = M.load_project_pmis(str(d), {"SS-1"})
         assert "SS-1" in pm
         assert dq["summary"]["pmisProvided"] is True
+
+    def test_empty_sheets_graceful(self, tmp_path):
+        d = tmp_path / "pmis"
+        d.mkdir()
+        # 目录存在但无任何 xlsx → read_pmis_sheet 全返回 [] → 优雅降级
+        pm, dq = M.load_project_pmis(str(d), {"SS-1"})
+        assert pm == {}
+        assert dq["summary"]["pmisProvided"] is False
