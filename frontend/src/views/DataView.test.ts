@@ -17,5 +17,8 @@ describe('DataView', () => {
     expect(text).toContain('更新数据')
     expect(text).toContain('设置')
     expect(text).not.toContain('数据质量总览')
+    // 关键控件:更新数据主按钮 + PMIS 多选上传输入
+    expect(w.find('.dv-btn.primary').exists()).toBe(true)
+    expect(w.find('input[type="file"][multiple]').exists()).toBe(true)
   })
 })
