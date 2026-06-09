@@ -163,28 +163,27 @@ def _get_next_record_num(today_str):
                 pass
     return max_num + 1
 
+def node_action_date_from_data(data: dict, project_id: str) -> str:
+    """从 analysis_data.json 的数据结构里,取某项目首个非空 nextActionDate。"""
+    try:
+        for n in data.get('rawNodes', []):
+            if str(n.get('projectId', '')) == str(project_id) and n.get('nextActionDate'):
+                return n.get('nextActionDate')
+    except Exception:
+        return ''
+    return ''
+
 def _get_node_action_date(project_id):
-    """从analysis_data.js中读取项目的节点动作完成时间"""
-    data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
+    """从 analysis_data.json 读取项目的节点动作完成时间(nextActionDate)。"""
+    data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
     if not os.path.exists(data_file):
         return ''
     try:
         with open(data_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-        # 尝试从JS中提取项目数据
-        import re
-        # 查找包含该项目编号的节点数据
-        pattern = rf'projectId\s*:\s*["\']?{re.escape(project_id)}["\']?'
-        if re.search(pattern, content):
-            # 尝试提取 nextActionDate 或类似字段
-            # 在preprocess_data.py输出中查找
-            action_pattern = rf'projectId\s*:\s*["\']?{re.escape(project_id)}["\']?[^}}]*?nextActionDate\s*:\s*["\']([^"\']+)["\']'
-            m = re.search(action_pattern, content, re.DOTALL)
-            if m:
-                return m.group(1)
-        return ''
+            data = json.load(f)
     except Exception:
         return ''
+    return node_action_date_from_data(data, project_id)
 
 def _write_followup_async(record, cloud_url):
     """异步写入跟进记录到云文档（含进度追踪）"""
@@ -447,8 +446,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(sync_state).encode('utf-8'))
     
     def handle_clear_data(self):
-        """删除业务数据文件 data/analysis_data.js 及原始提取数据目录 yundocs_data/"""
-        data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
+        """删除业务数据文件 data/analysis_data.json 及原始提取数据目录 yundocs_data/"""
+        data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
+        legacy_js = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
         yundocs_dir = os.path.join(BASE_DIR, 'yundocs_data')
         result = {"success": False, "message": ""}
         msgs = []
@@ -461,6 +461,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 msgs.append(f"分析数据文件删除失败: {str(e)}")
         else:
             msgs.append("分析数据文件不存在")
+        # 清理可能遗留的旧版数据文件
+        if os.path.exists(legacy_js):
+            try:
+                os.remove(legacy_js)
+            except Exception:
+                pass
         # 删除原始提取数据目录
         if os.path.exists(yundocs_dir):
             try:
