@@ -155,6 +155,115 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
     }
 
 
+# 普查确认的跨表口径冲突(静态告警,展示用)
+PMIS_CONFLICTS = [
+    {"column": "项目金额", "sheets": ["项目状态信息", "项目中心", "回款节点清单"],
+     "issue": "项目状态信息无'项目金额'列(其金额列为项目总预算),跨表不可相加",
+     "recommendation": "回款金额以回款清单为准;成本分析用项目状态信息总预算"},
+    {"column": "成本状态", "sheets": ["项目中心", "项目状态信息"],
+     "issue": "同名取值域一致但填充率不同(中心约35%/状态约46%)",
+     "recommendation": "以项目状态信息为权威源"},
+    {"column": "风险状态/风险等级", "sheets": ["项目风险", "项目中心", "项目状态信息"],
+     "issue": "记录级风险状态 vs 项目级风险评级混用,项目级评级几乎全空",
+     "recommendation": "项目级风险由项目风险表按 projectId 聚合派生"},
+]
+
+_BACKFILL_FIELDS = [  # (展示名, 取值函数)
+    ("完工进展", lambda p: p.get("progress", {}).get("完工进展")),
+    ("成本状态", lambda p: p.get("cost", {}).get("成本状态")),
+    ("项目阶段", lambda p: p.get("progress", {}).get("项目阶段")),
+    ("项目评级", lambda p: p.get("status", {}).get("评级")),
+]
+
+
+def _kind(pid: str) -> str:
+    """按项目编号前缀判断项目类型。"""
+    if "SF-" in pid:
+        return "SF售前"
+    if "SS-" in pid:
+        return "SS实施"
+    return "其他"
+
+
+def _theme_coverage(project_pmis: Dict[str, Dict[str, Any]],
+                    payment_ids: set) -> List[Dict[str, Any]]:
+    """五主题:在已匹配回款项目上,各关键字段的非空占比。"""
+    matched = [project_pmis[p] for p in payment_ids if p in project_pmis]
+    n = len(matched) or 1
+
+    def pctf(fn):
+        return round(sum(1 for m in matched if fn(m) not in (None, "")) / n, 4)
+
+    specs = [
+        ("成本预算", [
+            ("总预算", lambda m: m.get("cost", {}).get("总预算")),
+            ("成本状态", lambda m: m.get("cost", {}).get("成本状态")),
+        ]),
+        ("交付进度", [
+            ("完工进展", lambda m: m.get("progress", {}).get("完工进展")),
+            ("里程碑进度状态", lambda m: m.get("progress", {}).get("里程碑进度状态")),
+        ]),
+        ("风险", [
+            ("风险记录数", lambda m: m.get("risk", {}).get("风险记录数")),
+        ]),
+        ("客户合同", [
+            ("最终客户", lambda m: m.get("customer", {}).get("最终客户")),
+            ("合同总额", lambda m: m.get("customer", {}).get("合同总额")),
+        ]),
+    ]
+    out = []
+    for theme, fields in specs:
+        frs = [{"field": fn_name, "fillPct": pctf(fn)} for fn_name, fn in fields]
+        cov = round(sum(f["fillPct"] for f in frs) / len(frs), 4) if frs else 0.0
+        verdict = "green" if cov >= 0.7 else ("yellow" if cov >= 0.3 else "red")
+        out.append({"theme": theme, "verdict": verdict, "coveragePct": cov, "fields": frs})
+    return out
+
+
+def compute_data_quality(project_pmis: Dict[str, Dict[str, Any]],
+                         payment_projects: List[Dict[str, Any]],
+                         dirty: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """计算回款项目与 PMIS 的数据质量报告:匹配率/未匹配/回填缺失/口径冲突。"""
+    matched_active = matched_closed = 0
+    unmatched: List[Dict[str, Any]] = []
+    backfill: List[Dict[str, Any]] = []
+    seen: set = set()
+    for p in payment_projects:
+        pid = str(p.get("projectId") or "").strip()
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        pm = project_pmis.get(pid)
+        if not pm:
+            unmatched.append({"projectId": pid, "projectName": p.get("projectName", ""),
+                              "kind": _kind(pid)})
+            continue
+        if pm.get("source") == "已关闭":
+            matched_closed += 1
+        else:
+            matched_active += 1
+        if pm.get("status", {}).get("项目状态") == "实施中":
+            missing = [name for name, fn in _BACKFILL_FIELDS if fn(pm) in (None, "")]
+            if missing:
+                backfill.append({"projectId": pid, "projectName": p.get("projectName", ""),
+                                 "missingFields": missing})
+    total = len(seen) or 1
+    return {
+        "summary": {
+            "pmisProvided": bool(project_pmis),
+            "joinRate": round((matched_active + matched_closed) / total, 4),
+            "matchedActive": matched_active,
+            "matchedClosed": matched_closed,
+            "unmatched": len(unmatched),
+        },
+        "themes": _theme_coverage(project_pmis, seen),
+        "unmatched": unmatched,
+        "backfill": backfill,
+        "conflicts": PMIS_CONFLICTS,
+        "dirty": dirty or [],
+    }
+
+
 def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
                        closed: Dict[str, List[Dict[str, Any]]],
                        payment_project_ids: set) -> Dict[str, Dict[str, Any]]:
