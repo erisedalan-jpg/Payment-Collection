@@ -8,11 +8,14 @@ import DataQualityTable from '@/components/DataQualityTable.vue'
 import DataDrillModal from '@/components/DataDrillModal.vue'
 import { useCloudSync } from '@/composables/useCloudSync'
 import { useExcelImport } from '@/composables/useExcelImport'
+import { usePmisSync } from '@/composables/usePmisSync'
 
 const data = useDataStore()
 const filter = useFilterStore()
+const pmis = usePmisSync()
 onMounted(() => {
   if (!data.data) data.load()
+  pmis.loadLinks()
 })
 
 const TIER_LABELS = ['100万以上', '50-100万', '50万以下']
@@ -129,6 +132,30 @@ defineExpose({ onClear, onSync, onPickImport })
     </div>
 
     <div class="dv-card">
+      <div class="dv-card-head">PMIS 项目域数据</div>
+      <div class="dv-row dv-note">
+        配置各 PMIS 文件的下载链接后点击"下载并刷新 PMIS"，系统将逐个下载并写入 input/pmis/。
+        离线环境可将 7 个 xlsx 文件手动放入 input/pmis/ 目录后跳过下载直接使用。
+      </div>
+      <div v-for="name in pmis.PMIS_FILE_NAMES" :key="name" class="dv-row dv-pmis-row">
+        <span class="dv-label dv-pmis-label">{{ name }}</span>
+        <input
+          v-model="pmis.links.value[name]"
+          type="text"
+          class="dv-pmis-input"
+          placeholder="粘贴下载链接（可选）"
+        />
+      </div>
+      <div class="dv-row">
+        <button class="dv-btn" :disabled="pmis.running.value" @click="pmis.download()">下载并刷新 PMIS</button>
+      </div>
+      <div v-if="pmis.running.value || pmis.progress.value > 0" class="dv-progress">
+        <div class="dv-bar"><div class="dv-bar-fill" :style="{ width: pmis.progress.value + '%' }"></div></div>
+        <div class="dv-msg">{{ pmis.message.value || '处理中...' }}</div>
+      </div>
+    </div>
+
+    <div class="dv-card">
       <div class="dv-card-head">数据质量总览</div>
       <DataQualityTable :rows="rows" @drill="onDrill" />
     </div>
@@ -159,4 +186,8 @@ defineExpose({ onClear, onSync, onPickImport })
 .dv-msg { font-size: 12px; color: var(--mut); margin-top: 6px; }
 .dv-msg.done { color: var(--c-paid); }
 .dv-msg.error { color: var(--danger); }
+.dv-pmis-row { align-items: center; }
+.dv-pmis-label { width: 200px; flex-shrink: 0; word-break: break-all; white-space: normal; line-height: 1.4; }
+.dv-pmis-input { flex: 1; border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--txt); outline: none; }
+.dv-pmis-input:focus { border-color: var(--accent); }
 </style>
