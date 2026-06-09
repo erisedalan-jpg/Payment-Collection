@@ -16,7 +16,7 @@ describe('DashboardView', () => {
       projectOverview: { projects: [{ projectId: 'P1' }], columns: [] },
       naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
     } as any
-    const w = mount(DashboardView, { global: { stubs: { BoardDrilldownModal: true } } })
+    const w = mount(DashboardView, { global: { stubs: { BoardDrilldownModal: true, DashSignals: true } } })
     expect(w.find('.dash-metrics').exists()).toBe(true)
     expect(w.find('.tier-strip').exists()).toBe(true)
     expect(w.find('.org-ranking').exists()).toBe(true)
@@ -27,13 +27,13 @@ describe('DashboardView', () => {
   it('渲染加载态', () => {
     const ds = useDataStore()
     ds.loading = true
-    const w = mount(DashboardView, { global: { stubs: { BoardDrilldownModal: true } } })
+    const w = mount(DashboardView, { global: { stubs: { BoardDrilldownModal: true, DashSignals: true } } })
     expect(w.text()).toContain('加载中')
   })
 
   it('加载失败渲染错误态', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => null }))
-    const w = mount(DashboardView, { global: { stubs: { BoardDrilldownModal: true } } })
+    const w = mount(DashboardView, { global: { stubs: { BoardDrilldownModal: true, DashSignals: true } } })
     await flushPromises()
     expect(w.text()).toContain('数据加载失败')
   })

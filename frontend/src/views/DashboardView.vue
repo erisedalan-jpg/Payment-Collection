@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useDataStore } from '@/stores/data'
 import DashMetrics from '@/components/DashMetrics.vue'
+import DashSignals from '@/components/DashSignals.vue'
 import TierStrip from '@/components/TierStrip.vue'
 import OrgRanking from '@/components/OrgRanking.vue'
 import TrendCard from '@/components/TrendCard.vue'
@@ -18,6 +19,7 @@ onMounted(() => {
     <p v-if="data.loading" class="dash-hint">加载中…</p>
     <p v-else-if="data.error" class="dash-hint error">数据加载失败：{{ data.error }}</p>
     <template v-else-if="data.data">
+      <DashSignals />
       <DashMetrics />
       <div class="dash-grid">
         <section class="dash-card"><TierStrip /></section>
