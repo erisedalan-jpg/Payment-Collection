@@ -46,3 +46,34 @@ def test_extra_node_fields_allowed():
     data["rawNodes"][0]["someFutureField"] = "x"
     obj = schema.AnalysisData.model_validate(data)
     assert obj.rawNodes[0].projectId == "P1"
+
+
+def _minimal_analysis():
+    return {
+        "meta": {"lastUpdate": "2026-06-09 10:00", "totalProjects": 1, "totalPaymentNodes": 1},
+        "dashboard": {"totalProjectCount": 1, "totalPaymentNodes": 1, "totalPaidNodes": 0},
+        "summary": {}, "rawNodes": [],
+        "projectOverview": {"projects": [], "columns": []},
+    }
+
+
+class TestPmisSchema:
+    def test_backward_compatible_without_pmis(self):
+        schema.AnalysisData.model_validate(_minimal_analysis())
+
+    def test_with_pmis_and_quality(self):
+        d = _minimal_analysis()
+        d["projectPmis"] = {"SS-1": {"matched": True, "source": "在建",
+                                     "cost": {"消耗比": 0.5}, "progress": {}, "risk": {},
+                                     "status": {}, "customer": {}}}
+        d["dataQuality"] = {"summary": {"pmisProvided": True, "joinRate": 0.98,
+                                        "matchedActive": 1, "matchedClosed": 0, "unmatched": 0},
+                            "themes": [], "unmatched": [], "backfill": [],
+                            "conflicts": [], "dirty": []}
+        m = schema.AnalysisData.model_validate(d)
+        assert m.dataQuality is not None
+        assert "SS-1" in m.projectPmis
+        # 字段值断言:更早捕获字段名/类型转换问题
+        assert m.projectPmis["SS-1"].cost.消耗比 == 0.5
+        assert m.dataQuality.summary.joinRate == pytest.approx(0.98)
+        assert m.dataQuality.summary.matchedActive == 1

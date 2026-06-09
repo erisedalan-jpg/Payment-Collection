@@ -1,3 +1,3 @@
 // 版本号/发布信息单一来源（约定：发版时只改此处）。
-export const APP_VERSION = 'V6.0.0'
-export const RELEASE_DATE = '2026-06-02'
+export const APP_VERSION = 'V6.1.0'
+export const RELEASE_DATE = '2026-06-09'

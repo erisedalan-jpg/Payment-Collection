@@ -87,6 +87,8 @@ sync_state = {"running": False, "progress": 0, "message": ""}
 sync_url = ""
 # 导入状态（与同步互斥）
 import_state = {"running": False, "progress": 0, "message": ""}
+# PMIS 下载状态
+pmis_state = {"running": False, "progress": 0, "message": ""}
 followup_sync_state = {}  # key: 记录编号, value: {status:'syncing'|'success'|'failed', message:''}
 _followup_lock = threading.Lock()
 _write_followup_lock = threading.Lock()  # 云文档写入串行化，防并发覆盖
@@ -302,6 +304,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_types()
         elif parsed.path.startswith('/api/followup/sync-status'):
             self.handle_followup_sync_status()
+        elif parsed.path == '/api/pmis/links':
+            self.handle_pmis_links_get()
+        elif parsed.path == '/api/pmis/download':
+            self.handle_pmis_download()
         else:
             super().do_GET()
     
@@ -343,6 +349,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_delete()
         elif parsed.path == '/api/followup/update':
             self.handle_followup_update()
+        elif parsed.path == '/api/pmis/links':
+            self.handle_pmis_links_post()
         else:
             self.send_response(404)
             self.end_headers()
@@ -746,6 +754,62 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             state = followup_sync_state.get(record_id, {"status": "unknown", "message": "未找到同步状态"})
         self._json_response({"success": True, "recordId": record_id, "state": state})
     
+    def _pmis_links_path(self):
+        """返回 pmis_links.json 的绝对路径"""
+        return os.path.join(BASE_DIR, 'data', 'pmis_links.json')
+
+    def handle_pmis_links_get(self):
+        """GET /api/pmis/links - 读取已保存的 PMIS 链接"""
+        path = self._pmis_links_path()
+        links = {}
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    links = json.load(f).get('links', {})
+            except Exception:
+                links = {}
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps({"links": links}, ensure_ascii=False).encode('utf-8'))
+
+    def handle_pmis_links_post(self):
+        """POST /api/pmis/links - 保存 PMIS 链接配置"""
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length) if length else b'{}'
+        try:
+            payload = json.loads(body.decode('utf-8'))
+            links = payload.get('links', {})
+        except Exception as e:
+            # 解析失败：返回错误，不覆盖已有配置文件（与 handle_followup_add 一致）
+            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
+            return
+        os.makedirs(os.path.join(BASE_DIR, 'data'), exist_ok=True)
+        with open(self._pmis_links_path(), 'w', encoding='utf-8') as f:
+            json.dump({"links": links}, f, ensure_ascii=False, indent=2)
+        self._json_response({"ok": True})
+
+    def handle_pmis_download(self):
+        """GET /api/pmis/download - 启动 PMIS 下载，SSE 流式返回进度"""
+        global pmis_state
+        if pmis_state.get("running"):
+            self._json_response(pmis_state)
+            return
+        pmis_state = {"running": True, "progress": 0, "message": "启动 PMIS 下载..."}
+        threading.Thread(target=run_pmis_download, daemon=True).start()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        while True:
+            self.wfile.write(f"data: {json.dumps(pmis_state)}\n\n".encode('utf-8'))
+            self.wfile.flush()
+            if pmis_state["progress"] >= 100 or not pmis_state["running"]:
+                break
+            time.sleep(0.5)
+
     def _json_response(self, data):
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -1088,6 +1152,58 @@ def run_sync():
         # Keep the completion state for a few seconds
         time.sleep(3)
         sync_state["running"] = False
+
+def run_pmis_download():
+    """执行 PMIS 数据下载，下载后立即重跑预处理使 PMIS 数据并入 analysis_data。
+    frozen/dev 双路径：打包模式进程内直接执行，开发模式 subprocess 解析进度。
+    """
+    global pmis_state, active_process
+    try:
+        pmis_state = {"running": True, "progress": 10, "message": "开始下载 PMIS 数据..."}
+        script, cwd = _find_script("pmis_download.py")
+        if not script:
+            pmis_state = {"running": False, "progress": 0, "message": "pmis_download.py 不存在"}
+            return
+        if getattr(sys, 'frozen', False):
+            # 打包模式：进程内直接执行
+            _run_script_direct(script, 'pmis_download', cwd)
+        else:
+            # 开发模式：子进程，注册到 active_process 使其可被 _terminate_active_process 中断
+            active_process = subprocess.Popen([sys.executable, script], cwd=cwd,
+                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                              text=True, encoding='utf-8', errors='replace')
+            for line in active_process.stdout:
+                parsed = classify_progress_line(line)
+                if parsed:
+                    _level, text = parsed
+                    pmis_state = {"running": True,
+                                  "progress": min(pmis_state["progress"] + 10, 90),
+                                  "message": text}
+            active_process.wait()
+        # 下载后立即重跑预处理，使 PMIS 数据并入 analysis_data
+        preprocess_script, pcwd = _find_script("preprocess_data.py")
+        if preprocess_script:
+            pmis_state = {"running": True, "progress": 92, "message": "重新预处理(并入项目域)..."}
+            if getattr(sys, 'frozen', False):
+                _run_script_direct(preprocess_script, 'preprocess_data', pcwd)
+            else:
+                # 开发模式：检查预处理返回码（与 run_import 一致）
+                result = subprocess.run([sys.executable, preprocess_script], cwd=pcwd)
+                if result.returncode != 0:
+                    pmis_state = {"running": False, "progress": 0,
+                                  "message": f"预处理失败（返回码: {result.returncode}）"}
+                    logger.error(f"PMIS 预处理失败，返回码: {result.returncode}")
+                    return
+        pmis_state = {"running": True, "progress": 100, "message": "PMIS 下载并预处理完成"}
+        logger.info("PMIS 下载并预处理完成")
+    except Exception as e:
+        logger.error(f"PMIS 下载失败: {e}")
+        pmis_state = {"running": False, "progress": 0, "message": f"下载失败: {e}"}
+    finally:
+        active_process = None
+        time.sleep(3)
+        pmis_state["running"] = False
+
 
 def _terminate_active_process():
     """终止当前活跃的子进程"""

@@ -31,6 +31,51 @@ export type Projects = {
 export type Columns = {
   [k: string]: unknown;
 }[];
+export type Matched = boolean;
+export type Source = string;
+export type NoName = number | null;
+export type NoName1 = number | null;
+export type NoName2 = number | null;
+export type NoName3 = number | null;
+export type NoName4 = boolean | null;
+export type NoName5 = string | null;
+export type NoName6 = number | null;
+export type NoName7 = string | null;
+export type NoName8 = string | null;
+export type NoName9 = string | null;
+export type NoName10 = number | null;
+export type NoName11 = number | null;
+export type NoName12 = string | null;
+export type NoName13 = number | null;
+export type NoName14 = string | null;
+export type NoName15 = boolean | null;
+export type NoName16 = string | null;
+export type NoName17 = number | null;
+export type NoName18 = string | null;
+export type NoName19 = string | null;
+export type NoName20 = string | null;
+export type NoName21 = string | null;
+export type NoName22 = number | null;
+export type Pmisprovided = boolean;
+export type Joinrate = number;
+export type Matchedactive = number;
+export type Matchedclosed = number;
+export type Unmatched = number;
+export type Themes = {
+  [k: string]: unknown;
+}[];
+export type Unmatched1 = {
+  [k: string]: unknown;
+}[];
+export type Backfill = {
+  [k: string]: unknown;
+}[];
+export type Conflicts = {
+  [k: string]: unknown;
+}[];
+export type Dirty = {
+  [k: string]: unknown;
+}[];
 
 export interface AnalysisData {
   meta: Meta;
@@ -42,6 +87,8 @@ export interface AnalysisData {
   naguanExclude?: Naguanexclude;
   displayColumns?: Displaycolumns;
   followupRecords?: Followuprecords1;
+  projectPmis?: Projectpmis;
+  dataQuality?: DataQuality | null;
   [k: string]: unknown;
 }
 export interface Meta {
@@ -93,5 +140,73 @@ export interface Displaycolumns {
   [k: string]: unknown;
 }
 export interface Followuprecords1 {
+  [k: string]: unknown;
+}
+export interface Projectpmis {
+  [k: string]: ProjectPmis;
+}
+export interface ProjectPmis {
+  matched?: Matched;
+  source?: Source;
+  cost?: PmisCost;
+  progress?: PmisProgress;
+  risk?: PmisRisk;
+  status?: PmisStatus;
+  customer?: PmisCustomer;
+  [k: string]: unknown;
+}
+export interface PmisCost {
+  总预算?: NoName;
+  核算?: NoName1;
+  剩余预算?: NoName2;
+  消耗比?: NoName3;
+  超支?: NoName4;
+  成本状态?: NoName5;
+  [k: string]: unknown;
+}
+export interface PmisProgress {
+  完工进展?: NoName6;
+  里程碑进度状态?: NoName7;
+  项目阶段?: NoName8;
+  计划终验?: NoName9;
+  [k: string]: unknown;
+}
+export interface PmisRisk {
+  未关闭风险数?: NoName10;
+  风险记录数?: NoName11;
+  最高等级?: NoName12;
+  闭环率?: NoName13;
+  [k: string]: unknown;
+}
+export interface PmisStatus {
+  项目状态?: NoName14;
+  是否暂停?: NoName15;
+  评级?: NoName16;
+  评分?: NoName17;
+  [k: string]: unknown;
+}
+export interface PmisCustomer {
+  最终客户?: NoName18;
+  合同编号?: NoName19;
+  签约形式?: NoName20;
+  行业?: NoName21;
+  合同总额?: NoName22;
+  [k: string]: unknown;
+}
+export interface DataQuality {
+  summary: QualitySummary;
+  themes?: Themes;
+  unmatched?: Unmatched1;
+  backfill?: Backfill;
+  conflicts?: Conflicts;
+  dirty?: Dirty;
+  [k: string]: unknown;
+}
+export interface QualitySummary {
+  pmisProvided?: Pmisprovided;
+  joinRate?: Joinrate;
+  matchedActive?: Matchedactive;
+  matchedClosed?: Matchedclosed;
+  unmatched?: Unmatched;
   [k: string]: unknown;
 }

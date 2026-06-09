@@ -38,6 +38,7 @@ export const ANALYSIS_TAB_LINKS: NavLink[] = [
 
 export const TOOL_LINKS: NavLink[] = [
   { label: '数据管理', to: '/data' },
+  { label: '数据治理', to: '/governance' },
   { label: '关于产品', to: '/about' },
 ]
 
