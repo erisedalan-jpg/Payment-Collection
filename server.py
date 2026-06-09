@@ -54,6 +54,12 @@ else:
     STATIC_DIR = BASE_DIR
 PARENT_DIR = os.path.dirname(BASE_DIR)
 
+# 前端 Web 根:打包态用内置 dist,开发态用 frontend/dist
+if getattr(sys, 'frozen', False):
+    WEB_ROOT = os.path.join(STATIC_DIR, 'dist')
+else:
+    WEB_ROOT = os.path.join(BASE_DIR, 'frontend', 'dist')
+
 # ─── 日志配置 ───────────────────────────────────────────────
 LOG_DIR = os.path.join(BASE_DIR, 'log')
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -245,10 +251,21 @@ def _update_followup_sync_status(record_id, sync_status):
     except Exception as e:
         logger.error(f"[followup-sync] 更新syncStatus失败: {e}")
 
+def should_spa_fallback(path: str) -> bool:
+    """判断 GET 路径是否应回退到 dist/index.html(Vue Router history 模式)。
+    /api、/data、/yundocs_data 前缀不回退;带文件扩展名的(静态资源)不回退;其余视为前端路由,回退。"""
+    if path.startswith('/api') or path.startswith('/data') or path.startswith('/yundocs_data'):
+        return False
+    last = path.rsplit('/', 1)[-1]
+    if '.' in last:
+        return False
+    return True
+
+
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        # 默认使用 STATIC_DIR 服务静态文件（打包后从 _MEIPASS，开发时与 BASE_DIR 相同）
-        super().__init__(*args, directory=STATIC_DIR, **kwargs)
+        # 默认使用 WEB_ROOT 服务静态文件（打包后为 _MEIPASS/dist，开发时为 frontend/dist）
+        super().__init__(*args, directory=WEB_ROOT, **kwargs)
     
     def translate_path(self, path):
         """重写路径转换：静态文件优先从 STATIC_DIR 查找，数据文件从 BASE_DIR 查找"""
@@ -309,8 +326,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         else:
+            translated = self.translate_path(parsed.path)
+            if os.path.isfile(translated):
+                super().do_GET()
+                return
+            if should_spa_fallback(parsed.path):
+                self._serve_spa_index()
+                return
             super().do_GET()
-    
+
     def _serve_static_with_charset(self):
         """服务静态文件并强制添加 charset=utf-8"""
         try:
@@ -338,7 +362,27 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(content)
         except Exception as e:
             self.send_error(500, str(e))
-    
+
+    def _serve_spa_index(self):
+        """回退到 Vue SPA 入口 dist/index.html，支持 Vue Router history 模式。"""
+        index_path = os.path.join(WEB_ROOT, 'index.html')
+        if not os.path.isfile(index_path):
+            msg = '前端尚未构建。请运行: cd frontend && npm run build'
+            body = msg.encode('utf-8')
+            self.send_response(503)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        with open(index_path, 'rb') as f:
+            content = f.read()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
     def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path == '/api/import':
