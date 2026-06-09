@@ -41,4 +41,13 @@ describe('dashboardSignals', () => {
     const s = dashboardSignals([n({ planDate: '2026-06-09', expectedPayment: 10000, actualPayment: 0, followupRecords: [] })], TODAY)
     expect(s.due7Count).toBe(1)
   })
+
+  it('7天内临期且无跟进的节点同时计入 due7 与 待跟进', () => {
+    const s = dashboardSignals(
+      [n({ planDate: '2026-06-11', expectedPayment: 20000, actualPayment: 0, followupRecords: [] })],
+      TODAY,
+    )
+    expect(s.due7Count).toBe(1)
+    expect(s.toFollowupCount).toBe(1)
+  })
 })

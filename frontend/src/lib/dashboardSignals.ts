@@ -6,7 +6,7 @@ export interface DashSignal {
   monthDue: number
   /** 7 天内临期节点数：planDate 落在 [today, today+7天] 且未回款 */
   due7Count: number
-  /** 延期额（元）：nodeStatus='延期' 节点的待回款合计 */
+  /** 延期额（元）：nodeStatus='延期' 节点的待回款合计（rem<0 按 0 计，永不为负） */
   delayed: number
   /** 待跟进节点数：planDate 落在 [today, today+30天]、未回款、且该节点所属项目无"跟进中"记录 */
   toFollowupCount: number
@@ -40,7 +40,7 @@ export function dashboardSignals(nodes: RawNode[], today: string): DashSignal {
     const rem = getNodeRemaining(n)
 
     if (n.planMonth === month && rem > 0) monthDue += rem
-    if (n.nodeStatus === '延期') delayed += rem
+    if (n.nodeStatus === '延期') delayed += Math.max(0, rem)
 
     const pd: string = typeof n.planDate === 'string' ? n.planDate : ''
     if (pd && rem > 0 && pd >= today) {
