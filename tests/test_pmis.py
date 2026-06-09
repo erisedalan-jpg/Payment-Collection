@@ -175,11 +175,25 @@ class TestComputeDataQuality:
         assert "完工进展" in bf["SS-1"] and "成本状态" in bf["SS-1"]
 
 
+class TestPmisDataTime:
+    def test_empty_dir_returns_blank(self, tmp_path):
+        assert M.pmis_data_time(str(tmp_path)) == ''
+    def test_missing_dir_returns_blank(self, tmp_path):
+        assert M.pmis_data_time(str(tmp_path / 'nope')) == ''
+    def test_returns_formatted_max_mtime(self, tmp_path):
+        d = tmp_path / "pmis"
+        d.mkdir()
+        (d / "项目中心.xlsx").write_bytes(b"x")
+        out = M.pmis_data_time(str(d))
+        assert len(out) == 16 and out[4] == '-' and out[13] == ':'
+
+
 class TestLoadProjectPmis:
     def test_missing_dir_graceful(self, tmp_path):
         pm, dq = M.load_project_pmis(str(tmp_path / "nope"), {"SS-1"})
         assert pm == {}
         assert dq["summary"]["pmisProvided"] is False
+        assert dq["summary"]["lastPmisUpdate"] == ''
 
     def test_reads_files(self, tmp_path):
         d = tmp_path / "pmis"
@@ -193,6 +207,7 @@ class TestLoadProjectPmis:
         pm, dq = M.load_project_pmis(str(d), {"SS-1"})
         assert "SS-1" in pm
         assert dq["summary"]["pmisProvided"] is True
+        assert len(dq["summary"]["lastPmisUpdate"]) == 16
 
     def test_empty_sheets_graceful(self, tmp_path):
         d = tmp_path / "pmis"
