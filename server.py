@@ -253,8 +253,9 @@ def _update_followup_sync_status(record_id, sync_status):
 
 def should_spa_fallback(path: str) -> bool:
     """判断 GET 路径是否应回退到 dist/index.html(Vue Router history 模式)。
-    /api、/data、/yundocs_data 前缀不回退;带文件扩展名的(静态资源)不回退;其余视为前端路由,回退。"""
-    if path.startswith('/api') or path.startswith('/data') or path.startswith('/yundocs_data'):
+    /api/、/data/、/yundocs_data/ 子路径不回退(后端接口/数据文件);带文件扩展名的(静态资源)不回退;
+    其余视为前端路由回退(注意 /data 本身是 Vue 路由"数据管理",需回退,故用带斜杠前缀区分)。"""
+    if any(path.startswith(p) for p in ('/api/', '/data/', '/yundocs_data/')):
         return False
     last = path.rsplit('/', 1)[-1]
     if '.' in last:
@@ -268,13 +269,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=WEB_ROOT, **kwargs)
     
     def translate_path(self, path):
-        """重写路径转换：静态文件优先从 STATIC_DIR 查找，数据文件从 BASE_DIR 查找"""
-        # 先按默认逻辑从 STATIC_DIR 解析
+        """重写路径转换：静态文件优先从 WEB_ROOT 查找，数据文件从 BASE_DIR 查找"""
+        # 先按默认逻辑从 WEB_ROOT 解析（super 的 directory 即 WEB_ROOT）
         static_path = super().translate_path(path)
         if os.path.exists(static_path):
             return static_path
-        # 如果 STATIC_DIR 中找不到，尝试从 BASE_DIR 查找（data/, yundocs_data/ 等运行时数据）
-        rel = os.path.relpath(static_path, STATIC_DIR)
+        # 如果 WEB_ROOT 中找不到，尝试从 BASE_DIR 查找（data/, yundocs_data/ 等运行时数据）
+        rel = os.path.relpath(static_path, WEB_ROOT)
         base_path = os.path.join(BASE_DIR, rel)
         if os.path.exists(base_path):
             return base_path
