@@ -177,7 +177,7 @@ _BACKFILL_FIELDS = [  # (展示名, 取值函数)
 
 
 def _kind(pid: str) -> str:
-    """按项目编号前缀判断项目类型。"""
+    """按项目编号是否含 SF-/SS- 判断类型(SF 优先匹配)。"""
     if "SF-" in pid:
         return "SF售前"
     if "SS-" in pid:
@@ -187,7 +187,7 @@ def _kind(pid: str) -> str:
 
 def _theme_coverage(project_pmis: Dict[str, Dict[str, Any]],
                     payment_ids: set) -> List[Dict[str, Any]]:
-    """五主题:在已匹配回款项目上,各关键字段的非空占比。"""
+    """四主题(成本/进度/风险/客户):在已匹配回款项目上,各关键字段的非空占比。"""
     matched = [project_pmis[p] for p in payment_ids if p in project_pmis]
     n = len(matched) or 1
 
