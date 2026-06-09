@@ -14,6 +14,8 @@ class TestParsePmisMoney:
         assert M.parse_pmis_money(None) is None
     def test_number_passthrough(self):
         assert M.parse_pmis_money(1000) == 1000.0
+    def test_negative(self):
+        assert M.parse_pmis_money("-500.0") == -500.0
 
 
 class TestParsePmisPct:
@@ -25,6 +27,7 @@ class TestParsePmisPct:
         assert M.parse_pmis_pct("100") == pytest.approx(1.0)
     def test_blank_none(self):
         assert M.parse_pmis_pct("") is None
+        assert M.parse_pmis_pct(None) is None
 
 
 class TestParseCloseFraction:
