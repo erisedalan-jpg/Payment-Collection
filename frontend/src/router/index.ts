@@ -9,6 +9,14 @@ import DataView from '@/views/DataView.vue'
 import AboutView from '@/views/AboutView.vue'
 import DataQualityView from '@/views/DataQualityView.vue'
 
+// 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于)
+declare module 'vue-router' {
+  interface RouteMeta {
+    title?: string
+    hideFilter?: boolean
+  }
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
