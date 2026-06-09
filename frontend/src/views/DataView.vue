@@ -12,10 +12,19 @@ import { usePmisSync } from '@/composables/usePmisSync'
 
 const data = useDataStore()
 const filter = useFilterStore()
-const pmis = usePmisSync()
+// 解构使 ref 在模板自动解包，避免 .value 踩坑（与 useCloudSync/useExcelImport 保持一致）
+const {
+  links: pmisLinks,
+  progress: pmisProgress,
+  message: pmisMessage,
+  running: pmisRunning,
+  loadLinks: pmisLoadLinks,
+  download: pmisDownload,
+  PMIS_FILE_NAMES,
+} = usePmisSync({ onDone: () => data.reload() })
 onMounted(() => {
   if (!data.data) data.load()
-  pmis.loadLinks()
+  pmisLoadLinks()
 })
 
 const TIER_LABELS = ['100万以上', '50-100万', '50万以下']
@@ -137,21 +146,21 @@ defineExpose({ onClear, onSync, onPickImport })
         配置各 PMIS 文件的下载链接后点击"下载并刷新 PMIS"，系统将逐个下载并写入 input/pmis/。
         离线环境可将 7 个 xlsx 文件手动放入 input/pmis/ 目录后跳过下载直接使用。
       </div>
-      <div v-for="name in pmis.PMIS_FILE_NAMES" :key="name" class="dv-row dv-pmis-row">
+      <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-row dv-pmis-row">
         <span class="dv-label dv-pmis-label">{{ name }}</span>
         <input
-          v-model="pmis.links.value[name]"
+          v-model="pmisLinks[name]"
           type="text"
           class="dv-pmis-input"
           placeholder="粘贴下载链接（可选）"
         />
       </div>
       <div class="dv-row">
-        <button class="dv-btn" :disabled="pmis.running.value" @click="pmis.download()">下载并刷新 PMIS</button>
+        <button class="dv-btn" :disabled="pmisRunning" @click="pmisDownload()">下载并刷新 PMIS</button>
       </div>
-      <div v-if="pmis.running.value || pmis.progress.value > 0" class="dv-progress">
-        <div class="dv-bar"><div class="dv-bar-fill" :style="{ width: pmis.progress.value + '%' }"></div></div>
-        <div class="dv-msg">{{ pmis.message.value || '处理中...' }}</div>
+      <div v-if="pmisRunning || pmisProgress > 0" class="dv-progress">
+        <div class="dv-bar"><div class="dv-bar-fill" :style="{ width: pmisProgress + '%' }"></div></div>
+        <div class="dv-msg">{{ pmisMessage || '处理中...' }}</div>
       </div>
     </div>
 
