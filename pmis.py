@@ -289,10 +289,11 @@ def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
     return out
 
 
-def load_project_pmis(pmis_dir: str, payment_projects_or_ids,
+def load_project_pmis(pmis_dir: str, payment_projects_or_ids, dirty=None,
                       ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
     """读 input/pmis/ 下七表 → build_project_pmis + compute_data_quality。
     payment_projects_or_ids: 回款项目列表(dict 含 projectId/projectName)或 id 集合。
+    dirty: 回款侧脏值清单(由调用方扫描),透传给 compute_data_quality。
     目录/文件缺失 → 返回 ({}, 质量{pmisProvided:False})。"""
     if isinstance(payment_projects_or_ids, set):
         pay_projects = [{"projectId": pid, "projectName": ""} for pid in payment_projects_or_ids]
@@ -301,7 +302,7 @@ def load_project_pmis(pmis_dir: str, payment_projects_or_ids,
     pay_ids = {str(p.get("projectId") or "").strip() for p in pay_projects if p.get("projectId")}
 
     if not os.path.isdir(pmis_dir):
-        return {}, compute_data_quality({}, pay_projects)
+        return {}, compute_data_quality({}, pay_projects, dirty)
 
     def read_group(files):
         g = {}
@@ -312,7 +313,7 @@ def load_project_pmis(pmis_dir: str, payment_projects_or_ids,
     active = read_group(config.PMIS_FILES_ACTIVE)
     closed = read_group(config.PMIS_FILES_CLOSED)
     if not any(active.values()) and not any(closed.values()):
-        return {}, compute_data_quality({}, pay_projects)
+        return {}, compute_data_quality({}, pay_projects, dirty)
     project_pmis = build_project_pmis(active, closed, pay_ids)
-    dq = compute_data_quality(project_pmis, pay_projects)
+    dq = compute_data_quality(project_pmis, pay_projects, dirty)
     return project_pmis, dq
