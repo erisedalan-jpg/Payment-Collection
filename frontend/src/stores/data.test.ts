@@ -85,7 +85,7 @@ describe('useDataStore load 防缓存', () => {
     vi.stubGlobal('fetch', fetchMock as any)
     const store = useDataStore()
     await store.load()
-    const url = fetchMock.mock.lastCall![0] as string
+    const url = (fetchMock.mock.lastCall as unknown as string[])[0]
     expect(url.startsWith('/data/analysis_data.json?t=')).toBe(true)
   })
 })
