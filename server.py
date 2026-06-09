@@ -169,7 +169,7 @@ def node_action_date_from_data(data: dict, project_id: str) -> str:
         for n in data.get('rawNodes', []):
             if str(n.get('projectId', '')) == str(project_id) and n.get('nextActionDate'):
                 return n.get('nextActionDate')
-    except Exception:
+    except Exception:  # rawNodes 元素格式异常(非 dict 等)时防御性返回空
         return ''
     return ''
 
