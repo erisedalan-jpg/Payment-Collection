@@ -1,32 +1,47 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { useDataStore } from '@/stores/data'
 import DataQualityView from './DataQualityView.vue'
 
-function seed(dq: any) {
+function seed(d: any) {
   const store = useDataStore()
-  ;(store as any).data = {
-    meta: {}, dashboard: {}, summary: {}, rawNodes: [],
-    projectOverview: { projects: [], columns: [] }, dataQuality: dq,
-  }
+  ;(store as any).data = d
 }
 
 describe('DataQualityView', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })) as any)
+  })
+  afterEach(() => vi.unstubAllGlobals())
 
-  it('shows empty guide when PMIS not provided', () => {
-    seed({ summary: { pmisProvided: false }, themes: [], unmatched: [], backfill: [], conflicts: [], dirty: [] })
+  it('数据未加载时提示加载/后端', () => {
+    seed(null)
+    const w = mount(DataQualityView)
+    expect(w.text()).toContain('加载')
+  })
+
+  it('数据无 dataQuality 时提示重新同步', () => {
+    seed({ rawNodes: [], projectOverview: { projects: [], columns: [] } })
+    const w = mount(DataQualityView)
+    expect(w.text()).toContain('不含治理信息')
+  })
+
+  it('PMIS 未提供时提示未提供 PMIS', () => {
+    seed({ dataQuality: { summary: { pmisProvided: false }, themes: [], unmatched: [], backfill: [], conflicts: [], dirty: [] } })
     const w = mount(DataQualityView)
     expect(w.text()).toContain('未提供 PMIS')
   })
 
-  it('renders scorecard + unmatched count when provided', () => {
+  it('提供时渲染记分卡 + 未匹配计数', () => {
     seed({
-      summary: { pmisProvided: true, joinRate: 0.98, matchedActive: 462, matchedClosed: 158, unmatched: 8 },
-      themes: [{ theme: '成本预算', verdict: 'yellow', coveragePct: 0.5, fields: [] }],
-      unmatched: [{ projectId: 'SF-1', projectName: '甲', kind: 'SF售前' }],
-      backfill: [], conflicts: [], dirty: [],
+      dataQuality: {
+        summary: { pmisProvided: true, joinRate: 0.98, matchedActive: 462, matchedClosed: 158, unmatched: 8 },
+        themes: [{ theme: '成本预算', verdict: 'yellow', coveragePct: 0.5, fields: [] }],
+        unmatched: [{ projectId: 'SF-1', projectName: '甲', kind: 'SF售前' }],
+        backfill: [], conflicts: [], dirty: [],
+      },
     })
     const w = mount(DataQualityView)
     expect(w.text()).toContain('98')

@@ -78,3 +78,14 @@ describe('useDataStore.reload', () => {
     spy.mockRestore()
   })
 })
+
+describe('useDataStore load 防缓存', () => {
+  it('load() 拉取 URL 带防缓存参数 ?t=', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }))
+    vi.stubGlobal('fetch', fetchMock as any)
+    const store = useDataStore()
+    await store.load()
+    const url = (fetchMock.mock.lastCall as unknown as string[])[0]
+    expect(url.startsWith('/data/analysis_data.json?t=')).toBe(true)
+  })
+})
