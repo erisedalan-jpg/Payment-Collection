@@ -34,6 +34,7 @@ async function onPmisUpload() {
   if (!files.length) return
   const ok = await pmisUpload(files)
   pmisUploadMsg.value = `已上传 ${ok}/${files.length} 个 PMIS 文件,请点[更新数据]生效`
+  if (pmisInput.value) pmisInput.value.value = ''  // 清空选择,避免再次点击重复上传同一批
 }
 
 onMounted(() => { if (!data.data) data.load(); pmisLoadLinks() })
@@ -58,7 +59,7 @@ async function onClear() {
     <h2 class="dv-title">数据管理</h2>
 
     <div class="dv-times">
-      <span>总处理时间:<b>{{ lastUpdate }}</b></span>
+      <span>数据处理时间:<b>{{ lastUpdate }}</b></span>
       <span>PMIS 数据时间:<b>{{ lastPmis }}</b></span>
     </div>
 
