@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """pmis.py 纯函数单元测试。不依赖 input/ 真文件——用内存 dict 或 tmp_path 生成的小 xlsx。"""
+import config
 import openpyxl
 import pytest
 import pmis as M
@@ -164,3 +165,23 @@ class TestComputeDataQuality:
         bf = {b["projectId"]: b["missingFields"] for b in dq["backfill"]}
         assert "SS-1" in bf
         assert "完工进展" in bf["SS-1"] and "成本状态" in bf["SS-1"]
+
+
+class TestLoadProjectPmis:
+    def test_missing_dir_graceful(self, tmp_path):
+        pm, dq = M.load_project_pmis(str(tmp_path / "nope"), {"SS-1"})
+        assert pm == {}
+        assert dq["summary"]["pmisProvided"] is False
+
+    def test_reads_files(self, tmp_path):
+        d = tmp_path / "pmis"
+        d.mkdir()
+        _make_xlsx(str(d), config.PMIS_FILES_ACTIVE["base"],
+                   ["项目编号", "项目名称", "项目状态"],
+                   [{"项目编号": "SS-1", "项目名称": "甲", "项目状态": "实施中"}])
+        _make_xlsx(str(d), config.PMIS_FILES_ACTIVE["status"],
+                   ["项目编号", "项目总预算（元）", "项目核算（元）"],
+                   [{"项目编号": "SS-1", "项目总预算（元）": "1000", "项目核算（元）": "500"}])
+        pm, dq = M.load_project_pmis(str(d), {"SS-1"})
+        assert "SS-1" in pm
+        assert dq["summary"]["pmisProvided"] is True

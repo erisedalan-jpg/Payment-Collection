@@ -283,3 +283,31 @@ def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
         if pid in payment_project_ids and pid not in out:
             out[pid] = _assemble(pid, c_base, c_center, c_status, c_risk, "已关闭")
     return out
+
+
+def load_project_pmis(pmis_dir: str, payment_projects_or_ids,
+                      ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """读 input/pmis/ 下七表 → build_project_pmis + compute_data_quality。
+    payment_projects_or_ids: 回款项目列表(dict 含 projectId/projectName)或 id 集合。
+    目录/文件缺失 → 返回 ({}, 质量{pmisProvided:False})。"""
+    if isinstance(payment_projects_or_ids, set):
+        pay_projects = [{"projectId": pid, "projectName": ""} for pid in payment_projects_or_ids]
+    else:
+        pay_projects = list(payment_projects_or_ids)
+    pay_ids = {str(p.get("projectId") or "").strip() for p in pay_projects if p.get("projectId")}
+
+    def read_group(files):
+        g = {}
+        for key, fname in files.items():
+            g[key] = read_pmis_sheet(os.path.join(pmis_dir, fname))
+        return g
+
+    if not os.path.isdir(pmis_dir):
+        return {}, compute_data_quality({}, pay_projects)
+    active = read_group(config.PMIS_FILES_ACTIVE)
+    closed = read_group(config.PMIS_FILES_CLOSED)
+    if not any(active.values()) and not any(closed.values()):
+        return {}, compute_data_quality({}, pay_projects)
+    project_pmis = build_project_pmis(active, closed, pay_ids)
+    dq = compute_data_quality(project_pmis, pay_projects)
+    return project_pmis, dq
