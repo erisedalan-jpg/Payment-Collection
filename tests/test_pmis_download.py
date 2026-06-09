@@ -7,7 +7,7 @@ def test_plan_downloads_maps_links_to_files(tmp_path):
     links = {"项目中心.xlsx": "http://x/a", "项目基础信息数据.xlsx": "http://x/b"}
     plan = D.plan_downloads(links)
     names = {p["name"] for p in plan}
-    assert "项目中心.xlsx" in names and "项目基础信息数据.xlsx" in names
+    assert names == {"项目中心.xlsx", "项目基础信息数据.xlsx"}
 
 
 def test_plan_downloads_skips_unknown_and_blank(tmp_path):
