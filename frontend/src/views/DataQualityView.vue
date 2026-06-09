@@ -42,7 +42,7 @@ function exportBackfill() {
       <div class="dq-themes">
         <div v-for="t in themes" :key="t.theme" class="dq-theme">
           <span class="dq-theme-name">{{ t.theme }}</span>
-          <span class="dq-theme-bar"><i :style="{ width: pctTxt(t.coveragePct), background: coverageColor(t.coveragePct) }"></i></span>
+          <span class="dq-theme-bar"><span class="dq-theme-fill" :style="{ width: pctTxt(t.coveragePct), background: coverageColor(t.coveragePct) }"></span></span>
           <span class="dq-theme-val">{{ pctTxt(t.coveragePct) }} · {{ verdictLabel(t.verdict) }}</span>
         </div>
       </div>
@@ -69,7 +69,7 @@ function exportBackfill() {
 
 <style scoped>
 .dq-view { padding: 16px; }
-.dq-title { font-size: var(--fs-5); margin: 0 0 12px; color: var(--txt); }
+.dq-title { font-size: var(--fs-5); font-weight: 700; margin: 0 0 12px; color: var(--txt); }
 .dq-empty { padding: 32px; text-align: center; color: var(--mut); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
 .dq-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .dq-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
@@ -80,7 +80,7 @@ function exportBackfill() {
 .dq-theme { display: grid; grid-template-columns: 100px 1fr 120px; align-items: center; gap: 10px; }
 .dq-theme-name { color: var(--sub); font-size: var(--fs-1); }
 .dq-theme-bar { height: 10px; background: var(--card2); border-radius: 5px; overflow: hidden; }
-.dq-theme-bar i { display: block; height: 100%; }
+.dq-theme-fill { display: block; height: 100%; }
 .dq-theme-val { font-size: var(--fs-1); color: var(--sub); }
 .dq-exp { font-size: var(--fs-1); margin-left: 8px; cursor: pointer; background: var(--accent); color: var(--on-accent); border: none; border-radius: 6px; padding: 2px 10px; }
 .dq-tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
