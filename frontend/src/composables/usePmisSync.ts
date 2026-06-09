@@ -42,10 +42,21 @@ export function usePmisSync(opts: { onDone?: () => void } = {}) {
           } catch { /* 跳过半包 */ }
         }
       }
-      opts.onDone?.()
     } finally {
       running.value = false
     }
   }
-  return { links, progress, message, running, loadLinks, saveLinks, download, PMIS_FILE_NAMES }
+  async function upload(files: File[]): Promise<number> {
+    let ok = 0
+    for (const f of files) {
+      if (!PMIS_FILE_NAMES.includes(f.name)) continue
+      const buf = await f.arrayBuffer()
+      const res = await fetch('/api/pmis/upload?name=' + encodeURIComponent(f.name), {
+        method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: buf,
+      })
+      if (res.ok) ok++
+    }
+    return ok
+  }
+  return { links, progress, message, running, loadLinks, saveLinks, download, upload, PMIS_FILE_NAMES }
 }

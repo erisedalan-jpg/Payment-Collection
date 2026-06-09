@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { usePmisSync } from './usePmisSync'
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('usePmisSync', () => {
   beforeEach(() => { vi.restoreAllMocks() })
@@ -20,7 +22,7 @@ describe('usePmisSync', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/pmis/links', expect.objectContaining({ method: 'POST' }))
   })
 
-  it('streams progress and calls onDone, resets running', async () => {
+  it('streams progress, resets running; download 不再调用 onDone', async () => {
     const enc = new TextEncoder()
     let read = 0
     const reader = {
@@ -39,7 +41,7 @@ describe('usePmisSync', () => {
     await s.download()
     expect(s.progress.value).toBe(100)
     expect(s.running.value).toBe(false)
-    expect(onDone).toHaveBeenCalled()
+    expect(onDone).not.toHaveBeenCalled()
   })
 
   it('resets running on fetch error', async () => {
@@ -61,5 +63,17 @@ describe('usePmisSync', () => {
     await s.download()
     expect(s.message.value).toBe('下载失败 (503)')
     expect(s.running.value).toBe(false)
+  })
+
+  it('upload() 对每个 PMIS 文件 POST /api/pmis/upload?name=', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }))
+    vi.stubGlobal('fetch', fetchMock as any)
+    const s = usePmisSync()
+    const f = new File([new Uint8Array([1, 2, 3])], '项目中心.xlsx')
+    ;(f as any).arrayBuffer = async () => new Uint8Array([1, 2, 3]).buffer
+    const ok = await s.upload([f])
+    expect(ok).toBe(1)
+    const calls = fetchMock.mock.calls as unknown as [string, ...unknown[]][]
+    expect(calls[0][0]).toContain('/api/pmis/upload?name=')
   })
 })
