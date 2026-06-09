@@ -25,6 +25,16 @@ import logging
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from urllib.parse import urlparse, parse_qs
+import config
+
+# ── PMIS 上传白名单（防目录穿越/任意写） ──
+_PMIS_UPLOAD_NAMES = set(config.PMIS_FILES_ACTIVE.values()) | set(config.PMIS_FILES_CLOSED.values())
+
+
+def is_valid_pmis_name(name: str) -> bool:
+    """仅允许 7 个 PMIS 固定文件名(防目录穿越/任意写)。"""
+    return bool(name) and name in _PMIS_UPLOAD_NAMES
+
 
 # ── Playwright 依赖预导入（确保 PyInstaller 打包时追踪完整依赖链） ──
 if getattr(sys, 'frozen', False):
@@ -399,6 +409,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_update()
         elif parsed.path == '/api/pmis/links':
             self.handle_pmis_links_post()
+        elif parsed.path == '/api/pmis/upload':
+            self.handle_pmis_upload()
         else:
             self.send_response(404)
             self.end_headers()
@@ -844,6 +856,29 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         with open(self._pmis_links_path(), 'w', encoding='utf-8') as f:
             json.dump({"links": links}, f, ensure_ascii=False, indent=2)
         self._json_response({"ok": True})
+
+    def handle_pmis_upload(self):
+        """POST /api/pmis/upload?name=<文件名> - 接收原始字节，写入 input/pmis/"""
+        qs = parse_qs(urlparse(self.path).query)
+        name = (qs.get('name', [''])[0] or '').strip()
+        if not is_valid_pmis_name(name):
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
+            return
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length) if length else b''
+        pmis_dir = os.path.join(BASE_DIR, 'input', config.PMIS_DIRNAME)
+        os.makedirs(pmis_dir, exist_ok=True)
+        with open(os.path.join(pmis_dir, name), 'wb') as f:
+            f.write(body)
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps({"ok": True, "name": name, "bytes": len(body)}, ensure_ascii=False).encode('utf-8'))
 
     def handle_pmis_download(self):
         """GET /api/pmis/download - 启动 PMIS 下载，SSE 流式返回进度"""
