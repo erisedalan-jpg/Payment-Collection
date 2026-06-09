@@ -27,3 +27,36 @@ describe('AppLayout', () => {
     expect(wrapper.find('.filter-bar').exists()).toBe(true)
   })
 })
+
+const Blank = { template: '<div/>' }
+function makeRouter(routes: any[]) {
+  return createRouter({ history: createMemoryHistory(), routes })
+}
+
+describe('AppLayout FilterBar 按路由', () => {
+  it('hideFilter 路由不渲染 FilterBar', async () => {
+    const router = makeRouter([
+      { path: '/', component: Blank, meta: {} },
+      { path: '/data', component: Blank, meta: { hideFilter: true } },
+    ])
+    router.push('/data'); await router.isReady()
+    const w = mount(AppLayout, {
+      global: {
+        plugins: [createPinia(), router],
+        stubs: { AppHeader: true, AppSidebar: true, ProjectDetailDrawer: true },
+      },
+    })
+    expect(w.find('.filter-bar').exists()).toBe(false)
+  })
+  it('普通路由渲染 FilterBar', async () => {
+    const router = makeRouter([{ path: '/', component: Blank, meta: {} }])
+    router.push('/'); await router.isReady()
+    const w = mount(AppLayout, {
+      global: {
+        plugins: [createPinia(), router],
+        stubs: { AppHeader: true, AppSidebar: true, ProjectDetailDrawer: true },
+      },
+    })
+    expect(w.find('.filter-bar').exists()).toBe(true)
+  })
+})
