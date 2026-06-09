@@ -124,3 +124,15 @@ class TestBuildProjectPmis:
         assert "SS-9" in pm and pm["SS-9"]["source"] == "已关闭"
         assert "SS-OUT" not in pm
         assert "SS-FREE" not in pm
+
+    def test_pause_false_and_risk_override(self):
+        active = {
+            "base": [{"项目编号": "SS-2", "是否暂停": "否", "项目状态": "实施中"}],
+            "status": [{"项目编号": "SS-2", "未关闭风险数量": "3/5"}],
+            "risk": [{"项目编号": "SS-2", "风险等级": "低", "风险状态": "已识别"}],
+        }
+        pm = M.build_project_pmis(active, {}, set())
+        # "否" 必须判为 False(而非 None,也不被 "不是" 之类子串误判)
+        assert pm["SS-2"]["status"]["是否暂停"] is False
+        # status 表分式分子(3)覆盖 risk 记录推导值(1)
+        assert pm["SS-2"]["risk"]["未关闭风险数"] == 3
