@@ -95,6 +95,8 @@ sync_url = ""
 import_state = {"running": False, "progress": 0, "message": ""}
 # PMIS 下载状态
 pmis_state = {"running": False, "progress": 0, "message": ""}
+# 重新预处理状态（独立更新数据，不抓取）
+reprocess_state = {"running": False, "progress": 0, "message": ""}
 followup_sync_state = {}  # key: 记录编号, value: {status:'syncing'|'success'|'failed', message:''}
 _followup_lock = threading.Lock()
 _write_followup_lock = threading.Lock()  # 云文档写入串行化，防并发覆盖
@@ -325,6 +327,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_pmis_links_get()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
+        elif parsed.path == '/api/reprocess':
+            self.handle_reprocess()
         else:
             translated = self.translate_path(parsed.path)
             if os.path.isfile(translated):
@@ -861,6 +865,29 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 break
             time.sleep(0.5)
 
+    def handle_reprocess(self):
+        """GET /api/reprocess - 仅重跑预处理，不抓取/下载，SSE 流式返回进度"""
+        global reprocess_state
+        if sync_state.get("running") or import_state.get("running") or pmis_state.get("running"):
+            self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
+            return
+        if reprocess_state.get("running"):
+            self._json_response(reprocess_state)
+            return
+        reprocess_state = {"running": True, "progress": 0, "message": "启动更新..."}
+        threading.Thread(target=run_reprocess, daemon=True).start()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        while True:
+            self.wfile.write(f"data: {json.dumps(reprocess_state)}\n\n".encode('utf-8'))
+            self.wfile.flush()
+            if reprocess_state["progress"] >= 100 or not reprocess_state["running"]:
+                break
+            time.sleep(0.5)
+
     def _json_response(self, data):
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -997,6 +1024,61 @@ def classify_progress_line(line):
     return ('other', s)
 
 
+def run_reprocess():
+    """仅运行 preprocess_data.py(读 yundocs_data + input/pmis 重算 analysis_data)。
+    不抓取、不下载。供"更新数据"按钮调用。"""
+    global reprocess_state
+    try:
+        reprocess_state = {"running": True, "progress": 10, "message": "正在更新数据(预处理)..."}
+        preprocess_script, pcwd = _find_script("preprocess_data.py")
+        if not preprocess_script:
+            reprocess_state = {"running": False, "progress": 0, "message": "预处理脚本不存在"}
+            return
+        if getattr(sys, 'frozen', False):
+            try:
+                old_argv = sys.argv[:]
+                sys.argv = [preprocess_script]
+                _run_script_direct(preprocess_script, 'preprocess_data', pcwd)
+            except SystemExit as e:
+                if e.code and e.code != 0:
+                    reprocess_state = {"running": False, "progress": 0, "message": f"更新失败(退出码:{e.code})"}
+                    return
+            except Exception as e:
+                reprocess_state = {"running": False, "progress": 0, "message": f"更新失败: {str(e)[:100]}"}
+                logger.error(f"reprocess 失败: {e}", exc_info=True)
+                return
+            finally:
+                sys.argv = old_argv
+        else:
+            process = subprocess.Popen(
+                [sys.executable, '-u', preprocess_script],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                cwd=pcwd, encoding='utf-8', errors='replace')
+            errs = []
+            for raw in process.stdout:
+                parsed = classify_progress_line(raw)
+                if parsed is None:
+                    continue
+                level, text = parsed
+                if level in ('ok', 'info'):
+                    reprocess_state = {"running": True, "progress": min(reprocess_state["progress"] + 5, 95),
+                                       "message": raw.strip().replace('[INFO] ', '').replace('[OK] ', '')}
+                elif level == 'error':
+                    errs.append(text)
+            process.wait()
+            if process.returncode != 0:
+                reprocess_state = {"running": False, "progress": 0,
+                                   "message": f"更新失败: {'; '.join(errs[-3:]) if errs else '详见日志'}"}
+                return
+        reprocess_state = {"running": True, "progress": 100, "message": "数据更新完成"}
+    except Exception as e:
+        reprocess_state = {"running": False, "progress": 0, "message": f"更新失败: {str(e)}"}
+        logger.error(f"reprocess 失败: {e}", exc_info=True)
+    finally:
+        time.sleep(3)
+        reprocess_state["running"] = False
+
+
 def run_sync():
     """执行数据同步：提取+预处理"""
     global sync_state, sync_url
@@ -1128,73 +1210,10 @@ def run_sync():
                     logger.info("数据提取完成，开始预处理")
         
         time.sleep(0.5)
-        
-        # Step 2: Run preprocessing
-        sync_state = {"running": True, "progress": 80, "message": "正在预处理数据..."}
-        logger.info("开始预处理数据")
-        preprocess_script, preprocess_cwd = _find_script("preprocess_data.py")
-        
-        if not preprocess_script:
-            sync_state = {"running": False, "progress": 0, "message": "预处理脚本不存在，无法完成同步"}
-            logger.error("预处理脚本不存在，同步失败")
-            return
-        
-        if getattr(sys, 'frozen', False):
-            # ── 打包模式：直接导入运行 ──
-            try:
-                old_argv = sys.argv[:]
-                sys.argv = [preprocess_script]
-                _run_script_direct(preprocess_script, 'preprocess_data', preprocess_cwd)
-                logger.info("预处理完成（直接模式）")
-            except SystemExit as e:
-                if e.code and e.code != 0:
-                    sync_state = {"running": False, "progress": 0, "message": f"预处理失败（退出码:{e.code}）"}
-                    logger.error(f"预处理失败，退出码: {e.code}")
-                    return
-            except Exception as e:
-                sync_state = {"running": False, "progress": 0, "message": f"预处理失败: {str(e)[:100]}"}
-                logger.error(f"预处理失败: {e}", exc_info=True)
-                return
-            finally:
-                sys.argv = old_argv
-        else:
-            # ── 开发模式：使用subprocess ──
-            process = subprocess.Popen(
-                [sys.executable, '-u', preprocess_script],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                cwd=preprocess_cwd, encoding='utf-8', errors='replace'
-            )
-            
-            preprocess_errors = []
-            for raw_line in process.stdout:
-                parsed = classify_progress_line(raw_line)
-                if parsed is None:
-                    continue
-                level, text = parsed
-                full = raw_line.strip()
-                if level in ('ok', 'info'):
-                    msg = full.replace('[INFO] ', '').replace('[OK] ', '')
-                    sync_state = {"running": True, "progress": min(sync_state["progress"] + 3, 95), "message": msg}
-                    logger.info(f"[preprocess] {full}")
-                elif level == 'warn':
-                    logger.warning(f"[preprocess] {full}")
-                elif level == 'error':
-                    logger.error(f"[preprocess] {full}")
-                    preprocess_errors.append(text)
-                else:
-                    logger.debug(f"[preprocess] {full}")
-                    if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
-                        preprocess_errors.append(full)
-            
-            process.wait()
-            if process.returncode != 0:
-                err_summary = preprocess_errors[-3:] if preprocess_errors else ["详见日志"]
-                sync_state = {"running": False, "progress": 0, "message": f"预处理失败: {'; '.join(err_summary)}"}
-                logger.error(f"预处理失败，返回码: {process.returncode}，错误: {preprocess_errors}")
-                return
-        
-        sync_state = {"running": True, "progress": 100, "message": "同步完成！"}
-        logger.info("同步完成")
+
+        # 同步只负责抓取到 yundocs_data;处理由"更新数据"按钮触发
+        sync_state = {"running": True, "progress": 100, "message": "云同步完成,请点[更新数据]生效"}
+        logger.info("云同步(仅抓取)完成")
         
     except Exception as e:
         sync_state = {"running": False, "progress": 0, "message": f"同步失败: {str(e)}"}
@@ -1231,22 +1250,7 @@ def run_pmis_download():
                                   "progress": min(pmis_state["progress"] + 10, 90),
                                   "message": text}
             active_process.wait()
-        # 下载后立即重跑预处理，使 PMIS 数据并入 analysis_data
-        preprocess_script, pcwd = _find_script("preprocess_data.py")
-        if preprocess_script:
-            pmis_state = {"running": True, "progress": 92, "message": "重新预处理(并入项目域)..."}
-            if getattr(sys, 'frozen', False):
-                _run_script_direct(preprocess_script, 'preprocess_data', pcwd)
-            else:
-                # 开发模式：检查预处理返回码（与 run_import 一致）
-                result = subprocess.run([sys.executable, preprocess_script], cwd=pcwd)
-                if result.returncode != 0:
-                    pmis_state = {"running": False, "progress": 0,
-                                  "message": f"预处理失败（返回码: {result.returncode}）"}
-                    logger.error(f"PMIS 预处理失败，返回码: {result.returncode}")
-                    return
-        pmis_state = {"running": True, "progress": 100, "message": "PMIS 下载并预处理完成"}
-        logger.info("PMIS 下载并预处理完成")
+        pmis_state = {"running": False, "progress": 100, "message": "PMIS 下载完成,请点[更新数据]生效"}
     except Exception as e:
         logger.error(f"PMIS 下载失败: {e}")
         pmis_state = {"running": False, "progress": 0, "message": f"下载失败: {e}"}
@@ -1313,76 +1317,10 @@ def run_import(data):
         with open(os.path.join(yundocs_dir, 'sheet_list.json'), 'w', encoding='utf-8') as f:
             json.dump(sheet_list_data, f, ensure_ascii=False, indent=2)
         
-        import_state = {"running": True, "progress": 50, "message": f"已保存 {len(sheet_list)} 个Sheet，开始预处理..."}
-        logger.info(f"已保存 {len(sheet_list)} 个Sheet，开始预处理")
-        time.sleep(0.5)
-        
-        # 运行预处理脚本
-        preprocess_script, preprocess_cwd = _find_script("preprocess_data.py")
-        if not preprocess_script:
-            import_state = {"running": False, "progress": 0, "message": "预处理脚本不存在，导入失败"}
-            logger.error("预处理脚本不存在，导入失败")
-            return
-        
-        import_state = {"running": True, "progress": 55, "message": "正在预处理数据..."}
-        logger.info("开始预处理导入数据")
-        
-        if getattr(sys, 'frozen', False):
-            # ── 打包模式：直接导入运行 ──
-            try:
-                old_argv = sys.argv[:]
-                sys.argv = [preprocess_script]
-                _run_script_direct(preprocess_script, 'preprocess_data', preprocess_cwd)
-                logger.info("导入预处理完成（直接模式）")
-            except SystemExit as e:
-                if e.code and e.code != 0:
-                    import_state = {"running": False, "progress": 0, "message": f"预处理失败（退出码:{e.code}）"}
-                    logger.error(f"导入预处理失败，退出码: {e.code}")
-                    return
-            except Exception as e:
-                import_state = {"running": False, "progress": 0, "message": f"预处理失败: {str(e)[:100]}"}
-                logger.error(f"导入预处理失败: {e}", exc_info=True)
-                return
-            finally:
-                sys.argv = old_argv
-        else:
-            # ── 开发模式：使用subprocess ──
-            active_process = subprocess.Popen(
-                [sys.executable, '-u', preprocess_script],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                cwd=preprocess_cwd, encoding='utf-8', errors='replace'
-            )
-            
-            preprocess_errors = []
-            for raw_line in active_process.stdout:
-                parsed = classify_progress_line(raw_line)
-                if parsed is None:
-                    continue
-                level, text = parsed
-                full = raw_line.strip()
-                if level in ('ok', 'info'):
-                    msg = full.replace('[INFO] ', '').replace('[OK] ', '')
-                    import_state = {"running": True, "progress": min(import_state["progress"] + 5, 95), "message": msg}
-                    logger.info(f"[import-preprocess] {full}")
-                elif level == 'warn':
-                    logger.warning(f"[import-preprocess] {full}")
-                elif level == 'error':
-                    logger.error(f"[import-preprocess] {full}")
-                    preprocess_errors.append(text)
-                else:
-                    logger.debug(f"[import-preprocess] {full}")
-                    if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'Failed']):
-                        preprocess_errors.append(full)
-            
-            active_process.wait()
-            if active_process.returncode != 0:
-                err_summary = preprocess_errors[-3:] if preprocess_errors else ["详见日志"]
-                import_state = {"running": False, "progress": 0, "message": f"预处理失败: {'; '.join(err_summary)}"}
-                logger.error(f"导入预处理失败，返回码: {active_process.returncode}")
-                return
-        
-        import_state = {"running": True, "progress": 100, "message": "导入完成！"}
-        logger.info("离线导入完成")
+        # 导入只负责落地 yundocs_data;处理由"更新数据"按钮触发
+        import_state = {"running": False, "progress": 100, "message": f"已导入 {len(sheet_list)} 个Sheet,请点[更新数据]生效"}
+        logger.info("离线导入(仅落地)完成")
+        return
         
     except Exception as e:
         import_state = {"running": False, "progress": 0, "message": f"导入失败: {str(e)}"}
