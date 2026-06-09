@@ -48,7 +48,10 @@ def read_pmis_sheet(path: str) -> List[Dict[str, Any]]:
         return []
     import openpyxl
     try:
-        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        # 注意:不用 read_only=True。WPS 导出的 xlsx 其 worksheet dimension 元数据
+        # 不可靠,read_only 模式据此会把行数截断(实测 911 行只读出 1 行)。
+        # 非 read_only 模式按实际单元格遍历,行数正确;PMIS 文件不大(单文件 ≤4772 行),可全量载入。
+        wb = openpyxl.load_workbook(path, data_only=True)
         ws = wb.active
         all_rows = list(ws.iter_rows(values_only=True))
         wb.close()
