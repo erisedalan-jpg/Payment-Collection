@@ -8,6 +8,8 @@ const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
 
 const dq = computed(() => (data.data as any)?.dataQuality ?? null)
+const loaded = computed(() => !!data.data)
+const hasQuality = computed(() => !!dq.value)
 const provided = computed(() => !!dq.value?.summary?.pmisProvided)
 const themes = computed(() => dq.value?.themes ?? [])
 const unmatched = computed(() => dq.value?.unmatched ?? [])
@@ -27,7 +29,13 @@ function exportBackfill() {
 <template>
   <div class="dq-view">
     <h2 class="dq-title">数据治理</h2>
-    <div v-if="!provided" class="dq-empty">
+    <div v-if="!loaded" class="dq-empty">
+      数据加载中或加载失败,请确认后端服务在运行。
+    </div>
+    <div v-else-if="!hasQuality" class="dq-empty">
+      当前数据不含治理信息,请重新同步或导入后再查看。
+    </div>
+    <div v-else-if="!provided" class="dq-empty">
       未提供 PMIS 数据。请到「数据管理」页录入下载链接并下载,或把 PMIS 七个 xlsx 放入 input/pmis/ 后重新同步。
     </div>
     <template v-else>
