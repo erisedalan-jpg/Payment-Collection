@@ -31,10 +31,10 @@
   --c-pending: var(--warn);
   --c-remaining: var(--danger);
   --c-delayed: var(--danger);
-  --c-plan: #6c8fa9;
+  --c-plan: #6c8fa9;        /* 计划回款 */
   --c-urgent: #e07a4f;
 
-  /* 图表分类色（5 套各抽一支） */
+  /* 图表分类色（8 支，源自 5 套基调） */
   --chart-1: #6c8fa9;
   --chart-2: #b484b0;
   --chart-3: #417a64;

@@ -10,6 +10,7 @@ const css = readFileSync(fileURLToPath(new URL('./theme.css', _metaUrl)), 'utf-8
 // :root 与 html.dark 块内均无嵌套花括号，取第一个 '}' 即块尾。
 function block(selector: string): string {
   const start = css.indexOf(selector)
+  if (start === -1) throw new Error(`theme.css 缺少选择器块: ${selector}`)
   const end = css.indexOf('}', start)
   return css.slice(start, end)
 }
