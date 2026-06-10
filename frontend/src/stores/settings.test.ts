@@ -31,7 +31,7 @@ describe('settings store', () => {
     const s = useSettingsStore()
     s.setFontScale('lg')
     expect(localStorage.getItem('font_scale')).toBe('lg')
-    expect(document.documentElement.style.getPropertyValue('--fs-base')).toBe('17px')
+    expect(document.documentElement.style.getPropertyValue('--fs-base')).toBe('18px')
   })
 
   it('reads persisted values and applies them on init', () => {
@@ -42,6 +42,6 @@ describe('settings store', () => {
     expect(s.fontScale).toBe('sm')
     s.init()
     expect(document.documentElement.classList.contains('dark')).toBe(true)
-    expect(document.documentElement.style.getPropertyValue('--fs-base')).toBe('13px')
+    expect(document.documentElement.style.getPropertyValue('--fs-base')).toBe('14px')
   })
 })
