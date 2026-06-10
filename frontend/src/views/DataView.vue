@@ -43,6 +43,7 @@ const inputsInput = ref<HTMLInputElement | null>(null)
 const inputsUploadMsg = ref('')
 async function onUploadInputs() {
   const files = Array.from(inputsInput.value?.files || [])
+  if (!files.length) return
   const ok = await inputsUpload(files)
   inputsUploadMsg.value = `已上传 ${ok}/${files.length} 个项目域文件,请点[更新数据]生效`
   if (inputsInput.value) inputsInput.value.value = ''
