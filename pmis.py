@@ -141,8 +141,14 @@ def _risk_by_pid(rows: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
 
 
 def _jsonable_row(row: Dict[str, Any]) -> Dict[str, Any]:
-    """openpyxl 单元格可能是 datetime，入 JSON 前转 isoformat 字符串。"""
-    return {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in row.items()}
+    """openpyxl 单元格可能是 datetime/timedelta 等,入 JSON 前统一转可序列化值。"""
+    def _conv(v):
+        if v is None or isinstance(v, (str, int, float, bool)):
+            return v
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v)
+    return {k: _conv(v) for k, v in row.items()}
 
 
 def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,

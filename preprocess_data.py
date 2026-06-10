@@ -10,6 +10,7 @@ from collections import defaultdict
 import config
 import schema
 import pmis
+import projects as projects_mod
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -1131,6 +1132,12 @@ def main():
         pid = node.get("projectId", "")
         node["followupRecords"] = followup_records.get(pid, [])
 
+    # === 9a. 读项目映射(售前↔已关闭原项目),供 PMIS 已关闭收录与项目主域使用 ===
+    mapping = projects_mod.read_mapping(os.path.join(BASE_DIR, "input", config.MAPPING_FILE))
+    extra_closed = {m["closed"] for m in mapping}
+    if mapping:
+        print(f"  [OK] 项目映射 {len(mapping)} 条(售前↔已关闭)")
+
     # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
     print("[INFO] 摄取 PMIS 项目域数据...")
     pmis_dir = os.path.join(BASE_DIR, "input", config.PMIS_DIRNAME)
@@ -1143,12 +1150,24 @@ def main():
         if rnum is not None and rnum > 1:
             dirty.append({"type": "回款比例>1", "projectId": n.get("projectId", ""),
                           "field": "actualPaymentRatio", "value": n.get("actualPaymentRatio")})
-    project_pmis, data_quality = pmis.load_project_pmis(pmis_dir, pay_projects, dirty=dirty)
+    project_pmis, data_quality = pmis.load_project_pmis(
+        pmis_dir, pay_projects, dirty=dirty, extra_closed_ids=extra_closed)
     if data_quality["summary"]["pmisProvided"]:
         print(f"  [OK] PMIS 命中在建 {data_quality['summary']['matchedActive']} / "
               f"已关闭 {data_quality['summary']['matchedClosed']} / 未匹配 {data_quality['summary']['unmatched']}")
     else:
         print("  [WARN] 未提供 PMIS 数据(input/pmis/ 为空),数据治理视图将提示去获取")
+
+    # === 9c. 构建项目主域(PMIS在建 ∩ 交付三部,Phase P1) ===
+    print("[INFO] 构建项目主域(交付实施三部)...")
+    dept_projects, projects_quality = projects_mod.load_dept_projects(
+        os.path.join(BASE_DIR, "input"), project_pmis, all_nodes, mapping)
+    if projects_quality["orgFile"]["provided"]:
+        print(f"  [OK] 主域项目 {projects_quality['deptProjectCount']} 个, "
+              f"售前已映射 {projects_quality['presaleMapped']}/{projects_quality['presaleTotal']}, "
+              f"漏网告警 {len(projects_quality['managerNotInOrg'])}")
+    else:
+        print("  [WARN] 未提供 组织架构.xlsx,主域退化为 PMIS 在建全量")
 
     # === 10. 构建最终数据 ===
     final_data = {
@@ -1170,6 +1189,8 @@ def main():
         "followupRecords": followup_records,
         "projectPmis": project_pmis,
         "dataQuality": data_quality,
+        "projects": dept_projects,
+        "projectsQuality": projects_quality,
     }
 
     # === 10. 保存（校验后输出 JSON）===

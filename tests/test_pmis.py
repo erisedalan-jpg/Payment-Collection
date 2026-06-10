@@ -240,6 +240,13 @@ class TestAssembleTeamAndRisks:
         assert len(recs) == 1
         assert recs[0]["登记日期"] == "2026-01-02T03:04:00"  # datetime 必须转 str 才能入 JSON
 
+    def test_risk_records_timedelta_safe(self):
+        import datetime
+        risk_i = {"P1": [{"耗时": datetime.timedelta(hours=1, minutes=30)}]}
+        out = M._assemble("P1", {}, {}, {}, risk_i, "在建")
+        v = out["riskRecords"][0]["耗时"]
+        assert isinstance(v, str)  # 任何非 JSON 原生类型都必须转 str
+
 
 class TestBuildProjectPmisExtraClosed:
     def test_closed_included_via_extra_ids(self):
