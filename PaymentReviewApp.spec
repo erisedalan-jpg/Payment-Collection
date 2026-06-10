@@ -64,6 +64,7 @@ a = Analysis(
         # ── 后端脚本 ──
         ('preprocess_data.py', '.'),
         ('pmis.py', '.'),
+        ('projects.py', '.'),
         ('pmis_download.py', '.'),
         ('config.py', '.'),
         ('schema.py', '.'),
