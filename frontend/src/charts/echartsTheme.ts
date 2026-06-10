@@ -6,50 +6,45 @@ import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from
 // 按需注册 ECharts 模块（tree-shaking）
 use([CanvasRenderer, BarChart, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent])
 
-const PALETTE = ['#6366F1', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#EC4899']
+// canvas 读不到 CSS 变量:以下取值必须与 theme.css 同名令牌逐项一致(第二落地文件,spec 1.7),
+// 由 echartsTheme.tokens.test.ts 双源契约强制 —— 改 theme.css 没改这里(或反之),测试即红。
+export const FONT_SANS = '-apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif'
 
-// 'ent'：浅色（默认，沿用旧版主名，避免破坏既有引用/测试）
+// --chart-1..8(浅/暗)
+export const CHART_LIGHT = ['#6c8fa9', '#b484b0', '#417a64', '#886441', '#d24d5c', '#c8adc4', '#fec187', '#a7c190']
+export const CHART_DARK = ['#7fa5be', '#c29ac0', '#5ba88a', '#b08a63', '#e0697a', '#d2bccf', '#fec187', '#b7cea3']
+
+// 结构色映射:txt=标题/tooltip 文字,sub=轴标签/图例,line=分隔线/tooltip 边,line2=轴线,card=tooltip 底
+export const STRUCT_LIGHT = { txt: '#1e2a33', sub: '#4a5b68', line: '#dde6ee', line2: '#cddae2', card: '#ffffff' }
+export const STRUCT_DARK = { txt: '#e4edf2', sub: '#a7bac7', line: '#253a47', line2: '#2f4756', card: '#16262f' }
+
+function buildTheme(palette: string[], s: typeof STRUCT_LIGHT) {
+  return {
+    color: palette,
+    backgroundColor: 'transparent',
+    textStyle: { fontFamily: FONT_SANS, color: s.txt },
+    title: { textStyle: { color: s.txt } },
+    legend: { textStyle: { color: s.sub } },
+    categoryAxis: {
+      axisLine: { lineStyle: { color: s.line2 } },
+      axisTick: { lineStyle: { color: s.line2 } },
+      axisLabel: { color: s.sub },
+      splitLine: { show: false, lineStyle: { color: s.line } },
+    },
+    valueAxis: {
+      axisLine: { lineStyle: { color: s.line2 } },
+      axisTick: { lineStyle: { color: s.line2 } },
+      axisLabel: { color: s.sub },
+      splitLine: { lineStyle: { color: s.line } },
+    },
+    tooltip: { backgroundColor: s.card, borderColor: s.line, textStyle: { color: s.txt } },
+  }
+}
+
+// 'ent':浅色(沿用旧主题名,避免破坏既有引用/测试)
 export const ENT_THEME = 'ent'
-registerTheme(ENT_THEME, {
-  color: PALETTE,
-  backgroundColor: 'transparent',
-  textStyle: { fontFamily: 'Inter, "Noto Sans SC", sans-serif', color: '#1f2a3d' },
-  title: { textStyle: { color: '#1f2a3d' } },
-  legend: { textStyle: { color: '#5b6b85' } },
-  categoryAxis: {
-    axisLine: { lineStyle: { color: '#d4dbe8' } },
-    axisTick: { lineStyle: { color: '#d4dbe8' } },
-    axisLabel: { color: '#5b6b85' },
-    splitLine: { show: false, lineStyle: { color: '#eef2f8' } },
-  },
-  valueAxis: {
-    axisLine: { lineStyle: { color: '#d4dbe8' } },
-    axisTick: { lineStyle: { color: '#d4dbe8' } },
-    axisLabel: { color: '#5b6b85' },
-    splitLine: { lineStyle: { color: '#e6eaf2' } },
-  },
-  tooltip: { backgroundColor: '#ffffff', borderColor: '#e6eaf2', textStyle: { color: '#1f2a3d' } },
-})
+registerTheme(ENT_THEME, buildTheme(CHART_LIGHT, STRUCT_LIGHT))
 
-// 'ent-dark'：深色
+// 'ent-dark':深色
 export const ENT_THEME_DARK = 'ent-dark'
-registerTheme(ENT_THEME_DARK, {
-  color: PALETTE,
-  backgroundColor: 'transparent',
-  textStyle: { fontFamily: 'Inter, "Noto Sans SC", sans-serif', color: '#e6edf7' },
-  title: { textStyle: { color: '#e6edf7' } },
-  legend: { textStyle: { color: '#8aa0c0' } },
-  categoryAxis: {
-    axisLine: { lineStyle: { color: '#28385a' } },
-    axisTick: { lineStyle: { color: '#28385a' } },
-    axisLabel: { color: '#8aa0c0' },
-    splitLine: { show: false, lineStyle: { color: '#1f2c44' } },
-  },
-  valueAxis: {
-    axisLine: { lineStyle: { color: '#28385a' } },
-    axisTick: { lineStyle: { color: '#28385a' } },
-    axisLabel: { color: '#8aa0c0' },
-    splitLine: { lineStyle: { color: '#1f2c44' } },
-  },
-  tooltip: { backgroundColor: '#111c30', borderColor: '#1f2c44', textStyle: { color: '#e6edf7' } },
-})
+registerTheme(ENT_THEME_DARK, buildTheme(CHART_DARK, STRUCT_DARK))
