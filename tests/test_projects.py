@@ -76,3 +76,62 @@ class TestReadDelivery:
         assert len(rows) == 1
         assert rows[0]["项目编号"] == "WSGF-SS-1"
         assert rows[0]["差旅费_预算金额"] == 1000
+
+
+class TestDeliveryCostsFor:
+    def test_seven_categories_parsed(self):
+        row = {"差旅费_预算金额": "1,000", "差旅费_实际发生": 600,
+               "差旅费_剩余预算": 400, "差旅费_消耗率": "60%"}
+        out = P.delivery_costs_for(row)
+        assert len(out) == len(config.DELIVERY_COST_CATEGORIES)
+        trip = next(i for i in out if i["类别"] == "差旅费")
+        assert trip == {"类别": "差旅费", "预算金额": 1000.0, "实际发生": 600.0,
+                        "剩余预算": 400.0, "消耗率": pytest.approx(0.6)}
+        other = next(i for i in out if i["类别"] == "其他费用")
+        assert other["预算金额"] is None  # 缺列降 None
+
+
+class TestAggregatePayment:
+    def test_sums_and_delayed(self):
+        nodes = [
+            {"isPaymentRelated": True, "expectedPayment": 100.0, "actualPayment": 40.0,
+             "nodeStatus": config.STATUS_DELAYED},
+            {"isPaymentRelated": True, "expectedPayment": 50.0, "actualPayment": 50.0,
+             "nodeStatus": config.STATUS_FULL_PAID},
+            {"isPaymentRelated": False, "expectedPayment": 999.0, "actualPayment": 0.0,
+             "nodeStatus": ""},  # 非回款节点不计
+        ]
+        agg = P.aggregate_payment(nodes)
+        assert agg == {"relatedNodeCount": 2, "expectedTotal": 150.0, "actualTotal": 90.0,
+                       "remainingTotal": 60.0, "paymentRatio": 0.6, "delayedCount": 1}
+
+    def test_zero_expected_ratio_none(self):
+        assert P.aggregate_payment([])["paymentRatio"] is None
+
+
+class TestComputeHealth:
+    def _pm(self, **over):
+        pm = {"progress": {"里程碑进度状态": "正常"},
+              "risk": {"最高等级": "低", "未关闭风险数": 0},
+              "cost": {"超支": False, "消耗比": 0.5}}
+        pm.update(over)
+        return pm
+
+    def test_all_ok(self):
+        h = P.compute_health(self._pm(), delayed_count=0)
+        assert h["overall"] == "健康"
+        assert not any([h["progressAbnormal"], h["riskAbnormal"],
+                        h["costAbnormal"], h["paymentAbnormal"]])
+
+    def test_one_abnormal_is_warn(self):
+        h = P.compute_health(self._pm(progress={"里程碑进度状态": "里程碑滞后"}), 0)
+        assert h["progressAbnormal"] is True and h["overall"] == "关注"
+
+    def test_two_abnormal_is_risk(self):
+        h = P.compute_health(self._pm(risk={"最高等级": "高", "未关闭风险数": 2}), 1)
+        assert h["riskAbnormal"] and h["paymentAbnormal"] and h["overall"] == "风险"
+
+    def test_cost_abnormal_by_ratio_or_overrun(self):
+        assert P.compute_health(self._pm(cost={"超支": True, "消耗比": 0.2}), 0)["costAbnormal"]
+        assert P.compute_health(self._pm(cost={"超支": None, "消耗比": 1.2}), 0)["costAbnormal"]
+        assert not P.compute_health(self._pm(cost={"超支": None, "消耗比": None}), 0)["costAbnormal"]
