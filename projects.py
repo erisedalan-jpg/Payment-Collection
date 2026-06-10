@@ -112,7 +112,8 @@ def aggregate_payment(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
     """四维三态健康度(spec 4.6;阈值集中在此,后续可调)。"""
-    progress_ab = "滞后" in str(pm.get("progress", {}).get("里程碑进度状态") or "")
+    _ms = str(pm.get("progress", {}).get("里程碑进度状态") or "")
+    progress_ab = any(k in _ms for k in config.MILESTONE_DELAYED_KEYWORDS)
     risk = pm.get("risk", {})
     risk_ab = (risk.get("最高等级") == "高") and ((risk.get("未关闭风险数") or 0) > 0)
     cost = pm.get("cost", {})

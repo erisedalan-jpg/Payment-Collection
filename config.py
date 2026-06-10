@@ -30,6 +30,9 @@ NODE_STATUSES = [
     STATUS_FULL_PAID, STATUS_DELAYED, STATUS_ON_TIME,
 ]
 
+# ── 项目健康度:里程碑进度状态的"滞后类"关键词(命中任一即进度异常,取值域实测:正常/延期/严重延期/超期未发布) ──
+MILESTONE_DELAYED_KEYWORDS = ("滞后", "延期", "超期")
+
 # ── PMIS 数据(项目域)──
 PMIS_DIRNAME = "pmis"  # 位于 input/pmis/
 # 在建四表 + 已关闭三表(风险无已关闭变体);键=逻辑名,值=固定文件名

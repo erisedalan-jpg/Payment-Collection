@@ -124,8 +124,18 @@ class TestComputeHealth:
                         h["costAbnormal"], h["paymentAbnormal"]])
 
     def test_one_abnormal_is_warn(self):
-        h = P.compute_health(self._pm(progress={"里程碑进度状态": "里程碑滞后"}), 0)
+        h = P.compute_health(self._pm(progress={"里程碑进度状态": "严重延期"}), 0)
         assert h["progressAbnormal"] is True and h["overall"] == "关注"
+
+    def test_progress_abnormal_overdue_unpublished(self):
+        h = P.compute_health(self._pm(progress={"里程碑进度状态": "超期未发布"}), 0)
+        assert h["progressAbnormal"] is True
+
+    def test_empty_pm_degrades_to_healthy(self):
+        h = P.compute_health({}, 0)
+        assert h["overall"] == "健康"
+        assert not any([h["progressAbnormal"], h["riskAbnormal"],
+                        h["costAbnormal"], h["paymentAbnormal"]])
 
     def test_two_abnormal_is_risk(self):
         h = P.compute_health(self._pm(risk={"最高等级": "高", "未关闭风险数": 2}), 1)
