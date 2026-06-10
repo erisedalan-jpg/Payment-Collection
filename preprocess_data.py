@@ -1137,6 +1137,8 @@ def main():
     extra_closed = {m["closed"] for m in mapping}
     if mapping:
         print(f"  [OK] 项目映射 {len(mapping)} 条(售前↔已关闭)")
+    else:
+        print("  [WARN] 未提供 A.xlsx 项目映射,售前服务项目将标记待映射")
 
     # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
     print("[INFO] 摄取 PMIS 项目域数据...")
@@ -1168,6 +1170,8 @@ def main():
               f"漏网告警 {len(projects_quality['managerNotInOrg'])}")
     else:
         print("  [WARN] 未提供 组织架构.xlsx,主域退化为 PMIS 在建全量")
+    if not projects_quality["deliveryFile"]["provided"]:
+        print("  [WARN] 未提供 delivery_analysis.xlsx,预算核算明细缺失")
 
     # === 10. 构建最终数据 ===
     final_data = {
