@@ -7,6 +7,7 @@
 
 :root {
   --fs-base: 16px;
+  --font-sans: -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
 
   /* 调色板 · 结构色（浅色，蓝色系基调） */
   --bg: #eef3f7;
@@ -16,7 +17,7 @@
   --line2: #cddae2;
   --txt: #1e2a33;
   --sub: #4a5b68;
-  --mut: #7c8a97;
+  --mut: #62707d;
   --accent: #325969;
   --accent2: #6c8fa9;
   --highlight: #c8adc4;
@@ -33,6 +34,19 @@
   --c-delayed: var(--danger);
   --c-plan: #6c8fa9;        /* 计划回款 */
   --c-urgent: #e07a4f;
+  --c-advance: var(--cyan); /* 可提前(原 --cyan 收编,旧名保留兼容) */
+
+  /* 状态三态(V2):填充=上方本色;淡底 12% 自适应底色;文字深字达 4.5:1 */
+  --ok-bg: color-mix(in srgb, var(--ok) 12%, transparent);
+  --warn-bg: color-mix(in srgb, var(--warn) 12%, transparent);
+  --danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
+  --urgent-bg: color-mix(in srgb, var(--c-urgent) 12%, transparent);
+  --advance-bg: color-mix(in srgb, var(--c-advance) 12%, transparent);
+  --ok-text: #37745b;
+  --warn-text: #8a6210;
+  --danger-text: #b93848;
+  --urgent-text: #a84b1d;
+  --advance-text: #066f89;
 
   /* 图表分类色（8 支，源自 5 套基调） */
   --chart-1: #6c8fa9;
@@ -51,6 +65,12 @@
   --fs-4: 1.2rem;    /* 19 卡片标题/小节头 */
   --fs-5: 1.55rem;   /* 25 区块/页面标题 */
   --fs-6: 2.15rem;   /* 34 大数字/KPI 主值 */
+
+  /* 行高三档 + 字距(V2):tight=fs-5/6 大数字标题,dense=fs-1/2/4 表格标签,base=fs-3 正文;字距仅拉丁/数字大写标签 */
+  --lh-tight: 1.15;
+  --lh-dense: 1.4;
+  --lh-base: 1.6;
+  --ls-wide: 0.05em;
 
   /* 间距阶梯（4px 基 / 8px 节奏） */
   --sp-1: 4px;
@@ -81,6 +101,16 @@
   --dur-1: 120ms;
   --dur-2: 200ms;
   --ease: cubic-bezier(.2, 0, 0, 1);
+
+  /* 交互状态层(V2):自绘件五态 default/hover/selected/disabled/focus */
+  --hover-tint: color-mix(in srgb, var(--accent) 6%, transparent);
+  --selected-tint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --disabled-opacity: 0.45;
+
+  /* 层叠阶梯(V2):自绘浮层只准用这三级;弹窗/抽屉/下拉优先用 EP(自带 2000+ 动态管理) */
+  --z-sticky: 100;
+  --z-panel: 1500;
+  --z-toast: 4000;
 
   /* Element Plus 桥接：主色用我们的 accent；亮/暗色阶用 color-mix 派生，
      不支持 color-mix 的浏览器会忽略这些声明、自动回退 EP 内置值（安全降级）。 */
@@ -115,6 +145,18 @@ html.dark {
   --danger: #e0697a;
   --c-plan: #7fa5be;
   --c-urgent: #ec8a60;
+
+  /* 状态三态(暗色,V2):淡底提至 16%;warn/urgent/advance 文字用状态本色,ok/danger 用提亮专值(16% 淡底上实测 ≥4.5:1) */
+  --ok-bg: color-mix(in srgb, var(--ok) 16%, transparent);
+  --warn-bg: color-mix(in srgb, var(--warn) 16%, transparent);
+  --danger-bg: color-mix(in srgb, var(--danger) 16%, transparent);
+  --urgent-bg: color-mix(in srgb, var(--c-urgent) 16%, transparent);
+  --advance-bg: color-mix(in srgb, var(--c-advance) 16%, transparent);
+  --ok-text: #7dbfa3;
+  --warn-text: var(--warn);
+  --danger-text: #ea8b99;
+  --urgent-text: var(--c-urgent);
+  --advance-text: var(--c-advance);
 
   /* 图表分类色（深色） */
   --chart-1: #7fa5be;
@@ -152,7 +194,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--txt);
-  font-family: Inter, "Noto Sans SC", -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color var(--dur-1), color var(--dur-1);
@@ -176,6 +218,9 @@ body {
   gap: var(--gap-card);
   grid-template-columns: repeat(auto-fit, minmax(var(--col-min, 200px), 1fr));
 }
+
+/* 数字排版(V2):金额/百分比/KPI/表格数字列必须挂 —— 等宽数字,列对齐、刷新不跳动。 */
+.u-num { font-variant-numeric: tabular-nums; }
 
 /* 减少动态效果：尊重系统「prefers-reduced-motion」，关闭过渡与动画位移。 */
 @media (prefers-reduced-motion: reduce) {

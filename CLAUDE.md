@@ -72,10 +72,11 @@ pip install playwright && playwright install chromium
 ## 设计底层规范（展示形式）
 
 > 约束**展示形式**(配色/排版/间距/卡片/圆角/阴影/动效/密度)，不规定展示内容。
-> 令牌唯一落地于 `frontend/src/styles/theme.css`；页面只准引用令牌，**不准手写散值**。
+> 令牌落地于 `frontend/src/styles/theme.css`(CSS 唯一落地)与 `frontend/src/charts/echartsTheme.ts`(canvas 同源桥接，契约测试强制一致)；页面只准引用令牌，**不准手写散值**。
 > 完整取值表见 `docs/superpowers/specs/2026-06-10-design-foundation-design.md`。
 
-- **配色**：蓝色系做基调(`--accent` 浅 `#325969`/暗 `#6C8FA9`)，light/dark 两套。**结构色与状态色分离**：状态语义色固定(已回款 `--ok #4E9A7C` / 待回款 `--warn #E0A23B` / 风险延期 `--danger #D24D5C`)，不随基调变。图表分类用 `--chart-1..8`。
+- **配色**：蓝色系做基调(`--accent` 浅 `#325969`/暗 `#6C8FA9`)，light/dark 两套。**结构色与状态色分离**：状态语义色固定(已回款 `--ok #4E9A7C` / 待回款 `--warn #E0A23B` / 风险延期 `--danger #D24D5C` / 可提前 `--c-advance`)，不随基调变。图表分类用 `--chart-1..8`，表达回款状态的图表系列必须用状态色。
+- **状态三态**：带文字的状态标识一律「淡底+深字」(`--ok-bg`+`--ok-text` 等，warn/danger/urgent/advance 同构)；实底 100% 状态色只用于无文字色块；禁止实底+小号白字。
 - **8pt grid**：间距只取 `--sp-1..7`(4/8/12/16/24/32/48)，4px 仅内联半步。
 - **排版严格层级**：六级 `--fs-1..6`(12/14/16/19/25/34 @中)，每级字号·字重·色锁定，不混用。
 - **三档字号**：`--fs-base` 小14 / 中16(默认) / 大18，六级按 rem 整体缩放。
@@ -84,8 +85,13 @@ pip install playwright && playwright install chromium
 - **圆角**：`--r-sm 6` / `--r-md 10` / `--r-lg 14` / `--r-full 999`。
 - **阴影最多两层**：仅 `--shadow-1`(静置) / `--shadow-2`(悬浮)，每级 ≤2 层投影；扁平元素用边框，不加第三种阴影。
 - **可访问性护栏**：muted 蓝/紫(`--accent`/`--accent2`/`--highlight`)不用于小号正文，仅用于大号粗体/图标/填充/图表/边框；小号文字用 `--txt`/`--sub`。
+- **交互状态**：自绘交互件五态齐全(default/hover/selected/disabled/focus)，hover 用 `--hover-tint`、选中用 `--selected-tint`、禁用用 `--disabled-opacity .45`，focus 用全局 `:focus-visible` 规则。
 - **动效**：时长只用 `--dur-1 120ms`(状态反馈)/`--dur-2 200ms`(展开浮层)，缓动 `--ease`，尊重 `prefers-reduced-motion`。
 - **表格密度**：单元格内边距纵 8 横 12，行高随字号档缩放，不另设密度开关。
+- **数字排版**：金额/百分比/KPI/表格数字列必须挂 `.u-num`(tabular-nums)；行高三档 `--lh-tight 1.15`/`--lh-dense 1.4`/`--lh-base 1.6`；大写+字距(`--ls-wide`)仅限拉丁/数字标签，中文不大写不加字距。
+- **字体**：`--font-sans` 系统栈(无 Inter)，body 与 ECharts 同源；前端**禁止外链字体**。
+- **z-index**：自绘浮层只用 `--z-sticky 100`/`--z-panel 1500`/`--z-toast 4000` 三级，弹窗抽屉优先用 Element Plus；禁止散写数字。
+- **断点**：窄屏 `<=768px` / 常规 `<=1200px`(文档常量，优先靠 `.u-grid-auto` 自动换列少写断点)。
 
 ## 5. ⚠️ 最易踩坑：打包模式 vs 开发模式
 
