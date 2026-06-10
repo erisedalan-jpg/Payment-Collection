@@ -79,3 +79,30 @@ class TestPmisSchema:
         assert m.dataQuality.summary.joinRate == pytest.approx(0.98)
         assert m.dataQuality.summary.matchedActive == 1
         assert m.dataQuality.summary.lastPmisUpdate == "2026-06-09 10:00"
+
+
+class TestProjectsContract:
+    def test_minimal_project_validates(self):
+        import schema as S
+        proj = {
+            "projectId": "SF-1", "projectName": "售前服务A", "projectManager": "佘海龙",
+            "orgL4": "黑龙江服务组", "isPresale": True, "relatedClosedId": "SS-99",
+            "payment": {"relatedNodeCount": 1, "expectedTotal": 10.0, "actualTotal": 0.0,
+                        "remainingTotal": 10.0, "paymentRatio": 0.0, "delayedCount": 1},
+            "deliveryCosts": [{"类别": "差旅费", "预算金额": 100.0, "实际发生": None,
+                               "剩余预算": None, "消耗率": None}],
+            "health": {"progressAbnormal": False, "riskAbnormal": False, "costAbnormal": False,
+                       "paymentAbnormal": True, "overall": "关注"},
+        }
+        S.Project.model_validate(proj)
+
+    def test_projects_quality_validates(self):
+        import schema as S
+        S.ProjectsQuality.model_validate({
+            "deptProjectCount": 1,
+            "orgFile": {"provided": True, "rows": 2, "matched": 1, "matchRate": 0.5},
+            "mappingFile": {"provided": False, "rows": 0, "matched": 0, "matchRate": 0.0},
+            "deliveryFile": {"provided": False, "rows": 0, "matched": 0, "matchRate": 0.0},
+            "staffNoProject": [{"name": "杨亮"}],
+            "managerNotInOrg": [], "presaleTotal": 1, "presaleMapped": 1, "presaleUnmapped": [],
+        })

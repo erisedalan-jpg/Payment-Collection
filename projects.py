@@ -139,7 +139,8 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
 def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
                    mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
                    all_nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/回款/成本/健康度。"""
+    """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/回款/成本/健康度。
+    matched=False 守卫为防御性分支(现行 _assemble 恒 matched=True),供未来非 PMIS 来源项目使用。"""
     nodes_by_pid: Dict[str, List[Dict[str, Any]]] = {}
     for n in all_nodes:
         pid = str(n.get("projectId") or "").strip()

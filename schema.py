@@ -127,6 +127,62 @@ class DataQuality(_Base):
     dirty: List[Dict[str, Any]] = []
 
 
+class ProjectPayment(_Base):
+    relatedNodeCount: int = 0
+    expectedTotal: float = 0
+    actualTotal: float = 0
+    remainingTotal: float = 0
+    paymentRatio: Optional[float] = None
+    delayedCount: int = 0
+
+
+class DeliveryCostItem(_Base):
+    类别: str
+    预算金额: Optional[float] = None
+    实际发生: Optional[float] = None
+    剩余预算: Optional[float] = None
+    消耗率: Optional[float] = None
+
+
+class ProjectHealth(_Base):
+    progressAbnormal: bool = False
+    riskAbnormal: bool = False
+    costAbnormal: bool = False
+    paymentAbnormal: bool = False
+    overall: str = "健康"
+
+
+class Project(_Base):
+    projectId: str
+    projectName: str = ""
+    projectManager: str = ""
+    orgL4: str = ""
+    isPresale: bool = False
+    relatedClosedId: str = ""
+    payment: ProjectPayment = ProjectPayment()
+    deliveryCosts: List[DeliveryCostItem] = []
+    health: ProjectHealth = ProjectHealth()
+
+
+class InputFileStat(_Base):
+    provided: bool = False
+    rows: int = 0
+    matched: int = 0
+    matchRate: float = 0.0
+
+
+class ProjectsQuality(_Base):
+    deptProjectCount: int = 0
+    orgFile: InputFileStat = InputFileStat()
+    mappingFile: InputFileStat = InputFileStat()
+    deliveryFile: InputFileStat = InputFileStat()
+    staffNoProject: List[Dict[str, Any]] = []
+    managerNotInOrg: List[Dict[str, Any]] = []
+    presaleTotal: int = 0
+    presaleMapped: int = 0
+    presaleUnmapped: List[Dict[str, Any]] = []
+
+
 class AnalysisData(_Base):
     meta: Meta
     dashboard: Dashboard
@@ -139,6 +195,8 @@ class AnalysisData(_Base):
     followupRecords: Dict[str, Any] = {}
     projectPmis: Dict[str, ProjectPmis] = {}
     dataQuality: Optional[DataQuality] = None
+    projects: List[Project] = []
+    projectsQuality: Optional[ProjectsQuality] = None
 
 
 def validate_and_write_json(final_data: dict, output_dir: str) -> str:
