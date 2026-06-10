@@ -21,4 +21,10 @@ describe('DataView', () => {
     expect(w.find('.dv-btn.primary').exists()).toBe(true)
     expect(w.find('input[type="file"][multiple]').exists()).toBe(true)
   })
+
+  it('渲染项目域数据上传卡', () => {
+    const w = mount(DataView, { global: { stubs: { 'el-input': true, 'el-switch': true } } })
+    expect(w.text()).toContain('项目域数据')
+    expect(w.text()).toContain('组织架构.xlsx')
+  })
 })
