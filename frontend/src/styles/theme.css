@@ -1,34 +1,86 @@
-/* 全局主题变量 + 基线 reset + Element Plus 桥接 + 排版/字号令牌 + 滚动条适配。
+/* 全局主题变量（设计底层规范令牌）+ 基线 reset + Element Plus 桥接 + 滚动条适配。
+   令牌取值与角色见 docs/superpowers/specs/2026-06-10-design-foundation-design.md。
    :root 为浅色；html.dark 覆盖为深色。
-   --fs-base 由 settings store 在运行时写到 <html>；此处给默认值兜底。
-   断点约定（供后续页面用，本文件不强制）：窄屏 <=768px，常规 <=1200px。
-   注：本文件须在 main.ts 中于 element-plus 的 index.css 与 dark/css-vars.css 之后引入，
+   --fs-base 由 settings store 运行时写到 <html>（小14/中16/大18），六级字号按 rem 整体缩放。
+   本文件须在 main.ts 中于 element-plus 的 index.css 与 dark/css-vars.css 之后引入，
        使下面对 --el-* 的覆盖按源码顺序生效。 */
 
 :root {
-  --fs-base: 15px;
+  --fs-base: 16px;
 
-  /* 调色板（浅色） */
-  --bg: #eef2f8;
+  /* 调色板 · 结构色（浅色，蓝色系基调） */
+  --bg: #eef3f7;
   --card: #ffffff;
-  --card2: #fbfcfe;
-  --line: #e6eaf2;
-  --line2: #d4dbe8;
-  --txt: #1f2a3d;
-  --sub: #5b6b85;
-  --mut: #64748b;
-  --accent: #2563eb;
+  --card2: #f6f9fb;
+  --line: #dde6ee;
+  --line2: #cddae2;
+  --txt: #1e2a33;
+  --sub: #4a5b68;
+  --mut: #7c8a97;
+  --accent: #325969;
+  --accent2: #6c8fa9;
+  --highlight: #c8adc4;
   --cyan: #0891b2;
-  --danger: #e11d48;
-  --warn: #f59e0b;
-  --ok: #10b981;
+  --on-accent: #ffffff;
 
-  /* 字号 rem 令牌（随 --fs-base 缩放，供组件引用） */
-  --fs-1: 0.8rem;   /* 标签/角标 */
-  --fs-2: 0.92rem;  /* 次要文字 */
-  --fs-3: 1rem;     /* 正文基准 */
-  --fs-4: 1.2rem;   /* 小标题 */
-  --fs-5: 1.5rem;   /* 大数字/标题 */
+  /* 状态语义色（固定，不随基调变） */
+  --ok: #4e9a7c;
+  --warn: #e0a23b;
+  --danger: #d24d5c;
+  --c-paid: var(--ok);
+  --c-pending: var(--warn);
+  --c-remaining: var(--danger);
+  --c-delayed: var(--danger);
+  --c-plan: #6c8fa9;        /* 计划回款 */
+  --c-urgent: #e07a4f;
+
+  /* 图表分类色（8 支，源自 5 套基调） */
+  --chart-1: #6c8fa9;
+  --chart-2: #b484b0;
+  --chart-3: #417a64;
+  --chart-4: #886441;
+  --chart-5: #d24d5c;
+  --chart-6: #c8adc4;
+  --chart-7: #fec187;
+  --chart-8: #a7c190;
+
+  /* 字号 rem 令牌（随 --fs-base 缩放；px 标注 @中16） */
+  --fs-1: 0.75rem;   /* 12 角标/标签/列头 */
+  --fs-2: 0.875rem;  /* 14 次要/表格元信息 */
+  --fs-3: 1rem;      /* 16 正文基准 */
+  --fs-4: 1.2rem;    /* 19 卡片标题/小节头 */
+  --fs-5: 1.55rem;   /* 25 区块/页面标题 */
+  --fs-6: 2.15rem;   /* 34 大数字/KPI 主值 */
+
+  /* 间距阶梯（4px 基 / 8px 节奏） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* 卡片（统一） */
+  --card-pad: 20px;
+  --gap-card: 16px;
+  --gap-stack: 12px;
+  --gap-section: 24px;
+
+  /* 圆角 */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+
+  /* 阴影（仅两级，每级 ≤2 层） */
+  --shadow-1: 0 1px 2px rgba(30,42,51,.06), 0 2px 8px rgba(30,42,51,.05);
+  --shadow-2: 0 2px 4px rgba(30,42,51,.08), 0 12px 28px rgba(30,42,51,.12);
+
+  /* 动效 */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --ease: cubic-bezier(.2, 0, 0, 1);
 
   /* Element Plus 桥接：主色用我们的 accent；亮/暗色阶用 color-mix 派生，
      不支持 color-mix 的浏览器会忽略这些声明、自动回退 EP 内置值（安全降级）。 */
@@ -39,34 +91,44 @@
   --el-color-primary-light-8: color-mix(in srgb, var(--accent) 20%, #fff);
   --el-color-primary-light-9: color-mix(in srgb, var(--accent) 10%, #fff);
   --el-color-primary-dark-2: color-mix(in srgb, var(--accent) 80%, #000);
-  --el-border-radius-base: 8px;
-
-  /* 语义状态色（回款语义；引用调色板，随主题自动切换） */
-  --c-paid: var(--ok);          /* 已回款 */
-  --c-pending: var(--warn);     /* 待回款/警示 */
-  --c-remaining: var(--danger); /* 待回款缺口 */
-  --c-delayed: var(--danger);   /* 延期 */
-  --c-plan: var(--accent);      /* 计划回款 */
-  --c-urgent: #f97316;          /* 7天内到期(橙)，介于 pending(黄) 与 delayed(红) */
-  /* 彩色填充上的反白前景（文字/图标），两主题恒为白 */
-  --on-accent: #ffffff;
+  --el-border-radius-base: var(--r-md);
 }
 
 html.dark {
-  --bg: #0b1220;
-  --card: #111c30;
-  --card2: #0f1a2c;
-  --line: #1f2c44;
-  --line2: #28385a;
-  --txt: #e6edf7;
-  --sub: #8aa0c0;
-  --mut: #8595ad;
-  --accent: #3b82f6;
+  /* 结构色（深色） */
+  --bg: #0e1a22;
+  --card: #16262f;
+  --card2: #11212a;
+  --line: #253a47;
+  --line2: #2f4756;
+  --txt: #e4edf2;
+  --sub: #a7bac7;
+  --mut: #8295a3;
+  --accent: #6c8fa9;
+  --accent2: #8fb0c4;
+  --highlight: #c8adc4;
   --cyan: #22d3ee;
-  --danger: #fb7185;
-  --warn: #fbbf24;
-  --ok: #34d399;
-  --c-urgent: #fb923c;          /* 7天内到期(橙)，暗色下提亮 */
+
+  /* 状态语义色（深色提亮） */
+  --ok: #5ba88a;
+  --warn: #e6b056;
+  --danger: #e0697a;
+  --c-plan: #7fa5be;
+  --c-urgent: #ec8a60;
+
+  /* 图表分类色（深色） */
+  --chart-1: #7fa5be;
+  --chart-2: #c29ac0;
+  --chart-3: #5ba88a;
+  --chart-4: #b08a63;
+  --chart-5: #e0697a;
+  --chart-6: #d2bccf;
+  --chart-7: #fec187;
+  --chart-8: #b7cea3;
+
+  /* 阴影（深色加重） */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.5), 0 12px 28px rgba(0,0,0,.45);
 
   /* EP 暗色：把 EP 自带深灰统一到我们的深蓝调色板 */
   --el-bg-color: var(--card);
@@ -84,7 +146,7 @@ html.dark {
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { font-size: var(--fs-base, 15px); }
+html { font-size: var(--fs-base, 16px); }
 
 body {
   margin: 0;
@@ -93,7 +155,7 @@ body {
   font-family: Inter, "Noto Sans SC", -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color .15s, color .15s;
+  transition: background-color var(--dur-1), color var(--dur-1);
 }
 
 /* 选区 / 焦点 */
@@ -104,13 +166,23 @@ body {
 * { scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 6px; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: var(--r-sm); }
 ::-webkit-scrollbar-thumb:hover { background: var(--mut); }
 
 /* 自适应栅格：无断点自动换列，--col-min 控制单列最小宽，供卡片/指标区复用。
    断点约定（页面按需用 @media）：窄屏 <=768px，常规 <=1200px。 */
 .u-grid-auto {
   display: grid;
-  gap: 12px;
+  gap: var(--gap-card);
   grid-template-columns: repeat(auto-fit, minmax(var(--col-min, 200px), 1fr));
+}
+
+/* 减少动态效果：尊重系统「prefers-reduced-motion」，关闭过渡与动画位移。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
