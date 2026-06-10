@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V6.4.0**
-- 最近更新：2026-06-10（展示形式底层规范落地，V6.4.0）
+- 当前版本：**V6.5.0**
+- 最近更新：2026-06-10（设计底层规范 V2 增补，V6.5.0）
 - 维护语言：简体中文
 
 ---
@@ -123,6 +123,12 @@ _（无）_
 - S1 双域数据地基完成：PMIS 七表(在建+已关闭)摄取 + 按 projectId join(覆盖约 98%，未匹配 8 全为售前 SF) + projectPmis/dataQuality 入库 + 数据治理视图(记分卡/未匹配/回填/冲突/脏值，可导出) + PMIS 在线下载(链接持久化 data/pmis_links.json)/离线放置(input/pmis/)。已关闭仅作回款补充(∩回款约 158)，不做历史看板。后续：P 项目域看板、S2 回款×项目详情(PMIS-主)、S3 多角色看板。
 - backlog(S1 遗留小项)：① 前端 analysis.ts 中 PMIS Optional 字段经 json-schema-to-typescript 生成 46 个 NoName 别名(可编译，纯生成产物，后续可用 pydantic Field(title=...) 优化)；② 数据治理视图主题/未匹配等集合为 Dict[str,Any] 松类型，前端以局部 any 消费(如需强类型需补前端 item 接口)；③ spec 提到的 `lastPmisUpdate`(上次下载时间)未实现——`pmis_download` 未写时间戳、`dataQuality.summary` 未含该字段、视图未展示;当前无消费方,留待 S2/P 需要时补(写入 data/pmis_links.json + summary)。
 - 手工端到端烟雾测试（需用户执行）：将 7 张 PMIS xlsx 放入 input/pmis/，运行 sync/import 或 python preprocess_data.py，打开 /governance → 期望 join≈98%、命中在建≈462/已关闭≈158/未匹配≈8，导出正常；input/pmis/ 为空时页面显示"未提供 PMIS"，回款各页不受影响。
+
+### ✅ Plan design-foundation-v2 完成（2026-06-10）：设计底层规范 V2 增补（V6.5.0）
+- 分支 **`feat/design-foundation-v2`**，3 任务全完成、`verify.sh` 全绿。
+- V6.5.0（2026-06-10）底层规范 V2：浅色 --mut 加深 #62707D（对比度达标）；状态色三态（填充+淡底 12%/16%+深字，--cyan 收编为 --c-advance，暗色 ok/danger 文字用提亮专值 #7DBFA3/#EA8B99）；交互状态层（--hover-tint/--selected-tint/--disabled-opacity）；数字排版（.u-num tabular-nums + 行高三档 + --ls-wide）；--font-sans 系统栈（移除 Inter）；z-index 三级阶梯；断点入规范。ECharts 主题重写为令牌同源（chart-1..8/结构映射/字体栈），双源契约测试强制一致。仅令牌+文档，现有页面未迁移。spec: docs/superpowers/specs/2026-06-10-design-foundation-design.md（V2）
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → 看板图表配色应变为蓝/紫/绿/棕/红等 8 支分类色（不再是旧紫蓝色系）；切换亮\暗模式图表轴线/文字随主题；列头等弱化文字略加深；字体不再依赖本机 Inter。
+- backlog(V2 遗留小项)：echartsTheme 的 buildTheme 角色映射（axisLine→line2 等）暂无测试守护，待内容层新增图表页时补关键角色断言；双源契约测试 STRUCT 断言 TS 侧未 toLowerCase（失败方向安全，过严不漏放）。
 
 ### ✅ Plan design-foundation 完成（2026-06-10）：展示形式底层规范落地（V6.4.0）
 - 分支 **`feat/design-foundation`**，3 任务全完成、`verify.sh` 全绿。
