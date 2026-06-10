@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V6.3.0**
-- 最近更新：2026-06-09（U2 数据管理页重构完成，V6.3.0）
+- 当前版本：**V6.4.0**
+- 最近更新：2026-06-10（展示形式底层规范落地，V6.4.0）
 - 维护语言：简体中文
 
 ---
@@ -123,6 +123,11 @@ _（无）_
 - S1 双域数据地基完成：PMIS 七表(在建+已关闭)摄取 + 按 projectId join(覆盖约 98%，未匹配 8 全为售前 SF) + projectPmis/dataQuality 入库 + 数据治理视图(记分卡/未匹配/回填/冲突/脏值，可导出) + PMIS 在线下载(链接持久化 data/pmis_links.json)/离线放置(input/pmis/)。已关闭仅作回款补充(∩回款约 158)，不做历史看板。后续：P 项目域看板、S2 回款×项目详情(PMIS-主)、S3 多角色看板。
 - backlog(S1 遗留小项)：① 前端 analysis.ts 中 PMIS Optional 字段经 json-schema-to-typescript 生成 46 个 NoName 别名(可编译，纯生成产物，后续可用 pydantic Field(title=...) 优化)；② 数据治理视图主题/未匹配等集合为 Dict[str,Any] 松类型，前端以局部 any 消费(如需强类型需补前端 item 接口)；③ spec 提到的 `lastPmisUpdate`(上次下载时间)未实现——`pmis_download` 未写时间戳、`dataQuality.summary` 未含该字段、视图未展示;当前无消费方,留待 S2/P 需要时补(写入 data/pmis_links.json + summary)。
 - 手工端到端烟雾测试（需用户执行）：将 7 张 PMIS xlsx 放入 input/pmis/，运行 sync/import 或 python preprocess_data.py，打开 /governance → 期望 join≈98%、命中在建≈462/已关闭≈158/未匹配≈8，导出正常；input/pmis/ 为空时页面显示"未提供 PMIS"，回款各页不受影响。
+
+### ✅ Plan design-foundation 完成（2026-06-10）：展示形式底层规范落地（V6.4.0）
+- 分支 **`feat/design-foundation`**，3 任务全完成、`verify.sh` 全绿。
+- V6.4.0（2026-06-10）展示形式底层规范落地：theme.css 令牌体系（蓝基调结构色/固定状态色/chart-1..8/六级字号/间距/卡片/圆角/阴影/动效），三档字号 14/16/18；仅令牌+文档，现有页面未迁移（留待内容层重构）。spec: docs/superpowers/specs/2026-06-10-design-foundation-design.md
+- 手工端到端烟雾测试（需用户执行）：`python server.py` → 打开首页 → 切换亮/暗模式，观察蓝基调结构色与可读状态色；切换 小/中/大 字号，确认整页通过 :root font-size 14/16/18px 缩放。
 
 ### ✅ Plan U2 完成（2026-06-09）：数据管理页重构（V6.3.0）
 - 分支 **`feat/u2-data-mgmt`**，7 任务全完成、`verify.sh` 全绿（py_compile + ruff + 125 pytest + 323 vitest + typecheck + build）。
