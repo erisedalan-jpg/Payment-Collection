@@ -49,10 +49,20 @@ def _read_header_sheet(path: str, key_header: str) -> List[Dict[str, Any]]:
 
 
 def read_org_names(path: str) -> Tuple[set, set, int]:
-    """组织架构表 → (姓名集合, L4组织集合, 行数)。按"表头含工号"自动选 sheet。"""
+    """组织架构表 → (姓名集合, L4组织集合, 行数)。按"表头含工号"自动选 sheet。
+    若存在 新L3组织 列,仅收 交付实施三部 行(防误放全公司清单);姓名/L4 先 strip 再判空。"""
     rows = _read_header_sheet(path, "工号")
-    names = {str(r.get("姓名")).strip() for r in rows if r.get("姓名")}
-    l4s = {str(r.get("新L4组织")).strip() for r in rows if r.get("新L4组织")}
+    if rows and any(r.get("新L3组织") for r in rows):
+        rows = [r for r in rows if str(r.get("新L3组织") or "").strip() == config.DEPT_L3]
+    names: set = set()
+    l4s: set = set()
+    for r in rows:
+        name = str(r.get("姓名") or "").strip()
+        if name:
+            names.add(name)
+        l4 = str(r.get("新L4组织") or "").strip()
+        if l4:
+            l4s.add(l4)
     return names, l4s, len(rows)
 
 
@@ -124,3 +134,114 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
     overall = "健康" if n == 0 else ("关注" if n == 1 else "风险")
     return {"progressAbnormal": progress_ab, "riskAbnormal": risk_ab,
             "costAbnormal": cost_ab, "paymentAbnormal": pay_ab, "overall": overall}
+
+
+def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
+                   mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
+                   all_nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/回款/成本/健康度。"""
+    nodes_by_pid: Dict[str, List[Dict[str, Any]]] = {}
+    for n in all_nodes:
+        pid = str(n.get("projectId") or "").strip()
+        if pid:
+            nodes_by_pid.setdefault(pid, []).append(n)
+    delivery_by_pid: Dict[str, Dict[str, Any]] = {}
+    for r in delivery_rows:
+        pid = str(r.get("项目编号") or "").strip()
+        if pid:
+            delivery_by_pid.setdefault(pid, r)
+    map_by_current = {m["current"]: m for m in mapping}
+
+    out = []
+    for pid, pm in project_pmis.items():
+        if pm.get("source") != "在建":
+            continue
+        team = pm.get("team", {})
+        manager = str(team.get("项目经理") or "").strip()
+        if org_names and manager not in org_names:
+            continue
+        nodes = nodes_by_pid.get(pid, [])
+        drow = delivery_by_pid.get(pid)
+        name = str(team.get("项目名称") or "").strip()
+        if not name and drow:
+            name = str(drow.get("项目名称") or "").strip()
+        if not name and nodes:
+            name = str(nodes[0].get("projectName") or "").strip()
+        m = map_by_current.get(pid)
+        payment = aggregate_payment(nodes)
+        health = (compute_health(pm, payment["delayedCount"]) if pm.get("matched")
+                  else {"progressAbnormal": False, "riskAbnormal": False, "costAbnormal": False,
+                        "paymentAbnormal": False, "overall": "无数据"})
+        out.append({
+            "projectId": pid,
+            "projectName": name,
+            "projectManager": manager,
+            "orgL4": str(team.get("L4部门") or "").strip(),
+            "isPresale": name.startswith(config.PRESALE_PREFIX),
+            "relatedClosedId": (m["closed"] if m else ""),
+            "payment": payment,
+            "deliveryCosts": delivery_costs_for(drow) if drow else [],
+            "health": health,
+        })
+    out.sort(key=lambda p: p["projectId"])
+    return out
+
+
+def compute_projects_quality(projects: List[Dict[str, Any]],
+                             project_pmis: Dict[str, Dict[str, Any]],
+                             org_names: set, org_l4s: set, org_rows: int,
+                             mapping: List[Dict[str, str]],
+                             delivery_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """项目主域质量(spec 3.6):三文件记分卡 + 人员↔项目双向告警 + 售前映射覆盖。"""
+    proj_ids = {p["projectId"] for p in projects}
+    managers = {p["projectManager"] for p in projects if p["projectManager"]}
+    staff_no_project = sorted(org_names - managers)
+    manager_not_in_org = []
+    if org_names:
+        for pid, pm in project_pmis.items():
+            if pm.get("source") != "在建" or pid in proj_ids:
+                continue
+            team = pm.get("team", {})
+            mgr = str(team.get("项目经理") or "").strip()
+            l4 = str(team.get("L4部门") or "").strip()
+            if l4 in org_l4s and mgr:
+                manager_not_in_org.append({
+                    "projectId": pid,
+                    "projectName": str(team.get("项目名称") or ""),
+                    "manager": mgr,
+                })
+    presale = [p for p in projects if p["isPresale"]]
+    presale_unmapped = [p for p in presale if not p["relatedClosedId"]]
+    mapping_matched = sum(1 for m in mapping if m["current"] in proj_ids)
+    delivery_matched = sum(1 for r in delivery_rows
+                           if str(r.get("项目编号") or "").strip() in proj_ids)
+
+    def stat(provided: bool, rows: int, matched: int) -> Dict[str, Any]:
+        return {"provided": provided, "rows": rows, "matched": matched,
+                "matchRate": round(matched / rows, 4) if rows else 0.0}
+
+    return {
+        "deptProjectCount": len(projects),
+        "orgFile": stat(bool(org_names), org_rows, len(org_names & managers)),
+        "mappingFile": stat(bool(mapping), len(mapping), mapping_matched),
+        "deliveryFile": stat(bool(delivery_rows), len(delivery_rows), delivery_matched),
+        "staffNoProject": [{"name": n} for n in staff_no_project],
+        "managerNotInOrg": sorted(manager_not_in_org, key=lambda x: x["projectId"]),
+        "presaleTotal": len(presale),
+        "presaleMapped": len(presale) - len(presale_unmapped),
+        "presaleUnmapped": [{"projectId": p["projectId"], "projectName": p["projectName"]}
+                            for p in presale_unmapped],
+    }
+
+
+def load_dept_projects(input_dir: str, project_pmis: Dict[str, Dict[str, Any]],
+                       all_nodes: List[Dict[str, Any]],
+                       mapping: List[Dict[str, str]]
+                       ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """读组织架构+delivery → build_projects + 质量。mapping 由调用方先读(9a 也要用)。"""
+    names, l4s, org_rows = read_org_names(os.path.join(input_dir, config.ORG_FILE))
+    delivery = read_delivery(os.path.join(input_dir, config.DELIVERY_FILE))
+    projects = build_projects(project_pmis, names, l4s, mapping, delivery, all_nodes)
+    quality = compute_projects_quality(projects, project_pmis, names, l4s, org_rows,
+                                       mapping, delivery)
+    return projects, quality
