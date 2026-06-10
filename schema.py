@@ -91,6 +91,12 @@ class PmisCustomer(_Base):
     合同总额: Optional[float] = None
 
 
+class PmisTeam(_Base):
+    项目名称: Optional[str] = None
+    项目经理: Optional[str] = None
+    L4部门: Optional[str] = None
+
+
 class ProjectPmis(_Base):
     matched: bool = False
     source: str = ""
@@ -99,6 +105,8 @@ class ProjectPmis(_Base):
     risk: PmisRisk = PmisRisk()
     status: PmisStatus = PmisStatus()
     customer: PmisCustomer = PmisCustomer()
+    team: PmisTeam = PmisTeam()
+    riskRecords: List[Dict[str, Any]] = []
 
 
 class QualitySummary(_Base):
