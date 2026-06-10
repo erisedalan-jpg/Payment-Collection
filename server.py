@@ -36,6 +36,15 @@ def is_valid_pmis_name(name: str) -> bool:
     return bool(name) and name in _PMIS_UPLOAD_NAMES
 
 
+# ── 项目主域上传白名单（防目录穿越/任意写） ──
+_INPUT_UPLOAD_NAMES = set(config.INPUT_UPLOAD_NAMES)
+
+
+def is_valid_input_name(name: str) -> bool:
+    """仅允许 3 个项目主域固定文件名(防目录穿越/任意写)。"""
+    return bool(name) and name in _INPUT_UPLOAD_NAMES
+
+
 # ── Playwright 依赖预导入（确保 PyInstaller 打包时追踪完整依赖链） ──
 if getattr(sys, 'frozen', False):
     # 打包模式：playwright 必须存在，否则同步功能无法使用
@@ -411,6 +420,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_pmis_links_post()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
+        elif parsed.path == '/api/inputs/upload':
+            self.handle_inputs_upload()
         else:
             self.send_response(404)
             self.end_headers()
@@ -881,6 +892,37 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         pmis_dir = os.path.join(BASE_DIR, 'input', config.PMIS_DIRNAME)
         os.makedirs(pmis_dir, exist_ok=True)
         with open(os.path.join(pmis_dir, name), 'wb') as f:
+            f.write(body)
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps({"ok": True, "name": name, "bytes": len(body)}, ensure_ascii=False).encode('utf-8'))
+
+    def handle_inputs_upload(self):
+        """POST /api/inputs/upload?name=<文件名> - 接收原始字节，写入 input/ 根（项目主域三文件）"""
+        qs = parse_qs(urlparse(self.path).query)
+        name = (qs.get('name', [''])[0] or '').strip()
+        if not is_valid_input_name(name):
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
+            return
+        length = int(self.headers.get('Content-Length', 0))
+        if length <= 0:
+            # 空内容不落地,避免写出 0 字节坏文件却报成功
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
+            return
+        body = self.rfile.read(length)
+        input_dir = os.path.join(BASE_DIR, 'input')
+        os.makedirs(input_dir, exist_ok=True)
+        with open(os.path.join(input_dir, name), 'wb') as f:
             f.write(body)
         self.send_response(200)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
