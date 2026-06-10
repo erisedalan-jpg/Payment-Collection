@@ -146,15 +146,15 @@ html.dark {
   --c-plan: #7fa5be;
   --c-urgent: #ec8a60;
 
-  /* 状态三态(暗色,V2):淡底提至 16%,文字直接用状态本色(实测 4.78~8.59 达标) */
+  /* 状态三态(暗色,V2):淡底提至 16%;warn/urgent/advance 文字用状态本色,ok/danger 用提亮专值(16% 淡底上实测 ≥4.5:1) */
   --ok-bg: color-mix(in srgb, var(--ok) 16%, transparent);
   --warn-bg: color-mix(in srgb, var(--warn) 16%, transparent);
   --danger-bg: color-mix(in srgb, var(--danger) 16%, transparent);
   --urgent-bg: color-mix(in srgb, var(--c-urgent) 16%, transparent);
   --advance-bg: color-mix(in srgb, var(--c-advance) 16%, transparent);
-  --ok-text: var(--ok);
+  --ok-text: #7dbfa3;
   --warn-text: var(--warn);
-  --danger-text: var(--danger);
+  --danger-text: #ea8b99;
   --urgent-text: var(--c-urgent);
   --advance-text: var(--c-advance);
 

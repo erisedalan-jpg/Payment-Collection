@@ -55,14 +55,14 @@
 
 | 状态 | 填充(取值不变) | 淡底 | 文字(Light) | 文字(Dark) |
 |---|---|---|---|---|
-| 已回款 | `--ok` | `--ok-bg` | `--ok-text` `#37745B` | `var(--ok)` |
+| 已回款 | `--ok` | `--ok-bg` | `--ok-text` `#37745B` | `#7DBFA3` |
 | 待回款 | `--warn` | `--warn-bg` | `--warn-text` `#8A6210` | `var(--warn)` |
-| 风险延期 | `--danger` | `--danger-bg` | `--danger-text` `#B93848` | `var(--danger)` |
+| 风险延期 | `--danger` | `--danger-bg` | `--danger-text` `#B93848` | `#EA8B99` |
 | 7 天临期 | `--c-urgent` | `--urgent-bg` | `--urgent-text` `#A84B1D` | `var(--c-urgent)` |
 | 可提前 | `--c-advance` | `--advance-bg` | `--advance-text` `#066F89` | `var(--c-advance)` |
 
 - 淡底公式:浅色 `color-mix(in srgb, <状态填充色> 12%, transparent)`,暗色 16%;随所在底色自适应。不支持 `color-mix` 的浏览器忽略该声明 → 无淡底但深字仍可读(安全降级,同 EP 桥接策略)。
-- 文字色已实测:浅色五个值在白卡与各自淡底上全部 ≥4.5:1;暗色直接用状态本色(于暗色卡面实测 4.78~8.59,全达标)。
+- 文字色已实测(以真实使用形态 = 16% 淡底上为准):浅色五个值在白卡与各自淡底上全部 ≥4.5:1;暗色 warn/urgent/advance 用状态本色即达标,ok/danger 本色在淡底上仅 4.21/3.90 不达标,改用提亮专值 `#7DBFA3`/`#EA8B99`(淡底叠 --card/--card2/--bg 实测 5.21~6.44)。
 
 ### 1.4 图表分类色（5 套各抽一支）
 
