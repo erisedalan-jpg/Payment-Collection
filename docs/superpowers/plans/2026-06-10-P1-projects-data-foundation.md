@@ -733,6 +733,8 @@ git add projects.py tests/test_projects.py
 git commit -m "feat(p1): build_projects 主表构建 + 双向告警/售前覆盖质量数据"
 ```
 
+> 评审增补(执行时落地)：read_org_names 改 strip 后判空 + 按 新L3组织==DEPT_L3 过滤(列缺失不过滤)；build_projects 对 matched=False 输出 overall=无数据(spec 4.6 末行)；补读表层降级与守卫用例。
+
 ---
 
 ### Task 5: schema 模型 + main() 集成 + 真实数据冒烟 + 类型再生成
