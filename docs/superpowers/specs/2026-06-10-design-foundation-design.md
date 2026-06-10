@@ -257,7 +257,7 @@ ECharts 画在 canvas 里,读不到 CSS 变量,因此 `frontend/src/charts/echar
 | `--z-toast` | `4000` | 全局通知,压过一切 |
 
 - 弹窗 / 抽屉 / 下拉**优先用 Element Plus 组件**(自带 2000+ 动态 z 管理);自绘浮层只准用上表三级,**禁止散写数字**。
-- 现有 `FollowupRecords.vue` 的 `z-index: 3000` 留待内容层迁移时改为 `--z-panel`。
+- 现有 `FollowupRecords.vue` 的 `z-index: 3000`(`.fr-toasts` 通知堆叠容器)留待内容层迁移时改为 `--z-toast`。
 
 ---
 
