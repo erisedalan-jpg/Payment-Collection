@@ -6,7 +6,7 @@ import { api } from '@/api/client'
 import { useCloudSync } from '@/composables/useCloudSync'
 import { useExcelImport } from '@/composables/useExcelImport'
 import { usePmisSync } from '@/composables/usePmisSync'
-import { useInputFiles } from '../composables/useInputFiles'
+import { useInputFiles } from '@/composables/useInputFiles'
 import { useReprocess } from '@/composables/useReprocess'
 
 const data = useDataStore()
@@ -107,7 +107,7 @@ async function onClear() {
     </div>
 
     <div class="dv-card">
-      <div class="dv-card-title">项目域数据（组织架构 / 项目映射 / 预算核算）</div>
+      <div class="dv-card-head">项目域数据（组织架构 / 项目映射 / 预算核算）</div>
       <div class="dv-row dv-note">离线:将 3 个文件放入 input/ 根目录,或在此多选上传:{{ INPUT_FILE_NAMES.join(' · ') }}。</div>
       <div class="dv-row">
         <input ref="inputsInput" type="file" accept=".xlsx" multiple class="dv-file" />
