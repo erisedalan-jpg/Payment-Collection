@@ -33,7 +33,7 @@
 
 ## 进行中
 
-_（无）_
+- [~] **Phase P 项目主域整体看板**：spec 已与用户逐节确认并定稿（`docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md`，P1-P8 分期），待用户审阅 spec 后出 P1 实施计划。决策记录：原 S2/S3/P 项目域路线**保留记录、不再单独推进**，由本次整体重构吸收；实施依赖用户提供 `input/组织架构.xlsx`、`input/A.xlsx`、`input/delivery_analysis.xlsx`。
 
 ---
 
