@@ -2,13 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
-import type { Project, ProjectPmis, RawNode } from '@/types/analysis'
+import type { Project, ProjectPmis, RawNode, Event } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { formatCellValue } from '@/lib/cellFormat'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupRecords from '@/components/FollowupRecords.vue'
+import EventTimeline from '@/components/EventTimeline.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -113,6 +114,11 @@ const COST_COLS: DataColumn[] = [
 ]
 const costRows = computed(() => (p.value?.deliveryCosts ?? []) as Record<string, any>[])
 
+// —— 右栏:本项目动态(P3;spec 4.2 布局 B 右栏,与 /activity 同构) ——
+const myEvents = computed(() =>
+  (((data.data as any)?.events ?? []) as Event[]).filter((e) => e.projectId === p.value?.projectId),
+)
+
 // —— 原项目（售前整合，两份信息并存：spec 3.2 + 5）——
 const cm = computed(() => (page.value.closedPmis ?? {}) as Record<string, any>)
 const originInfo = computed(() => [
@@ -136,79 +142,87 @@ const originInfo = computed(() => [
     </div>
 
     <template v-else>
-      <div class="pd-head">
-        <h2 class="pd-name">{{ p.projectName || p.projectId }}</h2>
-        <span v-if="stage" class="pd-badge stage">{{ stage }}</span>
-        <span v-if="paused" class="pd-badge paused">已暂停</span>
-        <span v-if="rating" class="pd-badge rating">评级 {{ rating }}</span>
-        <span v-if="p.isPresale" class="pd-badge origin" title="含已关闭原项目信息">原项目</span>
-        <HealthBadge :overall="p.health?.overall || '无数据'" />
-      </div>
-      <div class="pd-meta">
-        <span>编号 <b>{{ p.projectId }}</b></span>
-        <span>客户 <b>{{ m.customer?.最终客户 || '-' }}</b></span>
-        <span>合同总额(万) <b class="u-num">{{ fmtWan(m.customer?.合同总额) }}</b></span>
-        <span>项目经理 <b>{{ p.projectManager || '-' }}</b></span>
-        <span>服务组 <b>{{ p.orgL4 || '-' }}</b></span>
-      </div>
-
-      <div class="pd-metrics">
-        <div v-for="it in metrics" :key="it.k" class="pd-metric">
-          <div class="pd-metric-v u-num">{{ it.v }}</div>
-          <div class="pd-metric-k">{{ it.k }}</div>
-        </div>
-      </div>
-
-      <nav class="pd-tabs">
-        <button v-for="t in TABS" :key="t.key" class="pd-tab" :class="{ active: tab === t.key }" @click="tab = t.key">{{ t.label }}</button>
-        <button v-if="showOrigin" class="pd-tab" :class="{ active: tab === 'origin' }" @click="tab = 'origin'">原项目</button>
-      </nav>
-
-      <section v-if="tab === 'payment'" class="pd-section">
-        <div class="pd-chips">
-          <div v-for="it in paySummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
-        </div>
-        <DataTable :columns="NODE_COLS" :rows="page.nodes" />
-        <div class="pd-section-title">跟进记录</div>
-        <FollowupRecords :project-id="p.projectId" :project-name="p.projectName || ''" />
-      </section>
-
-      <section v-else-if="tab === 'progress'" class="pd-section">
-        <div class="pd-chips">
-          <div v-for="it in progressInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
-        </div>
-      </section>
-
-      <section v-else-if="tab === 'risk'" class="pd-section">
-        <div class="pd-chips">
-          <div v-for="it in riskSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
-        </div>
-        <DataTable v-if="riskRows.length" :columns="riskCols" :rows="riskRows" />
-        <div v-else class="pd-note">无风险记录。</div>
-      </section>
-
-      <section v-else-if="tab === 'cost'" class="pd-section">
-        <div class="pd-chips">
-          <div v-for="it in costSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
-        </div>
-        <DataTable v-if="costRows.length" :columns="COST_COLS" :rows="costRows" :show-count="false" />
-        <div v-else class="pd-note">未提供预算核算明细（delivery_analysis.xlsx）。</div>
-      </section>
-
-      <section v-else-if="tab === 'origin'" class="pd-section">
-        <div v-if="!page.closedId" class="pd-note">待提供映射（A.xlsx）——该售前项目尚无已关闭原项目关联。</div>
-        <template v-else>
-          <div class="pd-note">以下为已关闭原项目信息（标记「原项目」，不计入当前项目汇总）。</div>
-          <div v-if="!page.closedPmis" class="pd-note">该原项目在 PMIS 已关闭项目表中无记录，仅能显示编号。</div>
-          <div class="pd-chips">
-            <div v-for="it in originInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+      <div class="pd-body">
+        <div class="pd-main">
+          <div class="pd-head">
+            <h2 class="pd-name">{{ p.projectName || p.projectId }}</h2>
+            <span v-if="stage" class="pd-badge stage">{{ stage }}</span>
+            <span v-if="paused" class="pd-badge paused">已暂停</span>
+            <span v-if="rating" class="pd-badge rating">评级 {{ rating }}</span>
+            <span v-if="p.isPresale" class="pd-badge origin" title="含已关闭原项目信息">原项目</span>
+            <HealthBadge :overall="p.health?.overall || '无数据'" />
           </div>
-          <template v-if="page.closedNodes.length">
-            <div class="pd-section-title">原项目回款节点（不计入当前汇总）</div>
-            <DataTable :columns="NODE_COLS" :rows="page.closedNodes" :show-count="false" />
-          </template>
-        </template>
-      </section>
+          <div class="pd-meta">
+            <span>编号 <b>{{ p.projectId }}</b></span>
+            <span>客户 <b>{{ m.customer?.最终客户 || '-' }}</b></span>
+            <span>合同总额(万) <b class="u-num">{{ fmtWan(m.customer?.合同总额) }}</b></span>
+            <span>项目经理 <b>{{ p.projectManager || '-' }}</b></span>
+            <span>服务组 <b>{{ p.orgL4 || '-' }}</b></span>
+          </div>
+
+          <div class="pd-metrics">
+            <div v-for="it in metrics" :key="it.k" class="pd-metric">
+              <div class="pd-metric-v u-num">{{ it.v }}</div>
+              <div class="pd-metric-k">{{ it.k }}</div>
+            </div>
+          </div>
+
+          <nav class="pd-tabs">
+            <button v-for="t in TABS" :key="t.key" class="pd-tab" :class="{ active: tab === t.key }" @click="tab = t.key">{{ t.label }}</button>
+            <button v-if="showOrigin" class="pd-tab" :class="{ active: tab === 'origin' }" @click="tab = 'origin'">原项目</button>
+          </nav>
+
+          <section v-if="tab === 'payment'" class="pd-section">
+            <div class="pd-chips">
+              <div v-for="it in paySummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+            </div>
+            <DataTable :columns="NODE_COLS" :rows="page.nodes" />
+            <div class="pd-section-title">跟进记录</div>
+            <FollowupRecords :project-id="p.projectId" :project-name="p.projectName || ''" />
+          </section>
+
+          <section v-else-if="tab === 'progress'" class="pd-section">
+            <div class="pd-chips">
+              <div v-for="it in progressInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+            </div>
+          </section>
+
+          <section v-else-if="tab === 'risk'" class="pd-section">
+            <div class="pd-chips">
+              <div v-for="it in riskSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+            </div>
+            <DataTable v-if="riskRows.length" :columns="riskCols" :rows="riskRows" />
+            <div v-else class="pd-note">无风险记录。</div>
+          </section>
+
+          <section v-else-if="tab === 'cost'" class="pd-section">
+            <div class="pd-chips">
+              <div v-for="it in costSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+            </div>
+            <DataTable v-if="costRows.length" :columns="COST_COLS" :rows="costRows" :show-count="false" />
+            <div v-else class="pd-note">未提供预算核算明细（delivery_analysis.xlsx）。</div>
+          </section>
+
+          <section v-else-if="tab === 'origin'" class="pd-section">
+            <div v-if="!page.closedId" class="pd-note">待提供映射（A.xlsx）——该售前项目尚无已关闭原项目关联。</div>
+            <template v-else>
+              <div class="pd-note">以下为已关闭原项目信息（标记「原项目」，不计入当前项目汇总）。</div>
+              <div v-if="!page.closedPmis" class="pd-note">该原项目在 PMIS 已关闭项目表中无记录，仅能显示编号。</div>
+              <div class="pd-chips">
+                <div v-for="it in originInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+              </div>
+              <template v-if="page.closedNodes.length">
+                <div class="pd-section-title">原项目回款节点（不计入当前汇总）</div>
+                <DataTable :columns="NODE_COLS" :rows="page.closedNodes" :show-count="false" />
+              </template>
+            </template>
+          </section>
+        </div>
+        <aside class="pd-aside">
+          <div class="pd-aside-title">项目动态</div>
+          <EventTimeline :events="myEvents" empty-text="暂无该项目动态" />
+        </aside>
+      </div>
     </template>
   </div>
 </template>
@@ -243,4 +257,8 @@ const originInfo = computed(() => [
 .pd-chip-k { color: var(--mut); }
 .pd-chip-v { color: var(--txt); font-weight: 600; }
 .pd-note { font-size: 12px; color: var(--mut); margin-bottom: 10px; }
+.pd-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.pd-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
+.pd-aside-title { font-weight: 700; font-size: 13px; color: var(--txt); margin-bottom: 8px; }
+@media (max-width: 1200px) { .pd-body { grid-template-columns: 1fr; } }
 </style>
