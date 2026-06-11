@@ -19,10 +19,10 @@ const rows = computed(() =>
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
   ),
 )
-const filters = reactive<ProjectFilters>({ search: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' })
+const filters = reactive<ProjectFilters>({ search: '', orgL4: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' })
 
 // 路由 query → 初始筛选(项目总览风险焦点行带筛选跳入;仅取字符串值)
-const QUERY_KEYS = ['search', 'stage', 'projectStatus', 'health', 'riskLevel', 'paymentStatus', 'presale', 'paused', 'overspend'] as const
+const QUERY_KEYS = ['search', 'orgL4', 'stage', 'projectStatus', 'health', 'riskLevel', 'paymentStatus', 'presale', 'paused', 'overspend'] as const
 for (const k of QUERY_KEYS) {
   const v = route.query[k]
   if (typeof v === 'string' && v) filters[k] = v
@@ -30,6 +30,7 @@ for (const k of QUERY_KEYS) {
 
 const filtered = computed(() => filterProjectRows(rows.value, filters))
 
+const orgOpts = computed(() => distinctOptions(rows.value, 'orgL4'))
 const stageOpts = computed(() => distinctOptions(rows.value, 'stage'))
 const statusOpts = computed(() => distinctOptions(rows.value, 'projectStatus'))
 const riskOpts = computed(() => distinctOptions(rows.value, 'riskLevel'))
@@ -41,6 +42,7 @@ const columns: DataColumn[] = [
   { key: 'projectId', label: '项目编号', width: 190 },
   { key: 'customer', label: '客户' },
   { key: 'projectManager', label: '项目经理', width: 90 },
+  { key: 'orgL4', label: '服务组(L4)', width: 110 },
   { key: 'stage', label: '阶段', width: 90 },
   { key: 'progress', label: '完工%', width: 85, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'riskLevel', label: '风险', width: 85, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
@@ -57,28 +59,32 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
     <h2 class="pv-title">项目清单</h2>
     <div class="toolbar">
       <el-input v-model="filters.search" size="small" placeholder="搜索 项目名/编号/客户/经理" clearable style="width: 230px" />
+      <el-select v-model="filters.orgL4" size="small" clearable placeholder="服务组(L4)" style="width: 120px"
+        :empty-values="['', null, undefined]" :value-on-clear="''">
+        <el-option v-for="o in orgOpts" :key="o" :value="o" :label="o" />
+      </el-select>
       <el-select v-model="filters.stage" size="small" clearable placeholder="阶段" style="width: 110px"
-        :empty-values="[null, undefined]" :value-on-clear="''">
+        :empty-values="['', null, undefined]" :value-on-clear="''">
         <el-option v-for="o in stageOpts" :key="o" :value="o" :label="o" />
       </el-select>
       <el-select v-model="filters.projectStatus" size="small" clearable placeholder="项目状态" style="width: 110px"
-        :empty-values="[null, undefined]" :value-on-clear="''">
+        :empty-values="['', null, undefined]" :value-on-clear="''">
         <el-option v-for="o in statusOpts" :key="o" :value="o" :label="o" />
       </el-select>
       <el-select v-model="filters.health" size="small" clearable placeholder="健康度" style="width: 105px"
-        :empty-values="[null, undefined]" :value-on-clear="''">
+        :empty-values="['', null, undefined]" :value-on-clear="''">
         <el-option v-for="o in HEALTH_OPTS" :key="o" :value="o" :label="o" />
       </el-select>
       <el-select v-model="filters.riskLevel" size="small" clearable placeholder="风险等级" style="width: 105px"
-        :empty-values="[null, undefined]" :value-on-clear="''">
+        :empty-values="['', null, undefined]" :value-on-clear="''">
         <el-option v-for="o in riskOpts" :key="o" :value="o" :label="o" />
       </el-select>
       <el-select v-model="filters.paymentStatus" size="small" clearable placeholder="回款状态" style="width: 105px"
-        :empty-values="[null, undefined]" :value-on-clear="''">
+        :empty-values="['', null, undefined]" :value-on-clear="''">
         <el-option v-for="o in PAY_OPTS" :key="o" :value="o" :label="o" />
       </el-select>
       <el-select v-model="filters.presale" size="small" clearable placeholder="售前整合" style="width: 105px"
-        :empty-values="[null, undefined]" :value-on-clear="''">
+        :empty-values="['', null, undefined]" :value-on-clear="''">
         <el-option value="yes" label="售前整合" />
         <el-option value="no" label="非售前" />
       </el-select>

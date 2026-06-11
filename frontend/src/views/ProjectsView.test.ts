@@ -91,6 +91,16 @@ describe('ProjectsView', () => {
     expect(w.text()).toContain('P-2')       // 关闭标签恢复全量
   })
 
+  it('服务组(L4) query 筛选生效(P5.5)', async () => {
+    seed()
+    await router.push('/projects?orgL4=B组')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect(w.text()).toContain('P-2')
+    expect(w.text()).not.toContain('P-1')
+  })
+
   it('query 初始化既有筛选(riskLevel)', async () => {
     seed()
     await router.push('/projects?riskLevel=中')

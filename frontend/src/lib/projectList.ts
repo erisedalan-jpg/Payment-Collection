@@ -6,6 +6,7 @@ export interface ProjectRow {
   projectName: string
   customer: string
   projectManager: string
+  orgL4: string
   stage: string
   progress: number | null
   projectStatus: string
@@ -23,6 +24,7 @@ export interface ProjectRow {
 
 export interface ProjectFilters {
   search: string
+  orgL4: string
   stage: string
   projectStatus: string
   health: string
@@ -56,6 +58,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       projectName: p.projectName || '-',
       customer: customer.最终客户 || '-',
       projectManager: p.projectManager || '-',
+      orgL4: p.orgL4 || '-',
       stage: prog.项目阶段 || '-',
       progress: typeof prog.完工进展 === 'number' ? prog.完工进展 : null,
       projectStatus: status.项目状态 || '-',
@@ -78,6 +81,7 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
   return rows.filter((r) => {
     // s !== '-'：占位值不参与搜索匹配（如 53% 项目客户缺失为 '-'，搜索单字符 '-' 不应命中它们）
     if (q && ![r.projectName, r.projectId, r.customer, r.projectManager].some((s) => s !== '-' && s.toLowerCase().includes(q))) return false
+    if (f.orgL4 && r.orgL4 !== f.orgL4) return false
     if (f.stage && r.stage !== f.stage) return false
     if (f.projectStatus && r.projectStatus !== f.projectStatus) return false
     if (f.health && r.health !== f.health) return false
@@ -93,6 +97,6 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
 
 /** 下拉选项：从行集取该列出现过的非空值（保插入序，剔除占位 '-'）。
  * 仅服务数据驱动的开放枚举列；health/paymentStatus 是代码定义的闭集，由视图层硬编码选项。 */
-export function distinctOptions(rows: ProjectRow[], key: 'stage' | 'projectStatus' | 'riskLevel'): string[] {
+export function distinctOptions(rows: ProjectRow[], key: 'stage' | 'projectStatus' | 'riskLevel' | 'orgL4'): string[] {
   return [...new Set(rows.map((r) => r[key]).filter((v) => v && v !== '-'))]
 }
