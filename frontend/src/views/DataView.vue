@@ -6,6 +6,7 @@ import { api } from '@/api/client'
 import { useCloudSync } from '@/composables/useCloudSync'
 import { useExcelImport } from '@/composables/useExcelImport'
 import { usePmisSync } from '@/composables/usePmisSync'
+import { useInputFiles } from '@/composables/useInputFiles'
 import { useReprocess } from '@/composables/useReprocess'
 
 const data = useDataStore()
@@ -35,6 +36,17 @@ async function onPmisUpload() {
   const ok = await pmisUpload(files)
   pmisUploadMsg.value = `已上传 ${ok}/${files.length} 个 PMIS 文件,请点[更新数据]生效`
   if (pmisInput.value) pmisInput.value.value = ''  // 清空选择,避免再次点击重复上传同一批
+}
+
+const { upload: inputsUpload, INPUT_FILE_NAMES } = useInputFiles()
+const inputsInput = ref<HTMLInputElement | null>(null)
+const inputsUploadMsg = ref('')
+async function onUploadInputs() {
+  const files = Array.from(inputsInput.value?.files || [])
+  if (!files.length) return
+  const ok = await inputsUpload(files)
+  inputsUploadMsg.value = `已上传 ${ok}/${files.length} 个项目域文件,请点[更新数据]生效`
+  if (inputsInput.value) inputsInput.value.value = ''
 }
 
 onMounted(() => { if (!data.data) data.load(); pmisLoadLinks() })
@@ -93,6 +105,16 @@ async function onClear() {
       </div>
       <div v-if="pmisRunning || pmisProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: pmisProgress + '%' }"></div></div><div class="dv-msg">{{ pmisMessage || '处理中...' }}</div></div>
       <div v-if="pmisUploadMsg" class="dv-row dv-note">{{ pmisUploadMsg }}</div>
+    </div>
+
+    <div class="dv-card">
+      <div class="dv-card-head">项目域数据（组织架构 / 项目映射 / 预算核算）</div>
+      <div class="dv-row dv-note">离线:将 3 个文件放入 input/ 根目录,或在此多选上传:{{ INPUT_FILE_NAMES.join(' · ') }}。</div>
+      <div class="dv-row">
+        <input ref="inputsInput" type="file" accept=".xlsx" multiple class="dv-file" />
+        <button class="dv-btn" @click="onUploadInputs">上传</button>
+      </div>
+      <div v-if="inputsUploadMsg" class="dv-row dv-note">{{ inputsUploadMsg }}</div>
     </div>
 
     <div class="dv-card">

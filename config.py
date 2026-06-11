@@ -30,6 +30,9 @@ NODE_STATUSES = [
     STATUS_FULL_PAID, STATUS_DELAYED, STATUS_ON_TIME,
 ]
 
+# ── 项目健康度:里程碑进度状态的"滞后类"关键词(命中任一即进度异常,取值域实测:正常/延期/严重延期/超期未发布) ──
+MILESTONE_DELAYED_KEYWORDS = ("滞后", "延期", "超期")
+
 # ── PMIS 数据(项目域)──
 PMIS_DIRNAME = "pmis"  # 位于 input/pmis/
 # 在建四表 + 已关闭三表(风险无已关闭变体);键=逻辑名,值=固定文件名
@@ -45,3 +48,15 @@ PMIS_FILES_CLOSED = {
     "status": "项目状态信息数据-已关闭.xlsx",
 }
 PMIS_HEADER_ROW = 2  # PMIS 表表头在第 2 行(第 1 行为合并标题)
+
+# ── 项目主域输入文件(Phase P,位于 input/ 根) ──
+ORG_FILE = "组织架构.xlsx"
+MAPPING_FILE = "A.xlsx"
+DELIVERY_FILE = "delivery_analysis.xlsx"
+INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE]
+DEPT_L3 = "交付实施三部"
+PRESALE_PREFIX = "售前服务"
+DELIVERY_COST_CATEGORIES = [
+    "交付外包服务成本", "交付部门人工成本", "项目直接成本", "差旅费",
+    "业务招待费", "本地交通及通讯费", "其他费用",
+]
