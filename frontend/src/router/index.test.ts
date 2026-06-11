@@ -3,7 +3,7 @@ import { router } from './index'
 
 describe('router', () => {
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/board', '/calendar', '/followup', '/ledger', '/data', '/about', '/projects', '/activity']) {
+    for (const path of ['/', '/board', '/calendar', '/followup', '/ledger', '/data', '/about', '/projects', '/activity', '/payment']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })
@@ -28,8 +28,13 @@ describe('router', () => {
     expect(r.name).toBe('project-detail')
   })
 
-  it('unknown path falls back to dashboard', () => {
+  it('unknown path falls back to overview', () => {
     const r = router.resolve('/nonexistent-xyz')
-    expect(r.name).toBe('dashboard')
+    expect(r.name).toBe('overview')
+  })
+
+  it('/ resolves overview and /payment resolves old dashboard', () => {
+    expect(router.resolve('/').name).toBe('overview')
+    expect(router.resolve('/payment').name).toBe('payment')
   })
 })
