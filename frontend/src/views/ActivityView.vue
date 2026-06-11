@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
-import type { Event } from '@/types/analysis'
+import type { Event, PeriodCompare, PeriodCompareEntry } from '@/types/analysis'
 import { filterEvents, type ActivityFilters } from '@/lib/activity'
 import { fmtWan } from '@/lib/format'
 import SegToggle from '@/components/SegToggle.vue'
@@ -17,26 +17,26 @@ const BASELINES = [
   { value: 'lastMonth', label: '上月' },
 ]
 const baseline = ref('lastSync')
-const entry = computed(() => {
-  const pc = (data.data as any)?.periodCompare
-  return pc ? pc[baseline.value] ?? null : null
+const entry = computed<PeriodCompareEntry | null>(() => {
+  const pc = data.data?.periodCompare
+  return (pc?.[baseline.value as keyof PeriodCompare] ?? null) as PeriodCompareEntry | null
 })
 const compareCards = computed(() => {
   const e = entry.value
   if (!e) return []
   const sign = (n: number) => (n > 0 ? `+${n}` : String(n))
   return [
-    { k: '阶段推进', v: `${e.advancedProjects} 项` },
-    { k: '新增延期节点', v: String(e.newDelayedNodes) },
+    { k: '阶段推进', v: `${e.advancedProjects ?? 0} 项` },
+    { k: '新增延期节点', v: String(e.newDelayedNodes ?? 0) },
     { k: '回款新增(万)', v: fmtWan(e.paymentGained) },
-    { k: '风险净增', v: sign(e.riskNetChange) },
-    { k: '新超支项目', v: String(e.newOverspendProjects) },
+    { k: '风险净增', v: sign(e.riskNetChange ?? 0) },
+    { k: '新超支项目', v: String(e.newOverspendProjects ?? 0) },
     { k: '回款达成率', v: e.paymentRatioChange == null ? '-' : `${sign(e.paymentRatioChange)}pp` },
   ]
 })
 
 // —— 时间线 ——
-const events = computed(() => ((data.data as any)?.events ?? []) as Event[])
+const events = computed(() => (data.data?.events ?? []) as Event[])
 const DOMAINS = [
   { value: '', label: '全部' },
   { value: 'project', label: '项目类' },
