@@ -22,6 +22,9 @@ data/analysis_data.js
 yundocs_data/
 # input/ 为用户放置/上传的真实数据（PMIS 七表、组织架构、项目映射、预算核算），不入库
 input/
+# 快照与事件流（运行时生成，Phase P3）
+data/snapshots/
+data/events.json
 # 本地跟进记录（运行时用户数据）
 data/followup_records.json
 

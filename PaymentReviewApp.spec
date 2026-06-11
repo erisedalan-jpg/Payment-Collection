@@ -65,6 +65,7 @@ a = Analysis(
         ('preprocess_data.py', '.'),
         ('pmis.py', '.'),
         ('projects.py', '.'),
+        ('snapshots.py', '.'),
         ('pmis_download.py', '.'),
         ('config.py', '.'),
         ('schema.py', '.'),

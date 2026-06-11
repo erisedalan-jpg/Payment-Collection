@@ -183,6 +183,34 @@ class ProjectsQuality(_Base):
     presaleUnmapped: List[Dict[str, Any]] = []
 
 
+class Event(_Base):
+    date: str
+    type: str
+    domain: str  # project | payment
+    projectId: str = ""
+    projectName: str = ""
+    summary: str = ""
+    prev: Optional[Any] = None
+    curr: Optional[Any] = None
+    amount: Optional[float] = None
+
+
+class PeriodCompareEntry(_Base):
+    baseDate: str
+    advancedProjects: int = 0
+    newDelayedNodes: int = 0
+    paymentGained: float = 0
+    riskNetChange: int = 0
+    newOverspendProjects: int = 0
+    paymentRatioChange: Optional[float] = None  # 百分点
+
+
+class PeriodCompare(_Base):
+    lastSync: Optional[PeriodCompareEntry] = None
+    lastWeek: Optional[PeriodCompareEntry] = None
+    lastMonth: Optional[PeriodCompareEntry] = None
+
+
 class AnalysisData(_Base):
     meta: Meta
     dashboard: Dashboard
@@ -197,6 +225,8 @@ class AnalysisData(_Base):
     dataQuality: Optional[DataQuality] = None
     projects: List[Project] = []
     projectsQuality: Optional[ProjectsQuality] = None
+    events: List[Event] = []
+    periodCompare: Optional[PeriodCompare] = None
 
 
 def validate_and_write_json(final_data: dict, output_dir: str) -> str:

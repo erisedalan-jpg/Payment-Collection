@@ -106,3 +106,36 @@ class TestProjectsContract:
             "staffNoProject": [{"name": "杨亮"}],
             "managerNotInOrg": [], "presaleTotal": 1, "presaleMapped": 1, "presaleUnmapped": [],
         })
+
+
+def _minimal_analysis_data():
+    return {
+        "meta": {"lastUpdate": "2026-06-11 10:00", "totalProjects": 1, "totalPaymentNodes": 1},
+        "dashboard": {"totalProjectCount": 1, "totalPaymentNodes": 1, "totalPaidNodes": 0},
+        "summary": {}, "rawNodes": [],
+        "projectOverview": {"projects": [], "columns": []},
+    }
+
+
+class TestEventsContract:
+    def test_analysis_data_accepts_events_and_period_compare(self):
+        data = _minimal_analysis_data()
+        data["events"] = [{
+            "date": "2026-06-11", "type": "到账", "domain": "payment",
+            "projectId": "P-1", "projectName": "甲", "summary": "初验款 到账 50.0万",
+            "prev": 0, "curr": 500000.0, "amount": 500000.0,
+        }]
+        data["periodCompare"] = {
+            "lastSync": {"baseDate": "2026-06-10", "advancedProjects": 1, "newDelayedNodes": 2,
+                         "paymentGained": 500000.0, "riskNetChange": -1, "newOverspendProjects": 0,
+                         "paymentRatioChange": 1.5},
+            "lastWeek": None, "lastMonth": None,
+        }
+        m = schema.AnalysisData.model_validate(data)
+        assert m.events[0].type == "到账"
+        assert m.periodCompare.lastSync.paymentGained == 500000.0
+        assert m.periodCompare.lastWeek is None
+
+    def test_events_default_empty(self):
+        m = schema.AnalysisData.model_validate(_minimal_analysis_data())
+        assert m.events == [] and m.periodCompare is None
