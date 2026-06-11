@@ -11,6 +11,7 @@ import config
 import schema
 import pmis
 import projects as projects_mod
+import snapshots as snapshots_mod
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -976,6 +977,37 @@ def compute_service_groups(projects, naguan_map):
     return result, len(focus_projects)
 
 
+def run_snapshot_pipeline(final_data, output_dir, today=None):
+    """9d. 快照/diff/事件/周期对比(Phase P3, spec 3.3)。
+    返回 (events_embed 新在前最多100条, period_compare dict)。
+    时序: 先 diff 既有最新快照(含同日早前一次) → 算周期对比 → 再覆盖写当日快照。"""
+    today = today or datetime.now().strftime("%Y-%m-%d")
+    snap_dir = os.path.join(output_dir, "snapshots")
+    events_path = os.path.join(output_dir, "events.json")
+
+    cur = snapshots_mod.build_snapshot(
+        today, final_data["projects"], final_data["projectPmis"], final_data["rawNodes"])
+
+    dates = snapshots_mod.list_snapshot_dates(snap_dir)
+    baselines = snapshots_mod.pick_baseline_dates(dates, today)
+
+    new_events = []
+    if baselines["lastSync"]:
+        prev = snapshots_mod.load_snapshot(snap_dir, baselines["lastSync"])
+        if prev:
+            new_events = snapshots_mod.diff_snapshots(prev, cur)
+    all_events = snapshots_mod.append_events(events_path, new_events, cap=500)
+
+    period = {}
+    for key in ("lastSync", "lastWeek", "lastMonth"):
+        ds = baselines[key]
+        base = snapshots_mod.load_snapshot(snap_dir, ds) if ds else None
+        period[key] = snapshots_mod.compute_period_compare_entry(ds, base, cur) if base else None
+
+    snapshots_mod.save_snapshot(snap_dir, cur, today=today, keep_days=90)
+    return list(reversed(all_events[-100:])), period
+
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -1196,6 +1228,16 @@ def main():
         "projects": dept_projects,
         "projectsQuality": projects_quality,
     }
+
+    # === 9d. 快照/diff/事件流/周期对比(Phase P3) ===
+    print("[INFO] 生成快照与项目动态...")
+    events_embed, period_compare = run_snapshot_pipeline(final_data, OUTPUT_DIR)
+    final_data["events"] = events_embed
+    final_data["periodCompare"] = period_compare
+    if events_embed:
+        print(f"  [OK] 新事件 {len([e for e in events_embed if e['date'] == datetime.now().strftime('%Y-%m-%d')])} 条,内嵌最近 {len(events_embed)} 条")
+    else:
+        print("  [INFO] 首次快照,暂无变化记录")
 
     # === 10. 保存（校验后输出 JSON）===
     output_file = schema.validate_and_write_json(final_data, OUTPUT_DIR)
