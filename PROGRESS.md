@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.3.0**
-- 最近更新：2026-06-11（P4 项目总览首页上线 + 旧首页迁 /payment，V7.3.0）
+- 当前版本：**V7.4.0**
+- 最近更新：2026-06-11（P5 /insight 项目分析上线，项目域五页齐，V7.4.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1-P3 已合并 master（V7.0.0-V7.2.0）；P4 `/` 项目总览（布局 2）+ 旧首页迁 /payment 已完成（分支 feat/phase-p4-overview 待合并，见下方 Handoff）。下一步 P5（/insight 项目分析，项目域五页齐）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
+- [~] **Phase P 项目主域整体看板**：P1-P4 已合并 master（V7.0.0-V7.3.0）；P5 /insight 项目分析已完成，**项目域五页齐**（分支 feat/phase-p5-insight 待合并，见下方 Handoff）。下一步 P6（回款子域重设计①：回款总览瘦身 + /board+业务分析五 tab 归并为一页）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
 
 ---
 
@@ -125,6 +125,15 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan P5 完成（2026-06-11）：/insight 项目分析，项目域五页齐（V7.4.0）
+- 分支 **`feat/phase-p5-insight`**，5 任务全完成（分级调度：泛型化/lib/弹窗 sonnet、页面 opus、双审合一 opus、设计与收尾主循环），`verify.sh` 全绿（188 pytest + 426 vitest + typecheck + build）。
+- 交付物：`/insight` 三模式（排名柱图 top15+全量表 / 交叉矩阵 / 多行列透视）× 7 维度（阶段/项目状态/风险等级/项目经理/行业/签约形式/健康度，空值归一）× 6 指标（项目数/合同总额/平均完工/平均消耗比/回款完成率 Σ/Σ/延期项目数，rate 无数据=null）；下钻 InsightDrillModal 项目列表 → /project/:id；`lib/pivot` 的 CrossMatrix/PivotResult 泛型化（默认 PivotGroup 零破坏）后 BoardMatrix/PivotTable/DimPicker/ChartBox 直接复用；nav 项目组第四项。**项目域五页齐**（总览/清单/详情/动态/分析）。
+- 设计决策：与回款域 pivot **并行**而非改造（groupByDims/PivotGroup 回款语义不动，P6 归并期再议统一）；交叉模式无堆叠图（rate 指标不可加，YAGNI）；排名图不设色走主题（不效仿 BoardView 硬编码 hex——L-21）。
+- 真实数据验证（opus 双审 python 复算零误差）：项目数 640/合同总额 20418 万/平均完工 45.47%(337 非空)/平均消耗比 58.72%(297)/延期项目 25；行业 42 值（银行 212/运营商 80/金融 78）/项目经理 74 值/阶段 4+未指定。**签约形式当前 640/640 全空** → 单桶"未指定"（PMIS 源列"签约形式分类"无值,数据依赖非 bug）。
+- 评审修正记录：交叉/透视格 rate 无数据曾随 ??0 误显 "0%"（真实 31/128 桶）——格值 NaN 标记、展示层 '-'，与排名表/下钻三处统一（双审 I-1）。
+- 已知测试缺口（双审 M-1/M-2,与仓库既有模式一致暂不补）：交叉模式视图测试未驱动次维选择（BoardMatrix 渲染路径零覆盖,接线已两轮人工核对）；InsightDrillModal 标题格式化经 ModalStub 未直测。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → ① 侧栏「项目」组四项,/insight 默认排名模式（阶段维×项目数,柱图无色板异常）；② 切"行业"维 42 组、表 Top3 银行 212/运营商 80/金融 78；③ 交叉模式选次维"健康度"出矩阵,rate 指标下无数据格显 '-' 非 0%；④ 透视模式选行维出表,点格弹项目列表,点行进详情页；⑤ 签约形式维呈单桶"未指定"（已知数据依赖）。
 
 ### ✅ Plan P4 完成（2026-06-11）：项目总览首页 + 旧首页迁 /payment（V7.3.0）
 - 分支 **`feat/phase-p4-overview`**，4 任务全完成（分级调度：lib/清单扩展 sonnet、总览页+路由让位 opus 双审、设计与收尾主循环），`verify.sh` 全绿（188 pytest + 413 vitest + typecheck + build）。
