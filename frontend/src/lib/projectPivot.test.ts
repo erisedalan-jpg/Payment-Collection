@@ -95,7 +95,7 @@ describe('insightCross / insightPivot', () => {
 
 describe('契约面', () => {
   it('7 维度 6 指标', () => {
-    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '行业', '签约形式', '健康度'])
+    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '行业', '签约形式', '健康度', '评级', '超支', '暂停'])
     expect(INSIGHT_METRICS.map((m) => m.key)).toEqual(['projectCount', 'contractAmount', 'avgProgress', 'avgCostRatio', 'paymentRatio', 'delayedProjects'])
   })
 })
