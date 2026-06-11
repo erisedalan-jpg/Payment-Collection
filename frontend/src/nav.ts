@@ -20,6 +20,7 @@ export const TIER_TABS: TierTab[] = [
 // 项目主域（P2 起逐期补全：P3 项目动态 /activity、P4 项目总览 /、P5 项目分析 /insight）
 export const PROJECT_LINKS: NavLink[] = [
   { label: '项目清单', to: '/projects' },
+  { label: '项目动态', to: '/activity' },
 ]
 
 // 回款重点子域（spec 2：分组低一级呈现；'/' 暂为旧首页，P4 迁 /payment）

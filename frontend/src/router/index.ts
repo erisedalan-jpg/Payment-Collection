@@ -10,6 +10,7 @@ import AboutView from '@/views/AboutView.vue'
 import DataQualityView from '@/views/DataQualityView.vue'
 import ProjectsView from '@/views/ProjectsView.vue'
 import ProjectDetailView from '@/views/ProjectDetailView.vue'
+import ActivityView from '@/views/ActivityView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于)
 declare module 'vue-router' {
@@ -24,6 +25,7 @@ export const router = createRouter({
   routes: [
     { path: '/projects', name: 'projects', component: ProjectsView, meta: { title: '项目清单', hideFilter: true } },
     { path: '/project/:id', name: 'project-detail', component: ProjectDetailView, meta: { title: '项目详情', hideFilter: true } },
+    { path: '/activity', name: 'activity', component: ActivityView, meta: { title: '项目动态', hideFilter: true } },
     { path: '/board', name: 'board', component: BoardView, meta: { title: '多维看板' } },
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
     { path: '/followup', name: 'followup', component: FollowupView, meta: { title: '临期跟进' } },
