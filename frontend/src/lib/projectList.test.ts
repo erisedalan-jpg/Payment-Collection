@@ -36,6 +36,9 @@ describe('paymentStatusOf', () => {
   it('其余 → 回款中', () => {
     expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, actualTotal: 50, remainingTotal: 50 } }))).toBe('回款中')
   })
+  it('remainingTotal 为负(超收) → 已回清', () => {
+    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, actualTotal: 120, remainingTotal: -20 } }))).toBe('已回清')
+  })
 })
 
 describe('buildProjectRows', () => {
@@ -82,6 +85,11 @@ describe('filterProjectRows', () => {
     expect(filterProjectRows(rows, { ...F0, health: '关注' })).toHaveLength(1)
     expect(filterProjectRows(rows, { ...F0, presale: 'yes' })[0].projectId).toBe('QAX-2')
     expect(filterProjectRows(rows, { ...F0, presale: 'no' })[0].projectId).toBe('QABJ-SS-1')
+  })
+  it("搜索 '-' 不命中占位字段(客户缺失为 '-')", () => {
+    // X9 行四个搜索字段中只有 customer 占位 '-' 含连字符 → 不应命中
+    const only = buildProjectRows([proj({ projectId: 'X9', projectName: '纯中文名' })], {})
+    expect(filterProjectRows(only, { ...F0, search: '-' })).toHaveLength(0)
   })
 })
 
