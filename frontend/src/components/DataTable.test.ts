@@ -50,3 +50,16 @@ describe('DataTable row-click', () => {
     expect(w.emitted('row-click')?.[0]?.[0]).toMatchObject({ projectId: 'P1' })
   })
 })
+
+describe('DataTable cell 插槽', () => {
+  it('cell-<key> 插槽覆盖该列默认渲染', async () => {
+    const w = mount(DataTable, {
+      props: { columns: [{ key: 'a', label: 'A' }, { key: 'b', label: 'B' }], rows: [{ a: 'x', b: 'y' }] },
+      slots: { 'cell-a': '<b class="custom-cell">徽章</b>' },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    expect(w.find('.custom-cell').exists()).toBe(true)
+    expect(w.text()).toContain('y') // 未提供插槽的列仍走默认渲染
+  })
+})
