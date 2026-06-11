@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.1.0**
-- 最近更新：2026-06-11（P2 导航收编 + 项目清单 + 项目详情，V7.1.0）
+- 当前版本：**V7.2.0**
+- 最近更新：2026-06-11（P3 快照/diff/事件流 + 项目动态页，V7.2.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1 数据地基已合并 master（V7.0.0）；P2 导航收编 + /projects 清单 + /project/:id 详情已完成（分支 feat/phase-p2-projects-nav 待合并，见下方 Handoff）。下一步 P3（快照/diff/events + /activity 项目动态，节点稳定键此期确认）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
+- [~] **Phase P 项目主域整体看板**：P1/P2 已合并 master（V7.0.0/V7.1.0）；P3 快照/diff/事件流 + /activity 项目动态 + 详情页右栏已完成（分支 feat/phase-p3-activity 待合并，见下方 Handoff）。下一步 P4（`/` 项目总览·布局 2 上线，旧首页迁 /payment）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
 
 ---
 
@@ -105,6 +105,7 @@
 - [ ] **L-17** CORS 收紧后续：上传/导入等写接口加 Origin/Host 校验，防跨站驱动写（配合 L-13）。
 - [ ] **L-18** analysis_data.json 体积优化（现 4.86MB）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）。
 - [ ] **L-19** P2 遗留小项：el-table 行下钻键盘可达性（清单/抽屉/台账等系列页统一处理,对齐 v-activate 约定）；详情页风险表「是否超期」为多行聚合串,70px 列宽靠 tooltip 可读（可加 formatter 摘要）；金额未填但有节点的项目（2/640）回款状态归「回款中」待业务确认是否单列。
+- [ ] **L-20** P3 遗留小项：重复组节点（同项目同名,59 键）中间插/删行会致 #k 位移、diff 产生组内噪声事件（设计已声明,展示侧可考虑同节点多事件轻度合并）；单快照 ~280KB×90 天 ≈ 25MB（节点数翻倍时关注压缩）；/activity 时间范围筛选随事件量积累再加（现仅内嵌 100 条,YAGNI 裁剪）。
 
 ### 🧰 Harness 自身（持续完善）
 - [x] **HX-1** 建立 `CLAUDE.md`（指令层；以其为唯一代理入口，不设 AGENTS.md）
@@ -123,6 +124,15 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan P3 完成（2026-06-11）：快照/diff/事件流 + 项目动态页（V7.2.0）
+- 分支 **`feat/phase-p3-activity`**，9 任务全完成（分级调度：核心算法/集成 opus、常规 sonnet、设计与收尾主循环），`verify.sh` 全绿（py_compile + ruff + 187 pytest + 396 vitest + typecheck + build）。
+- 交付物：`snapshots.py`（build_snapshot 精简快照[项目8字段+节点7字段+agg7项] / diff_snapshots 事件引擎[项目8类+回款5类,config 常量判定] / compute_period_compare_entry 六指标 / 90 天保留+三基线选择+events.json 截断500）；preprocess 9d 段集成（先 diff 旧快照→算对比→再覆盖写,内嵌最新 100 条新在前）；schema Event/PeriodCompare + STAGE_ORDER + 类型同源；前端 lib/activity + EventTimeline 共享组件 + `/activity`（三基线周期对比卡/置灰 + 域筛选/搜索 + 按日时间线）+ 详情页右栏动态（布局 B 完整态,≤1200px 落底,补 P2 推迟项）+ 导航「项目动态」。
+- **节点稳定键决策（spec 3.3 留本期确认）**：`projectId|nodeName#k`，k=同名节点按 rawNodes 原始行序的第 k 次出现（真实数据无天然唯一键：projectId+nodeName 25 组重复/84 行，无期次字段；重复组中间插行仅影响该组内匹配）。
+- 评审修正记录：① 快照管道 try/except 兜底——辅助特性 IO 异常（权限/磁盘满）不得阻断 analysis_data.json 主输出（exe 分发场景实测会连坐）；② load_snapshot 损坏 JSON 按缺失处理（与 append_events 防护一致）；③ 前端去 as any 走生成类型 + 周期对比缺字段 ??0 兜底；④ 零事件非首次运行文案区分"与上次快照相比无变化"。
+- 真实数据验证结论（opus 质量审合成变化实验）：稳定键两次构建完全一致（550 键=isPaymentRelated 节点数，59 个重复序号）；注入 5 类变化恰好产出 6 条预期事件、其余 639 项目/节点零噪声；六指标精确对应注入值；550 节点 diff 0.67ms；状态常量与真实取值域字面一致（延期 35/已全额回款 186 实际存在，无"永不触发"陷阱）。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → ① 首次[更新数据]后 /activity 显示"首次同步，暂无变化记录"、周期对比卡有 lastSync(全 0)；② 改动云文档或 PMIS 数据后再[更新数据]，/activity 出现事件时间线与非零对比值；③ 任一主域项目详情页右栏出现「项目动态」（无事件项目显示空态）；④ data/snapshots/ 出现当日 json、data/events.json 生成且二者不入库（git status 干净）。
+- backlog（P3 遗留并入 🟢 L-20）。
 
 ### ✅ Plan P2 完成（2026-06-11）：导航收编 + 项目清单 + 项目详情（V7.1.0）
 - 分支 **`feat/phase-p2-projects-nav`**，8 任务全完成，按分级调度执行（设计/计划主循环 Fable 5 亲做；实现 sonnet、核心页面 opus；审查按难度分级，T5 双审），`verify.sh` 全绿。
