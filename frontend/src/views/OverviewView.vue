@@ -128,17 +128,19 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
 .ov-risk-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .ov-risk-card { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--card2); border-radius: var(--r-sm); padding: 6px 10px; font-size: 13px; color: var(--txt); cursor: pointer; }
 .ov-risk-card:hover { background: var(--hover-tint); }
+.ov-risk-name { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-pay { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .ov-pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .ov-pay-block { display: block; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; text-decoration: none; }
 .ov-pay-block:hover { background: var(--hover-tint); }
 .ov-pay-bar { height: 8px; background: var(--line); border-radius: var(--r-full); overflow: hidden; margin-bottom: 6px; }
 .ov-pay-fill { height: 100%; background: var(--accent); }
-.ov-pay-v { font-size: 16px; font-weight: 700; color: var(--txt); }
+.ov-pay-v { font-size: 16px; font-weight: 700; color: var(--txt); white-space: nowrap; }
 .ov-pay-k { font-size: 12px; color: var(--mut); margin-top: 2px; }
 .ov-top-item { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: none; background: none; padding: 3px 0; font-size: 12px; color: var(--txt); cursor: pointer; text-align: left; }
 .ov-top-item:hover { color: var(--accent); }
-.ov-top-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* flex:1+min-width:0 缺一不可——flex 子项默认 min-width:auto 不收缩,59 字真实项目名会撑破卡片(同 DelayTopCard.dtc-name 约定) */
+.ov-top-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-empty-mini { font-size: 12px; color: var(--mut); }
 .ov-focus { display: flex; gap: 12px; }
 .ov-focus-card { flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: var(--r-md); font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); }
