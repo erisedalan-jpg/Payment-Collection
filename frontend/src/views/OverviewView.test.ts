@@ -71,6 +71,16 @@ describe('OverviewView', () => {
     expect(w.text()).toContain('60%')                   // 600/1000 fmtRatio
   })
 
+  it('KPI 六卡均带跳转(用户反馈)', async () => {
+    seed()
+    const w = await mountView()
+    const kpis = w.find('.ov-kpis')
+    expect(kpis.findAll('a')).toHaveLength(6)
+    expect(kpis.find('a[href="/projects"]').exists()).toBe(true)
+    expect(kpis.find('a[href="/projects?paused=yes"]').exists()).toBe(true)
+    expect(kpis.find('a[href="/payment"]').exists()).toBe(true)   // 回款达成率
+  })
+
   it('健康度总览:三档计数+四维+风险卡点击跳详情', async () => {
     seed()
     const w = await mountView()
