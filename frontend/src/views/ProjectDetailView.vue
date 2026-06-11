@@ -80,6 +80,15 @@ const progressInfo = computed(() => [
   { k: '里程碑进度状态', v: m.value.progress?.里程碑进度状态 || '-' },
   { k: '计划终验', v: fmtDateCell(m.value.progress?.计划终验) },
 ])
+// 里程碑明细=《项目回款节点（里程碑）清单》各行(P5.5 用户反馈;PMIS 无逐里程碑数据,仅百分比/状态枚举)
+const MILESTONE_COLS: DataColumn[] = [
+  { key: 'nodeName', label: '里程碑/节点' },
+  { key: 'expectedMilestoneDate', label: '计划里程碑日期', width: 120, formatter: (v) => fmtDateCell(v) },
+  { key: 'planDate', label: '计划回款日', width: 110, formatter: (v) => fmtDateCell(v) },
+  { key: 'isMilestoneAchieved', label: '是否达成', width: 90, formatter: (v) => String(v ?? '-') },
+  { key: 'actualDate', label: '实际日期', width: 110, formatter: (v) => fmtDateCell(v) },
+  { key: 'completionStatus', label: '完成状态', width: 130, formatter: (v) => String(v ?? '-') },
+]
 
 // —— 风险 ——
 const riskSummary = computed(() => [
@@ -185,6 +194,9 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in progressInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
+            <div class="pd-section-title">里程碑明细（来源：项目回款节点（里程碑）清单）</div>
+            <DataTable v-if="page.nodes.length" :columns="MILESTONE_COLS" :rows="page.nodes" :show-count="false" />
+            <div v-else class="pd-note">无里程碑节点记录。</div>
           </section>
 
           <section v-else-if="tab === 'risk'" class="pd-section">
@@ -199,6 +211,7 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in costSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
+            <div class="pd-note">汇总出处：PMIS《项目状态信息数据》（消耗比=项目核算÷项目总预算）；下方明细出处：delivery_analysis.xlsx，两者口径独立。</div>
             <DataTable v-if="costRows.length" :columns="COST_COLS" :rows="costRows" :show-count="false" />
             <div v-else class="pd-note">未提供预算核算明细（delivery_analysis.xlsx）。</div>
           </section>

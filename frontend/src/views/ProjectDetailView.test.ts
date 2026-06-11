@@ -25,7 +25,7 @@ function seed() {
     meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] },
     naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
     rawNodes: [
-      { projectId: 'P-1', nodeName: '初验款', planDate: '2026-03-31', expectedPayment: 500000, actualPayment: 0, nodeStatus: '延期', delayDays: 30, tier: '50-100万', isPaymentRelated: true },
+      { projectId: 'P-1', nodeName: '初验款', planDate: '2026-03-31', expectedPayment: 500000, actualPayment: 0, nodeStatus: '延期', delayDays: 30, tier: '50-100万', isPaymentRelated: true, expectedMilestoneDate: '2026-03-01', isMilestoneAchieved: '否', completionStatus: '未到期' },
       { projectId: 'OLD-9', nodeName: '终验款', planDate: '2024-01-01', expectedPayment: 200000, actualPayment: 200000, nodeStatus: '已全额回款', tier: '50万以下', isPaymentRelated: true },
     ],
     projects: [
@@ -80,6 +80,16 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('初验款')       // 节点明细
     expect(w.text()).toContain('延期节点')     // 回款汇总 chip
     expect(w.findComponent({ name: 'FollowupRecords' }).exists()).toBe(true)
+  })
+
+  it('进度里程碑 tab:指标chips+里程碑明细表(P5.5)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '进度里程碑')!.trigger('click')
+    expect(w.text()).toContain('里程碑明细')
+    expect(w.text()).toContain('初验款')
+    expect(w.text()).toContain('未到期')
+    expect(w.text()).toContain('2026-03-01')
   })
 
   it('切风险 tab 显示聚合与明细行', async () => {
