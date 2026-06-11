@@ -2,7 +2,7 @@
 import type { PivotResult } from '@/lib/pivot'
 
 const props = defineProps<{
-  pivot: PivotResult
+  pivot: PivotResult<unknown>
   format: (v: number) => string
 }>()
 const emit = defineEmits<{ 'cell-click': [{ rowKey: string; colKey: string }] }>()
