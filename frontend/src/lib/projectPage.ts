@@ -20,13 +20,14 @@ export function buildProjectPage(
   const project = projects.find((p) => p.projectId === id) ?? null
   if (!project) return { project: null, pmis: null, closedId: '', closedPmis: null, closedNodes: [], nodes: [] }
   const closedId = project.relatedClosedId || ''
+  // 回款表只取 isPaymentRelated 节点——与后端 aggregate_payment 聚合口径一致(chips 与表格计数对得上)
   return {
     project,
     pmis: pmisMap[id] ?? null,
     closedId,
     closedPmis: closedId ? (pmisMap[closedId] ?? null) : null,
-    nodes: rawNodes.filter((n) => n.projectId === id),
-    closedNodes: closedId ? rawNodes.filter((n) => n.projectId === closedId) : [],
+    nodes: rawNodes.filter((n) => n.projectId === id && n.isPaymentRelated),
+    closedNodes: closedId ? rawNodes.filter((n) => n.projectId === closedId && n.isPaymentRelated) : [],
   }
 }
 
