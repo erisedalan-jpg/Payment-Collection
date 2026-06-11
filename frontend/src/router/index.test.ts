@@ -22,6 +22,12 @@ describe('router', () => {
     expect(r.params.tab).toBe('plan')
   })
 
+  it('resolves project detail with id param', () => {
+    const r = router.resolve('/project/QABJ-SS-1')
+    expect(r.params.id).toBe('QABJ-SS-1')
+    expect(r.name).toBe('project-detail')
+  })
+
   it('unknown path falls back to dashboard', () => {
     const r = router.resolve('/nonexistent-xyz')
     expect(r.name).toBe('dashboard')
