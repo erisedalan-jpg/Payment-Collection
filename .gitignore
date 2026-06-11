@@ -20,6 +20,8 @@ data/analysis_data.json
 data/analysis_data.js
 # yundocs_data/ 由 fetch_yundocs_full.py 抓取，含真实业务数据，不入库
 yundocs_data/
+# input/ 为用户放置/上传的真实数据（PMIS 七表、组织架构、项目映射、预算核算），不入库
+input/
 # 本地跟进记录（运行时用户数据）
 data/followup_records.json
 

@@ -140,6 +140,17 @@ def _risk_by_pid(rows: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     return out
 
 
+def _jsonable_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """openpyxl 单元格可能是 datetime/timedelta 等,入 JSON 前统一转可序列化值。"""
+    def _conv(v):
+        if v is None or isinstance(v, (str, int, float, bool)):
+            return v
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v)
+    return {k: _conv(v) for k, v in row.items()}
+
+
 def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
               risk_i: Dict, source: str) -> Dict[str, Any]:
     """将四张表的索引合并为单个项目的维度 dict。"""
@@ -176,6 +187,12 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
             "行业": (b.get("行业中类") or None),
             "合同总额": parse_pmis_money(b.get("合同总额（元）")),
         },
+        "team": {
+            "项目名称": (c.get("项目名称") or b.get("项目名称") or None),
+            "项目经理": (c.get("项目经理") or b.get("项目经理（FR）") or None),
+            "L4部门": (b.get("项目经理L4部门") or None),
+        },
+        "riskRecords": [_jsonable_row(r) for r in risk_i.get(pid, [])],
     }
 
 
@@ -290,8 +307,9 @@ def compute_data_quality(project_pmis: Dict[str, Dict[str, Any]],
 
 def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
                        closed: Dict[str, List[Dict[str, Any]]],
-                       payment_project_ids: set) -> Dict[str, Dict[str, Any]]:
-    """在建全量入库;已关闭仅收 ∩ 回款。优先在建(同 pid 不被已关闭覆盖)。"""
+                       payment_project_ids: set,
+                       extra_closed_ids: Optional[set] = None) -> Dict[str, Dict[str, Any]]:
+    """在建全量入库;已关闭收 ∩(回款 ∪ extra_closed_ids[售前映射目标])。优先在建(同 pid 不被已关闭覆盖)。"""
     a_base = _index_by_pid(active.get("base", []))
     a_center = _index_by_pid(active.get("center", []))
     a_status = _index_by_pid(active.get("status", []))
@@ -303,17 +321,20 @@ def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
     c_center = _index_by_pid(closed.get("center", []))
     c_status = _index_by_pid(closed.get("status", []))
     c_risk = _risk_by_pid(closed.get("risk", []))
+    include_closed = payment_project_ids | (extra_closed_ids or set())
     for pid in (c_base.keys() | c_center.keys() | c_status.keys()):
-        if pid in payment_project_ids and pid not in out:
+        if pid in include_closed and pid not in out:
             out[pid] = _assemble(pid, c_base, c_center, c_status, c_risk, "已关闭")
     return out
 
 
 def load_project_pmis(pmis_dir: str, payment_projects_or_ids, dirty=None,
+                      extra_closed_ids=None,
                       ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
     """读 input/pmis/ 下七表 → build_project_pmis + compute_data_quality。
     payment_projects_or_ids: 回款项目列表(dict 含 projectId/projectName)或 id 集合。
     dirty: 回款侧脏值清单(由调用方扫描),透传给 compute_data_quality。
+    extra_closed_ids: 售前映射目标中的已关闭项目编号集合,扩大已关闭收录范围。
     目录/文件缺失 → 返回 ({}, 质量{pmisProvided:False})。"""
     if isinstance(payment_projects_or_ids, set):
         pay_projects = [{"projectId": pid, "projectName": ""} for pid in payment_projects_or_ids]
@@ -338,7 +359,7 @@ def load_project_pmis(pmis_dir: str, payment_projects_or_ids, dirty=None,
         dq = compute_data_quality({}, pay_projects, dirty)
         dq['summary']['lastPmisUpdate'] = pmis_data_time(pmis_dir)
         return {}, dq
-    project_pmis = build_project_pmis(active, closed, pay_ids)
+    project_pmis = build_project_pmis(active, closed, pay_ids, extra_closed_ids)
     dq = compute_data_quality(project_pmis, pay_projects, dirty)
     dq['summary']['lastPmisUpdate'] = pmis_data_time(pmis_dir)
     return project_pmis, dq

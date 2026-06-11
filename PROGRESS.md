@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V6.5.0**
-- 最近更新：2026-06-10（设计底层规范 V2 增补，V6.5.0）
+- 当前版本：**V7.0.0**
+- 最近更新：2026-06-10（P1 项目主域数据地基完成，V7.0.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-_（无）_
+- [~] **Phase P 项目主域整体看板**：P1 数据地基已完成（分支 feat/phase-p-project-domain 待合并 master，见下方 Handoff）。下一步 P2（导航收编 + /projects 清单 + /project/:id 详情）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
 
 ---
 
@@ -50,9 +50,10 @@ _（无）_
 - [x] **H-5** `sync_state/import_state/followup_sync_state` 多线程读写加锁（配合 B-1）。（A2 完成：followup_sync_state 加锁；sync_state/import_state 整体重赋值原子）
 - [x] **H-6** `followup_sync_state` 只增不删，成功后清理，防内存缓慢增长。（A2 完成：_set_followup_state 限容）
 - [ ] **H-7** `server.py:130 _get_node_action_date` 不再用正则扫 2.2MB 的 JS 文本；让 `preprocess_data.py` 额外输出结构化 JSON 供后端直接读。 (部分由 A1 完成：已输出结构化 analysis_data.json + schema 校验)
-- [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。 (部分由 A3 完成：解析逻辑已提取复用)
+- [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。 (部分由 A3 完成：解析逻辑已提取复用)；上传 handler 镜像对(handle_pmis_upload/handle_inputs_upload)也一并抽取,并包 PermissionError/ValueError 返回 JSON 错误(文件被 Excel 占用/Content-Length 非法时现为裸断连接)
 - [x] **A3** server.py API 契约与进度健壮性：统一错误响应 {success,code,message} 收口各 handler；进度解析提取为可测 classify_progress_line（run_sync/run_import 三处循环复用，含 ok/info 合并贴近原逻辑，H-8 部分达成）；跟进云写入串行锁 _write_followup_lock（防 WPS 并发覆盖）。
 - [ ] **A4** Playwright 脚本健壮性（需浏览器/云文档手验）：fetch_yundocs_full.py 抓取分块超时/重试；write_followup.py 把手工引号/换行转义改为 json.dumps；脚本输出改 JSON 行协议（与 classify_progress_line 对接）。
+- [ ] **P8-pre** 治理页重设计时的质量数据细分备忘：mappingFile matchRate 0.671 需拆分（75 条映射不在 PMIS=陈旧、68 条 closed、9 条被部门筛除）；增加"L4 命中但项目经理为空"告警；projectsQuality 三个 List[Dict] 收紧为带字段模型。
 
 ### 🟡 中（前端架构，较大重构，需在测试保护下分步做）
 - [ ] **M-9** `app.js` 按页面拆分 ES Modules，事件委托替代内联 `onclick`。
@@ -100,6 +101,9 @@ _（无）_
 - [ ] **L-13** 收紧 CORS（去掉 `Access-Control-Allow-Origin: *`）。
 - [ ] **L-14** `index.html:143` 硬编码内网地址改为配置项/留空。
 - [ ] **L-15** 跨平台一致性：macOS 下 taskkill/netstat/快捷方式逻辑失效，明确提示或补实现。
+- [ ] **L-16** 上传卡反馈改进（pmis+inputs 两卡）：白名单外文件跳过时提示原因、ok=0 时去掉"请点[更新数据]"后缀、fetch 网络异常捕获提示。
+- [ ] **L-17** CORS 收紧后续：上传/导入等写接口加 Origin/Host 校验，防跨站驱动写（配合 L-13）。
+- [ ] **L-18** analysis_data.json 体积优化（现 4.86MB）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）。
 
 ### 🧰 Harness 自身（持续完善）
 - [x] **HX-1** 建立 `CLAUDE.md`（指令层；以其为唯一代理入口，不设 AGENTS.md）
@@ -110,6 +114,7 @@ _（无）_
 - [ ] **HX-5** 扩展验证：Playwright 端到端冒烟（页面可加载、看板有数）
 - [ ] **HX-6** 为 `preprocess_data.py` 的计算函数（compute_dashboard 等）补集成测试（需小样本 fixture）。注：compute_* 已接收数据参数=可测，仅 `process_followup_records()` 需先解耦 I/O (部分由 A1 完成：compute_node_status 已单测；计算层 compute_dashboard/tier 集成测试起步)
 - [ ] **HX-8** ruff 渐进式扩规则：存量整改后逐步打开 F401→E→I
+- [ ] **HX-9** verify.sh 加类型同源漂移护栏：跑 `npm run gen:types` 后 `git diff --exit-code frontend/src/types/analysis.ts`（本期曾发现 schema 改动漏再生成）。
 - [x] **A1** 数据契约与配置地基：config.py + schema.py（pydantic 契约/校验/JSON Schema 导出）+ assign_tier/compute_node_status 纯函数 + 管道集成测试 + preprocess 输出校验后的 analysis_data.json
 
 > 验证基线：`bash verify.sh` 四步全绿（py_compile + ruff + 75 项 pytest + 前端 typecheck/vitest/build）。
@@ -123,6 +128,14 @@ _（无）_
 - S1 双域数据地基完成：PMIS 七表(在建+已关闭)摄取 + 按 projectId join(覆盖约 98%，未匹配 8 全为售前 SF) + projectPmis/dataQuality 入库 + 数据治理视图(记分卡/未匹配/回填/冲突/脏值，可导出) + PMIS 在线下载(链接持久化 data/pmis_links.json)/离线放置(input/pmis/)。已关闭仅作回款补充(∩回款约 158)，不做历史看板。后续：P 项目域看板、S2 回款×项目详情(PMIS-主)、S3 多角色看板。
 - backlog(S1 遗留小项)：① 前端 analysis.ts 中 PMIS Optional 字段经 json-schema-to-typescript 生成 46 个 NoName 别名(可编译，纯生成产物，后续可用 pydantic Field(title=...) 优化)；② 数据治理视图主题/未匹配等集合为 Dict[str,Any] 松类型，前端以局部 any 消费(如需强类型需补前端 item 接口)；③ spec 提到的 `lastPmisUpdate`(上次下载时间)未实现——`pmis_download` 未写时间戳、`dataQuality.summary` 未含该字段、视图未展示;当前无消费方,留待 S2/P 需要时补(写入 data/pmis_links.json + summary)。
 - 手工端到端烟雾测试（需用户执行）：将 7 张 PMIS xlsx 放入 input/pmis/，运行 sync/import 或 python preprocess_data.py，打开 /governance → 期望 join≈98%、命中在建≈462/已关闭≈158/未匹配≈8，导出正常；input/pmis/ 为空时页面显示"未提供 PMIS"，回款各页不受影响。
+
+### ✅ Plan P1 完成（2026-06-10）：项目主域数据地基（V7.0.0）
+- 分支 **`feat/phase-p-project-domain`**，8 任务全完成（每任务经规范+质量双审），`verify.sh` 全绿（py_compile + ruff + 164 pytest + 348 vitest + typecheck + build）。
+- 交付物：`projects.py`（三输入文件读表[自动选 sheet/无表头映射/优雅降级] + 筛三部 + 售前映射 + 回款/成本聚合 + 四维健康度 + 质量数据）；`pmis.py` 扩展（team 段/风险明细 jsonable[含 timedelta 兜底]/已关闭收录含售前映射目标）；schema 6 新模型（Project 链）+ main() 9a/9c 集成 + gen:types 同源；`/api/inputs/upload`（白名单防穿越）+ DataView「项目域数据」上传卡；打包 datas 补 projects.py（frozen 双模式坑）。
+- 真实数据基线（回归哨兵，后续期次冒烟对照）：主域项目 **640**（在建 911 筛三部）、售前 317（已映射 310/未映射 7）、漏网告警 managerNotInOrg 21、无项目人员 11、org 85 行/mapping 462 条/delivery 910 行、健康度 547 健康/82 关注/11 风险；analysis_data.json 3.07→4.86MB。
+- 评审修正记录（计划 bug 被双审拦截）：① 进度健康度判定由子串"滞后"改 config.MILESTONE_DELAYED_KEYWORDS 关键词集合（真实取值域 正常/延期/严重延期/超期未发布，原字面量 0/911 命中）；② PaymentReviewApp.spec datas 漏 projects.py（exe 版 ModuleNotFoundError，开发模式测不出）；③ DataView 新卡类名对齐 dv-card-head + 空选择守卫。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → 数据管理页出现「项目域数据」卡；上传或放置三文件到 input/ 后点[更新数据]；确认 data/analysis_data.json 含 projects（640 个）与 projectsQuality（售前映射/漏网告警数字与上面基线一致）。
+- backlog（P1 遗留小项已并入 Backlog 节）：上传 handler 异常包裹、CORS 校验、gen:types 漂移护栏、JSON 体积优化、治理页 matchRate 细分等，见 🟠/🟢 各节新条目。
 
 ### ✅ Plan design-foundation-v2 完成（2026-06-10）：设计底层规范 V2 增补（V6.5.0）
 - 分支 **`feat/design-foundation-v2`**，3 任务全完成、`verify.sh` 全绿（py_compile + ruff + 125 pytest + 344 vitest + typecheck + build）。

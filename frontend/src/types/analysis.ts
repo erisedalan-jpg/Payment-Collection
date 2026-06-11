@@ -56,6 +56,12 @@ export type NoName19 = string | null;
 export type NoName20 = string | null;
 export type NoName21 = string | null;
 export type NoName22 = number | null;
+export type NoName23 = string | null;
+export type NoName24 = string | null;
+export type L4 = string | null;
+export type Riskrecords = {
+  [k: string]: unknown;
+}[];
 export type Pmisprovided = boolean;
 export type Joinrate = number;
 export type Matchedactive = number;
@@ -77,6 +83,46 @@ export type Conflicts = {
 export type Dirty = {
   [k: string]: unknown;
 }[];
+export type Projectid1 = string;
+export type Projectname1 = string;
+export type Projectmanager = string;
+export type Orgl4 = string;
+export type Ispresale = boolean;
+export type Relatedclosedid = string;
+export type Relatednodecount = number;
+export type Expectedtotal = number;
+export type Actualtotal = number;
+export type Remainingtotal = number;
+export type Paymentratio = number | null;
+export type Delayedcount = number;
+export type NoName25 = string;
+export type NoName26 = number | null;
+export type NoName27 = number | null;
+export type NoName28 = number | null;
+export type NoName29 = number | null;
+export type Deliverycosts = DeliveryCostItem[];
+export type Progressabnormal = boolean;
+export type Riskabnormal = boolean;
+export type Costabnormal = boolean;
+export type Paymentabnormal = boolean;
+export type Overall = string;
+export type Projects1 = Project[];
+export type Deptprojectcount = number;
+export type Provided = boolean;
+export type Rows = number;
+export type Matched1 = number;
+export type Matchrate = number;
+export type Staffnoproject = {
+  [k: string]: unknown;
+}[];
+export type Managernotinorg = {
+  [k: string]: unknown;
+}[];
+export type Presaletotal = number;
+export type Presalemapped = number;
+export type Presaleunmapped = {
+  [k: string]: unknown;
+}[];
 
 export interface AnalysisData {
   meta: Meta;
@@ -90,6 +136,8 @@ export interface AnalysisData {
   followupRecords?: Followuprecords1;
   projectPmis?: Projectpmis;
   dataQuality?: DataQuality | null;
+  projects?: Projects1;
+  projectsQuality?: ProjectsQuality | null;
   [k: string]: unknown;
 }
 export interface Meta {
@@ -154,6 +202,8 @@ export interface ProjectPmis {
   risk?: PmisRisk;
   status?: PmisStatus;
   customer?: PmisCustomer;
+  team?: PmisTeam;
+  riskRecords?: Riskrecords;
   [k: string]: unknown;
 }
 export interface PmisCost {
@@ -194,6 +244,12 @@ export interface PmisCustomer {
   合同总额?: NoName22;
   [k: string]: unknown;
 }
+export interface PmisTeam {
+  项目名称?: NoName23;
+  项目经理?: NoName24;
+  L4部门?: L4;
+  [k: string]: unknown;
+}
 export interface DataQuality {
   summary: QualitySummary;
   themes?: Themes;
@@ -210,5 +266,75 @@ export interface QualitySummary {
   matchedClosed?: Matchedclosed;
   unmatched?: Unmatched;
   lastPmisUpdate?: Lastpmisupdate;
+  [k: string]: unknown;
+}
+export interface Project {
+  projectId: Projectid1;
+  projectName?: Projectname1;
+  projectManager?: Projectmanager;
+  orgL4?: Orgl4;
+  isPresale?: Ispresale;
+  relatedClosedId?: Relatedclosedid;
+  payment?: ProjectPayment;
+  deliveryCosts?: Deliverycosts;
+  health?: ProjectHealth;
+  [k: string]: unknown;
+}
+export interface ProjectPayment {
+  relatedNodeCount?: Relatednodecount;
+  expectedTotal?: Expectedtotal;
+  actualTotal?: Actualtotal;
+  remainingTotal?: Remainingtotal;
+  paymentRatio?: Paymentratio;
+  delayedCount?: Delayedcount;
+  [k: string]: unknown;
+}
+export interface DeliveryCostItem {
+  类别: NoName25;
+  预算金额?: NoName26;
+  实际发生?: NoName27;
+  剩余预算?: NoName28;
+  消耗率?: NoName29;
+  [k: string]: unknown;
+}
+export interface ProjectHealth {
+  progressAbnormal?: Progressabnormal;
+  riskAbnormal?: Riskabnormal;
+  costAbnormal?: Costabnormal;
+  paymentAbnormal?: Paymentabnormal;
+  overall?: Overall;
+  [k: string]: unknown;
+}
+export interface ProjectsQuality {
+  deptProjectCount?: Deptprojectcount;
+  orgFile?: InputFileStat;
+  mappingFile?: InputFileStat1;
+  deliveryFile?: InputFileStat2;
+  staffNoProject?: Staffnoproject;
+  managerNotInOrg?: Managernotinorg;
+  presaleTotal?: Presaletotal;
+  presaleMapped?: Presalemapped;
+  presaleUnmapped?: Presaleunmapped;
+  [k: string]: unknown;
+}
+export interface InputFileStat {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat1 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat2 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
   [k: string]: unknown;
 }

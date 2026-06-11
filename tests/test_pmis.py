@@ -216,3 +216,47 @@ class TestLoadProjectPmis:
         pm, dq = M.load_project_pmis(str(d), {"SS-1"})
         assert pm == {}
         assert dq["summary"]["pmisProvided"] is False
+
+
+class TestAssembleTeamAndRisks:
+    def test_team_from_center_then_base(self):
+        base_i = {"P1": {"项目经理（FR）": "李四", "项目经理L4部门": "银行服务组", "项目名称": "B名"}}
+        center_i = {"P1": {"项目经理": "张三", "项目名称": "C名"}}
+        out = M._assemble("P1", base_i, center_i, {}, {}, "在建")
+        assert out["team"] == {"项目名称": "C名", "项目经理": "张三", "L4部门": "银行服务组"}
+
+    def test_team_fallback_to_base(self):
+        base_i = {"P1": {"项目经理（FR）": "李四", "项目经理L4部门": "银行服务组", "项目名称": "B名"}}
+        out = M._assemble("P1", base_i, {}, {}, {}, "在建")
+        assert out["team"]["项目经理"] == "李四"
+        assert out["team"]["项目名称"] == "B名"
+
+    def test_risk_records_jsonable(self):
+        import datetime
+        risk_i = {"P1": [{"风险等级": "高", "风险状态": "已关闭",
+                          "登记日期": datetime.datetime(2026, 1, 2, 3, 4)}]}
+        out = M._assemble("P1", {}, {}, {}, risk_i, "在建")
+        recs = out["riskRecords"]
+        assert len(recs) == 1
+        assert recs[0]["登记日期"] == "2026-01-02T03:04:00"  # datetime 必须转 str 才能入 JSON
+
+    def test_risk_records_timedelta_safe(self):
+        import datetime
+        risk_i = {"P1": [{"耗时": datetime.timedelta(hours=1, minutes=30)}]}
+        out = M._assemble("P1", {}, {}, {}, risk_i, "在建")
+        v = out["riskRecords"][0]["耗时"]
+        assert isinstance(v, str)  # 任何非 JSON 原生类型都必须转 str
+
+
+class TestBuildProjectPmisExtraClosed:
+    def test_closed_included_via_extra_ids(self):
+        closed = {"base": [{"项目编号": "SS-1", "项目状态": "已完工"}], "center": [], "status": []}
+        out = M.build_project_pmis({"base": [], "center": [], "status": [], "risk": []},
+                                   closed, set(), extra_closed_ids={"SS-1"})
+        assert "SS-1" in out and out["SS-1"]["source"] == "已关闭"
+
+    def test_closed_excluded_without_any_ids(self):
+        closed = {"base": [{"项目编号": "SS-1"}], "center": [], "status": []}
+        out = M.build_project_pmis({"base": [], "center": [], "status": [], "risk": []},
+                                   closed, set())
+        assert "SS-1" not in out
