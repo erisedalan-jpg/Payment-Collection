@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
-import { OVERVIEW_LINKS, ANALYSIS_LINKS, ANALYSIS_TAB_LINKS, TOOL_LINKS } from '@/nav'
+import { PROJECT_LINKS, PAYMENT_LINKS, ANALYSIS_TAB_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 </script>
@@ -9,25 +9,22 @@ const ui = useUiStore()
   <aside class="sidebar" :class="{ collapsed: ui.sidebarCollapsed }">
     <nav class="sidebar-nav">
       <div class="section">
-        <div class="section-label">概览</div>
-        <RouterLink v-for="link in OVERVIEW_LINKS" :key="link.to" :to="link.to"
+        <div class="section-label">项目</div>
+        <RouterLink v-for="link in PROJECT_LINKS" :key="link.to" :to="link.to"
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
       <div class="section">
-        <div class="section-label">分析</div>
-        <RouterLink v-for="link in ANALYSIS_LINKS" :key="link.to" :to="link.to"
-          class="nav-item" active-class="active">{{ link.label }}</RouterLink>
-      </div>
-
-      <div class="section">
-        <div class="section-label">业务分析</div>
+        <div class="section-label">回款<span class="section-tag">重点子域</span></div>
+        <RouterLink v-for="link in PAYMENT_LINKS" :key="link.to" :to="link.to"
+          class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+        <div class="group-label">回款分析</div>
         <RouterLink v-for="link in ANALYSIS_TAB_LINKS" :key="link.to" :to="link.to"
-          class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+          class="nav-sub nav-sub2" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
       <div class="section">
-        <div class="section-label">管理工具</div>
+        <div class="section-label">工具</div>
         <RouterLink v-for="link in TOOL_LINKS" :key="link.to" :to="link.to"
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
@@ -54,4 +51,6 @@ const ui = useUiStore()
 .sidebar-toggle { width: 16px; border: none; border-right: 1px solid var(--line);
   background: var(--card2); color: var(--sub); cursor: pointer; font-size: 11px; padding: 0; }
 .sidebar-toggle:hover { background: var(--bg); color: var(--accent); }
+.section-tag { margin-left: 6px; font-weight: 400; font-size: 10px; color: var(--mut); }
+.nav-sub2 { padding-left: 42px; }
 </style>
