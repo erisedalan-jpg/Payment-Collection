@@ -14,6 +14,10 @@ export interface InsightRow {
   industry: string
   signType: string
   health: string
+  orgL4: string
+  rating: string
+  overspend: string // '是' | '否'(维度用字符串值)
+  paused: string    // '是' | '否'
   contractAmount: number
   progress: number | null
   costRatio: number | null
@@ -45,6 +49,10 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       industry: v(cust.行业),
       signType: v(cust.签约形式),
       health: v(p.health?.overall, '无数据'),
+      orgL4: v(p.orgL4),
+      rating: v(st.评级, '无'),
+      overspend: cost.超支 === true ? '是' : '否',
+      paused: st.是否暂停 === true ? '是' : '否',
       contractAmount: Number(cust.合同总额 ?? 0),
       progress: typeof prog.完工进展 === 'number' ? prog.完工进展 : null,
       costRatio: typeof cost.消耗比 === 'number' ? cost.消耗比 : null,
@@ -56,18 +64,24 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
 }
 
 export interface InsightDimDef {
-  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'industry' | 'signType' | 'health'
+  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'industry' | 'signType' | 'health' | 'rating' | 'overspend' | 'paused'
   label: string
 }
 
+// P5.5 用户反馈增 4 维(服务组/评级/超支/暂停,数据已在前端零后端成本);
+// 需后端增列的候选(项目级别/项目类型/省份/营销一级部门等)见 PROGRESS backlog,待用户选定
 export const INSIGHT_DIMENSIONS: InsightDimDef[] = [
   { key: 'stage', label: '阶段' },
   { key: 'projectStatus', label: '项目状态' },
   { key: 'riskLevel', label: '风险等级' },
   { key: 'manager', label: '项目经理' },
+  { key: 'orgL4', label: '服务组' },
   { key: 'industry', label: '行业' },
   { key: 'signType', label: '签约形式' },
   { key: 'health', label: '健康度' },
+  { key: 'rating', label: '评级' },
+  { key: 'overspend', label: '超支' },
+  { key: 'paused', label: '暂停' },
 ]
 
 export const INSIGHT_DIM_BY_KEY: Record<string, InsightDimDef> = Object.fromEntries(

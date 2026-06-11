@@ -80,6 +80,15 @@ const progressInfo = computed(() => [
   { k: '里程碑进度状态', v: m.value.progress?.里程碑进度状态 || '-' },
   { k: '计划终验', v: fmtDateCell(m.value.progress?.计划终验) },
 ])
+// 里程碑明细=《项目回款节点（里程碑）清单》各行(P5.5 用户反馈;PMIS 无逐里程碑数据,仅百分比/状态枚举)
+const MILESTONE_COLS: DataColumn[] = [
+  { key: 'nodeName', label: '里程碑/节点' },
+  { key: 'expectedMilestoneDate', label: '计划里程碑日期', width: 120, formatter: (v) => fmtDateCell(v) },
+  { key: 'planDate', label: '计划回款日', width: 110, formatter: (v) => fmtDateCell(v) },
+  { key: 'isMilestoneAchieved', label: '是否达成', width: 90, formatter: (v) => String(v ?? '-') },
+  { key: 'actualDate', label: '实际日期', width: 110, formatter: (v) => fmtDateCell(v) },
+  { key: 'completionStatus', label: '完成状态', width: 130, formatter: (v) => String(v ?? '-') },
+]
 
 // —— 风险 ——
 const riskSummary = computed(() => [
@@ -185,6 +194,9 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in progressInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
+            <div class="pd-section-title">里程碑明细（来源：项目回款节点（里程碑）清单）</div>
+            <DataTable v-if="page.nodes.length" :columns="MILESTONE_COLS" :rows="page.nodes" :show-count="false" />
+            <div v-else class="pd-note">无里程碑节点记录。</div>
           </section>
 
           <section v-else-if="tab === 'risk'" class="pd-section">
@@ -199,6 +211,7 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in costSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
+            <div class="pd-note">汇总出处：PMIS《项目状态信息数据》（消耗比=项目核算÷项目总预算）；下方明细出处：delivery_analysis.xlsx，两者口径独立。</div>
             <DataTable v-if="costRows.length" :columns="COST_COLS" :rows="costRows" :show-count="false" />
             <div v-else class="pd-note">未提供预算核算明细（delivery_analysis.xlsx）。</div>
           </section>
@@ -230,35 +243,35 @@ const originInfo = computed(() => [
 <style scoped>
 .project-detail-view { padding: 16px; }
 .pd-404 { text-align: center; padding: 60px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
-.pd-404-title { font-size: 18px; font-weight: 700; color: var(--txt); margin-bottom: 8px; }
-.pd-404-sub { font-size: 13px; color: var(--mut); margin-bottom: 16px; }
-.pd-404-link { color: var(--accent); font-size: 13px; text-decoration: none; font-weight: 600; }
+.pd-404-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: 8px; }
+.pd-404-sub { font-size: var(--fs-2); color: var(--mut); margin-bottom: 16px; }
+.pd-404-link { color: var(--accent); font-size: var(--fs-2); text-decoration: none; font-weight: 600; }
 .pd-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
-.pd-name { font-size: 19px; font-weight: 700; color: var(--txt); margin: 0; }
-.pd-badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-full); font-size: 12px; font-weight: 600; line-height: 1.6; }
+.pd-name { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
+.pd-badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-full); font-size: var(--fs-1); font-weight: 600; line-height: 1.6; }
 .pd-badge.stage { background: var(--selected-tint); color: var(--accent); }
 .pd-badge.paused { background: var(--warn-bg); color: var(--warn-text); }
 .pd-badge.rating { background: var(--card2); color: var(--sub); }
 .pd-badge.origin { background: var(--selected-tint); color: var(--accent); }
-.pd-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--sub); margin-bottom: 12px; }
+.pd-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: var(--fs-2); color: var(--sub); margin-bottom: 12px; }
 .pd-meta b { color: var(--txt); }
 .pd-metrics { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .pd-metric { flex: 1; min-width: 120px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; }
-.pd-metric-v { font-size: 16px; font-weight: 700; color: var(--txt); }
-.pd-metric-k { font-size: 12px; color: var(--mut); margin-top: 2px; }
+.pd-metric-v { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }
+.pd-metric-k { font-size: var(--fs-1); color: var(--mut); margin-top: 2px; }
 .pd-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
-.pd-tab { border: none; background: none; padding: 8px 14px; font-size: 13px; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; }
+.pd-tab { border: none; background: none; padding: 8px 14px; font-size: var(--fs-2); color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; }
 .pd-tab:hover { background: var(--hover-tint); }
 .pd-tab.active { color: var(--accent); font-weight: 700; border-bottom-color: var(--accent); }
 .pd-section { margin-bottom: 16px; }
-.pd-section-title { font-weight: 700; color: var(--accent); font-size: 13px; margin: 14px 0 8px; }
+.pd-section-title { font-weight: 700; color: var(--accent); font-size: var(--fs-2); margin: 14px 0 8px; }
 .pd-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-.pd-chip { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; }
+.pd-chip { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-2); }
 .pd-chip-k { color: var(--mut); }
 .pd-chip-v { color: var(--txt); font-weight: 600; }
-.pd-note { font-size: 12px; color: var(--mut); margin-bottom: 10px; }
+.pd-note { font-size: var(--fs-1); color: var(--mut); margin-bottom: 10px; }
 .pd-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
 .pd-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
-.pd-aside-title { font-weight: 700; font-size: 13px; color: var(--txt); margin-bottom: 8px; }
+.pd-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: 8px; }
 @media (max-width: 1200px) { .pd-body { grid-template-columns: 1fr; } }
 </style>
