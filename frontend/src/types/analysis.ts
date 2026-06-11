@@ -123,6 +123,21 @@ export type Presalemapped = number;
 export type Presaleunmapped = {
   [k: string]: unknown;
 }[];
+export type Date = string;
+export type Type = string;
+export type Domain = string;
+export type Projectid2 = string;
+export type Projectname2 = string;
+export type Summary1 = string;
+export type Amount = number | null;
+export type Events = Event[];
+export type Basedate = string;
+export type Advancedprojects = number;
+export type Newdelayednodes = number;
+export type Paymentgained = number;
+export type Risknetchange = number;
+export type Newoverspendprojects = number;
+export type Paymentratiochange = number | null;
 
 export interface AnalysisData {
   meta: Meta;
@@ -138,6 +153,8 @@ export interface AnalysisData {
   dataQuality?: DataQuality | null;
   projects?: Projects1;
   projectsQuality?: ProjectsQuality | null;
+  events?: Events;
+  periodCompare?: PeriodCompare | null;
   [k: string]: unknown;
 }
 export interface Meta {
@@ -336,5 +353,33 @@ export interface InputFileStat2 {
   rows?: Rows;
   matched?: Matched1;
   matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface Event {
+  date: Date;
+  type: Type;
+  domain: Domain;
+  projectId?: Projectid2;
+  projectName?: Projectname2;
+  summary?: Summary1;
+  prev?: unknown;
+  curr?: unknown;
+  amount?: Amount;
+  [k: string]: unknown;
+}
+export interface PeriodCompare {
+  lastSync?: PeriodCompareEntry | null;
+  lastWeek?: PeriodCompareEntry | null;
+  lastMonth?: PeriodCompareEntry | null;
+  [k: string]: unknown;
+}
+export interface PeriodCompareEntry {
+  baseDate: Basedate;
+  advancedProjects?: Advancedprojects;
+  newDelayedNodes?: Newdelayednodes;
+  paymentGained?: Paymentgained;
+  riskNetChange?: Risknetchange;
+  newOverspendProjects?: Newoverspendprojects;
+  paymentRatioChange?: Paymentratiochange;
   [k: string]: unknown;
 }
