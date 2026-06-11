@@ -75,15 +75,15 @@ const filtered = computed(() => filterEvents(events.value, filters))
 
 <style scoped>
 .activity-view { padding: 16px; }
-.av-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 10px; }
+.av-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
 .av-compare { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 16px; margin-bottom: 14px; }
 .av-compare-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.av-compare-label { font-weight: 700; font-size: 13px; color: var(--txt); }
-.av-base-date { font-size: 12px; color: var(--mut); }
+.av-compare-label { font-weight: 700; font-size: var(--fs-2); color: var(--txt); }
+.av-base-date { font-size: var(--fs-1); color: var(--mut); }
 .av-cards { display: flex; flex-wrap: wrap; gap: 10px; }
 .av-card { flex: 1; min-width: 110px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; }
-.av-card-v { font-size: 16px; font-weight: 700; color: var(--txt); }
-.av-card-k { font-size: 12px; color: var(--mut); margin-top: 2px; }
-.av-insufficient { color: var(--mut); font-size: 13px; padding: 8px 0; opacity: var(--disabled-opacity); }
+.av-card-v { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }
+.av-card-k { font-size: var(--fs-1); color: var(--mut); margin-top: 2px; }
+.av-insufficient { color: var(--mut); font-size: var(--fs-2); padding: 8px 0; opacity: var(--disabled-opacity); }
 .av-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 </style>

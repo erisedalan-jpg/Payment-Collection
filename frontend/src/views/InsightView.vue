@@ -160,11 +160,11 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
 
 <style scoped>
 .insight-view { padding: 16px; }
-.iv-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 10px; }
+.iv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
 .iv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
 .iv-dims { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-.iv-dims-label { font-size: 12px; color: var(--sub); font-weight: 600; }
+.iv-dims-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px; margin-bottom: 12px; }
-.iv-hint { font-size: 13px; color: var(--mut); padding: 24px 0; text-align: center; }
+.iv-hint { font-size: var(--fs-2); color: var(--mut); padding: 24px 0; text-align: center; }
 .iv-empty { color: var(--mut); padding: 40px 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 </style>
