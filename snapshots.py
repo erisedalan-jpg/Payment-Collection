@@ -120,3 +120,87 @@ def pick_baseline_dates(dates: List[str], today: str) -> Dict[str, Optional[str]
         "lastWeek": latest_at_or_before(t - timedelta(days=7)),
         "lastMonth": latest_at_or_before(t - timedelta(days=30)),
     }
+
+
+def _ev(date_str: str, etype: str, domain: str, pid: str, pname: str, summary: str,
+        prev: Any = None, curr: Any = None, amount: Optional[float] = None) -> dict:
+    return {"date": date_str, "type": etype, "domain": domain, "projectId": pid,
+            "projectName": pname, "summary": summary, "prev": prev, "curr": curr, "amount": amount}
+
+
+def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
+    """两快照 diff → 事件列表(spec 3.3 事件类型;纯函数,事件日期取 cur 日期)。"""
+    evs: List[dict] = []
+    d = cur["date"]
+    pp, cp = prev.get("projects") or {}, cur.get("projects") or {}
+
+    for pid, b in cp.items():
+        name = b.get("name") or ""
+        a = pp.get(pid)
+        if a is None:
+            evs.append(_ev(d, "进入主域", "project", pid, name, "新进入项目主域"))
+            continue
+        for field, etype in (("stage", "阶段变更"), ("milestone", "里程碑状态变更"),
+                             ("status", "项目状态变更"), ("rating", "评级变化")):
+            if a.get(field) != b.get(field):
+                evs.append(_ev(d, etype, "project", pid, name,
+                               f"{a.get(field) or '-'} → {b.get(field) or '-'}",
+                               prev=a.get(field), curr=b.get(field)))
+        if bool(a.get("paused")) != bool(b.get("paused")):
+            etype = "暂停" if b.get("paused") else "恢复"
+            evs.append(_ev(d, etype, "project", pid, name, f"项目{etype}"))
+        ra, rb = int(a.get("openRisks") or 0), int(b.get("openRisks") or 0)
+        if ra != rb:
+            evs.append(_ev(d, "风险数增减", "project", pid, name,
+                           f"未关闭风险 {ra} → {rb}", prev=ra, curr=rb))
+        if bool(a.get("overspend")) != bool(b.get("overspend")):
+            etype = "超支出现" if b.get("overspend") else "超支解除"
+            evs.append(_ev(d, etype, "project", pid, name, etype))
+    for pid, a in pp.items():
+        if pid not in cp:
+            evs.append(_ev(d, "移出主域", "project", pid, a.get("name") or "", "移出项目主域"))
+
+    pn, cn = prev.get("nodes") or {}, cur.get("nodes") or {}
+    for key, b in cn.items():
+        a = pn.get(key)
+        pid, pname, node = b.get("pid") or "", b.get("pname") or "", b.get("node") or ""
+        if a is None:
+            evs.append(_ev(d, "回款节点新增", "payment", pid, pname, f"新增节点「{node}」"))
+            continue
+        delta = round((b.get("actual") or 0) - (a.get("actual") or 0), 2)
+        if delta > 0:
+            evs.append(_ev(d, "到账", "payment", pid, pname,
+                           f"「{node}」到账 {round(delta / 10000, 2)} 万",
+                           prev=a.get("actual"), curr=b.get("actual"), amount=delta))
+        sa, sb = a.get("status"), b.get("status")
+        if sa != sb:
+            if sb == config.STATUS_DELAYED:
+                evs.append(_ev(d, "延期发生", "payment", pid, pname,
+                               f"「{node}」{sa or '-'} → 延期", prev=sa, curr=sb))
+            elif sb == config.STATUS_FULL_PAID:
+                evs.append(_ev(d, "回款完成", "payment", pid, pname,
+                               f"「{node}」已全额回款", prev=sa, curr=sb))
+        if (a.get("planDate") or "") != (b.get("planDate") or ""):
+            evs.append(_ev(d, "计划回款日变更", "payment", pid, pname,
+                           f"「{node}」计划日 {a.get('planDate') or '-'} → {b.get('planDate') or '-'}",
+                           prev=a.get("planDate"), curr=b.get("planDate")))
+    for key, a in pn.items():
+        if key not in cn:
+            evs.append(_ev(d, "回款节点移除", "payment", a.get("pid") or "",
+                           a.get("pname") or "", f"节点「{a.get('node') or ''}」移除"))
+    return evs
+
+
+def append_events(path: str, new_events: List[dict], cap: int = 500) -> List[dict]:
+    """events.json 旧→新追加,超 cap 截头;返回截断后的全量列表。"""
+    existing: List[dict] = []
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            existing = []
+    merged = (existing + new_events)[-cap:]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, separators=(",", ":"))
+    return merged

@@ -92,3 +92,102 @@ class TestPickBaselines:
         assert snapshots.pick_baseline_dates([], "2026-06-11") == {"lastSync": None, "lastWeek": None, "lastMonth": None}
         b = snapshots.pick_baseline_dates(["2026-06-10"], "2026-06-11")
         assert b["lastSync"] == "2026-06-10" and b["lastWeek"] is None and b["lastMonth"] is None
+
+
+def _snap(date_str, projects=None, nodes=None):
+    projects = projects or {}
+    nodes = nodes or {}
+    return {"date": date_str, "projects": projects, "nodes": nodes,
+            "agg": snapshots._agg(projects, nodes)}
+
+
+def _proj(name="甲", stage="项目执行", milestone="正常", status="实施中",
+          paused=False, rating="C", openRisks=0, overspend=False, costRatio=0.3):
+    return {"name": name, "stage": stage, "milestone": milestone, "status": status,
+            "paused": paused, "rating": rating, "openRisks": openRisks,
+            "overspend": overspend, "costRatio": costRatio}
+
+
+def _node(pid="P-1", pname="甲", node="初验款", status="正常实施中",
+          planDate="2026-03-31", actual=0.0, expected=500000.0):
+    return {"pid": pid, "pname": pname, "node": node, "status": status,
+            "planDate": planDate, "actual": actual, "expected": expected}
+
+
+class TestDiffProjects:
+    def test_enter_and_leave_domain(self):
+        prev = _snap("2026-06-10", {"P-1": _proj()})
+        cur = _snap("2026-06-11", {"P-2": _proj(name="乙")})
+        evs = snapshots.diff_snapshots(prev, cur)
+        types = {(e["type"], e["projectId"]) for e in evs}
+        assert ("进入主域", "P-2") in types and ("移出主域", "P-1") in types
+
+    def test_stage_milestone_status_rating_changes(self):
+        prev = _snap("2026-06-10", {"P-1": _proj()})
+        cur = _snap("2026-06-11", {"P-1": _proj(stage="项目收尾", milestone="延期", status="待验收", rating="B")})
+        evs = snapshots.diff_snapshots(prev, cur)
+        by = {e["type"]: e for e in evs}
+        assert by["阶段变更"]["prev"] == "项目执行" and by["阶段变更"]["curr"] == "项目收尾"
+        assert by["里程碑状态变更"]["curr"] == "延期"
+        assert by["项目状态变更"]["curr"] == "待验收"
+        assert by["评级变化"]["curr"] == "B"
+        assert all(e["domain"] == "project" for e in evs)
+
+    def test_pause_resume_risk_overspend(self):
+        prev = _snap("2026-06-10", {"P-1": _proj(openRisks=1, overspend=False),
+                                    "P-2": _proj(name="乙", paused=True, overspend=True)})
+        cur = _snap("2026-06-11", {"P-1": _proj(openRisks=3, overspend=True),
+                                   "P-2": _proj(name="乙", paused=False, overspend=False)})
+        types = {(e["type"], e["projectId"]) for e in snapshots.diff_snapshots(prev, cur)}
+        assert ("风险数增减", "P-1") in types and ("超支出现", "P-1") in types
+        assert ("恢复", "P-2") in types and ("超支解除", "P-2") in types
+
+    def test_no_change_no_events_and_none_stage_not_event(self):
+        prev = _snap("2026-06-10", {"P-1": _proj(stage=None)})
+        cur = _snap("2026-06-11", {"P-1": _proj(stage=None)})
+        assert snapshots.diff_snapshots(prev, cur) == []
+
+
+class TestDiffNodes:
+    def test_payment_received_with_amount(self):
+        prev = _snap("2026-06-10", {"P-1": _proj()}, {"P-1|初验款#0": _node(actual=100000)})
+        cur = _snap("2026-06-11", {"P-1": _proj()}, {"P-1|初验款#0": _node(actual=350000)})
+        evs = snapshots.diff_snapshots(prev, cur)
+        assert len(evs) == 1
+        e = evs[0]
+        assert e["type"] == "到账" and e["domain"] == "payment" and e["amount"] == 250000
+        assert e["projectId"] == "P-1" and "初验款" in e["summary"]
+
+    def test_delay_full_paid_plan_date_change(self):
+        prev = _snap("2026-06-10", {"P-1": _proj()}, {
+            "P-1|a#0": _node(node="a", status="正常实施中"),
+            "P-1|b#0": _node(node="b", status="正常实施中", actual=0),
+            "P-1|c#0": _node(node="c", planDate="2026-03-31"),
+        })
+        cur = _snap("2026-06-11", {"P-1": _proj()}, {
+            "P-1|a#0": _node(node="a", status="延期"),
+            "P-1|b#0": _node(node="b", status="已全额回款", actual=500000),
+            "P-1|c#0": _node(node="c", planDate="2026-06-30"),
+        })
+        types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
+        assert {"延期发生", "回款完成", "到账", "计划回款日变更"} <= types
+
+    def test_node_added_removed(self):
+        prev = _snap("2026-06-10", {"P-1": _proj()}, {"P-1|旧#0": _node(node="旧")})
+        cur = _snap("2026-06-11", {"P-1": _proj()}, {"P-1|新#0": _node(node="新")})
+        types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
+        assert {"回款节点新增", "回款节点移除"} <= types
+
+
+class TestAppendEvents:
+    def test_append_and_cap(self, tmp_path):
+        path = str(tmp_path / "events.json")
+        first = [{"date": "2026-06-10", "type": "到账", "domain": "payment",
+                  "projectId": "P-1", "projectName": "甲", "summary": "s", "amount": 1.0}]
+        out = snapshots.append_events(path, first, cap=3)
+        assert len(out) == 1
+        more = [dict(first[0], date="2026-06-11", summary=f"s{i}") for i in range(3)]
+        out = snapshots.append_events(path, more, cap=3)
+        assert len(out) == 3 and out[0]["summary"] == "s0"  # 旧的被截掉,保留最新 3 条(旧→新)
+        with open(path, encoding="utf-8") as f:
+            assert len(json.load(f)) == 3
