@@ -116,7 +116,7 @@ const costRows = computed(() => (p.value?.deliveryCosts ?? []) as Record<string,
 
 // —— 右栏:本项目动态(P3;spec 4.2 布局 B 右栏,与 /activity 同构) ——
 const myEvents = computed(() =>
-  (((data.data as any)?.events ?? []) as Event[]).filter((e) => e.projectId === p.value?.projectId),
+  ((data.data?.events ?? []) as Event[]).filter((e) => !!p.value?.projectId && e.projectId === p.value.projectId),
 )
 
 // —— 原项目（售前整合，两份信息并存：spec 3.2 + 5）——
