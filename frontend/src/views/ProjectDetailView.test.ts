@@ -50,6 +50,10 @@ function seed() {
       },
       'OLD-9': { source: '已关闭', team: { 项目名称: '某局一期', 项目经理: '王五' }, customer: { 最终客户: '某局', 合同总额: 1000000 }, status: { 项目状态: '已验收' }, progress: { 项目阶段: '项目收尾', 完工进展: 1 } },
     },
+    events: [
+      { date: '2026-06-11', type: '到账', domain: 'payment', projectId: 'P-1', projectName: '终端安全项目', summary: '「初验款」到账 25 万' },
+      { date: '2026-06-10', type: '阶段变更', domain: 'project', projectId: 'P-9', projectName: '他人项目', summary: '不应出现' },
+    ],
   } as any
 }
 
@@ -130,5 +134,19 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('未找到该项目')
     const link = w.find('a[href="/projects"]')
     expect(link.exists()).toBe(true)
+  })
+
+  it('右栏只显示本项目动态', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-aside').exists()).toBe(true)
+    expect(w.text()).toContain('「初验款」到账 25 万')
+    expect(w.text()).not.toContain('不应出现')
+  })
+
+  it('本项目无事件 → 右栏空态', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    expect(w.find('.pd-aside').text()).toContain('暂无该项目动态')
   })
 })
