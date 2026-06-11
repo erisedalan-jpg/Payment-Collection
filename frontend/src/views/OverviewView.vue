@@ -20,12 +20,13 @@ const health = computed(() => healthSummary(projects.value))
 const band = computed(() => paymentBand((data.data?.rawNodes ?? []) as RawNode[], new Date()))
 const recentEvents = computed(() => ((data.data?.events ?? []) as Event[]).slice(0, 10))
 
+// KPI 卡带跳转(用户实测反馈 2026-06-11,推翻原"不可点击"决策):前五张带筛选进清单,达成率进回款总览
 const kpiCards = computed(() => [
-  { k: '在管项目', v: String(kpis.value.total) },
-  { k: '进行中', v: String(kpis.value.active) }, // spec 4.1 用词;口径=项目状态'实施中'
-  { k: '暂停', v: String(kpis.value.paused) },
-  { k: '高风险', v: String(kpis.value.highRisk) },
-  { k: '超支', v: String(kpis.value.overspend) },
+  { k: '在管项目', v: String(kpis.value.total), to: '/projects' },
+  { k: '进行中', v: String(kpis.value.active), to: '/projects?projectStatus=实施中' }, // spec 4.1 用词;口径=项目状态'实施中'
+  { k: '暂停', v: String(kpis.value.paused), to: '/projects?paused=yes' },
+  { k: '高风险', v: String(kpis.value.highRisk), to: '/projects?riskLevel=高' },
+  { k: '超支', v: String(kpis.value.overspend), to: '/projects?overspend=yes' },
 ])
 const HEALTH_KEYS = ['健康', '关注', '风险'] as const
 const DIM_LABELS = [['progress', '进度'], ['risk', '风险'], ['cost', '成本'], ['payment', '回款']] as const
@@ -37,14 +38,14 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
     <div class="ov-body">
       <div class="ov-main">
         <div class="ov-kpis">
-          <div v-for="c in kpiCards" :key="c.k" class="ov-kpi">
+          <RouterLink v-for="c in kpiCards" :key="c.k" class="ov-kpi" :to="c.to">
             <div class="ov-kpi-v u-num">{{ c.v }}</div>
             <div class="ov-kpi-k">{{ c.k }}</div>
-          </div>
-          <div class="ov-kpi accent">
+          </RouterLink>
+          <RouterLink class="ov-kpi accent" to="/payment">
             <div class="ov-kpi-v u-num">{{ fmtRatio(kpis.paymentRatio) }}</div>
             <div class="ov-kpi-k">回款达成率</div>
-          </div>
+          </RouterLink>
         </div>
 
         <section class="ov-card">
@@ -113,7 +114,8 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
 .overview-view { padding: 16px; }
 .ov-body { display: grid; grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr); gap: 16px; align-items: start; }
 .ov-kpis { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-.ov-kpi { flex: 1; min-width: 110px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 16px; }
+.ov-kpi { flex: 1; min-width: 110px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 16px; display: block; text-decoration: none; }
+.ov-kpi:hover { background: var(--hover-tint); }
 .ov-kpi.accent { border-color: var(--accent); }
 .ov-kpi.accent .ov-kpi-v { color: var(--accent); }
 .ov-kpi-v { font-size: 22px; font-weight: 700; color: var(--txt); line-height: var(--lh-tight, 1.15); }
@@ -122,7 +124,10 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
 .ov-card-head { font-weight: 700; font-size: 14px; color: var(--txt); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 .ov-more { font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 600; }
 .ov-health-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 10px; }
-.ov-health-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--txt); }
+/* 三档计数行放大(用户反馈):数字升 --fs-4,徽章随 --fs-2 */
+.ov-health-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--txt); }
+.ov-health-chip b { font-size: var(--fs-4); }
+.ov-health-chip :deep(.health-badge) { font-size: var(--fs-2); }
 .ov-dim { font-size: 12px; color: var(--sub); }
 .ov-dim b { color: var(--txt); }
 .ov-risk-list { display: flex; flex-wrap: wrap; gap: 8px; }
