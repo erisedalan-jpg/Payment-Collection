@@ -23,19 +23,21 @@ beforeEach(() => {
 })
 
 describe('AppSidebar', () => {
-  it('renders overview + tier-tab + tool nav labels', async () => {
+  it('renders 项目/回款/工具 三段分组', async () => {
     const router = makeRouter()
     router.push('/')
     await router.isReady()
     const wrapper = mount(AppSidebar, { global: { plugins: [router] } })
     const text = wrapper.text()
-    expect(text).toContain('看板首页')
+    expect(text).toContain('项目清单')        // 项目组（新）
+    expect(text).toContain('回款总览')        // 回款组：旧首页收编更名
+    expect(text).toContain('回款日历')
     expect(text).toContain('多维看板')
-    expect(text).toContain('回款台账')
-    expect(text).toContain('项目总览')
-    expect(text).toContain('数据管理')
-    expect(text).not.toContain('区间对比')
-    expect(text).not.toContain('项目经理视图')
+    expect(text).toContain('回款分析')        // 业务分析 5 链接的子组标题
+    expect(text).toContain('数据管理')        // 工具组
+    expect(text).not.toContain('看板首页')    // 旧 label 退场
+    // 回款组为低一级呈现（缩进样式类存在）
+    expect(wrapper.findAll('.nav-sub').length).toBeGreaterThanOrEqual(5)
   })
 
   it('toggle button flips uiStore collapsed', async () => {

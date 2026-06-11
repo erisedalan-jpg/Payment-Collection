@@ -46,7 +46,9 @@ const count = computed(() => props.rows.length)
         show-overflow-tooltip
       >
         <template #default="scope">
-          {{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}
+          <slot :name="`cell-${col.key}`" :row="scope.row" :value="scope.row[col.key]">
+            {{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}
+          </slot>
         </template>
       </el-table-column>
     </el-table>

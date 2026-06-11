@@ -3,7 +3,7 @@ import { router } from './index'
 
 describe('router', () => {
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/board', '/calendar', '/followup', '/ledger', '/data', '/about']) {
+    for (const path of ['/', '/board', '/calendar', '/followup', '/ledger', '/data', '/about', '/projects']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })
@@ -20,6 +20,12 @@ describe('router', () => {
     expect(r.matched.length).toBeGreaterThan(0)
     expect(r.name).toBe('analysis')
     expect(r.params.tab).toBe('plan')
+  })
+
+  it('resolves project detail with id param', () => {
+    const r = router.resolve('/project/QABJ-SS-1')
+    expect(r.params.id).toBe('QABJ-SS-1')
+    expect(r.name).toBe('project-detail')
   })
 
   it('unknown path falls back to dashboard', () => {
