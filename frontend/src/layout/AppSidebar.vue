@@ -40,17 +40,17 @@ const ui = useUiStore()
 .sidebar.collapsed { width: 0; border-right: none; }
 .sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 0; }
 .section { margin-bottom: 14px; }
-.section-label { font-size: 11px; color: var(--mut); padding: 4px 18px; font-weight: 600; }
-.group-label { font-size: 12px; color: var(--sub); padding: 6px 18px 2px; }
+.section-label { font-size: var(--fs-1); color: var(--mut); padding: 4px 18px; font-weight: 600; }
+.group-label { font-size: var(--fs-1); color: var(--sub); padding: 6px 18px 2px; }
 .nav-item, .nav-sub { display: flex; align-items: center; gap: 8px; padding: 7px 18px;
-  font-size: 13px; color: var(--txt); text-decoration: none; }
-.nav-sub { padding-left: 30px; font-size: 12px; }
+  font-size: var(--fs-2); color: var(--txt); text-decoration: none; }
+.nav-sub { padding-left: 30px; font-size: var(--fs-1); }
 .nav-item:hover, .nav-sub:hover { background: var(--card2); }
 .nav-item.active, .nav-sub.active { background: var(--bg); color: var(--accent); font-weight: 600; }
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .sidebar-toggle { width: 16px; border: none; border-right: 1px solid var(--line);
-  background: var(--card2); color: var(--sub); cursor: pointer; font-size: 11px; padding: 0; }
+  background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); padding: 0; }
 .sidebar-toggle:hover { background: var(--bg); color: var(--accent); }
-.section-tag { margin-left: 6px; font-weight: 400; font-size: 10px; color: var(--mut); }
+.section-tag { margin-left: 6px; font-weight: 400; font-size: var(--fs-1); color: var(--mut); }
 .nav-sub2 { padding-left: 42px; }
 </style>

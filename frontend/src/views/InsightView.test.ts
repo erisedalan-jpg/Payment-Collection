@@ -70,14 +70,15 @@ describe('InsightView', () => {
     expect(document.body.textContent).toContain('个项目')   // 弹窗标题
   })
 
-  it('交叉模式渲染矩阵', async () => {
+  it('交叉模式:次维 SegToggle 点选后真实渲染矩阵(P5.5)', async () => {
     seed()
     const w = await mountView()
     await w.find('[data-test="seg-cross"]').trigger('click')
-    await w.find('[data-test="seg-health"]').trigger('click')
-    // 次维度选择(el-select) — 直接驱动内部状态较繁琐,断言矩阵组件出现需先选次维;
-    // 用暴露的次维 select 选项数断言代替(7-1=6 个可选 + 占位)
-    expect(w.findComponent({ name: 'BoardMatrix' }).exists() || w.text().includes('选择次维度')).toBe(true)
+    const healthBtns = w.findAll('[data-test="seg-health"]')
+    await healthBtns[healthBtns.length - 1].trigger('click')   // 次维 SegToggle 的健康度
+    await flushPromises()
+    expect(w.findComponent({ name: 'BoardMatrix' }).exists()).toBe(true)
+    expect(w.text()).toContain('风险')   // 矩阵行头含健康度取值
   })
 
   it('透视模式:行维选择后渲染 PivotTable', async () => {

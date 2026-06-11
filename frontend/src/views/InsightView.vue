@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
@@ -76,7 +76,9 @@ const RANK_COLS = computed<DataColumn[]>(() => [
 ])
 
 // ---- 交叉 ----
-const SECOND_OPTS = computed(() => DIM_OPTS.filter((o) => o.value !== dimKey.value))
+// 次维同为点击选择(P5.5 用户反馈,弃下拉);「无」=不交叉;主维变更若与次维撞车则复位
+const SECOND_OPTS = computed(() => [{ value: '', label: '无' }, ...DIM_OPTS.filter((o) => o.value !== dimKey.value)])
+watch(dimKey, () => { if (secondDim.value === dimKey.value) secondDim.value = '' })
 const matrix = computed(() =>
   mode.value === 'cross' && secondDim.value
     ? insightCross(rows.value, dimKey.value, secondDim.value, metricKey.value)
@@ -118,11 +120,11 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
     <div class="iv-toolbar">
       <SegToggle v-model="mode" :options="MODES" />
       <SegToggle v-if="mode !== 'pivot'" v-model="dimKey" :options="DIM_OPTS" />
-      <el-select v-if="mode === 'cross'" v-model="secondDim" size="small" placeholder="选择次维度" style="width: 130px"
-        :empty-values="['', null, undefined]" :value-on-clear="''" clearable>
-        <el-option v-for="o in SECOND_OPTS" :key="o.value" :value="o.value" :label="o.label" />
-      </el-select>
       <SegToggle v-model="metricKey" :options="METRIC_OPTS" />
+    </div>
+    <div v-if="mode === 'cross'" class="iv-toolbar">
+      <span class="iv-dims-label">次维度</span>
+      <SegToggle v-model="secondDim" :options="SECOND_OPTS" />
     </div>
 
     <div v-if="mode === 'pivot'" class="iv-dims">
@@ -158,11 +160,11 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
 
 <style scoped>
 .insight-view { padding: 16px; }
-.iv-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 10px; }
+.iv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
 .iv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
 .iv-dims { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-.iv-dims-label { font-size: 12px; color: var(--sub); font-weight: 600; }
+.iv-dims-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px; margin-bottom: 12px; }
-.iv-hint { font-size: 13px; color: var(--mut); padding: 24px 0; text-align: center; }
+.iv-hint { font-size: var(--fs-2); color: var(--mut); padding: 24px 0; text-align: center; }
 .iv-empty { color: var(--mut); padding: 40px 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 </style>

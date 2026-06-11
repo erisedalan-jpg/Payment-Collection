@@ -13,7 +13,7 @@ const cls = computed(() => CLS[props.overall || ''] || 'none')
 </template>
 
 <style scoped>
-.health-badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-full); font-size: 12px; font-weight: 600; line-height: 1.6; }
+.health-badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-full); font-size: var(--fs-1); font-weight: 600; line-height: 1.6; }
 .health-badge.ok { background: var(--ok-bg); color: var(--ok-text); }
 .health-badge.warn { background: var(--warn-bg); color: var(--warn-text); }
 .health-badge.danger { background: var(--danger-bg); color: var(--danger-text); }
