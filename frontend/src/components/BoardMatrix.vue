@@ -2,7 +2,7 @@
 import type { CrossMatrix } from '@/lib/pivot'
 
 const props = defineProps<{
-  matrix: CrossMatrix
+  matrix: CrossMatrix<unknown>
   rowLabel: string
   colLabel: string
   format: (v: number) => string

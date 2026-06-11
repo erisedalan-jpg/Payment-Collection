@@ -91,11 +91,11 @@ export const METRIC_BY_KEY: Record<string, MetricDef> = Object.fromEntries(
   METRICS.map((m) => [m.key, m]),
 )
 
-export interface CrossMatrix {
+export interface CrossMatrix<G = PivotGroup> {
   rows: string[]
   cols: string[]
   cells: number[][]
-  index: Record<string, Record<string, PivotGroup>>
+  index: Record<string, Record<string, G>>
 }
 
 /** 双维透视：行=rowDim 取值、列=colDim 取值、格=所选指标值（无该交叉组则 0）。
@@ -131,13 +131,13 @@ export interface PivotCol {
   label: string
   key: string
 }
-export interface PivotResult {
+export interface PivotResult<G = PivotGroup> {
   rowDimLabels: string[]
   colDimLabels: string[]
   rows: PivotRow[]
   cols: PivotCol[]
   cells: number[][]
-  index: Record<string, Record<string, PivotGroup>>
+  index: Record<string, Record<string, G>>
 }
 
 /** 多行多列透视：行=rowDims 组合、列=colDims 组合、格=metric;按行/列指标合计降序。
