@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { Project, ProjectPmis, RawNode } from '@/types/analysis'
@@ -48,6 +48,8 @@ const TABS = [
 ]
 const tab = ref('payment')
 const showOrigin = computed(() => !!p.value?.isPresale)
+// 同组件复用(/project/A → /project/B)时回到默认回款 Tab——否则售前→非售前会留下无高亮的孤立 origin 内容
+watch(() => route.params.id, () => { tab.value = 'payment' })
 
 // —— 回款 ——
 const paySummary = computed(() => {
@@ -197,6 +199,7 @@ const originInfo = computed(() => [
         <div v-if="!page.closedId" class="pd-note">待提供映射（A.xlsx）——该售前项目尚无已关闭原项目关联。</div>
         <template v-else>
           <div class="pd-note">以下为已关闭原项目信息（标记「原项目」，不计入当前项目汇总）。</div>
+          <div v-if="!page.closedPmis" class="pd-note">该原项目在 PMIS 已关闭项目表中无记录，仅能显示编号。</div>
           <div class="pd-chips">
             <div v-for="it in originInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
           </div>

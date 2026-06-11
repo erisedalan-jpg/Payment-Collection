@@ -113,6 +113,17 @@ describe('ProjectDetailView', () => {
     expect(w.findAll('.pd-tab').some((b) => b.text() === '原项目')).toBe(false)
   })
 
+  it('路由参数变化(同组件复用) → tab 重置为回款', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '原项目')!.trigger('click')
+    expect(w.find('.pd-tab.active').text()).toBe('原项目')
+    await router.push('/project/P-1')
+    await flushPromises()
+    expect(w.find('.pd-tab.active').text()).toBe('回款')
+    expect(w.text()).toContain('初验款')
+  })
+
   it('未知 id → 404 空态 + 返回清单链接', async () => {
     seed()
     const w = await mountAt('/project/NOPE')
