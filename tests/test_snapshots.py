@@ -191,3 +191,35 @@ class TestAppendEvents:
         assert len(out) == 3 and out[0]["summary"] == "s0"  # 旧的被截掉,保留最新 3 条(旧→新)
         with open(path, encoding="utf-8") as f:
             assert len(json.load(f)) == 3
+
+
+class TestPeriodCompare:
+    def _base(self):
+        return _snap("2026-06-04",
+                     {"P-1": _proj(stage="项目规划", openRisks=1, overspend=False),
+                      "P-2": _proj(name="乙", stage="项目执行", overspend=False)},
+                     {"P-1|a#0": _node(node="a", actual=100000, status="正常实施中")})
+
+    def _cur(self):
+        return _snap("2026-06-11",
+                     {"P-1": _proj(stage="项目执行", openRisks=3, overspend=True),
+                      "P-2": _proj(name="乙", stage="项目执行", overspend=False),
+                      "P-3": _proj(name="丙", overspend=True)},  # 新项目超支也计新超支
+                     {"P-1|a#0": _node(node="a", actual=400000, status="延期"),
+                      "P-1|b#0": _node(node="b", actual=50000, status="延期")})
+
+    def test_entry_metrics(self):
+        e = snapshots.compute_period_compare_entry("2026-06-04", self._base(), self._cur())
+        assert e["baseDate"] == "2026-06-04"
+        assert e["advancedProjects"] == 1          # P-1 规划→执行
+        assert e["newDelayedNodes"] == 2           # a 转延期 + b 新增即延期
+        assert e["paymentGained"] == 350000        # a +30万, b 新节点 5万
+        assert e["riskNetChange"] == 2             # openRiskTotal 1→3
+        assert e["newOverspendProjects"] == 2      # P-1 false→true + P-3 新入即超支
+        # paymentRatio: base 100000/500000=0.2, cur 450000/1000000=0.45 → +25.0pp
+        assert e["paymentRatioChange"] == 25.0
+
+    def test_ratio_none_when_base_missing(self):
+        base = _snap("2026-06-04", {"P-1": _proj()}, {})  # exp=0 → ratio None
+        e = snapshots.compute_period_compare_entry("2026-06-04", base, self._cur())
+        assert e["paymentRatioChange"] is None

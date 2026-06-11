@@ -204,3 +204,39 @@ def append_events(path: str, new_events: List[dict], cap: int = 500) -> List[dic
     with open(path, "w", encoding="utf-8") as f:
         json.dump(merged, f, ensure_ascii=False, separators=(",", ":"))
     return merged
+
+
+def compute_period_compare_entry(base_date: str, base: dict, cur: dict) -> dict:
+    """单基线六指标(spec 3.3): 直接 diff 快照,不累加事件。"""
+    order = {s: i for i, s in enumerate(config.STAGE_ORDER)}
+    bp, cp = base.get("projects") or {}, cur.get("projects") or {}
+    advanced = sum(
+        1 for pid, b in cp.items()
+        if pid in bp and bp[pid].get("stage") in order and b.get("stage") in order
+        and order[b["stage"]] > order[bp[pid]["stage"]]
+    )
+    bn, cn = base.get("nodes") or {}, cur.get("nodes") or {}
+    new_delayed = sum(
+        1 for k, v in cn.items()
+        if v.get("status") == config.STATUS_DELAYED
+        and (k not in bn or bn[k].get("status") != config.STATUS_DELAYED)
+    )
+    gained = round(sum(
+        max((v.get("actual") or 0) - ((bn.get(k) or {}).get("actual") or 0), 0)
+        for k, v in cn.items()
+    ), 2)
+    risk_net = int((cur.get("agg") or {}).get("openRiskTotal") or 0) - int((base.get("agg") or {}).get("openRiskTotal") or 0)
+    new_overspend = sum(1 for pid, v in cp.items()
+                        if v.get("overspend") and not (bp.get(pid) or {}).get("overspend"))
+    rb = (base.get("agg") or {}).get("paymentRatio")
+    rc = (cur.get("agg") or {}).get("paymentRatio")
+    ratio_change = round((rc - rb) * 100, 1) if (rb is not None and rc is not None) else None
+    return {
+        "baseDate": base_date,
+        "advancedProjects": advanced,
+        "newDelayedNodes": new_delayed,
+        "paymentGained": gained,
+        "riskNetChange": risk_net,
+        "newOverspendProjects": new_overspend,
+        "paymentRatioChange": ratio_change,
+    }
