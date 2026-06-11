@@ -68,7 +68,7 @@ describe('buildProjectRows', () => {
   })
 })
 
-const F0: ProjectFilters = { search: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' }
+const F0: ProjectFilters = { search: '', orgL4: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -90,6 +90,18 @@ describe('filterProjectRows', () => {
     // X9 行四个搜索字段中只有 customer 占位 '-' 含连字符 → 不应命中
     const only = buildProjectRows([proj({ projectId: 'X9', projectName: '纯中文名' })], {})
     expect(filterProjectRows(only, { ...F0, search: '-' })).toHaveLength(0)
+  })
+})
+
+describe('orgL4 列与筛选(P5.5 用户反馈)', () => {
+  it('build 取 orgL4,filter 按服务组过滤', () => {
+    const rows = buildProjectRows(
+      [proj(), proj({ projectId: 'X2', projectName: '乙', orgL4: 'B组' } as any)],
+      {},
+    )
+    expect(rows[0].orgL4).toBe('小微部')
+    expect(filterProjectRows(rows, { ...F0, orgL4: 'B组' })).toHaveLength(1)
+    expect(distinctOptions(rows, 'orgL4').sort()).toEqual(['B组', '小微部'])
   })
 })
 
