@@ -22,6 +22,7 @@ export const PROJECT_LINKS: NavLink[] = [
   { label: '项目总览', to: '/' },
   { label: '项目清单', to: '/projects' },
   { label: '项目动态', to: '/activity' },
+  { label: '项目分析', to: '/insight' },
 ]
 
 // 回款重点子域（spec 2：分组低一级呈现；P4 起回款总览迁 /payment，P6 再瘦身）

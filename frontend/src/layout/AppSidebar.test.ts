@@ -32,6 +32,7 @@ describe('AppSidebar', () => {
     expect(text).toContain('项目总览')        // 项目组（P4 新首页）
     expect(text).toContain('项目清单')        // 项目组（新）
     expect(text).toContain('项目动态')
+    expect(text).toContain('项目分析')        // 项目组（P5 新）
     expect(text).toContain('回款总览')        // 回款组：旧首页收编更名
     expect(text).toContain('回款日历')
     expect(text).toContain('多维看板')
