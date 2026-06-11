@@ -42,7 +42,8 @@ const colDims = ref<string[]>([])
 
 const metricFormat = computed(() => {
   const kind = INSIGHT_METRIC_BY_KEY[metricKey.value].kind
-  return (v: number) => (kind === 'money' ? fmtWan(v) : kind === 'rate' ? pct(v) : String(v))
+  // NaN=桶存在但 rate 指标无数据(lib cellVal 标记),显 '-' 与排名表/下钻一致,区别于真实 0%
+  return (v: number) => (Number.isNaN(v) ? '-' : kind === 'money' ? fmtWan(v) : kind === 'rate' ? pct(v) : String(v))
 })
 
 // ---- 排名 ----
