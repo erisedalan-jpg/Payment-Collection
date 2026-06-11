@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { RawNode } from '@/types/analysis'
+import { useRouter } from 'vue-router'
+import type { RawNode, Project } from '@/types/analysis'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useDataStore } from '@/stores/data'
 import { buildProjectDetail } from '@/lib/projectDetail'
@@ -8,8 +9,20 @@ import { formatCellValue } from '@/lib/cellFormat'
 import { fmtYuan, fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from './DataTable.vue'
 
+const router = useRouter()
 const pd = useProjectDetailStore()
 const data = useDataStore()
+
+// 仅项目主域（projects[]）的项目展示全页详情入口——非主域项目跳过去是 404（spec 2：抽屉保留快速下钻，/project/:id 为全页升级版）
+const inDomain = computed(
+  () => !!pd.openId && ((data.data?.projects ?? []) as Project[]).some((x) => x.projectId === pd.openId),
+)
+
+function goFull() {
+  const id = pd.openId
+  pd.close()
+  if (id) router.push(`/project/${id}`)
+}
 
 const visible = computed({
   get: () => pd.visible,
@@ -62,6 +75,7 @@ const summary = computed(() => {
     append-to-body
   >
     <div v-if="detail.project" class="pd">
+      <button v-if="inDomain" class="pd-full-link" @click="goFull">查看完整详情 →</button>
       <div class="pd-grid">
         <div v-for="item in summary" :key="item.k" class="pd-cell">
           <span class="pd-k">{{ item.k }}</span>
@@ -83,4 +97,5 @@ const summary = computed(() => {
 .pd-v { color: var(--txt); font-weight: 600; text-align: right; }
 .pd-nodes-title { font-weight: 700; color: var(--accent); font-size: 13px; margin-bottom: 8px; }
 .pd-empty { color: var(--mut); padding: 24px; text-align: center; }
+.pd-full-link { border: none; background: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 10px; }
 </style>
