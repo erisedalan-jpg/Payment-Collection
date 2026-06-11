@@ -223,3 +223,9 @@ class TestPeriodCompare:
         base = _snap("2026-06-04", {"P-1": _proj()}, {})  # exp=0 → ratio None
         e = snapshots.compute_period_compare_entry("2026-06-04", base, self._cur())
         assert e["paymentRatioChange"] is None
+
+
+class TestLoadSnapshotRobustness:
+    def test_corrupted_json_returns_none(self, tmp_path):
+        (tmp_path / "2026-06-11.json").write_text("{broken", encoding="utf-8")
+        assert snapshots.load_snapshot(str(tmp_path), "2026-06-11") is None

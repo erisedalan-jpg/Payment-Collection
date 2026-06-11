@@ -1231,7 +1231,11 @@ def main():
 
     # === 9d. 快照/diff/事件流/周期对比(Phase P3) ===
     print("[INFO] 生成快照与项目动态...")
-    events_embed, period_compare = run_snapshot_pipeline(final_data, OUTPUT_DIR)
+    try:
+        events_embed, period_compare = run_snapshot_pipeline(final_data, OUTPUT_DIR)
+    except Exception as e:  # 快照/事件为辅助特性,IO 异常(权限/磁盘满)不得阻断主数据输出
+        print(f"  [WARN] 快照/动态生成失败,本次跳过: {e}")
+        events_embed, period_compare = [], {"lastSync": None, "lastWeek": None, "lastMonth": None}
     final_data["events"] = events_embed
     final_data["periodCompare"] = period_compare
     if events_embed:
