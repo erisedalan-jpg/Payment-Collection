@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, distinctOptions, type ProjectFilters } from '@/lib/projectList'
@@ -9,6 +9,7 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 
 const data = useDataStore()
+const route = useRoute()
 const router = useRouter()
 onMounted(() => { if (!data.data) data.load() })
 
@@ -18,7 +19,15 @@ const rows = computed(() =>
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
   ),
 )
-const filters = reactive<ProjectFilters>({ search: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '' })
+const filters = reactive<ProjectFilters>({ search: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' })
+
+// 路由 query → 初始筛选(项目总览风险焦点行带筛选跳入;仅取字符串值)
+const QUERY_KEYS = ['search', 'stage', 'projectStatus', 'health', 'riskLevel', 'paymentStatus', 'presale', 'paused', 'overspend'] as const
+for (const k of QUERY_KEYS) {
+  const v = route.query[k]
+  if (typeof v === 'string' && v) filters[k] = v
+}
+
 const filtered = computed(() => filterProjectRows(rows.value, filters))
 
 const stageOpts = computed(() => distinctOptions(rows.value, 'stage'))
@@ -75,6 +84,11 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
       </el-select>
     </div>
 
+    <div v-if="filters.paused === 'yes' || filters.overspend === 'yes'" class="pv-tags">
+      <span v-if="filters.paused === 'yes'" class="pv-tag">已暂停项目 <button @click="filters.paused = ''">✕</button></span>
+      <span v-if="filters.overspend === 'yes'" class="pv-tag">超支项目 <button @click="filters.overspend = ''">✕</button></span>
+    </div>
+
     <div v-if="!rows.length" class="pv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
     <DataTable v-else :columns="columns" :rows="filtered" clickable @row-click="onRow">
       <template #cell-projectName="{ row }">
@@ -93,4 +107,7 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .pv-origin { margin-left: 6px; padding: 0 6px; border-radius: var(--r-full); font-size: 11px; background: var(--selected-tint); color: var(--accent); }
 .pv-empty { color: var(--mut); padding: 40px 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.pv-tags { display: flex; gap: 8px; margin-bottom: 10px; }
+.pv-tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--r-full); font-size: 12px; background: var(--selected-tint); color: var(--accent); font-weight: 600; }
+.pv-tag button { border: none; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 12px; }
 </style>

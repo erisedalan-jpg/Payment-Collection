@@ -33,7 +33,7 @@ function seed() {
         deliveryCosts: [], health: { overall: '关注' } },
     ],
     projectPmis: {
-      'P-1': { progress: { 项目阶段: '项目执行', 完工进展: 0.2 }, status: { 项目状态: '实施中' }, risk: { 最高等级: '中', 未关闭风险数: 1 }, cost: { 消耗比: 0.3 }, customer: { 最终客户: '海聚博源' } },
+      'P-1': { progress: { 项目阶段: '项目执行', 完工进展: 0.2 }, status: { 项目状态: '实施中' }, risk: { 最高等级: '中', 未关闭风险数: 1 }, cost: { 消耗比: 0.3, 超支: true }, customer: { 最终客户: '海聚博源' } },
     },
   } as any
 }
@@ -76,5 +76,28 @@ describe('ProjectsView', () => {
     ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] }, naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {} } as any
     const w = mountView()
     expect(w.text()).toContain('暂无项目主域数据')
+  })
+
+  it('路由 query 初始化筛选并显示可关闭标签(风险焦点行跳入)', async () => {
+    seed()
+    await router.push('/projects?overspend=yes')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect(w.text()).toContain('超支项目')   // 标签
+    expect(w.text()).toContain('P-1')
+    expect(w.text()).not.toContain('P-2')   // P-2 无超支
+    await w.find('.pv-tag button').trigger('click')
+    expect(w.text()).toContain('P-2')       // 关闭标签恢复全量
+  })
+
+  it('query 初始化既有筛选(riskLevel)', async () => {
+    seed()
+    await router.push('/projects?riskLevel=中')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect(w.text()).toContain('P-1')
+    expect(w.text()).not.toContain('P-2')
   })
 })

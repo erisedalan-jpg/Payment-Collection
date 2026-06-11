@@ -17,6 +17,8 @@ export interface ProjectRow {
   health: string
   isPresale: boolean
   hasClosed: boolean
+  paused: boolean
+  overspend: boolean
 }
 
 export interface ProjectFilters {
@@ -27,6 +29,8 @@ export interface ProjectFilters {
   riskLevel: string
   paymentStatus: string
   presale: string // '' | 'yes' | 'no'
+  paused: string   // '' | 'yes'（URL-only,风险焦点行跳入）
+  overspend: string // '' | 'yes'（URL-only,风险焦点行跳入）
 }
 
 /** 项目级回款状态四态：无节点 / 延期 / 已回清 / 回款中。
@@ -63,6 +67,8 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       health: p.health?.overall || '无数据',
       isPresale: !!p.isPresale,
       hasClosed: !!p.relatedClosedId,
+      paused: status.是否暂停 === true,
+      overspend: cost.超支 === true,
     }
   })
 }
@@ -77,6 +83,8 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
     if (f.health && r.health !== f.health) return false
     if (f.riskLevel && r.riskLevel !== f.riskLevel) return false
     if (f.paymentStatus && r.paymentStatus !== f.paymentStatus) return false
+    if (f.paused === 'yes' && !r.paused) return false
+    if (f.overspend === 'yes' && !r.overspend) return false
     if (f.presale === 'yes' && !r.isPresale) return false
     if (f.presale === 'no' && r.isPresale) return false
     return true
