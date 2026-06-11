@@ -17,9 +17,10 @@ const PMIS = {
 } as unknown as Record<string, ProjectPmis>
 
 const NODES = [
-  { projectId: 'P-1', nodeName: '初验', nodeStatus: '正常实施中' },
-  { projectId: 'OLD-9', nodeName: '终验', nodeStatus: '已全额回款' },
-  { projectId: 'X', nodeName: '无关', nodeStatus: '延期' },
+  { projectId: 'P-1', nodeName: '初验', nodeStatus: '正常实施中', isPaymentRelated: true },
+  { projectId: 'P-1', nodeName: '非回款里程碑', nodeStatus: '正常实施中', isPaymentRelated: false },
+  { projectId: 'OLD-9', nodeName: '终验', nodeStatus: '已全额回款', isPaymentRelated: true },
+  { projectId: 'X', nodeName: '无关', nodeStatus: '延期', isPaymentRelated: true },
 ] as unknown as RawNode[]
 
 describe('buildProjectPage', () => {
@@ -27,7 +28,8 @@ describe('buildProjectPage', () => {
     const pg = buildProjectPage(PROJECTS, PMIS, NODES, 'P-1')
     expect(pg.project?.projectId).toBe('P-1')
     expect((pg.pmis as any)?.status?.项目状态).toBe('实施中')
-    expect(pg.nodes).toHaveLength(1)
+    expect(pg.nodes).toHaveLength(1) // 非回款节点(isPaymentRelated=false)被排除,与后端聚合口径一致
+    expect(pg.nodes[0].nodeName).toBe('初验')
     expect(pg.closedId).toBe('')
     expect(pg.closedPmis).toBeNull()
     expect(pg.closedNodes).toHaveLength(0)
