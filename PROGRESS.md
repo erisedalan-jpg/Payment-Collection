@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.0.0**
-- 最近更新：2026-06-10（P1 项目主域数据地基完成，V7.0.0）
+- 当前版本：**V7.1.0**
+- 最近更新：2026-06-11（P2 导航收编 + 项目清单 + 项目详情，V7.1.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1 数据地基已完成（分支 feat/phase-p-project-domain 待合并 master，见下方 Handoff）。下一步 P2（导航收编 + /projects 清单 + /project/:id 详情）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
+- [~] **Phase P 项目主域整体看板**：P1 数据地基已合并 master（V7.0.0）；P2 导航收编 + /projects 清单 + /project/:id 详情已完成（分支 feat/phase-p2-projects-nav 待合并，见下方 Handoff）。下一步 P3（快照/diff/events + /activity 项目动态，节点稳定键此期确认）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
 
 ---
 
@@ -104,6 +104,7 @@
 - [ ] **L-16** 上传卡反馈改进（pmis+inputs 两卡）：白名单外文件跳过时提示原因、ok=0 时去掉"请点[更新数据]"后缀、fetch 网络异常捕获提示。
 - [ ] **L-17** CORS 收紧后续：上传/导入等写接口加 Origin/Host 校验，防跨站驱动写（配合 L-13）。
 - [ ] **L-18** analysis_data.json 体积优化（现 4.86MB）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）。
+- [ ] **L-19** P2 遗留小项：el-table 行下钻键盘可达性（清单/抽屉/台账等系列页统一处理,对齐 v-activate 约定）；详情页风险表「是否超期」为多行聚合串,70px 列宽靠 tooltip 可读（可加 formatter 摘要）；金额未填但有节点的项目（2/640）回款状态归「回款中」待业务确认是否单列。
 
 ### 🧰 Harness 自身（持续完善）
 - [x] **HX-1** 建立 `CLAUDE.md`（指令层；以其为唯一代理入口，不设 AGENTS.md）
@@ -122,6 +123,14 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan P2 完成（2026-06-11）：导航收编 + 项目清单 + 项目详情（V7.1.0）
+- 分支 **`feat/phase-p2-projects-nav`**，8 任务全完成，按分级调度执行（设计/计划主循环 Fable 5 亲做；实现 sonnet、核心页面 opus；审查按难度分级，T5 双审），`verify.sh` 全绿。
+- 交付物：侧边导航三段分组（项目 / 回款·重点子域[缩进 + 回款分析子组] / 工具，旧路由全保留，旧首页 label 改「回款总览」暂留 `/`）；`/projects` 清单页（搜索 4 字段 + 阶段/项目状态/健康度/风险等级/回款状态/售前 六维筛选 + 健康度徽章 + 原项目* 徽章 + 行点击跳详情）；`/project/:id` 详情页（回款默认 Tab + 进度里程碑/风险/预算核算 Tab + 售前「原项目」Tab + 404 空态；右栏动态时间线按设计决策推迟 P3）；抽屉「查看完整详情 →」入口（仅主域项目显示）；基建：DataTable `cell-<key>` 插槽（向后兼容）、HealthBadge 三态徽章、lib/projectList 与 lib/projectPage 纯函数（vitest 全覆盖）。
+- 评审修正记录：① 详情页回款表过滤 isPaymentRelated——与后端 aggregate_payment 口径一致（真实数据 214 个有节点项目 chips/表格计数 0 偏差）；② 路由参数变化（/project/A→B 同组件复用）重置回默认回款 Tab——否则售前→非售前留下无高亮孤立 origin 态；③ 清单搜索跳过占位 '-' 字段（53% 项目客户缺失）。
+- 真实数据验证结论（opus 质量审）：空值降级 0 泄漏（340 客户缺失/303 完工缺失全部 '-' 兜底）；日期格式 100% slice(0,10) 安全；售前 closedPmis 命中 222/310（88 个无 PMIS 已关闭记录,页面有提示文案）；closedNodes 当前数据为 0/310 的备用路径（守卫住,数据接入后自动生效）。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → ① 侧栏呈三段分组（项目/回款缩进/工具,无"看板首页"字样）；② /projects 显示 640 行,筛选/搜索/排序可用,行点击进详情；③ 详情页头部徽章/6 指标条/回款默认 Tab（节点表+跟进记录）/风险明细/预算核算,售前项目多「原项目」Tab；④ 任一回款页打开主域项目抽屉出现「查看完整详情 →」,点击跳全页。
+- backlog（P2 遗留小项已并入 🟢 L-19）。
 
 ### ✅ Plan S1 完成（2026-06-09）：双域数据地基（V6.1.0）
 - 分支 **`feat/s1-pmis-governance`**，13 任务全完成、`verify.sh` 全绿（py_compile + ruff + 106 pytest + 87 vitest + typecheck + build）。
