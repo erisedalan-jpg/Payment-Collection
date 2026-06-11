@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
-import { PROJECT_LINKS, PAYMENT_LINKS, ANALYSIS_TAB_LINKS, TOOL_LINKS } from '@/nav'
+import { PROJECT_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 </script>
@@ -18,9 +18,6 @@ const ui = useUiStore()
         <div class="section-label">回款<span class="section-tag">重点子域</span></div>
         <RouterLink v-for="link in PAYMENT_LINKS" :key="link.to" :to="link.to"
           class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        <div class="group-label">回款分析</div>
-        <RouterLink v-for="link in ANALYSIS_TAB_LINKS" :key="link.to" :to="link.to"
-          class="nav-sub nav-sub2" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
       <div class="section">
