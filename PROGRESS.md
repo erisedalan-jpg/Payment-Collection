@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.2.0**
-- 最近更新：2026-06-11（P3 快照/diff/事件流 + 项目动态页，V7.2.0）
+- 当前版本：**V7.3.0**
+- 最近更新：2026-06-11（P4 项目总览首页上线 + 旧首页迁 /payment，V7.3.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1/P2 已合并 master（V7.0.0/V7.1.0）；P3 快照/diff/事件流 + /activity 项目动态 + 详情页右栏已完成（分支 feat/phase-p3-activity 待合并，见下方 Handoff）。下一步 P4（`/` 项目总览·布局 2 上线，旧首页迁 /payment）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
+- [~] **Phase P 项目主域整体看板**：P1-P3 已合并 master（V7.0.0-V7.2.0）；P4 `/` 项目总览（布局 2）+ 旧首页迁 /payment 已完成（分支 feat/phase-p4-overview 待合并，见下方 Handoff）。下一步 P5（/insight 项目分析，项目域五页齐）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
 
 ---
 
@@ -106,6 +106,7 @@
 - [ ] **L-18** analysis_data.json 体积优化（现 4.86MB）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）。
 - [ ] **L-19** P2 遗留小项：el-table 行下钻键盘可达性（清单/抽屉/台账等系列页统一处理,对齐 v-activate 约定）；详情页风险表「是否超期」为多行聚合串,70px 列宽靠 tooltip 可读（可加 formatter 摘要）；金额未填但有节点的项目（2/640）回款状态归「回款中」待业务确认是否单列。
 - [ ] **L-20** P3 遗留小项：重复组节点（同项目同名,59 键）中间插/删行会致 #k 位移、diff 产生组内噪声事件（设计已声明,展示侧可考虑同节点多事件轻度合并）；单快照 ~280KB×90 天 ≈ 25MB（节点数翻倍时关注压缩）；/activity 时间范围筛选随事件量积累再加（现仅内嵌 100 条,YAGNI 裁剪）。
+- [ ] **L-21** 项目域视图（Projects/ProjectDetail/Activity/Overview,P2-P4）字号/间距存在手写散值（22px/12px/gap 等）未走 --fs-*/--sp-* 令牌——P4 终审点名的全域设计债,随 P6-P8 重设计期按 V2 令牌统一整改,新页面起即应只用令牌。
 
 ### 🧰 Harness 自身（持续完善）
 - [x] **HX-1** 建立 `CLAUDE.md`（指令层；以其为唯一代理入口，不设 AGENTS.md）
@@ -124,6 +125,15 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan P4 完成（2026-06-11）：项目总览首页 + 旧首页迁 /payment（V7.3.0）
+- 分支 **`feat/phase-p4-overview`**，4 任务全完成（分级调度：lib/清单扩展 sonnet、总览页+路由让位 opus 双审、设计与收尾主循环），`verify.sh` 全绿（188 pytest + 413 vitest + typecheck + build）。
+- 交付物：`/` 驾驶舱式项目总览（spec 4.1 布局 2）——KPI 条六指标（不可点击）/ 项目健康度（三档+四维异常+风险卡→详情）/ 回款重点带（年度进度条+本月待回+7 天临期+延期 Top3，微块钻 /payment//followup/详情，accent 边框强调）/ 风险焦点行（高风险/暂停/超支带筛选跳清单）/ 右栏动态 10 条+查看全部；`lib/overview` 三纯函数（now 注入）；清单页路由 query 筛选初始化 + paused/overspend URL-only 筛选与可关闭标签；旧回款看板**零改动**平移 `/payment`（FilterBar 保留），catch-all 路由名 dashboard→overview（hideFilter）。
+- 口径决策：KPI 达成率=主域 projects[] 聚合；回款重点带与 /payment 同口径（全 isPaymentRelated 节点）——两套口径并存是有意设计（微块钻的就是 /payment）；暂停=是否暂停 bool、高风险=riskAbnormal、超支=cost.超支。
+- 真实数据基线（质量审 python 复算逐值零误差）：KPI 640/563/8/6/43/59.13%；健康度 547/82/11/0 + 四维 19/6/54/25；年度 4648/11055 万、本月待回 887 万、7 天临期 2、延期 35（Top1 1063 万）。
+- 评审修正记录：延期 Top 项目名（真实 59 字）缺 flex:1+min-width:0 会撑破回款带卡片（对齐 DelayTopCard 既有约定）+ 风险卡 max-width/金额串 nowrap 溢出约束。
+- 手工端到端烟雾测试（需用户执行）：`cd frontend && npm run build` → `python server.py` → ① `/` 显示驾驶舱五区,数字对上基线（640/563/8/6/43/59.13%,年度 4648/11055 万）；② 侧栏「项目」组现"项目总览/项目清单/项目动态",「回款」组"回款总览"指 /payment 且旧看板原样（FilterBar 在）；③ 点风险焦点行"超支"卡 → 清单页带「超支项目 ✕」标签 43 行,关闭恢复；④ 健康度风险卡/延期 Top 项点击进详情页。
+- backlog：无新增（风险卡视觉宽度差异为可选打磨,不立项）。
 
 ### ✅ Plan P3 完成（2026-06-11）：快照/diff/事件流 + 项目动态页（V7.2.0）
 - 分支 **`feat/phase-p3-activity`**，9 任务全完成（分级调度：核心算法/集成 opus、常规 sonnet、设计与收尾主循环），`verify.sh` 全绿（py_compile + ruff + 187 pytest + 396 vitest + typecheck + build）。
