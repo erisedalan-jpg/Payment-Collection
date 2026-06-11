@@ -74,6 +74,16 @@ describe('insightCross / insightPivot', () => {
     expect(m.cells).toEqual([[1, 1], [1, 0]])
     expect(m.index['风险']['何平'].rows[0].projectId).toBe('P-1')
   })
+  it('rate 指标:桶存在但无数据 → 格为 NaN(展示层显 -),不与真实 0% 混淆', () => {
+    const rows = buildInsightRows(PROJECTS, PMIS)
+    const m = insightCross(rows, 'health', 'manager', 'paymentRatio')
+    const r = m.rows.indexOf('健康')
+    const c = m.cols.indexOf('李四')
+    expect(Number.isNaN(m.cells[r][c])).toBe(true)   // P-3 Σexpected=0 → null → NaN
+    const c2 = m.cols.indexOf('何平')
+    expect(m.cells[r][c2]).toBeCloseTo(1)            // P-2 1000/1000,真实值不受影响
+  })
+
   it('透视:colDims 空退化单列合计', () => {
     const rows = buildInsightRows(PROJECTS, PMIS)
     const p = insightPivot(rows, ['manager'], [], 'contractAmount')

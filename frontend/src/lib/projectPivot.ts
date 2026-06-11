@@ -141,6 +141,14 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
 
 const mv = (g: InsightGroup, k: InsightMetricKey): number => (g[k] ?? 0) as number
 
+/** 矩阵/透视格值:桶存在但 rate 指标无数据(null)用 NaN 标记,展示层显 '-'(区别于真实 0%);
+ *  桶不存在为 0(组件 has() 已置灰)。排序/合计仍走 mv(??0),NaN 不参与。 */
+const cellVal = (g: InsightGroup | undefined, k: InsightMetricKey): number => {
+  if (!g) return 0
+  const v = g[k]
+  return v == null ? NaN : (v as number)
+}
+
 /** 双维交叉(复用 pivot 泛型结构):行列按指标合计降序,rate 指标 null→0 计 */
 export function insightCross(
   rows: InsightRow[], rowDim: string, colDim: string, metricKey: InsightMetricKey,
@@ -158,7 +166,7 @@ export function insightCross(
   }
   const rws = Object.keys(rowTot).sort((a, b) => rowTot[b] - rowTot[a])
   const cols = Object.keys(colTot).sort((a, b) => colTot[b] - colTot[a])
-  const cells = rws.map((rv) => cols.map((cv) => (index[rv]?.[cv] ? mv(index[rv][cv], metricKey) : 0)))
+  const cells = rws.map((rv) => cols.map((cv) => cellVal(index[rv]?.[cv], metricKey)))
   return { rows: rws, cols, cells, index }
 }
 
@@ -189,7 +197,7 @@ export function insightPivot(
   const colKeys = [...colMap.keys()].sort((a, b) => colTot[b] - colTot[a])
   const prows: PivotRow[] = rowKeys.map((k) => ({ key: k, tuple: rowMap.get(k)! }))
   const pcols: PivotCol[] = colKeys.map((k) => ({ key: k, label: colDims.length ? k : '合计' }))
-  const cells = prows.map((r) => pcols.map((c) => (index[r.key]?.[c.key] ? mv(index[r.key][c.key], metricKey) : 0)))
+  const cells = prows.map((r) => pcols.map((c) => cellVal(index[r.key]?.[c.key], metricKey)))
   return {
     rowDimLabels: rowDims.map((d) => INSIGHT_DIM_BY_KEY[d]?.label ?? d),
     colDimLabels: colDims.map((d) => INSIGHT_DIM_BY_KEY[d]?.label ?? d),
