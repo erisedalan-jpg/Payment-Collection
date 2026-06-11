@@ -91,8 +91,12 @@ def load_snapshot(dirpath: str, date_str: str) -> Optional[dict]:
     path = os.path.join(dirpath, f"{date_str}.json")
     if not os.path.exists(path):
         return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        # 损坏/不可读的快照按缺失处理(与 append_events 防护标准一致),调用方走"无基线"分支
+        return None
 
 
 def save_snapshot(dirpath: str, snap: dict, today: Optional[str] = None, keep_days: int = 90) -> None:
