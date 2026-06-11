@@ -29,7 +29,8 @@ export interface ProjectFilters {
   presale: string // '' | 'yes' | 'no'
 }
 
-/** 项目级回款状态四态：无节点 / 延期 / 已回清 / 回款中 */
+/** 项目级回款状态四态：无节点 / 延期 / 已回清 / 回款中。
+ * 边界：有节点但金额全 0（节点建了未填金额，真实数据约 2/640）归「回款中」，业务上如需单列再调。 */
 export function paymentStatusOf(p: Project): string {
   const pay = p.payment
   if (!pay || !pay.relatedNodeCount) return '无节点'
@@ -69,7 +70,8 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
 export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): ProjectRow[] {
   const q = (f.search || '').trim().toLowerCase()
   return rows.filter((r) => {
-    if (q && ![r.projectName, r.projectId, r.customer, r.projectManager].some((s) => s.toLowerCase().includes(q))) return false
+    // s !== '-'：占位值不参与搜索匹配（如 53% 项目客户缺失为 '-'，搜索单字符 '-' 不应命中它们）
+    if (q && ![r.projectName, r.projectId, r.customer, r.projectManager].some((s) => s !== '-' && s.toLowerCase().includes(q))) return false
     if (f.stage && r.stage !== f.stage) return false
     if (f.projectStatus && r.projectStatus !== f.projectStatus) return false
     if (f.health && r.health !== f.health) return false
@@ -81,7 +83,8 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
   })
 }
 
-/** 下拉选项：从行集取该列出现过的非空值（保插入序，剔除占位 '-'） */
+/** 下拉选项：从行集取该列出现过的非空值（保插入序，剔除占位 '-'）。
+ * 仅服务数据驱动的开放枚举列；health/paymentStatus 是代码定义的闭集，由视图层硬编码选项。 */
 export function distinctOptions(rows: ProjectRow[], key: 'stage' | 'projectStatus' | 'riskLevel'): string[] {
   return [...new Set(rows.map((r) => r[key]).filter((v) => v && v !== '-'))]
 }
