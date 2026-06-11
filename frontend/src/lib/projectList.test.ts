@@ -68,7 +68,7 @@ describe('buildProjectRows', () => {
   })
 })
 
-const F0: ProjectFilters = { search: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '' }
+const F0: ProjectFilters = { search: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -97,5 +97,24 @@ describe('distinctOptions', () => {
   it('去重且剔除空与占位 -', () => {
     const rows = buildProjectRows([proj(), proj({ projectId: 'NO-PMIS' })], PMIS)
     expect(distinctOptions(rows, 'stage')).toEqual(['项目执行'])
+  })
+})
+
+describe('paused/overspend 扩展(P4 风险焦点行)', () => {
+  const PM2: Record<string, any> = {
+    'QABJ-SS-1': { status: { 是否暂停: true }, cost: { 超支: true } },
+  }
+  it('build 取 是否暂停/超支 bool', () => {
+    const [r] = buildProjectRows([proj()], PM2 as any)
+    expect(r.paused).toBe(true)
+    expect(r.overspend).toBe(true)
+    const [r2] = buildProjectRows([proj({ projectId: 'NO-PMIS' })], PM2 as any)
+    expect(r2.paused).toBe(false)
+    expect(r2.overspend).toBe(false)
+  })
+  it('filter paused=yes / overspend=yes', () => {
+    const rows = buildProjectRows([proj(), proj({ projectId: 'X2', projectName: '乙' })], PM2 as any)
+    expect(filterProjectRows(rows, { ...F0, paused: 'yes' })).toHaveLength(1)
+    expect(filterProjectRows(rows, { ...F0, overspend: 'yes' })[0].projectId).toBe('QABJ-SS-1')
   })
 })
