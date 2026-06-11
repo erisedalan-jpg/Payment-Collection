@@ -1236,6 +1236,8 @@ def main():
     final_data["periodCompare"] = period_compare
     if events_embed:
         print(f"  [OK] 新事件 {len([e for e in events_embed if e['date'] == datetime.now().strftime('%Y-%m-%d')])} 条,内嵌最近 {len(events_embed)} 条")
+    elif period_compare.get("lastSync"):
+        print("  [INFO] 与上次快照相比无变化")
     else:
         print("  [INFO] 首次快照,暂无变化记录")
 
