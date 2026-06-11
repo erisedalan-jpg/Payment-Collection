@@ -11,6 +11,7 @@ import DataQualityView from '@/views/DataQualityView.vue'
 import ProjectsView from '@/views/ProjectsView.vue'
 import ProjectDetailView from '@/views/ProjectDetailView.vue'
 import ActivityView from '@/views/ActivityView.vue'
+import OverviewView from '@/views/OverviewView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于)
 declare module 'vue-router' {
@@ -31,10 +32,11 @@ export const router = createRouter({
     { path: '/followup', name: 'followup', component: FollowupView, meta: { title: '临期跟进' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
     { path: '/analysis/:tab', name: 'analysis', component: AnalysisView, meta: { title: '业务分析' } },
+    { path: '/payment', name: 'payment', component: DashboardView, meta: { title: '回款总览' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true } },
     { path: '/about', name: 'about', component: AboutView, meta: { title: '关于产品', hideFilter: true } },
-    // catch-all (including '/') renders DashboardView and is the canonical 'dashboard' name
-    { path: '/:pathMatch(.*)*', name: 'dashboard', component: DashboardView, alias: '/', meta: { title: '看板首页' } },
+    // catch-all(含 '/')渲染项目总览——P4 起 '/' 为项目主域首页,旧回款看板迁 /payment
+    { path: '/:pathMatch(.*)*', name: 'overview', component: OverviewView, alias: '/', meta: { title: '项目总览', hideFilter: true } },
   ],
 })
