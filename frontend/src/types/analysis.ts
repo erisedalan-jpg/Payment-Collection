@@ -164,6 +164,7 @@ export type Projectid2 = string;
 export type Projectname2 = string;
 export type Summary3 = string;
 export type Amount1 = number | null;
+export type Tone = string;
 export type Events = Event[];
 export type Basedate = string;
 export type Advancedprojects = number;
@@ -520,6 +521,7 @@ export interface Event {
   prev?: unknown;
   curr?: unknown;
   amount?: Amount1;
+  tone?: Tone;
   [k: string]: unknown;
 }
 export interface PeriodCompare {

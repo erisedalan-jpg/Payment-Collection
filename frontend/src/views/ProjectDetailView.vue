@@ -233,6 +233,7 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in paySummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
+            <div class="pd-note">完成率=回款流水累计÷合同总额（payment_records.csv；售前项目取原项目合同总额）；计划/已回/待回与下表为云文档节点口径。</div>
             <DataTable :columns="NODE_COLS" :rows="page.nodes" />
             <div class="pd-section-title">跟进记录</div>
             <FollowupRecords :project-id="p.projectId" :project-name="p.projectName || ''" />

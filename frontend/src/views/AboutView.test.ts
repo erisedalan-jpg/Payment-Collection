@@ -18,5 +18,6 @@ describe('AboutView', () => {
     expect(w.text()).toContain('数据治理')
     expect(w.text()).toContain('王叙潼牛逼')
     expect(w.text()).not.toContain('数据来源')
+    expect(w.text()).toContain('健康度规则')   // S1:健康度定义入关于页
   })
 })

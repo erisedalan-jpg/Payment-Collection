@@ -111,6 +111,26 @@ def delivery_costs_for(row: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
+def delivery_overspend_cats(delivery_costs: List[Dict[str, Any]]) -> List[str]:
+    """交付费用超支类目(S1):实际发生 > 预算金额 的类目名(预算缺失不判)。"""
+    out = []
+    for c in delivery_costs or []:
+        b, a = c.get("预算金额"), c.get("实际发生")
+        if b is not None and a is not None and a > b:
+            out.append(str(c.get("类别") or ""))
+    return out
+
+
+def payment_ratio_from_records(records_total: Optional[float], contract: Optional[float],
+                               closed_contract: Optional[float]) -> Optional[float]:
+    """回款完成率新口径(S1):流水累计 ÷ 合同总额(本项目优先,售前回退原项目)。
+    分母缺失/0 → None(前端显 '-');无流水但有合同 → 0。"""
+    denom = contract if contract else closed_contract
+    if not denom or denom <= 0:
+        return None
+    return round((records_total or 0) / denom, 4)
+
+
 def aggregate_payment(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """项目的回款子域聚合(仅 isPaymentRelated 节点;明细仍在 rawNodes,不复制)。"""
     rel = [n for n in nodes if n.get("isPaymentRelated")]

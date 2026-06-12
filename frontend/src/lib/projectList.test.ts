@@ -74,7 +74,7 @@ describe('buildProjectRows', () => {
   })
 })
 
-const F0: ProjectFilters = { search: '', orgL4: '', stage: '', projectStatus: '', health: '', riskLevel: '', paymentStatus: '', presale: '', paused: '', overspend: '' }
+const F0: ProjectFilters = { search: '', manager: [], orgL4: [], stage: [], projectStatus: [], riskLevel: [], projectLevel: [], paymentStatus: [], health: [], presale: '', paused: '', overspend: '' }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -88,9 +88,17 @@ describe('filterProjectRows', () => {
     expect(filterProjectRows(rows, { ...F0, search: '不存在' })).toHaveLength(0)
   })
   it('按健康度与售前过滤', () => {
-    expect(filterProjectRows(rows, { ...F0, health: '关注' })).toHaveLength(1)
+    expect(filterProjectRows(rows, { ...F0, health: ['关注'] })).toHaveLength(1)
     expect(filterProjectRows(rows, { ...F0, presale: 'yes' })[0].projectId).toBe('QAX-2')
     expect(filterProjectRows(rows, { ...F0, presale: 'no' })[0].projectId).toBe('QABJ-SS-1')
+  })
+  it('多选命中:stage 两类 / manager 单选', () => {
+    const multi = buildProjectRows(
+      [proj(), proj({ projectId: 'X3', projectName: '丙', projectManager: '王五' })],
+      { ...PMIS, X3: { progress: { 项目阶段: '项目收尾' } } as unknown as ProjectPmis },
+    )
+    expect(filterProjectRows(multi, { ...F0, stage: ['项目执行', '项目收尾'] })).toHaveLength(2)
+    expect(filterProjectRows(multi, { ...F0, manager: ['何平'] })).toHaveLength(1)
   })
   it("搜索 '-' 不命中占位字段(客户缺失为 '-')", () => {
     // X9 行四个搜索字段中只有 customer 占位 '-' 含连字符 → 不应命中
@@ -106,7 +114,7 @@ describe('orgL4 列与筛选(P5.5 用户反馈)', () => {
       {},
     )
     expect(rows[0].orgL4).toBe('小微部')
-    expect(filterProjectRows(rows, { ...F0, orgL4: 'B组' })).toHaveLength(1)
+    expect(filterProjectRows(rows, { ...F0, orgL4: ['B组'] })).toHaveLength(1)
     expect(distinctOptions(rows, 'orgL4').sort()).toEqual(['B组', '小微部'])
   })
 })

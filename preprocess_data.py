@@ -988,7 +988,8 @@ def run_snapshot_pipeline(final_data, output_dir, today=None):
     events_path = os.path.join(output_dir, "events.json")
 
     cur = snapshots_mod.build_snapshot(
-        today, final_data["projects"], final_data["projectPmis"], final_data["rawNodes"])
+        today, final_data["projects"], final_data["projectPmis"], final_data["rawNodes"],
+        final_data.get("projectProfit"))
 
     dates = snapshots_mod.list_snapshot_dates(snap_dir)
     baselines = snapshots_mod.pick_baseline_dates(dates, today)
@@ -1229,6 +1230,17 @@ def main():
             print(f"  [OK] {label} {st['rows']} 行, 命中 {st['matched']}")
         else:
             print(f"  [WARN] 未提供 {label} 数据文件")
+
+    # === S1: 回款完成率切流水口径(流水累计÷合同总额,售前回退原项目;文件缺失保留旧口径) ===
+    if pr_stat["provided"]:
+        def _contract(pid):
+            return ((project_pmis.get(pid) or {}).get("customer") or {}).get("合同总额")
+        for p in dept_projects:
+            rec = payment_records.get(p["projectId"]) or {}
+            p["payment"]["paymentRatio"] = projects_mod.payment_ratio_from_records(
+                rec.get("total"), _contract(p["projectId"]),
+                _contract(p.get("relatedClosedId") or ""))
+        print("  [OK] 回款完成率已切换为 流水累计÷合同总额 口径")
 
     # === 10. 构建最终数据 ===
     final_data = {
