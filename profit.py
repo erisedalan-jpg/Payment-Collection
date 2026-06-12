@@ -67,7 +67,11 @@ def parse_profit_rows(row: Dict[str, Any], prefix: str) -> List[Dict[str, Any]]:
                           "budget": None, "estimate": None, "final": None,
                           "actual": None, "remaining": None, "rate": None}
             order.append(key)
-        found[key][_METRIC_KEYS[metric]] = _num(raw)
+        val = _num(raw)
+        if metric == "消耗率" and val is not None:
+            # CSV 消耗率为百分点量级(实测 字段=actual/budget*100,如 184.52=184.52%),归一 0-1 与全站口径一致
+            val = round(val / 100, 6)
+        found[key][_METRIC_KEYS[metric]] = val
     out = []
     for key in order:
         r = found[key]
@@ -135,8 +139,12 @@ def load_profit(input_dir: str, keep_ids: Set[str]
             if hit:
                 row_item["estimate"] = hit["estimate"]
                 row_item["final"] = hit["final"]
+        summary = {k: _num(r.get(k)) for k in _SUMMARY_COLS}
+        if summary.get("成本消耗率") is not None:
+            # 顶部汇总「成本消耗率」与科目树消耗率同为百分点量级(毛利率列则是 0-1),同样归一
+            summary["成本消耗率"] = round(summary["成本消耗率"] / 100, 6)
         out[pid] = {
-            "summary": {k: _num(r.get(k)) for k in _SUMMARY_COLS},
+            "summary": summary,
             "rows": rows,
             "bridge": None,
         }
