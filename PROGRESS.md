@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.5.0**
-- 最近更新：2026-06-11（P6 回款分析归并 /panalysis + 回款总览瘦身，V7.5.0）
+- 当前版本：**V7.6.0**
+- 最近更新：2026-06-12（P8 数据治理页健康检查重设计 + 工具组收尾 + 打包专项核验，V7.6.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1-P5.5 已合并 master（V7.0.0-V7.4.1）；P6 回款分析归并 + 回款总览瘦身已完成（分支 feat/phase-p6-payment-redesign 待合并，见下方 Handoff）。下一步 P7（回款子域重设计②：日历/临期跟进/台账按 V2 令牌逐页重做）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
+- [~] **Phase P 项目主域整体看板**：P1-P6 已合并 master（V7.0.0-V7.5.0，P6 合并提交 85ea00b）；**P7 暂停**（用户 2026-06-12 决策：回款子域预计全量重新设计，逐页翻新会被推翻，后续独立立项时整体覆盖）；P8（治理页健康检查重设计 + 工具组收尾 + 打包专项核验）已完成，分支 feat/phase-p8-governance 待合并（见 Handoff）。P8 合并后 Phase P 收官（P7 取消出排期）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）+ 2026-06-12-P8-governance-tools-design.md。
 
 ---
 
@@ -53,7 +53,7 @@
 - [ ] **H-8** 抽取 `run_sync`/`run_import` 重复的"双模式 + 进度解析"为公共函数。 (部分由 A3 完成：解析逻辑已提取复用)；上传 handler 镜像对(handle_pmis_upload/handle_inputs_upload)也一并抽取,并包 PermissionError/ValueError 返回 JSON 错误(文件被 Excel 占用/Content-Length 非法时现为裸断连接)
 - [x] **A3** server.py API 契约与进度健壮性：统一错误响应 {success,code,message} 收口各 handler；进度解析提取为可测 classify_progress_line（run_sync/run_import 三处循环复用，含 ok/info 合并贴近原逻辑，H-8 部分达成）；跟进云写入串行锁 _write_followup_lock（防 WPS 并发覆盖）。
 - [ ] **A4** Playwright 脚本健壮性（需浏览器/云文档手验）：fetch_yundocs_full.py 抓取分块超时/重试；write_followup.py 把手工引号/换行转义改为 json.dumps；脚本输出改 JSON 行协议（与 classify_progress_line 对接）。
-- [ ] **P8-pre** 治理页重设计时的质量数据细分备忘：mappingFile matchRate 0.671 需拆分（75 条映射不在 PMIS=陈旧、68 条 closed、9 条被部门筛除）；增加"L4 命中但项目经理为空"告警；projectsQuality 三个 List[Dict] 收紧为带字段模型。
+- [ ] **P8-pre** 质量数据后端细分备忘（P8 治理页重设计为零后端改动，本项保留）：mappingFile matchRate 0.671 需拆分（75 条映射不在 PMIS=陈旧、68 条 closed、9 条被部门筛除）；增加"L4 命中但项目经理为空"告警；projectsQuality 三个 List[Dict] 收紧为带字段模型。注：P8 已落地告警注册表（lib/governance.ts buildHealthReport），新增告警类目只需后端补数据 + 注册表加一项，接入点就绪。
 
 ### 🟡 中（前端架构，较大重构，需在测试保护下分步做）
 - [ ] **M-9** `app.js` 按页面拆分 ES Modules，事件委托替代内联 `onclick`。
@@ -106,7 +106,7 @@
 - [ ] **L-18** analysis_data.json 体积优化（现 4.86MB）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）。
 - [ ] **L-19** P2 遗留小项：el-table 行下钻键盘可达性（清单/抽屉/台账等系列页统一处理,对齐 v-activate 约定）；详情页风险表「是否超期」为多行聚合串,70px 列宽靠 tooltip 可读（可加 formatter 摘要）；金额未填但有节点的项目（2/640）回款状态归「回款中」待业务确认是否单列。
 - [ ] **L-20** P3 遗留小项：重复组节点（同项目同名,59 键）中间插/删行会致 #k 位移、diff 产生组内噪声事件（设计已声明,展示侧可考虑同节点多事件轻度合并）；单快照 ~280KB×90 天 ≈ 25MB（节点数翻倍时关注压缩）；/activity 时间范围筛选随事件量积累再加（现仅内嵌 100 条,YAGNI 裁剪）。
-- [ ] **L-21** 项目域视图字号散值已于 P5.5 迁移 rem 令牌（done 部分）；**余项**：间距/圆角等 px 散值未走 --sp-*/--r-* 令牌 + BoardView 排名图两处硬编码 hex——随 P6-P8 重设计期统一整改。
+- [x] **L-21** 令牌化整改关闭（P5.5 字号 rem + P8 存活页扫尾）：项目域五页/数据管理/布局三件/共用组件 px 散值清零（42px 侧栏对齐缩进与 1-3px 微调按规范保留）；BoardView 两处状态 hex 入 echartsTheme STATUS_LIGHT/DARK 镜像（契约测试同步 theme.css）。**移交回款全量重设计**（实测规模远超原记录）：回款域遗留页约 230 处 px（Calendar/Followup/Ledger/Dashboard/PayAnalysis 及专属组件链）+ lib/calendar.ts、lib/planBoards.ts、nav.ts TIERS 回退 hex（--red/--orange/--green 未在 theme 定义，档位分类色语义待该期定）；ColumnFilter 经引用核实为回款专属（LedgerTable/PlanBoard），一并移交。
 - [ ] **P-next（用户待办,2026-06-11）**：① 回款金额数据源拟从云文档迁 PMIS——等用户给出 PMIS 侧数据出处后立项；② Insight 后端增列候选维度（项目级别/项目类型/省份/营销一级部门/项目一级分类/主责部门/销售,均在 PMIS 表头存在）——用户选定后做 pmis.py 摄取+schema+前端接入；③ 若期望 PMIS 侧项目里程碑明细,需 PMIS 补导出逐里程碑表（当前仅百分比/状态枚举）。
 
 ### 🧰 Harness 自身（持续完善）
@@ -126,6 +126,16 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan P8 完成（2026-06-12）：数据治理页健康检查重设计 + 工具组收尾 + 打包专项核验（V7.6.0）
+- 分支 **`feat/phase-p8-governance`**，6 任务（视图模型/治理页 opus，关于页/令牌扫尾 sonnet，打包/收尾主循环），`verify.sh` 全绿。spec：`docs/superpowers/specs/2026-06-12-P8-governance-tools-design.md`（含 P7 暂停决策记录）。
+- **治理页 /governance 整页重写**（「同步后健康检查」三层）：① 结论横幅三态（红=云文档主数据缺失 / 黄=辅源缺失或高中告警 / 绿=无高中告警，低优先附注不阻塞绿）；② 五张源状态卡（云文档/PMIS/组织架构/售前映射/delivery，缺失=灰态未提供）；③ 折叠分级告警区——九类静态+四类动态缺失告警，严重度 高(源缺失/PMIS未匹配/负责人不在清单)→中(回填/售前未映射/口径冲突/主题覆盖不足)→低(人员无项目/脏值)，0 条置灰沉底，展开=明细表(DataTable)+导出(四类目)，源缺失类展开为降级说明 note。双向告警(母 spec §3.6)落地为「负责人不在人员清单」(高)+「人员清单无项目」(低)。
+- 架构：纯函数 `lib/governance.ts buildHealthReport(AnalysisData)→HealthReport`（10 项单测全分支），View 是薄渲染层（8 项组件测试），**零后端改动**；旧 coverageColor/verdictLabel 删除。
+- 真实数据核验：joinRate 0-1 量纲、themes verdict 枚举吻合；当前真实数据呈黄横幅「6 类告警需关注·另有 12 条低优先提示」（负责人告警 21/未匹配 8/回填 250/售前未映射 7/冲突 3/覆盖不足 1，低优先：人员无项目 11+脏值 1）。
+- **工具组收尾**：关于页双域刷新（项目域五页/回款域五页/工具组 + 三类数据来源）+ 全令牌化；数据管理页文案对齐（项目映射→售前映射、预算核算→预算核算明细）。
+- **L-21 扫尾**：见 backlog L-21 关闭条目；BoardView 状态色入 echartsTheme STATUS_LIGHT/DARK 镜像（契约测试同步 theme.css，主题切换响应）。
+- **打包专项核验**：① 修复 `.spec` **write_followup.py 缺件**（server.py:230 frozen 分支 _run_script_direct 依赖，打包版跟进回写此前必坏）+ exe 名 v7.6.0；② frozen 走查通过——四个 _run_script_direct 目标脚本（preprocess_data/fetch_yundocs_full/pmis_download/write_followup）BASE_DIR 均双模式正确（sys.executable 目录），可变数据（data/snapshots/events/input/yundocs_data/followup_records）全挂 exe 目录，内嵌脚本走 _MEIPASS+cwd=BASE_DIR；③ 本地 PyInstaller 6.20 实际构建成功（dist/PaymentReviewApp_v7.6.0.exe，76MB），exe 冒烟通过（/ 200、/data/analysis_data.json 200 5.1MB、浏览器实载成功、/api/stop 优雅停止）。注意：本机 curl 走系统代理会对 localhost 返回 503，测试需 `--noproxy '*'`。
+- 手工烟雾清单（需用户执行）：① /governance 黄横幅「6 类告警需关注」+ 五源卡数值（更新时间对照数据管理页）；② 展开「PMIS 未匹配」明细表+导出 xlsx 可开；③ 0 条告警（如口径冲突清零后）置灰不可点；④ 展开「数据源缺失」类（可临时移走 input 文件重跑更新数据验证）显示降级说明；⑤ /about 双域文案 + V7.6.0；⑥ 字号三档在治理/关于页生效；⑦ dist/PaymentReviewApp_v7.6.0.exe 双击启动目检治理页渲染（exe 目录需有 data/）。
 
 ### ✅ Plan P6 完成（2026-06-11）：回款分析归并 + 回款总览瘦身（V7.5.0）
 - 分支 **`feat/phase-p6-payment-redesign`**，3 任务（归并 opus / 瘦身 sonnet / 收尾主循环），`verify.sh` 全绿。
