@@ -63,10 +63,10 @@ const mode = computed({
 </template>
 
 <style scoped>
-.filter-bar { display: flex; align-items: center; gap: 16px; padding: 8px 18px;
+.filter-bar { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) var(--sp-4);
   border-bottom: 1px solid var(--line); background: var(--card); font-size: var(--fs-1); color: var(--sub); }
-.fb-item { display: inline-flex; align-items: center; gap: 6px; }
-.fb-item select { padding: 4px 8px; border: 1px solid var(--line2); border-radius: 6px;
+.fb-item { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.fb-item select { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line2); border-radius: var(--r-sm);
   font-size: var(--fs-1); background: var(--card2); color: var(--txt); }
 .naguan { margin-left: auto; }
 </style>

@@ -29,8 +29,8 @@ function order(v: string): number {
 </template>
 
 <style scoped>
-.dp { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-.dp-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer; font-size: var(--fs-1); padding: 4px 10px; border-radius: 8px; }
+.dp { display: inline-flex; flex-wrap: wrap; gap: var(--sp-2); }
+.dp-chip { display: inline-flex; align-items: center; gap: var(--sp-1); border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer; font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-md); }
 .dp-chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }
-.dp-ord { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; }
+.dp-ord { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: var(--r-full); background: var(--accent); color: var(--on-accent); font-size: var(--fs-1); font-weight: 700; }
 </style>

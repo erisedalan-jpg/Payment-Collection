@@ -90,12 +90,12 @@ const summary = computed(() => {
 </template>
 
 <style scoped>
-.pd-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; margin-bottom: 16px; }
-.pd-cell { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px;
-  background: var(--card2); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.pd-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-4); }
+.pd-cell { display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-md); font-size: var(--fs-2); }
 .pd-k { color: var(--mut); }
 .pd-v { color: var(--txt); font-weight: 600; text-align: right; }
-.pd-nodes-title { font-weight: 700; color: var(--accent); font-size: 13px; margin-bottom: 8px; }
-.pd-empty { color: var(--mut); padding: 24px; text-align: center; }
-.pd-full-link { border: none; background: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 10px; }
+.pd-nodes-title { font-weight: 700; color: var(--accent); font-size: var(--fs-2); margin-bottom: var(--sp-2); }
+.pd-empty { color: var(--mut); padding: var(--sp-5); text-align: center; }
+.pd-full-link { border: none; background: none; color: var(--accent); font-size: var(--fs-2); font-weight: 600; cursor: pointer; padding: 0; margin-bottom: var(--sp-3); }
 </style>

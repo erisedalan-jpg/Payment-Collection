@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { CHART_LIGHT, CHART_DARK, STRUCT_LIGHT, STRUCT_DARK, FONT_SANS } from './echartsTheme'
+import { CHART_LIGHT, CHART_DARK, STRUCT_LIGHT, STRUCT_DARK, FONT_SANS, STATUS_LIGHT, STATUS_DARK } from './echartsTheme'
 
 // 双源契约(spec 1.7):ECharts 画在 canvas 上读不到 CSS 变量,
 // echartsTheme.ts 的取值必须与 theme.css 同名令牌逐项一致 —— 改一边漏一边,这里即红。
@@ -54,5 +54,16 @@ describe('ECharts 双源契约 · 结构映射(spec 1.7)', () => {
   })
   it('字体栈 = theme.css --font-sans', () => {
     expect(FONT_SANS.toLowerCase()).toBe(cssVar(root, '--font-sans'))
+  })
+})
+
+describe('ECharts 双源契约 · 状态色(spec 1.7)', () => {
+  it('STATUS_* 与 theme.css 状态色同步', () => {
+    expect(STATUS_LIGHT.ok).toBe(cssVar(root, '--ok'))
+    expect(STATUS_LIGHT.warn).toBe(cssVar(root, '--warn'))
+    expect(STATUS_LIGHT.danger).toBe(cssVar(root, '--danger'))
+    expect(STATUS_DARK.ok).toBe(cssVar(dark, '--ok'))
+    expect(STATUS_DARK.warn).toBe(cssVar(dark, '--warn'))
+    expect(STATUS_DARK.danger).toBe(cssVar(dark, '--danger'))
   })
 })

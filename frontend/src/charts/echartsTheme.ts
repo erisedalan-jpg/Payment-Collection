@@ -48,3 +48,7 @@ registerTheme(ENT_THEME, buildTheme(CHART_LIGHT, STRUCT_LIGHT))
 // 'ent-dark':深色
 export const ENT_THEME_DARK = 'ent-dark'
 registerTheme(ENT_THEME_DARK, buildTheme(CHART_DARK, STRUCT_DARK))
+
+// 状态色镜像(canvas 不能读 CSS 变量,与 CHART_* 同理;契约测试与 theme.css 同步)
+export const STATUS_LIGHT = { ok: '#4e9a7c', warn: '#e0a23b', danger: '#d24d5c' }
+export const STATUS_DARK = { ok: '#5ba88a', warn: '#e6b056', danger: '#e0697a' }

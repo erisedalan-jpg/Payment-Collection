@@ -29,10 +29,10 @@ const FONTS: { key: FontScale; label: string }[] = [
 </template>
 
 <style scoped>
-.display-settings { display: flex; align-items: center; gap: 8px; }
-.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.display-settings { display: flex; align-items: center; gap: var(--sp-2); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .seg-btn { border: none; background: var(--card); color: var(--sub); cursor: pointer;
-  font-size: 12px; padding: 4px 10px; }
+  font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); }
 .seg-btn + .seg-btn { border-left: 1px solid var(--line); }
 .seg-btn.on { background: var(--accent); color: #fff; font-weight: 700; }
 .seg-btn:hover:not(.on) { color: var(--txt); }

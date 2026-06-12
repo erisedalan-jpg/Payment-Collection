@@ -3,6 +3,8 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
+import { useSettingsStore } from '@/stores/settings'
+import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import { DIMENSIONS, groupByDims, crossMatrix, pivotTable, METRICS, METRIC_BY_KEY, type PivotGroup } from '@/lib/pivot'
 import { fmtWan, pct } from '@/lib/format'
 import ChartBox from '@/charts/ChartBox.vue'
@@ -15,6 +17,7 @@ import BoardDrilldownModal from '@/components/BoardDrilldownModal.vue'
 const route = useRoute()
 const data = useDataStore()
 const filter = useFilterStore()
+const settings = useSettingsStore()
 
 const DIM_OPTS = DIMENSIONS.map((d) => ({ value: d.key, label: d.label }))
 const METRIC_OPTS = METRICS.map((m) => ({ value: m.key, label: m.label }))
@@ -59,17 +62,20 @@ const groups = computed<PivotGroup[]>(() => {
   return [...gs].sort((a, b) => (b[k] as number) - (a[k] as number))
 })
 const top = computed(() => groups.value.slice(0, 15))
-const chartOption = computed(() => ({
-  tooltip: { trigger: 'axis' },
-  legend: { data: ['已回款', '待回款'], top: 0 },
-  grid: { left: 60, right: 20, top: 30, bottom: 60 },
-  xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
-  yAxis: { type: 'value', name: '金额(万)' },
-  series: [
-    { name: '已回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.actualAmount / 10000).toFixed(2)), itemStyle: { color: '#10B981' } },
-    { name: '待回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.remainingAmount / 10000).toFixed(2)), itemStyle: { color: '#F59E0B' } },
-  ],
-}))
+const chartOption = computed(() => {
+  const sc = settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['已回款', '待回款'], top: 0 },
+    grid: { left: 60, right: 20, top: 30, bottom: 60 },
+    xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
+    yAxis: { type: 'value', name: '金额(万)' },
+    series: [
+      { name: '已回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.actualAmount / 10000).toFixed(2)), itemStyle: { color: sc.ok } },
+      { name: '待回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.remainingAmount / 10000).toFixed(2)), itemStyle: { color: sc.warn } },
+    ],
+  }
+})
 
 // ---- 共用指标格式 ----
 const metricKind = computed(() => METRIC_BY_KEY[metricKey.value].kind)
