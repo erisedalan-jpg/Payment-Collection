@@ -1592,7 +1592,7 @@ def create_server(host=HOST, port=PORT):
 
 def main():
     logger.info("=" * 50)
-    logger.info("项目回款跟踪与管控平台 - 本地服务启动")
+    logger.info("项目管理平台 - 本地服务启动")
     logger.info(f"目录: {BASE_DIR}")
     logger.info(f"日志: {os.path.join(LOG_DIR, 'server.log')}")
     logger.info(f"访问: http://localhost:{PORT}")

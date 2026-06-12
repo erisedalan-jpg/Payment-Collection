@@ -12,7 +12,7 @@ describe('AppHeader', () => {
     const store = useDataStore()
     store.data = { meta: { lastUpdate: '2026-06-03 10:00', totalProjects: 1, totalPaymentNodes: 1 } } as any
     const wrapper = mount(AppHeader)
-    expect(wrapper.text()).toContain('项目回款跟踪与管控平台')
+    expect(wrapper.text()).toContain('项目管理平台')
     expect(wrapper.text()).toContain('2026-06-03 10:00')
   })
 
