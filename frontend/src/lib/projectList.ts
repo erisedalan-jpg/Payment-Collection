@@ -5,6 +5,9 @@ export interface ProjectRow {
   projectId: string
   projectName: string
   customer: string
+  contractAmount: number | null
+  projectLevel: string
+  projectType: string
   projectManager: string
   orgL4: string
   stage: string
@@ -57,6 +60,9 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       projectId: p.projectId,
       projectName: p.projectName || '-',
       customer: customer.最终客户 || '-',
+      contractAmount: typeof customer.合同总额 === 'number' ? customer.合同总额 : null,
+      projectLevel: status.项目级别 || '-',
+      projectType: status.项目类型 || '-',
       projectManager: p.projectManager || '-',
       orgL4: p.orgL4 || '-',
       stage: prog.项目阶段 || '-',

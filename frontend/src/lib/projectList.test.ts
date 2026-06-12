@@ -16,7 +16,7 @@ function proj(over: Partial<Project> = {}): Project {
 const PMIS: Record<string, ProjectPmis> = {
   'QABJ-SS-1': {
     progress: { 完工进展: 0.2, 里程碑进度状态: '正常', 项目阶段: '项目执行', 计划终验: '2028-01-31' },
-    status: { 项目状态: '实施中', 是否暂停: false, 评级: 'C', 评分: 25.0 },
+    status: { 项目状态: '实施中', 是否暂停: false, 评级: 'C', 评分: 25.0, 项目级别: 'P3', 项目类型: '交付项目' },
     cost: { 总预算: 654051.9, 核算: 208745.13, 剩余预算: 445306.77, 消耗比: 0.319, 超支: false, 成本状态: '正常' },
     risk: { 未关闭风险数: 2, 风险记录数: 3, 最高等级: '中', 闭环率: 0.33 },
     customer: { 最终客户: '北京海聚博源', 合同编号: 'QAX1', 签约形式: null, 行业: '企业', 合同总额: 5276000.0 },
@@ -52,11 +52,17 @@ describe('buildProjectRows', () => {
     expect(r.costRatio).toBe(0.319)
     expect(r.projectStatus).toBe('实施中')
     expect(r.health).toBe('健康')
+    expect(r.contractAmount).toBe(5276000.0)
+    expect(r.projectLevel).toBe('P3')
+    expect(r.projectType).toBe('交付项目')
   })
   it('pmis 缺失时取占位默认值', () => {
     const [r] = buildProjectRows([proj({ projectId: 'NO-PMIS' })], PMIS)
     expect(r.stage).toBe('-')
     expect(r.customer).toBe('-')
+    expect(r.contractAmount).toBeNull()
+    expect(r.projectLevel).toBe('-')
+    expect(r.projectType).toBe('-')
     expect(r.progress).toBeNull()
     expect(r.riskLevel).toBe('无')
     expect(r.costRatio).toBeNull()
