@@ -86,7 +86,14 @@ def read_mapping(path: str) -> List[Dict[str, str]]:
 
 
 def read_delivery(path: str) -> List[Dict[str, Any]]:
-    """delivery_analysis 表。按"表头含项目编号"自动选 sheet(跳过透视杂表)。"""
+    """delivery_analysis 表:csv 优先(R1 起),缺失回退旧 xlsx;xlsx 按"表头含项目编号"自动选 sheet。"""
+    if path.endswith(".csv"):
+        from profit import read_csv_rows
+        rows = read_csv_rows(path)
+        if rows:
+            return rows
+        legacy = os.path.join(os.path.dirname(path), config.DELIVERY_FILE_LEGACY)
+        return _read_header_sheet(legacy, "项目编号")
     return _read_header_sheet(path, "项目编号")
 
 

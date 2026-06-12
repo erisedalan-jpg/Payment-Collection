@@ -78,6 +78,17 @@ class TestReadDelivery:
         assert rows[0]["差旅费_预算金额"] == 1000
 
 
+class TestReadDeliveryCsv:
+    def test_csv_first_and_legacy_fallback(self, tmp_path):
+        import projects as PJ
+        csv_path = tmp_path / "delivery_analysis.csv"
+        csv_path.write_text("项目编号,项目名称,交付外包服务成本_预算金额\nSS-1,甲,100.0\n", encoding="utf-8-sig")
+        rows = PJ.read_delivery(str(csv_path))
+        assert rows[0]["项目编号"] == "SS-1"
+        # csv 缺失 → 回退 xlsx(不存在则空)
+        assert PJ.read_delivery(str(tmp_path / "none" / "delivery_analysis.csv")) == []
+
+
 class TestDeliveryCostsFor:
     def test_seven_categories_parsed(self):
         row = {"差旅费_预算金额": "1,000", "差旅费_实际发生": 600,
