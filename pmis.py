@@ -178,6 +178,8 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
             "项目状态": (b.get("项目状态") or s.get("项目状态") or None),
             "是否暂停": paused,
             "评级": (s.get("项目评级") or None),
+            "项目级别": (b.get("项目级别") or s.get("项目级别") or None),
+            "项目类型": (b.get("项目类型") or s.get("项目类型") or None),
             "评分": parse_pmis_money(b.get("项目评分")),
         },
         "customer": {

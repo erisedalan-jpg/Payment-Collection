@@ -61,8 +61,10 @@ PAYMENT_RECORDS_FILE = "payment_records.csv"
 # ── 项目主域输入文件(Phase P,位于 input/ 根) ──
 ORG_FILE = "组织架构.xlsx"
 MAPPING_FILE = "A.xlsx"
-DELIVERY_FILE = "delivery_analysis.xlsx"
-INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE]
+DELIVERY_FILE = "delivery_analysis.csv"
+DELIVERY_FILE_LEGACY = "delivery_analysis.xlsx"  # csv 缺失时回退(R 批次过渡)
+# 上传白名单含 legacy:R 批次过渡期 csv/xlsx 两式 delivery 均可上传(读侧 read_delivery 同款回退)
+INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
 DELIVERY_COST_CATEGORIES = [
