@@ -159,12 +159,12 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
 </template>
 
 <style scoped>
-.insight-view { padding: 16px; }
-.iv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
-.iv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-.iv-dims { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.insight-view { padding: var(--sp-4); }
+.iv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
+.iv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.iv-dims { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-dims-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
-.iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px; margin-bottom: 12px; }
-.iv-hint { font-size: var(--fs-2); color: var(--mut); padding: 24px 0; text-align: center; }
-.iv-empty { color: var(--mut); padding: 40px 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
+.iv-hint { font-size: var(--fs-2); color: var(--mut); padding: var(--sp-5) 0; text-align: center; }
+.iv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 </style>

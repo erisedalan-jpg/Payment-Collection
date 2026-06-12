@@ -135,32 +135,32 @@ async function onClear() {
 </template>
 
 <style scoped>
-.data-view { padding: 16px; }
-.dv-title { font-size: 18px; font-weight: 700; color: var(--txt); margin: 0 0 10px; }
-.dv-times { display: flex; gap: 24px; font-size: var(--fs-1); color: var(--sub); margin-bottom: 14px; }
+.data-view { padding: var(--sp-4); }
+.dv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
+.dv-times { display: flex; gap: var(--sp-5); font-size: var(--fs-1); color: var(--sub); margin-bottom: var(--sp-4); }
 .dv-times b { color: var(--txt); }
-.dv-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; }
-.dv-card-head { font-weight: 700; padding: 10px 16px; border-bottom: 1px solid var(--line); color: var(--txt); }
-.dv-sub { padding: 10px 16px 0; font-size: var(--fs-1); color: var(--mut); font-weight: 700; }
-.dv-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; font-size: 13px; }
+.dv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: var(--sp-4); }
+.dv-card-head { font-weight: 700; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--txt); }
+.dv-sub { padding: var(--sp-3) var(--sp-4) 0; font-size: var(--fs-1); color: var(--mut); font-weight: 700; }
+.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-2); }
 .dv-label { width: 84px; flex-shrink: 0; color: var(--sub); font-weight: 600; }
-.dv-hint, .dv-note { font-size: 12px; color: var(--mut); }
-.dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; color: var(--txt); }
+.dv-hint, .dv-note { font-size: var(--fs-1); color: var(--mut); }
+.dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-4); font-size: var(--fs-2); cursor: pointer; color: var(--txt); }
 .dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .dv-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .dv-btn:disabled { opacity: 0.5; cursor: default; }
-.dv-clear-state { font-size: 12px; color: var(--c-paid); }
-.dv-file { font-size: 12px; }
-.dv-progress { padding: 0 16px 12px; }
-.dv-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.dv-clear-state { font-size: var(--fs-1); color: var(--c-paid); }
+.dv-file { font-size: var(--fs-1); }
+.dv-progress { padding: 0 var(--sp-4) var(--sp-3); }
+.dv-bar { height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .dv-bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
 .dv-bar-fill.done { background: var(--c-paid); }
 .dv-bar-fill.error { background: var(--danger); }
-.dv-msg { font-size: 12px; color: var(--mut); margin-top: 6px; }
+.dv-msg { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-2); }
 .dv-msg.done { color: var(--c-paid); }
 .dv-msg.error { color: var(--danger); }
 .dv-pmis-row { align-items: center; }
-.dv-pmis-label { width: 200px; flex-shrink: 0; word-break: break-all; white-space: normal; line-height: 1.4; }
-.dv-pmis-input { flex: 1; border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--txt); outline: none; }
+.dv-pmis-label { width: 200px; flex-shrink: 0; word-break: break-all; white-space: normal; line-height: var(--lh-dense); }
+.dv-pmis-input { flex: 1; border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-1); color: var(--txt); outline: none; }
 .dv-pmis-input:focus { border-color: var(--accent); }
 </style>
