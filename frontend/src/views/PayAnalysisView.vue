@@ -7,6 +7,7 @@ import { tierSummaryBar } from '@/lib/dashboardStats'
 import { fmtWan, pct } from '@/lib/format'
 import { TIERS } from '@/nav'
 import SegToggle from '@/components/SegToggle.vue'
+import BoardView from '@/views/BoardView.vue'
 import ProjectsOverviewTab from '@/components/ProjectsOverviewTab.vue'
 import TierNodesTab from '@/components/TierNodesTab.vue'
 import PlanTab from '@/components/PlanTab.vue'
@@ -19,13 +20,14 @@ const filter = useFilterStore()
 onMounted(() => { if (!data.data) data.load() })
 
 const TABS = [
+  { tab: 'board', label: '多维看板' },
   { tab: 'projects', label: '项目总览' },
   { tab: 'nodes', label: '回款节点' },
   { tab: 'plan', label: '回款状态' },
   { tab: 'risk', label: '风险项目' },
   { tab: 'integrity', label: '数据质检' },
 ]
-const tab = computed(() => String(route.params.tab || 'projects'))
+const tab = computed(() => String(route.params.tab || 'board'))
 const tier = ref('')
 const TIER_OPTS = [{ value: '', label: '全部' }, ...TIERS.map((t) => ({ value: t.label, label: t.label }))]
 
@@ -44,12 +46,12 @@ const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(-
         <RouterLink
           v-for="t in TABS"
           :key="t.tab"
-          :to="`/analysis/${t.tab}`"
+          :to="`/panalysis/${t.tab}`"
           class="av-tab"
           :class="{ on: tab === t.tab }"
         >{{ t.label }}</RouterLink>
       </nav>
-      <div class="av-ctl">
+      <div v-if="tab !== 'board'" class="av-ctl">
         <span class="av-label">档位</span>
         <SegToggle v-model="tier" :options="TIER_OPTS" />
       </div>
@@ -65,7 +67,8 @@ const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(-
       <div class="sb-item"><div class="sb-label">延期</div><div class="sb-val danger">{{ summary.projDelayed }}</div></div>
     </div>
 
-    <ProjectsOverviewTab v-if="tab === 'projects'" :tier="tier" />
+    <BoardView v-if="tab === 'board'" />
+    <ProjectsOverviewTab v-else-if="tab === 'projects'" :tier="tier" />
     <TierNodesTab v-else-if="tab === 'nodes'" :tier="tier" />
     <PlanTab v-else-if="tab === 'plan'" :tier="tier" />
     <RiskTab v-else-if="tab === 'risk'" :tier="tier" />

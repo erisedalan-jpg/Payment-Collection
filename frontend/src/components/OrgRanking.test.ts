@@ -40,11 +40,11 @@ describe('OrgRanking', () => {
     expect(items[0].text()).toContain('北京服务组')
   })
 
-  it('点击排名行跳转 /board（orgL4 维度）', async () => {
+  it('点击排名行跳转 /panalysis/board（orgL4 维度）', async () => {
     seed()
     pushSpy.mockClear()
     const w = mount(OrgRanking)
     await w.findAll('.rank-item')[0].trigger('click')
-    expect(pushSpy).toHaveBeenCalledWith({ path: '/board', query: { dim: 'orgL4' } })
+    expect(pushSpy).toHaveBeenCalledWith({ path: '/panalysis/board', query: { dim: 'orgL4' } })
   })
 })

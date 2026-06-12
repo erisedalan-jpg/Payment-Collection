@@ -144,7 +144,7 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
 .ov-pay-k { font-size: var(--fs-1); color: var(--mut); margin-top: 2px; }
 .ov-top-item { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: none; background: none; padding: 3px 0; font-size: var(--fs-1); color: var(--txt); cursor: pointer; text-align: left; }
 .ov-top-item:hover { color: var(--accent); }
-/* flex:1+min-width:0 缺一不可——flex 子项默认 min-width:auto 不收缩,59 字真实项目名会撑破卡片(同 DelayTopCard.dtc-name 约定) */
+/* flex:1+min-width:0 缺一不可——flex 子项默认 min-width:auto 不收缩,59 字真实项目名会撑破卡片 */
 .ov-top-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-empty-mini { font-size: var(--fs-1); color: var(--mut); }
 .ov-focus { display: flex; gap: 12px; }
