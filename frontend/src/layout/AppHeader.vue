@@ -19,7 +19,7 @@ async function stopServer() {
 <template>
   <header class="app-header">
     <div class="brand">
-      <span class="title">项目回款跟踪与管控平台</span>
+      <span class="title">项目管理平台</span>
       <span class="version">{{ APP_VERSION }}</span>
     </div>
     <div class="meta">
