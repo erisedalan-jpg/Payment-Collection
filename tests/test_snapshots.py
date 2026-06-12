@@ -102,10 +102,13 @@ def _snap(date_str, projects=None, nodes=None):
 
 
 def _proj(name="甲", stage="项目执行", milestone="正常", status="实施中",
-          paused=False, rating="C", openRisks=0, overspend=False, costRatio=0.3):
+          paused=False, rating="C", openRisks=0, overspend=False, costRatio=0.3,
+          overspendAmount=None, deliveryOver=False, deliveryOverCats=None):
     return {"name": name, "stage": stage, "milestone": milestone, "status": status,
             "paused": paused, "rating": rating, "openRisks": openRisks,
-            "overspend": overspend, "costRatio": costRatio}
+            "overspend": overspend, "costRatio": costRatio,
+            "overspendAmount": overspendAmount, "deliveryOver": deliveryOver,
+            "deliveryOverCats": deliveryOverCats if deliveryOverCats is not None else []}
 
 
 def _node(pid="P-1", pname="甲", node="初验款", status="正常实施中",
@@ -115,22 +118,22 @@ def _node(pid="P-1", pname="甲", node="初验款", status="正常实施中",
 
 
 class TestDiffProjects:
-    def test_enter_and_leave_domain(self):
+    def test_new_and_closed_project(self):
         prev = _snap("2026-06-10", {"P-1": _proj()})
         cur = _snap("2026-06-11", {"P-2": _proj(name="乙")})
         evs = snapshots.diff_snapshots(prev, cur)
         types = {(e["type"], e["projectId"]) for e in evs}
-        assert ("进入主域", "P-2") in types and ("移出主域", "P-1") in types
+        assert ("新增项目", "P-2") in types and ("关闭项目", "P-1") in types
 
-    def test_stage_milestone_status_rating_changes(self):
+    def test_stage_milestone_status_changes(self):
         prev = _snap("2026-06-10", {"P-1": _proj()})
-        cur = _snap("2026-06-11", {"P-1": _proj(stage="项目收尾", milestone="延期", status="待验收", rating="B")})
+        cur = _snap("2026-06-11", {"P-1": _proj(stage="项目收尾", milestone="待验收", status="待验收", rating="B")})
         evs = snapshots.diff_snapshots(prev, cur)
         by = {e["type"]: e for e in evs}
         assert by["阶段变更"]["prev"] == "项目执行" and by["阶段变更"]["curr"] == "项目收尾"
-        assert by["里程碑状态变更"]["curr"] == "延期"
+        assert by["里程碑状态变更"]["curr"] == "待验收"
         assert by["项目状态变更"]["curr"] == "待验收"
-        assert by["评级变化"]["curr"] == "B"
+        assert "评级变化" not in by  # S1:评级变化不展示
         assert all(e["domain"] == "project" for e in evs)
 
     def test_pause_resume_risk_overspend(self):
@@ -146,6 +149,89 @@ class TestDiffProjects:
         prev = _snap("2026-06-10", {"P-1": _proj(stage=None)})
         cur = _snap("2026-06-11", {"P-1": _proj(stage=None)})
         assert snapshots.diff_snapshots(prev, cur) == []
+
+
+class TestS1EventRules:
+    def test_rating_change_no_event(self):
+        evs = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": _proj(rating="C")}),
+                                       _snap("2026-06-12", {"P1": _proj(rating="A")}))
+        assert evs == []
+
+    def test_new_and_closed_project_renamed_green(self):
+        evs = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": _proj()}),
+                                       _snap("2026-06-12", {"P2": _proj(name="乙")}))
+        types = {e["type"]: e for e in evs}
+        assert types["新增项目"]["tone"] == "ok" and "进入项目主域" in types["新增项目"]["summary"]
+        assert types["关闭项目"]["tone"] == "ok" and "移出项目主域" in types["关闭项目"]["summary"]
+
+    def test_milestone_bad_red_normal_plain(self):
+        evs = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": _proj(milestone="正常")}),
+                                       _snap("2026-06-12", {"P1": _proj(milestone="严重延期")}))
+        assert evs[0]["type"] == "里程碑状态变更" and evs[0]["tone"] == "danger"
+        evs2 = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": _proj(milestone="延期")}),
+                                        _snap("2026-06-12", {"P1": _proj(milestone="正常")}))
+        assert evs2[0]["tone"] == ""
+
+    def test_risk_up_red_down_green(self):
+        up = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": _proj(openRisks=1)}),
+                                      _snap("2026-06-12", {"P1": _proj(openRisks=3)}))
+        assert up[0]["type"] == "风险数增减" and up[0]["tone"] == "danger"
+        down = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": _proj(openRisks=3)}),
+                                        _snap("2026-06-12", {"P1": _proj(openRisks=1)}))
+        assert down[0]["tone"] == "ok"
+
+    def test_overspend_amount_threshold(self):
+        big = snapshots.diff_snapshots(
+            _snap("2026-06-11", {"P1": _proj()}),
+            _snap("2026-06-12", {"P1": _proj(overspend=True, overspendAmount=6000.0)}))
+        assert big[0]["type"] == "超支出现" and big[0]["tone"] == "danger"
+        assert "0.6 万" in big[0]["summary"] and big[0]["amount"] == 6000.0
+        small = snapshots.diff_snapshots(
+            _snap("2026-06-11", {"P1": _proj()}),
+            _snap("2026-06-12", {"P1": _proj(overspend=True, overspendAmount=4000.0)}))
+        assert small[0]["tone"] == "warn"
+        gone = snapshots.diff_snapshots(
+            _snap("2026-06-11", {"P1": _proj(overspend=True)}),
+            _snap("2026-06-12", {"P1": _proj(overspend=False)}))
+        assert gone[0]["type"] == "超支解除" and gone[0]["tone"] == "ok"
+        # PMIS 分项标超但整体金额为负(实测 38/45):warn 且摘要不带负数金额
+        neg = snapshots.diff_snapshots(
+            _snap("2026-06-11", {"P1": _proj()}),
+            _snap("2026-06-12", {"P1": _proj(overspend=True, overspendAmount=-500.0)}))
+        assert neg[0]["tone"] == "warn" and "万" not in neg[0]["summary"]
+
+    def test_delivery_overspend_event_and_upgrade_guard(self):
+        evs = snapshots.diff_snapshots(
+            _snap("2026-06-11", {"P1": _proj(deliveryOver=False)}),
+            _snap("2026-06-12", {"P1": _proj(deliveryOver=True, deliveryOverCats=["交付外包服务成本"])}))
+        assert evs[0]["type"] == "交付费用超支" and evs[0]["tone"] == "danger"
+        assert "交付外包服务成本" in evs[0]["summary"]
+        # 旧快照无该字段(升级首跑) → 不触发
+        old = _proj()
+        old.pop("deliveryOver")
+        old.pop("deliveryOverCats")
+        evs2 = snapshots.diff_snapshots(_snap("2026-06-11", {"P1": old}),
+                                        _snap("2026-06-12", {"P1": _proj(deliveryOver=True, deliveryOverCats=["差旅费"])}))
+        assert all(e["type"] != "交付费用超支" for e in evs2)
+
+    def test_delay_event_red(self):
+        a = {"date": "2026-06-11", "projects": {}, "agg": {},
+             "nodes": {"P1|款#0": {"pid": "P1", "pname": "甲", "node": "款", "status": "正常实施中",
+                                    "planDate": "", "actual": 0, "expected": 100}}}
+        b = json.loads(json.dumps(a))
+        b["date"] = "2026-06-12"
+        b["nodes"]["P1|款#0"]["status"] = "延期"
+        evs = snapshots.diff_snapshots(a, b)
+        assert evs[0]["type"] == "延期发生" and evs[0]["tone"] == "danger"
+
+    def test_build_snapshot_new_fields(self):
+        projects = [{"projectId": "P1", "projectName": "甲",
+                     "deliveryCosts": [{"类别": "差旅费", "预算金额": 10.0, "实际发生": 20.0}]}]
+        profit = {"P1": {"summary": {"实际成本": 9000.0, "预算成本": 1000.0}, "rows": [], "bridge": None}}
+        snap = snapshots.build_snapshot("2026-06-12", projects, {}, [], profit)
+        e = snap["projects"]["P1"]
+        assert e["overspendAmount"] == 8000.0
+        assert e["deliveryOver"] is True and e["deliveryOverCats"] == ["差旅费"]
 
 
 class TestDiffNodes:

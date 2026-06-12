@@ -254,6 +254,7 @@ class Event(_Base):
     prev: Optional[Any] = None
     curr: Optional[Any] = None
     amount: Optional[float] = None
+    tone: str = ""  # S1: ok | warn | danger | ''(默认走 domain 缺省色)
 
 
 class PeriodCompareEntry(_Base):

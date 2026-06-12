@@ -11,6 +11,8 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 import config
+from profit import overspend_amount
+from projects import delivery_overspend_cats
 
 
 def _agg(projects: Dict[str, dict], nodes: Dict[str, dict]) -> Dict[str, Any]:
@@ -28,7 +30,8 @@ def _agg(projects: Dict[str, dict], nodes: Dict[str, dict]) -> Dict[str, Any]:
 
 
 def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[str, dict],
-                   raw_nodes: List[dict]) -> Dict[str, Any]:
+                   raw_nodes: List[dict],
+                   project_profit: Optional[Dict[str, dict]] = None) -> Dict[str, Any]:
     """从 final_data 三块构建精简快照(纯函数)。"""
     projs: Dict[str, dict] = {}
     for p in dept_projects:
@@ -38,6 +41,7 @@ def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[
         st = m.get("status") or {}
         risk = m.get("risk") or {}
         cost = m.get("cost") or {}
+        cats = delivery_overspend_cats(p.get("deliveryCosts") or [])
         projs[pid] = {
             "name": p.get("projectName") or "",
             "stage": prog.get("项目阶段"),
@@ -48,6 +52,9 @@ def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[
             "openRisks": int(risk.get("未关闭风险数") or 0),
             "overspend": bool(cost.get("超支")),
             "costRatio": cost.get("消耗比"),
+            "overspendAmount": overspend_amount((project_profit or {}).get(pid)),
+            "deliveryOver": bool(cats),
+            "deliveryOverCats": cats,
         }
     nodes: Dict[str, dict] = {}
     seen: Dict[tuple, int] = {}
@@ -127,9 +134,11 @@ def pick_baseline_dates(dates: List[str], today: str) -> Dict[str, Optional[str]
 
 
 def _ev(date_str: str, etype: str, domain: str, pid: str, pname: str, summary: str,
-        prev: Any = None, curr: Any = None, amount: Optional[float] = None) -> dict:
+        prev: Any = None, curr: Any = None, amount: Optional[float] = None,
+        tone: str = "") -> dict:
     return {"date": date_str, "type": etype, "domain": domain, "projectId": pid,
-            "projectName": pname, "summary": summary, "prev": prev, "curr": curr, "amount": amount}
+            "projectName": pname, "summary": summary, "prev": prev, "curr": curr,
+            "amount": amount, "tone": tone}
 
 
 def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
@@ -142,27 +151,47 @@ def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
         name = b.get("name") or ""
         a = pp.get(pid)
         if a is None:
-            evs.append(_ev(d, "进入主域", "project", pid, name, "新进入项目主域"))
+            evs.append(_ev(d, "新增项目", "project", pid, name, "新增项目（进入项目主域）", tone="ok"))
             continue
         for field, etype in (("stage", "阶段变更"), ("milestone", "里程碑状态变更"),
-                             ("status", "项目状态变更"), ("rating", "评级变化")):
+                             ("status", "项目状态变更")):
             if a.get(field) != b.get(field):
+                tone = ""
+                if field == "milestone" and any(
+                        kw in str(b.get(field) or "") for kw in config.MILESTONE_DELAYED_KEYWORDS):
+                    tone = "danger"
                 evs.append(_ev(d, etype, "project", pid, name,
                                f"{a.get(field) or '-'} → {b.get(field) or '-'}",
-                               prev=a.get(field), curr=b.get(field)))
+                               prev=a.get(field), curr=b.get(field), tone=tone))
         if bool(a.get("paused")) != bool(b.get("paused")):
             etype = "暂停" if b.get("paused") else "恢复"
             evs.append(_ev(d, etype, "project", pid, name, f"项目{etype}"))
         ra, rb = int(a.get("openRisks") or 0), int(b.get("openRisks") or 0)
         if ra != rb:
             evs.append(_ev(d, "风险数增减", "project", pid, name,
-                           f"未关闭风险 {ra} → {rb}", prev=ra, curr=rb))
+                           f"未关闭风险 {ra} → {rb}", prev=ra, curr=rb,
+                           tone="danger" if rb > ra else "ok"))
         if bool(a.get("overspend")) != bool(b.get("overspend")):
-            etype = "超支出现" if b.get("overspend") else "超支解除"
-            evs.append(_ev(d, etype, "project", pid, name, etype))
+            if b.get("overspend"):
+                amt = b.get("overspendAmount")
+                # 整体超支金额>0 才入摘要与阈值判色;PMIS 分项超支但整体未超(实测 38/45 为负)只标 warn 不显负数
+                if amt is not None and amt > 0:
+                    evs.append(_ev(d, "超支出现", "project", pid, name,
+                                   f"超支出现,整体超支 {round(amt / 10000, 2)} 万",
+                                   amount=amt, tone="danger" if amt > 5000 else "warn"))
+                else:
+                    evs.append(_ev(d, "超支出现", "project", pid, name, "超支出现", tone="warn"))
+            else:
+                evs.append(_ev(d, "超支解除", "project", pid, name, "超支解除", tone="ok"))
+        # 交付费用超支(S1 新事件;旧快照缺字段=升级首跑,不触发)
+        if "deliveryOver" in a and not a.get("deliveryOver") and b.get("deliveryOver"):
+            evs.append(_ev(d, "交付费用超支", "project", pid, name,
+                           f"交付费用超支：{'、'.join(b.get('deliveryOverCats') or []) or '-'}",
+                           tone="danger"))
     for pid, a in pp.items():
         if pid not in cp:
-            evs.append(_ev(d, "移出主域", "project", pid, a.get("name") or "", "移出项目主域"))
+            evs.append(_ev(d, "关闭项目", "project", pid, a.get("name") or "",
+                           "关闭项目（移出项目主域）", tone="ok"))
 
     pn, cn = prev.get("nodes") or {}, cur.get("nodes") or {}
     for key, b in cn.items():
@@ -180,7 +209,7 @@ def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
         if sa != sb:
             if sb == config.STATUS_DELAYED:
                 evs.append(_ev(d, "延期发生", "payment", pid, pname,
-                               f"「{node}」{sa or '-'} → 延期", prev=sa, curr=sb))
+                               f"「{node}」{sa or '-'} → 延期", prev=sa, curr=sb, tone="danger"))
             elif sb == config.STATUS_FULL_PAID:
                 evs.append(_ev(d, "回款完成", "payment", pid, pname,
                                f"「{node}」已全额回款", prev=sa, curr=sb))
