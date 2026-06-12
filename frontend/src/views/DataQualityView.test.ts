@@ -1,51 +1,111 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { useDataStore } from '@/stores/data'
+import { setActivePinia, createPinia } from 'pinia'
 import DataQualityView from './DataQualityView.vue'
+import { useDataStore } from '@/stores/data'
 
-function seed(d: any) {
-  const store = useDataStore()
-  ;(store as any).data = d
+vi.mock('@/lib/exportXlsx', () => ({ exportRows: vi.fn() }))
+import { exportRows } from '@/lib/exportXlsx'
+
+beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks() })
+
+function seed(over: Record<string, any> = {}) {
+  const ds = useDataStore()
+  ds.data = {
+    meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
+    dashboard: {}, summary: {}, projectOverview: {},
+    rawNodes: [{ projectId: 'P-1', tier: 't', isPaymentRelated: true }],
+    dataQuality: {
+      summary: { pmisProvided: true, joinRate: 0.95, matchedActive: 8, matchedClosed: 2, unmatched: 1, lastPmisUpdate: '2026-06-11' },
+      themes: [{ theme: '成本', coveragePct: 0.9, verdict: 'green' }],
+      unmatched: [{ projectId: 'X-1', projectName: '甲', kind: '在建' }],
+      backfill: [], conflicts: [], dirty: [],
+    },
+    projectsQuality: {
+      deptProjectCount: 9,
+      orgFile: { provided: true, rows: 30, matched: 25, matchRate: 0.83 },
+      mappingFile: { provided: true, rows: 5, matched: 5, matchRate: 1 },
+      deliveryFile: { provided: true, rows: 40, matched: 38, matchRate: 0.95 },
+      staffNoProject: [], managerNotInOrg: [], presaleTotal: 3, presaleMapped: 3, presaleUnmapped: [],
+    },
+    ...over,
+  } as any
 }
 
+const mountView = () => mount(DataQualityView, { global: { stubs: { DataTable: true } } })
+
 describe('DataQualityView', () => {
-  beforeEach(() => {
-    setActivePinia(createPinia())
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })) as any)
-  })
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('数据未加载时提示加载/后端', () => {
-    seed(null)
-    const w = mount(DataQualityView)
-    expect(w.text()).toContain('加载')
+  it('黄横幅:有未匹配告警', () => {
+    seed()
+    const w = mountView()
+    const banner = w.find('[data-test="banner"]')
+    expect(banner.classes()).toContain('yellow')
+    expect(banner.text()).toContain('1 类告警需关注')
+    expect(banner.text()).toContain('2026-06-12 09:00')
   })
 
-  it('数据无 dataQuality 时提示重新同步', () => {
-    seed({ rawNodes: [], projectOverview: { projects: [], columns: [] } })
-    const w = mount(DataQualityView)
-    expect(w.text()).toContain('不含治理信息')
+  it('绿横幅:告警清零', () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).dataQuality.unmatched = []
+    ;(ds.data as any).dataQuality.summary.unmatched = 0
+    const w = mountView()
+    expect(w.find('[data-test="banner"]').classes()).toContain('green')
+    expect(w.text()).toContain('数据就绪')
   })
 
-  it('PMIS 未提供时提示未提供 PMIS', () => {
-    seed({ dataQuality: { summary: { pmisProvided: false }, themes: [], unmatched: [], backfill: [], conflicts: [], dirty: [] } })
-    const w = mount(DataQualityView)
-    expect(w.text()).toContain('未提供 PMIS')
+  it('红横幅:云文档缺失', () => {
+    seed({ rawNodes: [] })
+    const w = mountView()
+    expect(w.find('[data-test="banner"]').classes()).toContain('red')
   })
 
-  it('提供时渲染记分卡 + 未匹配计数', () => {
-    seed({
-      dataQuality: {
-        summary: { pmisProvided: true, joinRate: 0.98, matchedActive: 462, matchedClosed: 158, unmatched: 8 },
-        themes: [{ theme: '成本预算', verdict: 'yellow', coveragePct: 0.5, fields: [] }],
-        unmatched: [{ projectId: 'SF-1', projectName: '甲', kind: 'SF售前' }],
-        backfill: [], conflicts: [], dirty: [],
-      },
-    })
-    const w = mount(DataQualityView)
-    expect(w.text()).toContain('98')
-    expect(w.text()).toContain('成本预算')
-    expect(w.find('[data-test="unmatched-count"]').text()).toContain('1')
+  it('五张源卡,缺失源置灰带未提供徽章', () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projectsQuality.orgFile = { provided: false, rows: 0, matched: 0, matchRate: 0 }
+    const w = mountView()
+    expect(w.findAll('.gov-src')).toHaveLength(5)
+    const org = w.find('[data-test="src-org"]')
+    expect(org.classes()).toContain('off')
+    expect(org.text()).toContain('未提供')
+  })
+
+  it('0 条告警置灰且按钮禁用', () => {
+    seed()
+    const w = mountView()
+    const dirty = w.find('[data-test="alert-dirty"]')
+    expect(dirty.classes()).toContain('zero')
+    expect(dirty.find('button').attributes('disabled')).toBeDefined()
+  })
+
+  it('点击展开明细表,缺失类展开为 note 文案', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projectsQuality.mappingFile = { provided: false, rows: 0, matched: 0, matchRate: 0 }
+    const w = mountView()
+    const un = w.find('[data-test="alert-unmatched"]')
+    await un.find('button').trigger('click')
+    expect(un.find('data-table-stub').exists()).toBe(true)
+    const miss = w.find('[data-test="alert-missing-mapping"]')
+    await miss.find('button').trigger('click')
+    expect(miss.find('.gov-note').text()).toContain('A.xlsx')
+    expect(miss.find('data-table-stub').exists()).toBe(false)
+  })
+
+  it('导出按钮调用 exportRows(文件名+行)', async () => {
+    seed()
+    const w = mountView()
+    const un = w.find('[data-test="alert-unmatched"]')
+    await un.find('button').trigger('click')
+    await un.find('.gov-exp').trigger('click')
+    expect(exportRows).toHaveBeenCalledWith('PMIS未匹配清单.xlsx', [{ projectId: 'X-1', projectName: '甲', kind: '在建' }])
+  })
+
+  it('未加载空态', () => {
+    const ds = useDataStore()
+    vi.spyOn(ds, 'load').mockResolvedValue(undefined as never)
+    const w = mountView()
+    expect(w.text()).toContain('数据加载中或加载失败')
   })
 })
