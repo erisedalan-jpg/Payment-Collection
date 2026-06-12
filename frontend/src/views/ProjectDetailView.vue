@@ -2,14 +2,16 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
-import type { Project, ProjectPmis, RawNode, Event } from '@/types/analysis'
+import type { Project, ProjectPmis, RawNode, Event, MilestoneItem, PaymentRecordsEntry, ProjectProfit } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
-import { fmtWan, fmtRatio } from '@/lib/format'
+import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
 import { formatCellValue } from '@/lib/cellFormat'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupRecords from '@/components/FollowupRecords.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
+import MilestoneTable from '@/components/MilestoneTable.vue'
+import ProfitTree from '@/components/ProfitTree.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -43,6 +45,7 @@ const metrics = computed(() => [
 // —— Tab（回款为默认：重点子域，spec 4.2）——
 const TABS = [
   { key: 'payment', label: '回款' },
+  { key: 'payrec', label: '回款数据' },
   { key: 'progress', label: '进度里程碑' },
   { key: 'risk', label: '风险' },
   { key: 'cost', label: '预算核算' },
@@ -89,6 +92,51 @@ const MILESTONE_COLS: DataColumn[] = [
   { key: 'actualDate', label: '实际日期', width: 110, formatter: (v) => fmtDateCell(v) },
   { key: 'completionStatus', label: '完成状态', width: 130, formatter: (v) => String(v ?? '-') },
 ]
+
+// —— R2:项目里程碑(PMIS 里程碑两表)/回款流水/全预算 ——
+const myMilestones = computed(() =>
+  ((data.data?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[p.value?.projectId || ''] ?? [])
+const originMilestones = computed(() =>
+  ((data.data?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[page.value.closedId || ''] ?? [])
+
+const payRec = computed(() =>
+  ((data.data?.paymentRecords ?? {}) as Record<string, PaymentRecordsEntry>)[p.value?.projectId || ''] ?? null)
+const payRecSummary = computed(() => [
+  { k: '累计回款(万)', v: fmtWan(payRec.value?.total) },
+  { k: '回款笔数', v: String(payRec.value?.count ?? 0) },
+  { k: '最近回款日', v: payRec.value?.lastDate || '-' },
+])
+const PAYREC_COLS: DataColumn[] = [
+  { key: 'type', label: '回款类型', width: 100 },
+  { key: 'amount', label: '付款金额(元)', width: 130, formatter: (v) => fmtYuan(v as number) },
+  { key: 'date', label: '回款确认日期', width: 120 },
+  { key: 'payer', label: '回款单位' },
+  { key: 'serial', label: '收款流水号', width: 150 },
+  { key: 'claimer', label: '认领人', width: 90 },
+  { key: 'currency', label: '币种', width: 120, formatter: (v, r) => (!v || v === 'CNY' ? 'CNY' : `${v}(汇率 ${r.rate ?? '-'})`) },
+]
+
+const profit = computed(() =>
+  ((data.data?.projectProfit ?? {}) as Record<string, ProjectProfit>)[p.value?.projectId || ''] ?? null)
+const profitSummary = computed(() => {
+  const s = (profit.value?.summary ?? {}) as Record<string, number | null>
+  return [
+    { k: '预算收入(万)', v: fmtWan(s.预算收入) },
+    { k: '实际成本(万)', v: fmtWan(s.实际成本) },
+    { k: '预算毛利(万)', v: fmtWan(s.预算毛利) },
+    { k: '预算毛利率', v: fmtRatio(s.预算毛利率) },
+  ]
+})
+const bridge = computed(() => profit.value?.bridge ?? null)
+const bridgeSummary = computed(() => {
+  const s = (bridge.value?.summary ?? {}) as Record<string, number | null>
+  return [
+    { k: '预算收入(万)', v: fmtWan(s.预算收入) },
+    { k: '预算成本(万)', v: fmtWan(s.预算成本) },
+    { k: '实际成本(万)', v: fmtWan(s.实际成本) },
+    { k: '预算毛利率', v: fmtRatio(s.预算毛利率) },
+  ]
+})
 
 // —— 风险 ——
 const riskSummary = computed(() => [
@@ -190,11 +238,25 @@ const originInfo = computed(() => [
             <FollowupRecords :project-id="p.projectId" :project-name="p.projectName || ''" />
           </section>
 
+          <section v-else-if="tab === 'payrec'" class="pd-section">
+            <template v-if="payRec">
+              <div class="pd-chips">
+                <div v-for="it in payRecSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+              </div>
+              <div class="pd-note">出处：payment_records.csv（PMIS 回款流水）。</div>
+              <DataTable :columns="PAYREC_COLS" :rows="payRec.records ?? []" />
+            </template>
+            <div v-else class="pd-note">未提供回款流水数据（input/payment_records.csv），或该项目暂无回款记录。</div>
+          </section>
+
           <section v-else-if="tab === 'progress'" class="pd-section">
             <div class="pd-chips">
               <div v-for="it in progressInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
-            <div class="pd-section-title">里程碑明细（来源：项目回款节点（里程碑）清单）</div>
+            <div class="pd-section-title">项目里程碑（来源：PMIS 里程碑计划；行色=优先级 红高/棕中/绿低）</div>
+            <MilestoneTable v-if="myMilestones.length" :items="myMilestones" />
+            <div v-else class="pd-note">未提供项目里程碑数据（input/pmis/ 里程碑两表）。</div>
+            <div class="pd-section-title">回款里程碑（来源：项目回款节点（里程碑）清单）</div>
             <DataTable v-if="page.nodes.length" :columns="MILESTONE_COLS" :rows="page.nodes" :show-count="false" />
             <div v-else class="pd-note">无里程碑节点记录。</div>
           </section>
@@ -208,12 +270,28 @@ const originInfo = computed(() => [
           </section>
 
           <section v-else-if="tab === 'cost'" class="pd-section">
+            <template v-if="profit">
+              <div class="pd-chips">
+                <div v-for="it in profitSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+              </div>
+              <div class="pd-note">全预算出处：profit_loss_direct.csv；概算/核算列出处：budget_data.csv。</div>
+              <ProfitTree :rows="profit.rows ?? []" />
+              <template v-if="bridge">
+                <div class="pd-section-title">原项目预算核算（桥接 {{ bridge.ssId || '-' }}，不计入当前汇总）</div>
+                <div class="pd-chips">
+                  <div v-for="it in bridgeSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+                </div>
+                <ProfitTree :rows="bridge.rows ?? []" />
+              </template>
+            </template>
+            <div v-else class="pd-note">未提供全预算数据（input/profit_loss_direct.csv）。</div>
+            <div class="pd-section-title">PMIS 汇总与交付明细</div>
             <div class="pd-chips">
               <div v-for="it in costSummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
-            <div class="pd-note">汇总出处：PMIS《项目状态信息数据》（消耗比=项目核算÷项目总预算）；下方明细出处：delivery_analysis.xlsx，两者口径独立。</div>
+            <div class="pd-note">汇总出处：PMIS《项目状态信息数据》（消耗比=项目核算÷项目总预算）；下方明细出处：delivery_analysis.csv，两者口径独立。</div>
             <DataTable v-if="costRows.length" :columns="COST_COLS" :rows="costRows" :show-count="false" />
-            <div v-else class="pd-note">未提供预算核算明细（delivery_analysis.xlsx）。</div>
+            <div v-else class="pd-note">未提供预算核算明细（delivery_analysis.csv）。</div>
           </section>
 
           <section v-else-if="tab === 'origin'" class="pd-section">
@@ -227,6 +305,10 @@ const originInfo = computed(() => [
               <template v-if="page.closedNodes.length">
                 <div class="pd-section-title">原项目回款节点（不计入当前汇总）</div>
                 <DataTable :columns="NODE_COLS" :rows="page.closedNodes" :show-count="false" />
+              </template>
+              <template v-if="originMilestones.length">
+                <div class="pd-section-title">原项目里程碑（不计入当前汇总）</div>
+                <MilestoneTable :items="originMilestones" />
               </template>
             </template>
           </section>
