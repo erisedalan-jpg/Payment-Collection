@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # ============================================================
 #  项目回款跟踪与管控平台 - PyInstaller 打包配置
-#  版本: V5.9.1 | 日期: 2026-06-02
+#  版本: V7.6.0 | 日期: 2026-06-12
 # ============================================================
 import os, sys
 block_cipher = None
@@ -66,6 +66,7 @@ a = Analysis(
         ('pmis.py', '.'),
         ('projects.py', '.'),
         ('snapshots.py', '.'),
+        ('write_followup.py', '.'),
         ('pmis_download.py', '.'),
         ('config.py', '.'),
         ('schema.py', '.'),
@@ -105,7 +106,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='PaymentReviewApp_v5.9.1',
+    name='PaymentReviewApp_v7.6.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
