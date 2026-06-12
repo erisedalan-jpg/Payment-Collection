@@ -43,6 +43,14 @@ const SECTIONS = [
         <li v-for="(f, i) in sec.items" :key="i">{{ f }}</li>
       </ul>
     </div>
+
+    <div class="about-feat-box">
+      <div class="about-feat-title">健康度规则</div>
+      <ul class="about-features">
+        <li>四维异常：进度=里程碑进度状态含滞后/延期/超期；风险=最高等级高且未关闭风险数&gt;0；成本=超支或消耗比&gt;100%；回款=存在延期回款节点</li>
+        <li>总评：0 项异常=健康 / 1 项=关注 / ≥2 项=风险；PMIS 未匹配=无数据（不计三态）</li>
+      </ul>
+    </div>
   </div>
 </template>
 
