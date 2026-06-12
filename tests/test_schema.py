@@ -139,3 +139,38 @@ class TestEventsContract:
     def test_events_default_empty(self):
         m = schema.AnalysisData.model_validate(_minimal_analysis_data())
         assert m.events == [] and m.periodCompare is None
+
+
+class TestR1DataSourcesContract:
+    def test_milestones_payments_profit_round_trip(self):
+        data = _minimal_analysis_data()
+        data["projectMilestones"] = {
+            "SS-1": [{"name": "终验", "planDate": "2026-07-01", "actualDate": "",
+                      "payStage": "终验款，100.00%", "pct": 50.0, "priority": "high"}]
+        }
+        data["paymentRecords"] = {
+            "SS-1": {"total": 3250.0, "count": 2, "lastDate": "2026-06-04",
+                     "records": [{"type": "实际回款", "serial": "BANK-1", "payer": "某公司",
+                                  "amount": 2250.0, "date": "2026-06-04", "claimer": "马春艳",
+                                  "orderNo": "N-1", "currency": "CNY", "rate": 1.0, "note": ""}]}
+        }
+        data["projectProfit"] = {
+            "SS-1": {"summary": {"预算收入": 1000.0, "实际成本": 200.0},
+                     "rows": [{"code": "1", "name": "项目收入", "level": 1, "budget": 1000.0,
+                               "estimate": 900.0, "final": 950.0, "actual": 0.0,
+                               "remaining": 1000.0, "rate": 0.0}],
+                     "bridge": {"ssId": "SS-9",
+                                "summary": {"实际成本": 250.0},
+                                "rows": [{"code": "1", "name": "项目收入", "level": 1}]}}
+        }
+        m = schema.AnalysisData.model_validate(data)
+        assert m.projectMilestones["SS-1"][0].priority == "high"
+        assert m.projectMilestones["SS-1"][0].pct == 50.0
+        assert m.paymentRecords["SS-1"].total == 3250.0
+        assert m.paymentRecords["SS-1"].records[0].currency == "CNY"
+        assert m.projectProfit["SS-1"].rows[0].final == 950.0
+        assert m.projectProfit["SS-1"].bridge.ssId == "SS-9"
+
+    def test_r1_sources_default_empty(self):
+        m = schema.AnalysisData.model_validate(_minimal_analysis_data())
+        assert m.projectMilestones == {} and m.paymentRecords == {} and m.projectProfit == {}

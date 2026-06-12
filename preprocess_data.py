@@ -12,6 +12,8 @@ import schema
 import pmis
 import projects as projects_mod
 import snapshots as snapshots_mod
+import milestones as milestones_mod
+import profit as profit_mod
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -1205,6 +1207,29 @@ def main():
     if not projects_quality["deliveryFile"]["provided"]:
         print("  [WARN] 未提供 delivery_analysis.xlsx,预算核算明细缺失")
 
+    # === 9e. 新数据源(Phase R1):里程碑/回款流水/全预算 ===
+    print("[INFO] 摄取里程碑/回款流水/全预算数据...")
+    keep_ids = {p["projectId"] for p in dept_projects}
+    keep_ids |= {p["relatedClosedId"] for p in dept_projects if p.get("relatedClosedId")}
+    project_milestones, ms_a, ms_c = milestones_mod.load_milestones(pmis_dir, keep_ids)
+    payment_records, pr_stat = profit_mod.load_payment_records(
+        os.path.join(BASE_DIR, "input"), keep_ids)
+    project_profit, pf_stats = profit_mod.load_profit(
+        os.path.join(BASE_DIR, "input"), keep_ids)
+    projects_quality["milestoneActive"] = ms_a
+    projects_quality["milestoneClosed"] = ms_c
+    projects_quality["paymentRecordsFile"] = pr_stat
+    projects_quality["profitDirectFile"] = pf_stats["direct"]
+    projects_quality["profitBridgeFile"] = pf_stats["bridge"]
+    projects_quality["budgetFile"] = pf_stats["budget"]
+    for label, st in [("里程碑(在建)", ms_a), ("里程碑(已结项)", ms_c),
+                      ("回款流水", pr_stat), ("全预算(direct)", pf_stats["direct"]),
+                      ("预算版本(budget)", pf_stats["budget"]), ("桥接预算", pf_stats["bridge"])]:
+        if st["provided"]:
+            print(f"  [OK] {label} {st['rows']} 行, 命中 {st['matched']}")
+        else:
+            print(f"  [WARN] 未提供 {label} 数据文件")
+
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {
@@ -1227,6 +1252,9 @@ def main():
         "dataQuality": data_quality,
         "projects": dept_projects,
         "projectsQuality": projects_quality,
+        "projectMilestones": project_milestones,
+        "paymentRecords": payment_records,
+        "projectProfit": project_profit,
     }
 
     # === 9d. 快照/diff/事件流/周期对比(Phase P3) ===

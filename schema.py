@@ -80,6 +80,8 @@ class PmisStatus(_Base):
     项目状态: Optional[str] = None
     是否暂停: Optional[bool] = None
     评级: Optional[str] = None
+    项目级别: Optional[str] = None
+    项目类型: Optional[str] = None
     评分: Optional[float] = None
 
 
@@ -176,11 +178,70 @@ class ProjectsQuality(_Base):
     orgFile: InputFileStat = InputFileStat()
     mappingFile: InputFileStat = InputFileStat()
     deliveryFile: InputFileStat = InputFileStat()
+    milestoneActive: InputFileStat = InputFileStat()
+    milestoneClosed: InputFileStat = InputFileStat()
+    paymentRecordsFile: InputFileStat = InputFileStat()
+    profitDirectFile: InputFileStat = InputFileStat()
+    profitBridgeFile: InputFileStat = InputFileStat()
+    budgetFile: InputFileStat = InputFileStat()
     staffNoProject: List[Dict[str, Any]] = []
     managerNotInOrg: List[Dict[str, Any]] = []
     presaleTotal: int = 0
     presaleMapped: int = 0
     presaleUnmapped: List[Dict[str, Any]] = []
+
+
+class MilestoneItem(_Base):
+    name: str
+    planDate: str = ""
+    actualDate: str = ""
+    payStage: str = ""
+    pct: Optional[float] = None  # 0-100 原值
+    priority: str = "low"  # high | mid | low
+
+
+class PaymentRecord(_Base):
+    type: str = ""
+    serial: str = ""
+    payer: str = ""
+    amount: Optional[float] = None
+    date: str = ""
+    claimer: str = ""
+    orderNo: str = ""
+    currency: str = ""
+    rate: Optional[float] = None
+    note: str = ""
+
+
+class PaymentRecordsEntry(_Base):
+    total: float = 0
+    count: int = 0
+    lastDate: str = ""
+    records: List[PaymentRecord] = []
+
+
+class ProfitRow(_Base):
+    code: str
+    name: str
+    level: int = 1
+    budget: Optional[float] = None
+    estimate: Optional[float] = None   # budget_data 概算
+    final: Optional[float] = None      # budget_data 核算
+    actual: Optional[float] = None
+    remaining: Optional[float] = None
+    rate: Optional[float] = None
+
+
+class BridgeProfit(_Base):
+    ssId: str = ""
+    summary: Dict[str, Optional[float]] = {}
+    rows: List[ProfitRow] = []
+
+
+class ProjectProfit(_Base):
+    summary: Dict[str, Optional[float]] = {}
+    rows: List[ProfitRow] = []
+    bridge: Optional[BridgeProfit] = None
 
 
 class Event(_Base):
@@ -225,6 +286,9 @@ class AnalysisData(_Base):
     dataQuality: Optional[DataQuality] = None
     projects: List[Project] = []
     projectsQuality: Optional[ProjectsQuality] = None
+    projectMilestones: Dict[str, List[MilestoneItem]] = {}
+    paymentRecords: Dict[str, PaymentRecordsEntry] = {}
+    projectProfit: Dict[str, ProjectProfit] = {}
     events: List[Event] = []
     periodCompare: Optional[PeriodCompare] = None
 

@@ -20,6 +20,12 @@ function makeData(over: Record<string, any> = {}): AnalysisData {
       orgFile: { provided: true, rows: 30, matched: 25, matchRate: 0.83 },
       mappingFile: { provided: true, rows: 5, matched: 5, matchRate: 1 },
       deliveryFile: { provided: true, rows: 40, matched: 38, matchRate: 0.95 },
+      milestoneActive: { provided: true, rows: 634, matched: 610, matchRate: 0.96 },
+      milestoneClosed: { provided: true, rows: 3914, matched: 310, matchRate: 0.08 },
+      paymentRecordsFile: { provided: true, rows: 622, matched: 600, matchRate: 0.96 },
+      profitDirectFile: { provided: true, rows: 903, matched: 620, matchRate: 0.69 },
+      profitBridgeFile: { provided: true, rows: 285, matched: 280, matchRate: 0.98 },
+      budgetFile: { provided: true, rows: 607, matched: 600, matchRate: 0.99 },
       staffNoProject: [], managerNotInOrg: [], presaleTotal: 3, presaleMapped: 3, presaleUnmapped: [],
     },
     ...over,
@@ -31,7 +37,7 @@ describe('buildHealthReport', () => {
     const r = buildHealthReport(makeData())
     expect(r.verdict).toBe('green')
     expect(r.title).toBe('数据就绪')
-    expect(r.sources).toHaveLength(5)
+    expect(r.sources).toHaveLength(9)
     expect(r.sources.every((s) => s.provided)).toBe(true)
     expect(r.alerts.every((a) => a.count === 0)).toBe(true)
     expect(r.metaLine).toContain('2026-06-12 09:00')
@@ -83,10 +89,11 @@ describe('buildHealthReport', () => {
     expect(r.verdict).toBe('yellow')
   })
 
-  it('projectsQuality 整体缺失 → 三卡未提供+三条缺失告警', () => {
+  it('projectsQuality 整体缺失 → 七卡未提供+九条缺失告警', () => {
     const r = buildHealthReport(makeData({ projectsQuality: null }))
-    expect(r.sources.filter((s) => !s.provided).map((s) => s.key)).toEqual(['org', 'mapping', 'delivery'])
-    expect(r.alerts.filter((a) => a.key.startsWith('missing-'))).toHaveLength(3)
+    expect(r.sources.filter((s) => !s.provided).map((s) => s.key)).toEqual(['org', 'mapping', 'delivery', 'milestone', 'payRecords', 'profit', 'bridge'])
+    // org/mapping/delivery/msActive/paymentRecords/profitDirect 高 + msClosed/profitBridge/budget 中
+    expect(r.alerts.filter((a) => a.key.startsWith('missing-'))).toHaveLength(9)
   })
 
   it('排序:0条沉底,非零按严重度高→低再条数降序', () => {
@@ -116,5 +123,29 @@ describe('buildHealthReport', () => {
     const r = buildHealthReport(makeData())
     expect(r.alerts.filter((a) => a.exportName).map((a) => a.key).sort())
       .toEqual(['backfill', 'managerNotInOrg', 'presaleUnmapped', 'unmatched'])
+  })
+
+  it('R1 新源四卡:就绪计 9 卡', () => {
+    const r = buildHealthReport(makeData())
+    expect(r.sources).toHaveLength(9)
+    expect(r.sources.map((s) => s.key)).toContain('milestone')
+    expect(r.sources.find((s) => s.key === 'profit')!.subs[0]).toContain('budget 607')
+    expect(r.verdict).toBe('green')
+  })
+
+  it('R1 新源缺失:在建里程碑/流水/direct 高告警,已结项/桥接/budget 中告警', () => {
+    const d = makeData()
+    for (const k of ['milestoneActive', 'milestoneClosed', 'paymentRecordsFile', 'profitDirectFile', 'profitBridgeFile', 'budgetFile']) {
+      delete (d.projectsQuality as any)[k]   // 退回 P1 时代形状 → R1 六源全缺失
+    }
+    const r = buildHealthReport(d)
+    expect(r.sources.find((s) => s.key === 'milestone')!.provided).toBe(false)
+    const keys = r.alerts.filter((a) => a.key.startsWith('missing-')).map((a) => a.key)
+    expect(keys).toEqual(expect.arrayContaining(
+      ['missing-msActive', 'missing-msClosed', 'missing-paymentRecords', 'missing-profitDirect', 'missing-profitBridge', 'missing-budget']))
+    expect(r.alerts.find((a) => a.key === 'missing-msActive')!.severity).toBe('high')
+    expect(r.alerts.find((a) => a.key === 'missing-msClosed')!.severity).toBe('mid')
+    expect(r.alerts.find((a) => a.key === 'missing-budget')!.severity).toBe('mid')
+    expect(r.verdict).toBe('yellow')
   })
 })

@@ -33,7 +33,7 @@ function seed() {
         deliveryCosts: [], health: { overall: '关注' } },
     ],
     projectPmis: {
-      'P-1': { progress: { 项目阶段: '项目执行', 完工进展: 0.2 }, status: { 项目状态: '实施中' }, risk: { 最高等级: '中', 未关闭风险数: 1 }, cost: { 消耗比: 0.3, 超支: true }, customer: { 最终客户: '海聚博源' } },
+      'P-1': { progress: { 项目阶段: '项目执行', 完工进展: 0.2 }, status: { 项目状态: '实施中', 项目级别: 'P3', 项目类型: '交付项目' }, risk: { 最高等级: '中', 未关闭风险数: 1 }, cost: { 消耗比: 0.3, 超支: true }, customer: { 最终客户: '海聚博源', 合同总额: 1234567 } },
     },
   } as any
 }
@@ -52,6 +52,16 @@ describe('ProjectsView', () => {
     expect(w.text()).toContain('原项目*')
     expect(w.findAll('.health-badge').length).toBeGreaterThanOrEqual(2)
     expect(w.text()).toContain('共 2 条')
+  })
+
+  it('R1 三新列:合同金额(万)/级别/项目类型', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.text()).toContain('合同金额(万)')
+    expect(w.text()).toContain('123.5')   // 1234567 元 → 123.5 万
+    expect(w.text()).toContain('P3')
+    expect(w.text()).toContain('交付项目')
   })
 
   it('搜索过滤（按经理）', async () => {

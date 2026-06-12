@@ -50,14 +50,16 @@ export type NoName13 = number | null;
 export type NoName14 = string | null;
 export type NoName15 = boolean | null;
 export type NoName16 = string | null;
-export type NoName17 = number | null;
+export type NoName17 = string | null;
 export type NoName18 = string | null;
-export type NoName19 = string | null;
+export type NoName19 = number | null;
 export type NoName20 = string | null;
 export type NoName21 = string | null;
-export type NoName22 = number | null;
+export type NoName22 = string | null;
 export type NoName23 = string | null;
-export type NoName24 = string | null;
+export type NoName24 = number | null;
+export type NoName25 = string | null;
+export type NoName26 = string | null;
 export type L4 = string | null;
 export type Riskrecords = {
   [k: string]: unknown;
@@ -95,11 +97,11 @@ export type Actualtotal = number;
 export type Remainingtotal = number;
 export type Paymentratio = number | null;
 export type Delayedcount = number;
-export type NoName25 = string;
-export type NoName26 = number | null;
-export type NoName27 = number | null;
+export type NoName27 = string;
 export type NoName28 = number | null;
 export type NoName29 = number | null;
+export type NoName30 = number | null;
+export type NoName31 = number | null;
 export type Deliverycosts = DeliveryCostItem[];
 export type Progressabnormal = boolean;
 export type Riskabnormal = boolean;
@@ -123,13 +125,45 @@ export type Presalemapped = number;
 export type Presaleunmapped = {
   [k: string]: unknown;
 }[];
-export type Date = string;
+export type Name = string;
+export type Plandate1 = string;
+export type Actualdate = string;
+export type Paystage = string;
+export type Pct = number | null;
+export type Priority = string;
+export type Total = number;
+export type Count = number;
+export type Lastdate = string;
 export type Type = string;
+export type Serial = string;
+export type Payer = string;
+export type Amount = number | null;
+export type Date = string;
+export type Claimer = string;
+export type Orderno = string;
+export type Currency = string;
+export type Rate = number | null;
+export type Note = string;
+export type Records = PaymentRecord[];
+export type Code = string;
+export type Name1 = string;
+export type Level = number;
+export type Budget = number | null;
+export type Estimate = number | null;
+export type Final = number | null;
+export type Actual = number | null;
+export type Remaining = number | null;
+export type Rate1 = number | null;
+export type Rows1 = ProfitRow[];
+export type Ssid = string;
+export type Rows2 = ProfitRow[];
+export type Date1 = string;
+export type Type1 = string;
 export type Domain = string;
 export type Projectid2 = string;
 export type Projectname2 = string;
-export type Summary1 = string;
-export type Amount = number | null;
+export type Summary3 = string;
+export type Amount1 = number | null;
 export type Events = Event[];
 export type Basedate = string;
 export type Advancedprojects = number;
@@ -153,6 +187,9 @@ export interface AnalysisData {
   dataQuality?: DataQuality | null;
   projects?: Projects1;
   projectsQuality?: ProjectsQuality | null;
+  projectMilestones?: Projectmilestones;
+  paymentRecords?: Paymentrecords;
+  projectProfit?: Projectprofit;
   events?: Events;
   periodCompare?: PeriodCompare | null;
   [k: string]: unknown;
@@ -250,20 +287,22 @@ export interface PmisStatus {
   项目状态?: NoName14;
   是否暂停?: NoName15;
   评级?: NoName16;
-  评分?: NoName17;
+  项目级别?: NoName17;
+  项目类型?: NoName18;
+  评分?: NoName19;
   [k: string]: unknown;
 }
 export interface PmisCustomer {
-  最终客户?: NoName18;
-  合同编号?: NoName19;
-  签约形式?: NoName20;
-  行业?: NoName21;
-  合同总额?: NoName22;
+  最终客户?: NoName20;
+  合同编号?: NoName21;
+  签约形式?: NoName22;
+  行业?: NoName23;
+  合同总额?: NoName24;
   [k: string]: unknown;
 }
 export interface PmisTeam {
-  项目名称?: NoName23;
-  项目经理?: NoName24;
+  项目名称?: NoName25;
+  项目经理?: NoName26;
   L4部门?: L4;
   [k: string]: unknown;
 }
@@ -307,11 +346,11 @@ export interface ProjectPayment {
   [k: string]: unknown;
 }
 export interface DeliveryCostItem {
-  类别: NoName25;
-  预算金额?: NoName26;
-  实际发生?: NoName27;
-  剩余预算?: NoName28;
-  消耗率?: NoName29;
+  类别: NoName27;
+  预算金额?: NoName28;
+  实际发生?: NoName29;
+  剩余预算?: NoName30;
+  消耗率?: NoName31;
   [k: string]: unknown;
 }
 export interface ProjectHealth {
@@ -327,6 +366,12 @@ export interface ProjectsQuality {
   orgFile?: InputFileStat;
   mappingFile?: InputFileStat1;
   deliveryFile?: InputFileStat2;
+  milestoneActive?: InputFileStat3;
+  milestoneClosed?: InputFileStat4;
+  paymentRecordsFile?: InputFileStat5;
+  profitDirectFile?: InputFileStat6;
+  profitBridgeFile?: InputFileStat7;
+  budgetFile?: InputFileStat8;
   staffNoProject?: Staffnoproject;
   managerNotInOrg?: Managernotinorg;
   presaleTotal?: Presaletotal;
@@ -355,16 +400,126 @@ export interface InputFileStat2 {
   matchRate?: Matchrate;
   [k: string]: unknown;
 }
+export interface InputFileStat3 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat4 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat5 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat6 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat7 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat8 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface Projectmilestones {
+  [k: string]: MilestoneItem[];
+}
+export interface MilestoneItem {
+  name: Name;
+  planDate?: Plandate1;
+  actualDate?: Actualdate;
+  payStage?: Paystage;
+  pct?: Pct;
+  priority?: Priority;
+  [k: string]: unknown;
+}
+export interface Paymentrecords {
+  [k: string]: PaymentRecordsEntry;
+}
+export interface PaymentRecordsEntry {
+  total?: Total;
+  count?: Count;
+  lastDate?: Lastdate;
+  records?: Records;
+  [k: string]: unknown;
+}
+export interface PaymentRecord {
+  type?: Type;
+  serial?: Serial;
+  payer?: Payer;
+  amount?: Amount;
+  date?: Date;
+  claimer?: Claimer;
+  orderNo?: Orderno;
+  currency?: Currency;
+  rate?: Rate;
+  note?: Note;
+  [k: string]: unknown;
+}
+export interface Projectprofit {
+  [k: string]: ProjectProfit;
+}
+export interface ProjectProfit {
+  summary?: Summary1;
+  rows?: Rows1;
+  bridge?: BridgeProfit | null;
+  [k: string]: unknown;
+}
+export interface Summary1 {
+  [k: string]: number | null;
+}
+export interface ProfitRow {
+  code: Code;
+  name: Name1;
+  level?: Level;
+  budget?: Budget;
+  estimate?: Estimate;
+  final?: Final;
+  actual?: Actual;
+  remaining?: Remaining;
+  rate?: Rate1;
+  [k: string]: unknown;
+}
+export interface BridgeProfit {
+  ssId?: Ssid;
+  summary?: Summary2;
+  rows?: Rows2;
+  [k: string]: unknown;
+}
+export interface Summary2 {
+  [k: string]: number | null;
+}
 export interface Event {
-  date: Date;
-  type: Type;
+  date: Date1;
+  type: Type1;
   domain: Domain;
   projectId?: Projectid2;
   projectName?: Projectname2;
-  summary?: Summary1;
+  summary?: Summary3;
   prev?: unknown;
   curr?: unknown;
-  amount?: Amount;
+  amount?: Amount1;
   [k: string]: unknown;
 }
 export interface PeriodCompare {

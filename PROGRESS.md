@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.6.0**
-- 最近更新：2026-06-12（P8 数据治理页健康检查重设计 + 工具组收尾 + 打包专项核验，V7.6.0）
+- 当前版本：**V7.7.0**
+- 最近更新：2026-06-12（R1 数据地基：七文件摄取/治理源卡 5→9/清单三列，V7.7.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,8 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1-P6 已合并 master（V7.0.0-V7.5.0，P6 合并提交 85ea00b）；**P7 暂停**（用户 2026-06-12 决策：回款子域预计全量重新设计，逐页翻新会被推翻，后续独立立项时整体覆盖）；P8（治理页健康检查重设计 + 工具组收尾 + 打包专项核验）已完成，分支 feat/phase-p8-governance 待合并（见 Handoff）。P8 合并后 Phase P 收官（P7 取消出排期）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）+ 2026-06-12-P8-governance-tools-design.md。
+- [x] **Phase P 项目主域整体看板**：P1-P6、P8 已合并 master（V7.0.0-V7.6.0，P8 合并提交 59ad935），P7 暂停取消出排期（回款子域待全量重设计立项）。spec：2026-06-10-project-domain-dashboard-design.md + 2026-06-12-P8-governance-tools-design.md。
+- [~] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md，R1-R4 分期）：R1 数据地基（七文件摄取+治理源卡 5→9+清单三列）已完成，分支 feat/phase-r1-data-foundation 待合并（见 Handoff）。下一期 R2（详情页三 tab：里程碑双层/预算核算科目树表/回款数据）；其后 R3（数据管理页重设计+默认链接+新入口）、R4（产品改名「项目管理平台」+关于页+V1.0.0 版本策略）。
 
 ---
 
@@ -103,7 +104,7 @@
 - [ ] **L-15** 跨平台一致性：macOS 下 taskkill/netstat/快捷方式逻辑失效，明确提示或补实现。
 - [ ] **L-16** 上传卡反馈改进（pmis+inputs 两卡）：白名单外文件跳过时提示原因、ok=0 时去掉"请点[更新数据]"后缀、fetch 网络异常捕获提示。
 - [ ] **L-17** CORS 收紧后续：上传/导入等写接口加 Origin/Host 校验，防跨站驱动写（配合 L-13）。
-- [ ] **L-18** analysis_data.json 体积优化（现 4.86MB）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）。
+- [ ] **L-18** analysis_data.json 体积优化（现 **8.08MB**，R1 三新键增量 ~3.2MB，优先级上调）：indent=1 改紧凑 separators 约省 18%；deliveryCosts 结构精简（640×7 类目重复中文键）；projectProfit/projectMilestones 可考虑空值列剔除与字段名压缩。
 - [ ] **L-19** P2 遗留小项：el-table 行下钻键盘可达性（清单/抽屉/台账等系列页统一处理,对齐 v-activate 约定）；详情页风险表「是否超期」为多行聚合串,70px 列宽靠 tooltip 可读（可加 formatter 摘要）；金额未填但有节点的项目（2/640）回款状态归「回款中」待业务确认是否单列。
 - [ ] **L-20** P3 遗留小项：重复组节点（同项目同名,59 键）中间插/删行会致 #k 位移、diff 产生组内噪声事件（设计已声明,展示侧可考虑同节点多事件轻度合并）；单快照 ~280KB×90 天 ≈ 25MB（节点数翻倍时关注压缩）；/activity 时间范围筛选随事件量积累再加（现仅内嵌 100 条,YAGNI 裁剪）。
 - [x] **L-21** 令牌化整改关闭（P5.5 字号 rem + P8 存活页扫尾）：项目域五页/数据管理/布局三件/共用组件 px 散值清零（42px 侧栏对齐缩进与 1-3px 微调按规范保留）；BoardView 两处状态 hex 入 echartsTheme STATUS_LIGHT/DARK 镜像（契约测试同步 theme.css）。**移交回款全量重设计**（实测规模远超原记录）：回款域遗留页约 230 处 px（Calendar/Followup/Ledger/Dashboard/PayAnalysis 及专属组件链）+ lib/calendar.ts、lib/planBoards.ts、nav.ts TIERS 回退 hex（--red/--orange/--green 未在 theme 定义，档位分类色语义待该期定）；ColumnFilter 经引用核实为回款专属（LedgerTable/PlanBoard），一并移交。
@@ -126,6 +127,16 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan R1 完成（2026-06-12）：数据地基——七文件摄取 + 治理源卡 5→9 + 清单三列（V7.7.0）
+- 分支 **`feat/phase-r1-data-foundation`**，5 任务（里程碑/科目树/集成 opus，前端 sonnet 中途死亡由主循环接管补完，收尾主循环），`verify.sh` 全绿。spec：`2026-06-12-R-batch-data-expansion-design.md` §2，计划：`2026-06-12-R1-data-foundation.md`。
+- **新模块**：milestones.py（宽转长 13 类目+三段优先级 高=终验/服务完成/关联回款非空、中=项目关闭、低=其他；**MilestoneItem.pct 为 0-100 原值**，真实数据百分比列当前全空；已结项 matched 排除被在建覆盖的 pid）；profit.py（direct/bridge 科目树 + budget 概算/核算按 **code+name 双键**合并、毛利编码别名 3.1→3/3.2→4——budget 与 direct 的 2.3.x/2.4.x 子科目**同码不同名不可合并**；payment_records 按项目分组 新→旧）。
+- **集成**：preprocess 9e 段，keep_ids=主域∪relatedClosedId 体积护栏；analysis_data 三新键 projectMilestones(827)/paymentRecords(374)/projectProfit(632 含 bridge 276)；projectsQuality +6 统计；PmisStatus +项目级别/项目类型（基础信息表优先状态表兜底）；delivery_analysis 切 csv（读侧回退 legacy xlsx，上传白名单两式过渡）；**.spec datas +milestones.py/profit.py**（frozen 硬依赖）。
+- 真实管线量级（2026-06-12）：里程碑在建 634 行命中 610 / 已结项 3915 命中 217、流水 622 命中 584、direct 903 命中 632、budget 607 命中 574（概算并入 574 个收入行）、桥接 285 命中 276。
+- **坑位记录**：PMIS 导出 xlsx 的 dimension 元数据是假的，openpyxl read_only 会把 3915 行截成 1 行——一律走 pmis.read_pmis_sheet（非 read_only）。
+- 前端：治理页源卡 9 张（+里程碑两表/回款流水/全预算 direct+budget/桥接预算），缺失告警 6 类分级（msActive/paymentRecords/profitDirect 高，msClosed/profitBridge/budget 中）；清单 +合同金额(万)/级别/项目类型 三列。
+- 手工烟雾清单（需用户执行）：① /governance 九源卡数值与告警区（在建里程碑 634/流水 622/direct 903 等）；② /projects 三新列显示与合同金额排序；③ 数据管理页「更新数据」重跑后治理页数值刷新；④ analysis_data.json 含三新键（R2 才有页面消费，本期仅数据就绪）。
+- analysis_data.json 4.86→**8.08MB**（R1 增量），L-18 体积优化优先级上调。
 
 ### ✅ Plan P8 完成（2026-06-12）：数据治理页健康检查重设计 + 工具组收尾 + 打包专项核验（V7.6.0）
 - 分支 **`feat/phase-p8-governance`**，6 任务（视图模型/治理页 opus，关于页/令牌扫尾 sonnet，打包/收尾主循环），`verify.sh` 全绿。spec：`docs/superpowers/specs/2026-06-12-P8-governance-tools-design.md`（含 P7 暂停决策记录）。
