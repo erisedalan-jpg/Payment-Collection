@@ -51,7 +51,7 @@ def _split_col(col: str, prefix: str) -> Optional[Tuple[str, str, str]]:
 
 
 def parse_profit_rows(row: Dict[str, Any], prefix: str) -> List[Dict[str, Any]]:
-    """一行 CSV → 科目树行(按列序;level>1 且四指标全 None/0 的剪掉)。"""
+    """一行 CSV → 科目树行(按列序;level>1 且四指标全 None 的剪掉,全零保留——S1 科目全量展示;一级行恒保留)。"""
     found: Dict[Tuple[str, str], Dict[str, Any]] = {}
     order: List[Tuple[str, str]] = []
     for col, raw in row.items():
@@ -76,7 +76,8 @@ def parse_profit_rows(row: Dict[str, Any], prefix: str) -> List[Dict[str, Any]]:
     for key in order:
         r = found[key]
         vals = [r["budget"], r["actual"], r["remaining"], r["rate"]]
-        if r["level"] > 1 and not any(v for v in vals):
+        # level>1 且四指标全 None 的剪掉(全零保留——S1 科目全量展示);一级行恒保留
+        if r["level"] > 1 and all(v is None for v in vals):
             continue
         out.append(r)
     return out
@@ -211,3 +212,24 @@ def load_payment_records(input_dir: str, keep_ids: Set[str]
     for e in out.values():
         e["records"].sort(key=lambda x: x["date"], reverse=True)
     return out, _stat(True, len(rows), matched)
+
+
+def overspend_amount(profit_entry: Optional[Dict[str, Any]]) -> Optional[float]:
+    """整体超支金额(元,S1 用户口径;可为负=未超支):
+    非售前 = direct 顶部 实际成本-预算成本(不用"剩余预算"列——225/632 与两列差不一致);
+    售前(bridge 科目2剩余预算可得) = 当前消耗(实际成本) - 原剩余预算;否则退非售前式。"""
+    if not profit_entry:
+        return None
+    s = profit_entry.get("summary") or {}
+    actual = s.get("实际成本")
+    if actual is None:
+        return None
+    bridge = profit_entry.get("bridge")
+    if bridge:
+        r2 = next((r for r in (bridge.get("rows") or []) if r.get("code") == "2"), None)
+        if r2 is not None and r2.get("remaining") is not None:
+            return round(actual - r2["remaining"], 2)
+    budget = s.get("预算成本")
+    if budget is None:
+        return None
+    return round(actual - budget, 2)
