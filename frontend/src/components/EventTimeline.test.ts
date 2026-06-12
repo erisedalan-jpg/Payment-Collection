@@ -34,4 +34,15 @@ describe('EventTimeline', () => {
     const w = mount(EventTimeline, { props: { events: [], emptyText: '首次同步，暂无变化记录' }, global: { plugins: [router] } })
     expect(w.text()).toContain('首次同步，暂无变化记录')
   })
+  it('S1:tone 染色优先于 domain 缺省色', () => {
+    const w = mount(EventTimeline, { props: { events: [
+      { date: '2026-06-12', type: '延期发生', domain: 'payment', projectId: '', projectName: '', summary: 'x', tone: 'danger' },
+      { date: '2026-06-12', type: '新增项目', domain: 'project', projectId: '', projectName: '', summary: 'y', tone: 'ok' },
+      { date: '2026-06-12', type: '阶段变更', domain: 'project', projectId: '', projectName: '', summary: 'z' },
+    ] as any }, global: { plugins: [router] } })
+    const chips = w.findAll('.ev-type')
+    expect(chips[0].classes()).toContain('tone-danger')
+    expect(chips[1].classes()).toContain('tone-ok')
+    expect(chips[2].classes()).toContain('proj')   // 无 tone 走 domain 缺省
+  })
 })
