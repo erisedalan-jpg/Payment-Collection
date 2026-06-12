@@ -47,6 +47,9 @@ PMIS_FILES_CLOSED = {
     "base": "项目基础信息数据-已关闭.xlsx",
     "status": "项目状态信息数据-已关闭.xlsx",
 }
+# 里程碑两表(Phase R1,位于 input/pmis/)
+MILESTONE_FILE_ACTIVE = "在建项目里程碑计划数据.xlsx"
+MILESTONE_FILE_CLOSED = "已结项里程碑计划数据.xlsx"
 PMIS_HEADER_ROW = 2  # PMIS 表表头在第 2 行(第 1 行为合并标题)
 
 # ── 项目主域输入文件(Phase P,位于 input/ 根) ──
