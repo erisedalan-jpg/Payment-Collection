@@ -267,3 +267,26 @@ class TestReadDegradation:
         assert P.read_delivery(str(bad)) == []
         names, l4s, rows = P.read_org_names(str(bad))
         assert names == set() and rows == 0
+
+
+class TestDeliveryOverspendCats:
+    def test_over_categories_listed(self):
+        import projects as PJ
+        costs = [
+            {"类别": "交付外包服务成本", "预算金额": 100.0, "实际发生": 150.0},
+            {"类别": "差旅费", "预算金额": 200.0, "实际发生": 100.0},
+            {"类别": "项目直接成本", "预算金额": 0.0, "实际发生": 50.0},   # 预算0实际>0 也算超
+            {"类别": "其他", "预算金额": None, "实际发生": 10.0},          # 预算缺失不算
+        ]
+        assert PJ.delivery_overspend_cats(costs) == ["交付外包服务成本", "项目直接成本"]
+        assert PJ.delivery_overspend_cats([]) == []
+
+
+class TestPaymentRatioFromRecords:
+    def test_normal_and_presale_fallback(self):
+        import projects as PJ
+        assert PJ.payment_ratio_from_records(500.0, 1000.0, None) == 0.5
+        assert PJ.payment_ratio_from_records(1151500.0, None, 1151500.0) == 1.0   # 售前取原项目
+        assert PJ.payment_ratio_from_records(None, 1000.0, None) == 0.0           # 无流水=0%
+        assert PJ.payment_ratio_from_records(500.0, None, None) is None           # 分母缺失
+        assert PJ.payment_ratio_from_records(500.0, 0, 0) is None

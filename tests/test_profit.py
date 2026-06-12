@@ -44,12 +44,12 @@ PAY_CSV = (
 
 
 class TestParseProfitRows:
-    def test_tree_levels_and_zero_pruning(self):
+    def test_tree_levels_and_all_none_pruning(self):
         import csv, io
         row = next(csv.DictReader(io.StringIO(DIRECT_CSV)))
         rows = P.parse_profit_rows(row, "本项目_")
         codes = [r["code"] for r in rows]
-        assert codes == ["1", "2", "2.3.2", "3"]   # 2.4.1 全 0 被剪,一级行保留
+        assert codes == ["1", "2", "2.3.2", "2.4.1", "3"]   # 2.4.1 全 0 保留(S1),一级行保留
         r232 = next(r for r in rows if r["code"] == "2.3.2")
         assert r232 == {"code": "2.3.2", "name": "交付部门人工成本", "level": 3,
                         "budget": 100.0, "estimate": None, "final": None,
@@ -101,3 +101,47 @@ class TestPaymentRecords:
     def test_missing(self, tmp_path):
         recs, stat = P.load_payment_records(str(tmp_path), {"SS-1"})
         assert recs == {} and stat["provided"] is False
+
+
+class TestOverspendAmount:
+    def _entry(self, actual, budget, bridge_remaining=None):
+        e = {"summary": {"实际成本": actual, "预算成本": budget}, "rows": [], "bridge": None}
+        if bridge_remaining is not None:
+            e["bridge"] = {"ssId": "SS-X", "summary": {},
+                           "rows": [{"code": "2", "name": "项目成本", "level": 1,
+                                     "remaining": bridge_remaining}]}
+        return e
+
+    def test_normal_actual_minus_budget(self):
+        assert P.overspend_amount(self._entry(7000.0, 1000.0)) == 6000.0
+        assert P.overspend_amount(self._entry(500.0, 1000.0)) == -500.0   # 未超支为负
+
+    def test_presale_uses_bridge_remaining(self):
+        # 售前:当前消耗 - 原剩余预算
+        assert P.overspend_amount(self._entry(8000.0, 1.0, bridge_remaining=2000.0)) == 6000.0
+
+    def test_presale_without_bridge_falls_back(self):
+        e = self._entry(7000.0, 1000.0)
+        e["bridge"] = {"ssId": "SS-X", "summary": {}, "rows": []}   # 有桥但无科目2 → 退非售前式
+        assert P.overspend_amount(e) == 6000.0
+
+    def test_missing_data_none(self):
+        assert P.overspend_amount(None) is None
+        assert P.overspend_amount({"summary": {}, "rows": [], "bridge": None}) is None
+
+
+class TestZeroRowsKept:
+    def test_all_zero_kept_all_none_pruned(self):
+        row = {
+            "本项目_2.2.1_自有产品外包服务成本_预算金额": "0.0",
+            "本项目_2.2.1_自有产品外包服务成本_实际发生": "0.0",
+            "本项目_2.2.1_自有产品外包服务成本_剩余预算": "0.0",
+            "本项目_2.2.1_自有产品外包服务成本_消耗率": "0.0",
+            "本项目_2.9.9_幽灵科目_预算金额": "",
+            "本项目_2.9.9_幽灵科目_实际发生": "",
+            "本项目_2.9.9_幽灵科目_剩余预算": "",
+            "本项目_2.9.9_幽灵科目_消耗率": "",
+        }
+        codes = [r["code"] for r in P.parse_profit_rows(row, "本项目_")]
+        assert "2.2.1" in codes      # 全零保留(S1:科目全量展示)
+        assert "2.9.9" not in codes  # 全 None 仍剪
