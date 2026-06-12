@@ -58,13 +58,27 @@ PROFIT_BRIDGE_FILE = "profit_loss_bridge.csv"
 BUDGET_FILE = "budget_data.csv"
 PAYMENT_RECORDS_FILE = "payment_records.csv"
 
+# PMIS 全量文件名(九表=七表+里程碑两表;上传白名单/下载候选,Phase R3)
+PMIS_ALL_FILENAMES = (list(PMIS_FILES_ACTIVE.values()) + list(PMIS_FILES_CLOSED.values())
+                      + [MILESTONE_FILE_ACTIVE, MILESTONE_FILE_CLOSED])
+
+# 默认下载直链(Phase R3,用户 2026-06-12 提供;blob 类无直链文件不入此表,入口标注手动导出上传)
+WPS_LINK_KEY = "回款数据"  # 非 PMIS 文件名键,pmis_download.plan_downloads 按九表名单过滤不受影响
+DEFAULT_LINKS = {
+    WPS_LINK_KEY: "https://yundocs.qianxin-inc.cn/weboffice/l/sRs8GgCmE2ygb",
+    "项目状态信息数据.xlsx": "https://pmis.qianxin-inc.cn/design/cache/cacheProjectsStatus/exportProjectStatusExcel.pd?params=null&projSearch=&isArchive=0&isMyProject=0&projectType=&parentWbsId=&deptId=&advancedQueryArray=",
+    "项目状态信息数据-已关闭.xlsx": "https://pmis.qianxin-inc.cn/design/cache/cacheProjectsStatus/exportProjectStatusExcel.pd?params=null&projSearch=&isArchive=1&isMyProject=0&projectType=&parentWbsId=&deptId=&advancedQueryArray=",
+    "项目风险数据.xlsx": "https://pmis.qianxin-inc.cn/design/risk/projRisklibrary/exportProjExcel.pd?params=null&searchValue=&deleteFlag=0&riskLevel=&realm=&projStage=&status=&projIdType=1&parentWbsId=&deptId=&projId=&advancedQueryArray=",
+}
+
 # ── 项目主域输入文件(Phase P,位于 input/ 根) ──
 ORG_FILE = "组织架构.xlsx"
 MAPPING_FILE = "A.xlsx"
 DELIVERY_FILE = "delivery_analysis.csv"
 DELIVERY_FILE_LEGACY = "delivery_analysis.xlsx"  # csv 缺失时回退(R 批次过渡)
 # 上传白名单含 legacy:R 批次过渡期 csv/xlsx 两式 delivery 均可上传(读侧 read_delivery 同款回退)
-INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY]
+INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY,
+                      PAYMENT_RECORDS_FILE, PROFIT_DIRECT_FILE, PROFIT_BRIDGE_FILE, BUDGET_FILE]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
 DELIVERY_COST_CATEGORIES = [
