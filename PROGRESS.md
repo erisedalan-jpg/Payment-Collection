@@ -4,16 +4,17 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.9.0**
-- 最近更新：2026-06-12（R3 数据管理页五卡重排：默认直链/九表与 CSV 白名单/文件时间，V7.9.0）
+- 当前版本：**V1.0.0**（产品更名「项目管理平台」并重置版本，2026-06-12）
+- 最近更新：2026-06-12（R4 产品改名+版本策略落地，Phase R 收官）
 - 维护语言：简体中文
 
 ---
 
-## 版本（单一来源约定）
+## 版本（单一来源约定，2026-06-12 起）
 
-版本号目前散落在多处（`app.js` 版本变量、`index.html` 的 `?v=` 静态资源戳、本文件）。
-**约定**：以本文件 + `app.js` 为准；发版时三处一起改。后续应改为构建时统一注入（见 Backlog H-7）。
+- **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
+- **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.0.0 = 产品更名「项目管理平台」基线（此前 V5.x 旧前端与 V7.x Phase P/R 序列退役，历史见 git）。
 
 ---
 
@@ -34,7 +35,7 @@
 ## 进行中
 
 - [x] **Phase P 项目主域整体看板**：P1-P6、P8 已合并 master（V7.0.0-V7.6.0，P8 合并提交 59ad935），P7 暂停取消出排期（回款子域待全量重设计立项）。spec：2026-06-10-project-domain-dashboard-design.md + 2026-06-12-P8-governance-tools-design.md。
-- [~] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md，R1-R4 分期）：R1 已合并（V7.7.0，合并提交 a11aceb）；R2 已合并（V7.8.0，合并提交 1a0a39b）；R3 数据管理页重设计（五卡版式 A+默认直链+九表/CSV 白名单+文件时间）已完成，分支 feat/phase-r3-data-management 待合并（见 Handoff）。下一期 R4（产品改名「项目管理平台」+关于页+V1.0.0 版本策略落地，Phase R 收官）。
+- [~] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md，R1-R4 分期）：R1 已合并（V7.7.0，合并提交 a11aceb）；R2 已合并（V7.8.0，合并提交 1a0a39b）；R3 已合并（V7.9.0，合并提交 997fe15）；R4 产品改名「项目管理平台」+关于页+V1.0.0 版本策略已完成，分支 feat/phase-r4-rename-version 待合并（见 Handoff）。**R4 合并后 Phase R 收官（R1-R4 全交付）**。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）。
 
 ---
 
@@ -127,6 +128,13 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan R4 完成（2026-06-12）：产品改名「项目管理平台」+ V1.0.0 版本策略（Phase R 收官）
+- 分支 **`feat/phase-r4-rename-version`**，2 任务（改名 sonnet、约定与收尾主循环），`verify.sh` 全绿。计划：`2026-06-12-R4-rename-version.md`。
+- **改名（展示层 8 处）**：index.html title / AppHeader 标题 / 关于页名称与产品名称行 / server.py 启动日志 / 停止服务.py docstring+print；关于页作者=王叙潼牛逼、**删数据来源行**；版本重置 **V1.0.0**（version.ts 单一来源）。
+- **保留旧名（文件名兼容链，随下次打包专项更名）**：server.py:1502-1557 快捷方式区（.lnk/.vbs 名与 Description）、*_启动.bat/.command、PaymentReviewApp.spec exe 名。
+- **版本策略入约定**（CLAUDE.md+本文件版本节）：`VX.Y.Z`——X 须用户确认 / Y=整页级 / Z=子页面级；单一来源 version.ts。
+- 手工烟雾清单（需用户执行）：① 浏览器标题与侧栏头为「项目管理平台」；② 关于页：作者王叙潼牛逼、无数据来源行、版本 V1.0.0；③ `python server.py` 启动日志新名；④ 既有桌面快捷方式仍可启动（旧名 .vbs 链未动）。
 
 ### ✅ Plan R3 完成（2026-06-12）：数据管理页五卡重排 + 默认直链 + 白名单扩展（V7.9.0）
 - 分支 **`feat/phase-r3-data-management`**，3 任务（后端/前端 opus、收尾主循环），`verify.sh` 全绿。计划：`2026-06-12-R3-data-management.md`，版式 A 经用户预览确认。
