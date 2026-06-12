@@ -35,7 +35,7 @@
 ## 进行中
 
 - [x] **Phase P 项目主域整体看板**：P1-P6、P8 已合并 master（V7.0.0-V7.6.0，P8 合并提交 59ad935），P7 暂停取消出排期（回款子域待全量重设计立项）。spec：2026-06-10-project-domain-dashboard-design.md + 2026-06-12-P8-governance-tools-design.md。
-- [~] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md，R1-R4 分期）：R1 已合并（V7.7.0，合并提交 a11aceb）；R2 已合并（V7.8.0，合并提交 1a0a39b）；R3 已合并（V7.9.0，合并提交 997fe15）；R1-R4 已全部合并（V7.7.0-V1.0.0，R4 合并提交 55a5aba，**Phase R 收官**）。
+- [x] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md）：R1-R4 四期全部合并（V7.7.0→V1.0.0；a11aceb / 1a0a39b / 997fe15 / 55a5aba），**Phase R 收官**。
 - [~] **S1 反馈修缮批次**（spec：2026-06-12-S1-feedback-fixes-design.md，V1.0.1）：动态事件规则与 tone 染色/清单分页多选/科目树全量/回款完成率迁流水口径/分析配色，已完成，分支 feat/phase-s1-feedback-fixes 待合并（见 Handoff）。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）。
 
 ---
