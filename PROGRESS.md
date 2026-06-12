@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V7.4.1**
-- 最近更新：2026-06-11（P5.5 实测反馈修缮：字号令牌化/总览跳转/清单L4/里程碑表/分析11维，V7.4.1）
+- 当前版本：**V7.5.0**
+- 最近更新：2026-06-11（P6 回款分析归并 /panalysis + 回款总览瘦身，V7.5.0）
 - 维护语言：简体中文
 
 ---
@@ -33,7 +33,7 @@
 
 ## 进行中
 
-- [~] **Phase P 项目主域整体看板**：P1-P4 已合并 master（V7.0.0-V7.3.0）；P5 /insight 项目分析已完成，**项目域五页齐**（分支 feat/phase-p5-insight 待合并，见下方 Handoff）。下一步 P6（回款子域重设计①：回款总览瘦身 + /board+业务分析五 tab 归并为一页）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
+- [~] **Phase P 项目主域整体看板**：P1-P5.5 已合并 master（V7.0.0-V7.4.1）；P6 回款分析归并 + 回款总览瘦身已完成（分支 feat/phase-p6-payment-redesign 待合并，见下方 Handoff）。下一步 P7（回款子域重设计②：日历/临期跟进/台账按 V2 令牌逐页重做）。spec：docs/superpowers/specs/2026-06-10-project-domain-dashboard-design.md（P1-P8 分期）。
 
 ---
 
@@ -126,6 +126,14 @@
 ---
 
 ## 会话交接备注（Handoff）
+
+### ✅ Plan P6 完成（2026-06-11）：回款分析归并 + 回款总览瘦身（V7.5.0）
+- 分支 **`feat/phase-p6-payment-redesign`**，3 任务（归并 opus / 瘦身 sonnet / 收尾主循环），`verify.sh` 全绿。
+- **归并**：新 `/panalysis/:tab?`（默认 board）「回款分析」单页 = 多维看板（内嵌 BoardView,深链 query.dim 兼容）+ 业务分析五 tab（项目总览/回款节点/回款状态/风险项目/数据质检,tier 档位与汇总条原样迁移）；AnalysisView 删除；旧路由 `/board`、`/analysis/:tab` **函数式 redirect** 到新页（保 query,深链不破）；navContext.goBoard 改推新路径；导航「回款」组收为 5 项（总览/分析/日历/跟进/台账）,删多维看板项与回款分析子组。
+- **瘦身**：/payment 删 DashSignals（临期信号行）与 DelayTopCard（延期 Top）整链（-198 行,组件+测试 4 文件;职能已由项目总览回款重点带 + /followup + /panalysis 风险 tab 覆盖）；保留 DashMetrics/TierStrip/OrgRanking/TrendCard（FilterBar 联动回款工作台）,TrendCard 通栏；lib 纯函数（delayedTopProjects 等）保留。
+- 技术要点：vue-router 4 的 resolve() 不跟随函数式 redirect——redirect 测试用 push 后断言 currentRoute（含 redirectedFrom/query 透传）。
+- 手工烟雾清单（需用户执行）：① 侧栏「回款」组 5 项,「回款分析」进 /panalysis 默认多维看板 tab,六 tab 可切；② 旧链接 /board?dim=orgL4 与 /analysis/plan 自动重定向落对应 tab（query 保留）；③ /payment 余四卡（指标/档位条/服务组排名/趋势通栏）,FilterBar 联动正常；④ 服务组排名行点击仍带 dim 落多维看板 tab。
+- P6 归并后 pivot 双实现（回款 groupByDims/项目 projectPivot）保持并行——统一抽象无消费方需求,YAGNI 维持（P5 决策延续）。
 
 ### ✅ Plan P5.5 完成（2026-06-11）：实测反馈修缮（V7.4.1）
 - 分支 **`fix/p5.5-feedback`**，用户对 P2-P5 的实测反馈批次（主循环亲做小改密集项 + sonnet 批量令牌化），`verify.sh` 全绿。

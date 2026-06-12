@@ -1,8 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardView from '@/views/DashboardView.vue'
-import AnalysisView from '@/views/AnalysisView.vue'
+import PayAnalysisView from '@/views/PayAnalysisView.vue'
 import LedgerView from '@/views/LedgerView.vue'
-import BoardView from '@/views/BoardView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import FollowupView from '@/views/FollowupView.vue'
 import DataView from '@/views/DataView.vue'
@@ -29,11 +28,14 @@ export const router = createRouter({
     { path: '/project/:id', name: 'project-detail', component: ProjectDetailView, meta: { title: '项目详情', hideFilter: true } },
     { path: '/activity', name: 'activity', component: ActivityView, meta: { title: '项目动态', hideFilter: true } },
     { path: '/insight', name: 'insight', component: InsightView, meta: { title: '项目分析', hideFilter: true } },
-    { path: '/board', name: 'board', component: BoardView, meta: { title: '多维看板' } },
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
     { path: '/followup', name: 'followup', component: FollowupView, meta: { title: '临期跟进' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
-    { path: '/analysis/:tab', name: 'analysis', component: AnalysisView, meta: { title: '业务分析' } },
+    // 回款分析归并页:多维看板(board) + 业务分析五 tab;:tab? 缺省视为 board;六 tab 全依赖 FilterBar(不 hideFilter)
+    { path: '/panalysis/:tab?', name: 'panalysis', component: PayAnalysisView, meta: { title: '回款分析' } },
+    // 旧路由 redirect 兼容(保留深链):/board 保 query(dim),/analysis/:tab 映射 tab
+    { path: '/board', redirect: (to) => ({ path: '/panalysis/board', query: to.query }) },
+    { path: '/analysis/:tab', redirect: (to) => ({ path: '/panalysis/' + String(to.params.tab) }) },
     { path: '/payment', name: 'payment', component: DashboardView, meta: { title: '回款总览' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true } },
