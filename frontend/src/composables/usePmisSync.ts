@@ -3,17 +3,23 @@ import { ref } from 'vue'
 export const PMIS_FILE_NAMES = [
   '项目中心.xlsx', '项目基础信息数据.xlsx', '项目状态信息数据.xlsx', '项目风险数据.xlsx',
   '项目中心-已关闭.xlsx', '项目基础信息数据-已关闭.xlsx', '项目状态信息数据-已关闭.xlsx',
+  '在建项目里程碑计划数据.xlsx', '已结项里程碑计划数据.xlsx',
 ]
 
 export function usePmisSync(opts: { onDone?: () => void } = {}) {
   const links = ref<Record<string, string>>({})
+  const defaults = ref<Record<string, string>>({})
   const progress = ref(0)
   const message = ref('')
   const running = ref(false)
 
   async function loadLinks() {
     const res = await fetch('/api/pmis/links')
-    if (res.ok) links.value = (await res.json()).links ?? {}
+    if (res.ok) {
+      const data = await res.json()
+      links.value = data.links ?? {}
+      defaults.value = data.defaults ?? {}
+    }
   }
   async function saveLinks() {
     await fetch('/api/pmis/links', {
@@ -58,5 +64,5 @@ export function usePmisSync(opts: { onDone?: () => void } = {}) {
     }
     return ok
   }
-  return { links, progress, message, running, loadLinks, saveLinks, download, upload, PMIS_FILE_NAMES }
+  return { links, defaults, progress, message, running, loadLinks, saveLinks, download, upload, PMIS_FILE_NAMES }
 }

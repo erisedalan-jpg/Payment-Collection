@@ -1,5 +1,5 @@
 # pmis_download.py
-"""PMIS 在线下载:按持久化链接把七个文件下载到 input/pmis/。
+"""PMIS 在线下载:按持久化链接把九表文件下载到 input/pmis/。
 进度用 [INFO]/[OK]/[ERROR] 标记输出,供 server 解析为 SSE。
 fetch 可注入便于测试;默认用 urllib(标准库,无新依赖)。"""
 from __future__ import annotations
@@ -15,11 +15,11 @@ if getattr(sys, "frozen", False):
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-_ALL_PMIS_NAMES = set(config.PMIS_FILES_ACTIVE.values()) | set(config.PMIS_FILES_CLOSED.values())
+_ALL_PMIS_NAMES = set(config.PMIS_ALL_FILENAMES)
 
 
 def plan_downloads(links: Dict[str, str]) -> List[Dict[str, str]]:
-    """links: 文件名→URL。只保留属于 PMIS 七表且 URL 非空的项。"""
+    """links: 文件名→URL。只保留属于 PMIS 九表且 URL 非空的项。"""
     return [{"name": name, "url": url} for name, url in links.items()
             if name in _ALL_PMIS_NAMES and url and str(url).strip()]
 
