@@ -67,6 +67,8 @@ a = Analysis(
         ('projects.py', '.'),
         ('snapshots.py', '.'),
         ('write_followup.py', '.'),
+        ('milestones.py', '.'),
+        ('profit.py', '.'),
         ('pmis_download.py', '.'),
         ('config.py', '.'),
         ('schema.py', '.'),

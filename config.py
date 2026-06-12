@@ -47,13 +47,24 @@ PMIS_FILES_CLOSED = {
     "base": "项目基础信息数据-已关闭.xlsx",
     "status": "项目状态信息数据-已关闭.xlsx",
 }
+# 里程碑两表(Phase R1,位于 input/pmis/)
+MILESTONE_FILE_ACTIVE = "在建项目里程碑计划数据.xlsx"
+MILESTONE_FILE_CLOSED = "已结项里程碑计划数据.xlsx"
 PMIS_HEADER_ROW = 2  # PMIS 表表头在第 2 行(第 1 行为合并标题)
+
+# 预算/核算/回款 CSV(Phase R1,位于 input/ 根)
+PROFIT_DIRECT_FILE = "profit_loss_direct.csv"
+PROFIT_BRIDGE_FILE = "profit_loss_bridge.csv"
+BUDGET_FILE = "budget_data.csv"
+PAYMENT_RECORDS_FILE = "payment_records.csv"
 
 # ── 项目主域输入文件(Phase P,位于 input/ 根) ──
 ORG_FILE = "组织架构.xlsx"
 MAPPING_FILE = "A.xlsx"
-DELIVERY_FILE = "delivery_analysis.xlsx"
-INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE]
+DELIVERY_FILE = "delivery_analysis.csv"
+DELIVERY_FILE_LEGACY = "delivery_analysis.xlsx"  # csv 缺失时回退(R 批次过渡)
+# 上传白名单含 legacy:R 批次过渡期 csv/xlsx 两式 delivery 均可上传(读侧 read_delivery 同款回退)
+INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
 DELIVERY_COST_CATEGORIES = [

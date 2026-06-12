@@ -26,6 +26,12 @@ function seed(over: Record<string, any> = {}) {
       orgFile: { provided: true, rows: 30, matched: 25, matchRate: 0.83 },
       mappingFile: { provided: true, rows: 5, matched: 5, matchRate: 1 },
       deliveryFile: { provided: true, rows: 40, matched: 38, matchRate: 0.95 },
+      milestoneActive: { provided: true, rows: 634, matched: 610, matchRate: 0.96 },
+      milestoneClosed: { provided: true, rows: 3914, matched: 217, matchRate: 0.06 },
+      paymentRecordsFile: { provided: true, rows: 622, matched: 584, matchRate: 0.94 },
+      profitDirectFile: { provided: true, rows: 903, matched: 632, matchRate: 0.7 },
+      profitBridgeFile: { provided: true, rows: 285, matched: 276, matchRate: 0.97 },
+      budgetFile: { provided: true, rows: 607, matched: 574, matchRate: 0.95 },
       staffNoProject: [], managerNotInOrg: [], presaleTotal: 3, presaleMapped: 3, presaleUnmapped: [],
     },
     ...over,
@@ -60,12 +66,12 @@ describe('DataQualityView', () => {
     expect(w.find('[data-test="banner"]').classes()).toContain('red')
   })
 
-  it('五张源卡,缺失源置灰带未提供徽章', () => {
+  it('九张源卡,缺失源置灰带未提供徽章', () => {
     seed()
     const ds = useDataStore()
     ;(ds.data as any).projectsQuality.orgFile = { provided: false, rows: 0, matched: 0, matchRate: 0 }
     const w = mountView()
-    expect(w.findAll('.gov-src')).toHaveLength(5)
+    expect(w.findAll('.gov-src')).toHaveLength(9)
     const org = w.find('[data-test="src-org"]')
     expect(org.classes()).toContain('off')
     expect(org.text()).toContain('未提供')

@@ -231,6 +231,21 @@ class TestAssembleTeamAndRisks:
         assert out["team"]["项目经理"] == "李四"
         assert out["team"]["项目名称"] == "B名"
 
+    def test_status_level_and_type_from_base_then_status(self):
+        # 项目级别/项目类型:base 优先 status 兜底(与"项目状态"同模式)
+        base_i = {"P1": {"项目级别": "P3", "项目类型": "交付项目"}}
+        out = M._assemble("P1", base_i, {}, {}, {}, "在建")
+        assert out["status"]["项目级别"] == "P3"
+        assert out["status"]["项目类型"] == "交付项目"
+        # base 缺 → status 兜底
+        status_i = {"P2": {"项目级别": "P1", "项目类型": "实施项目"}}
+        out2 = M._assemble("P2", {}, {}, status_i, {}, "在建")
+        assert out2["status"]["项目级别"] == "P1"
+        assert out2["status"]["项目类型"] == "实施项目"
+        # 两表皆缺 → None
+        out3 = M._assemble("P3", {}, {}, {}, {}, "在建")
+        assert out3["status"]["项目级别"] is None and out3["status"]["项目类型"] is None
+
     def test_risk_records_jsonable(self):
         import datetime
         risk_i = {"P1": [{"风险等级": "高", "风险状态": "已关闭",
