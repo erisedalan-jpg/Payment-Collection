@@ -120,4 +120,29 @@ describe('ProjectsView', () => {
     expect(w.text()).toContain('P-1')
     expect(w.text()).not.toContain('P-2')
   })
+
+  it('S1:分页器与总数,客户列已删,项目名不可排序', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.pv-pager').exists()).toBe(true)
+    expect(w.text()).toContain('共 2 条')
+    expect(w.find('.el-pagination').exists()).toBe(true)
+    const headers = w.findAll('th').map((n) => n.text())
+    expect(headers.some((t) => t.includes('客户'))).toBe(false)
+    expect(w.text()).toContain('健康度')
+  })
+
+  it('S1:经理/级别多选筛选', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    ;(w.vm as any).filters.manager = ['何平']
+    await flushPromises()
+    expect(w.text()).toContain('共 1 条')
+    ;(w.vm as any).filters.manager = []
+    ;(w.vm as any).filters.projectLevel = ['P3']
+    await flushPromises()
+    expect(w.text()).toContain('共 1 条')
+  })
 })
