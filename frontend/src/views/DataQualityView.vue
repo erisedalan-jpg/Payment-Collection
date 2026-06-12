@@ -1,98 +1,127 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
-import { coverageColor, verdictLabel } from '@/lib/governance'
+import { buildHealthReport, type AlertGroup } from '@/lib/governance'
 import { exportRows } from '@/lib/exportXlsx'
+import DataTable from '@/components/DataTable.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
 
-const dq = computed(() => (data.data as any)?.dataQuality ?? null)
 const loaded = computed(() => !!data.data)
-const hasQuality = computed(() => !!dq.value)
-const provided = computed(() => !!dq.value?.summary?.pmisProvided)
-const themes = computed(() => dq.value?.themes ?? [])
-const unmatched = computed(() => dq.value?.unmatched ?? [])
-const backfill = computed(() => dq.value?.backfill ?? [])
-const conflicts = computed(() => dq.value?.conflicts ?? [])
-const dirty = computed(() => dq.value?.dirty ?? [])
+const report = computed(() => (data.data ? buildHealthReport(data.data) : null))
 
-function pctTxt(n: number) { return Math.round((n ?? 0) * 100) + '%' }
-function exportUnmatched() { exportRows('PMIS未匹配清单.xlsx', unmatched.value) }
-function exportBackfill() {
-  exportRows('PMIS回填待办.xlsx', backfill.value.map((b: any) => ({
-    项目编号: b.projectId, 项目名称: b.projectName, 缺失字段: (b.missingFields || []).join('、'),
-  })))
+const open = ref<Set<string>>(new Set())
+function toggle(a: AlertGroup) {
+  if (a.count === 0) return
+  const s = new Set(open.value)
+  if (s.has(a.key)) s.delete(a.key)
+  else s.add(a.key)
+  open.value = s
 }
+function onExport(a: AlertGroup) { if (a.exportName) exportRows(a.exportName, a.rows) }
+const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
 </script>
 
 <template>
-  <div class="dq-view">
-    <h2 class="dq-title">数据治理</h2>
-    <div v-if="!loaded" class="dq-empty">
-      数据加载中或加载失败,请确认后端服务在运行。
-    </div>
-    <div v-else-if="!hasQuality" class="dq-empty">
-      当前数据不含治理信息,请重新同步或导入后再查看。
-    </div>
-    <div v-else-if="!provided" class="dq-empty">
-      未提供 PMIS 数据。请到「数据管理」页录入下载链接并下载,或把 PMIS 七个 xlsx 放入 input/pmis/ 后重新同步。
-    </div>
-    <template v-else>
-      <div class="dq-cards">
-        <div class="dq-card"><div class="dq-k">匹配率</div><div class="dq-v">{{ pctTxt(dq.summary.joinRate) }}</div></div>
-        <div class="dq-card"><div class="dq-k">命中在建</div><div class="dq-v">{{ dq.summary.matchedActive }}</div></div>
-        <div class="dq-card"><div class="dq-k">命中已关闭</div><div class="dq-v">{{ dq.summary.matchedClosed }}</div></div>
-        <div class="dq-card"><div class="dq-k">未匹配</div><div class="dq-v" data-test="unmatched-count">{{ unmatched.length }}</div></div>
+  <div class="gov-view">
+    <h2 class="gov-title">数据治理</h2>
+    <div v-if="!loaded" class="gov-empty">数据加载中或加载失败,请确认后端服务在运行。</div>
+    <template v-else-if="report">
+      <div class="gov-banner" :class="report.verdict" data-test="banner">
+        <div class="gov-banner-main">
+          <span class="gov-dot" />
+          <div>
+            <div class="gov-banner-title">{{ report.title }}</div>
+            <div v-if="report.sub" class="gov-banner-sub">{{ report.sub }}</div>
+          </div>
+        </div>
+        <div class="gov-banner-meta u-num">{{ report.metaLine }}</div>
       </div>
 
-      <h3 class="dq-h">主题覆盖率</h3>
-      <div class="dq-themes">
-        <div v-for="t in themes" :key="t.theme" class="dq-theme">
-          <span class="dq-theme-name">{{ t.theme }}</span>
-          <span class="dq-theme-bar"><span class="dq-theme-fill" :style="{ width: pctTxt(t.coveragePct), background: coverageColor(t.coveragePct) }"></span></span>
-          <span class="dq-theme-val">{{ pctTxt(t.coveragePct) }} · {{ verdictLabel(t.verdict) }}</span>
+      <div class="gov-srcs">
+        <div v-for="src in report.sources" :key="src.key" class="gov-src" :class="{ off: !src.provided }" :data-test="`src-${src.key}`">
+          <div class="gov-src-head">
+            <span class="gov-src-name">{{ src.label }}</span>
+            <span class="gov-src-badge" :class="{ on: src.provided }">{{ src.provided ? '已提供' : '未提供' }}</span>
+          </div>
+          <div class="gov-src-main u-num">{{ src.main }}</div>
+          <div class="gov-src-mlabel">{{ src.mainLabel }}</div>
+          <div v-for="(sub, i) in src.subs" :key="i" class="gov-src-sub u-num">{{ sub }}</div>
         </div>
       </div>
 
-      <h3 class="dq-h">未匹配清单({{ unmatched.length }}) <button class="dq-exp" @click="exportUnmatched">导出</button></h3>
-      <table class="dq-tbl"><thead><tr><th>项目编号</th><th>项目名称</th><th>类型</th></tr></thead>
-        <tbody><tr v-for="u in unmatched" :key="u.projectId"><td>{{ u.projectId }}</td><td>{{ u.projectName }}</td><td>{{ u.kind }}</td></tr></tbody>
-      </table>
-
-      <h3 class="dq-h">回填待办({{ backfill.length }}) <button class="dq-exp" @click="exportBackfill">导出</button></h3>
-      <table class="dq-tbl"><thead><tr><th>项目编号</th><th>项目名称</th><th>缺失字段</th></tr></thead>
-        <tbody><tr v-for="b in backfill" :key="b.projectId"><td>{{ b.projectId }}</td><td>{{ b.projectName }}</td><td>{{ (b.missingFields || []).join('、') }}</td></tr></tbody>
-      </table>
-
-      <details class="dq-fold"><summary>口径冲突告警({{ conflicts.length }})</summary>
-        <ul><li v-for="(c, i) in conflicts" :key="i"><b>{{ c.column }}</b> — {{ c.issue }} → {{ c.recommendation }}</li></ul>
-      </details>
-      <details class="dq-fold"><summary>脏值告警({{ dirty.length }})</summary>
-        <ul><li v-for="(d, i) in dirty" :key="i">{{ d.type }}:{{ d.projectId }} {{ d.field }}={{ d.value }}</li></ul>
-      </details>
+      <h3 class="gov-h">告警 <span class="gov-h-hint">按严重度排序,0 条置灰</span></h3>
+      <div class="gov-alerts">
+        <div v-for="a in report.alerts" :key="a.key" class="gov-alert" :class="{ zero: a.count === 0 }" :data-test="`alert-${a.key}`">
+          <button class="gov-alert-row" :disabled="a.count === 0" @click="toggle(a)">
+            <span class="gov-sev" :class="a.severity">{{ SEV_TXT[a.severity] }}</span>
+            <span class="gov-alert-label">{{ a.label }}</span>
+            <span class="gov-alert-count u-num">{{ a.count }} 条</span>
+            <span class="gov-alert-arrow" :class="{ open: open.has(a.key) }">▾</span>
+          </button>
+          <div v-if="open.has(a.key)" class="gov-alert-body">
+            <p v-if="a.note" class="gov-note">{{ a.note }}</p>
+            <template v-else>
+              <div v-if="a.exportName" class="gov-exp-row">
+                <button class="gov-exp" @click="onExport(a)">导出</button>
+              </div>
+              <DataTable :columns="a.columns" :rows="a.rows" :show-count="false" />
+            </template>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
 
 <style scoped>
-.dq-view { padding: 16px; }
-.dq-title { font-size: var(--fs-5); font-weight: 700; margin: 0 0 12px; color: var(--txt); }
-.dq-empty { padding: 32px; text-align: center; color: var(--mut); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
-.dq-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
-.dq-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
-.dq-k { font-size: var(--fs-1); color: var(--mut); }
-.dq-v { font-size: var(--fs-4); font-weight: 700; color: var(--txt); }
-.dq-h { font-size: var(--fs-2); color: var(--txt); margin: 18px 0 8px; }
-.dq-themes { display: flex; flex-direction: column; gap: 8px; }
-.dq-theme { display: grid; grid-template-columns: 100px 1fr 120px; align-items: center; gap: 10px; }
-.dq-theme-name { color: var(--sub); font-size: var(--fs-1); }
-.dq-theme-bar { height: 10px; background: var(--card2); border-radius: 5px; overflow: hidden; }
-.dq-theme-fill { display: block; height: 100%; }
-.dq-theme-val { font-size: var(--fs-1); color: var(--sub); }
-.dq-exp { font-size: var(--fs-1); margin-left: 8px; cursor: pointer; background: var(--accent); color: var(--on-accent); border: none; border-radius: 6px; padding: 2px 10px; }
-.dq-tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
-.dq-tbl th, .dq-tbl td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; color: var(--txt); }
-.dq-tbl th { background: var(--card2); color: var(--sub); }
-.dq-fold { margin-top: 14px; color: var(--sub); }
+.gov-view { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--gap-section); }
+.gov-title { font-size: var(--fs-5); font-weight: 700; margin: 0; color: var(--txt); }
+.gov-empty { padding: var(--sp-6); text-align: center; color: var(--mut); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.gov-banner { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); padding: var(--card-pad); border-radius: var(--r-lg); border: 1px solid var(--line); flex-wrap: wrap; }
+.gov-banner.green { background: var(--ok-bg); }
+.gov-banner.yellow { background: var(--warn-bg); }
+.gov-banner.red { background: var(--danger-bg); }
+.gov-banner-main { display: flex; align-items: center; gap: var(--sp-3); }
+.gov-dot { width: 12px; height: 12px; border-radius: var(--r-full); flex-shrink: 0; }
+.gov-banner.green .gov-dot { background: var(--ok); }
+.gov-banner.yellow .gov-dot { background: var(--warn); }
+.gov-banner.red .gov-dot { background: var(--danger); }
+.gov-banner-title { font-size: var(--fs-4); font-weight: 700; }
+.gov-banner.green .gov-banner-title { color: var(--ok-text); }
+.gov-banner.yellow .gov-banner-title { color: var(--warn-text); }
+.gov-banner.red .gov-banner-title { color: var(--danger-text); }
+.gov-banner-sub { font-size: var(--fs-1); color: var(--sub); margin-top: 2px; }
+.gov-banner-meta { font-size: var(--fs-1); color: var(--sub); }
+.gov-srcs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--gap-card); }
+.gov-src { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); box-shadow: var(--shadow-1); }
+.gov-src.off { opacity: var(--disabled-opacity); }
+.gov-src-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); gap: var(--sp-2); }
+.gov-src-name { font-size: var(--fs-2); font-weight: 600; color: var(--sub); }
+.gov-src-badge { font-size: var(--fs-1); padding: 1px var(--sp-2); border-radius: var(--r-full); background: var(--card2); color: var(--mut); white-space: nowrap; }
+.gov-src-badge.on { background: var(--ok-bg); color: var(--ok-text); }
+.gov-src-main { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight); }
+.gov-src-mlabel { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-2); }
+.gov-src-sub { font-size: var(--fs-1); color: var(--sub); }
+.gov-h { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0; }
+.gov-h-hint { font-size: var(--fs-1); font-weight: 400; color: var(--mut); margin-left: var(--sp-2); }
+.gov-alerts { display: flex; flex-direction: column; gap: var(--gap-stack); }
+.gov-alert { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.gov-alert.zero { opacity: var(--disabled-opacity); }
+.gov-alert-row { display: flex; align-items: center; gap: var(--sp-3); width: 100%; padding: var(--sp-3) var(--sp-4); background: none; border: none; cursor: pointer; color: var(--txt); font-size: var(--fs-2); text-align: left; }
+.gov-alert-row:disabled { cursor: default; }
+.gov-alert-row:not(:disabled):hover { background: var(--hover-tint); }
+.gov-sev { font-size: var(--fs-1); font-weight: 600; padding: 1px var(--sp-2); border-radius: var(--r-sm); flex-shrink: 0; }
+.gov-sev.high { background: var(--danger-bg); color: var(--danger-text); }
+.gov-sev.mid { background: var(--warn-bg); color: var(--warn-text); }
+.gov-sev.low { background: var(--card2); color: var(--mut); }
+.gov-alert-label { flex: 1; font-weight: 600; }
+.gov-alert-count { color: var(--sub); }
+.gov-alert-arrow { color: var(--mut); transition: transform var(--dur-2) var(--ease); }
+.gov-alert-arrow.open { transform: rotate(180deg); }
+.gov-alert-body { padding: 0 var(--sp-4) var(--sp-4); }
+.gov-note { font-size: var(--fs-2); color: var(--sub); margin: 0; line-height: var(--lh-base); }
+.gov-exp-row { display: flex; justify-content: flex-end; margin-bottom: var(--sp-2); }
+.gov-exp { font-size: var(--fs-1); background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); cursor: pointer; }
 </style>
