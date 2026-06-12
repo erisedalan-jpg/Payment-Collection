@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-跨平台停止服务脚本 - 项目回款跟踪与管控平台
+跨平台停止服务脚本 - 项目管理平台
 支持 Windows / macOS / Linux
 通过查找占用 8080 端口的进程或运行 server.py 的 Python 进程来终止服务
 """
@@ -19,7 +19,7 @@ SERVER_SCRIPT = "server.py"
 def print_header():
     """打印脚本头部信息"""
     print("=" * 44)
-    print("  项目回款跟踪与管控平台 - 停止服务")
+    print("  项目管理平台 - 停止服务")
     print("=" * 44)
     print()
 

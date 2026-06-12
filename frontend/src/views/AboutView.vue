@@ -26,16 +26,15 @@ const SECTIONS = [
 <template>
   <div class="about-view">
     <div class="about-head">
-      <div class="about-name">项目回款跟踪与管控平台</div>
+      <div class="about-name">项目管理平台</div>
       <div class="about-ver">Version {{ APP_VERSION }}</div>
     </div>
 
     <div class="about-grid">
-      <div class="about-k">产品名称</div><div class="about-v">项目回款跟踪与管控平台</div>
+      <div class="about-k">产品名称</div><div class="about-v">项目管理平台</div>
       <div class="about-k">版本号</div><div class="about-v">{{ APP_VERSION }}</div>
       <div class="about-k">发布日期</div><div class="about-v">{{ RELEASE_DATE }}</div>
-      <div class="about-k">作者</div><div class="about-v">交付中心-交付实施三部-阿童木</div>
-      <div class="about-k">数据来源</div><div class="about-v">WPS 云文档(回款节点清单) + PMIS 七表 + 项目域三文件(组织架构 / 售前映射 A / delivery)</div>
+      <div class="about-k">作者</div><div class="about-v">王叙潼牛逼</div>
     </div>
 
     <div v-for="sec in SECTIONS" :key="sec.title" class="about-feat-box">
