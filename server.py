@@ -28,11 +28,11 @@ from urllib.parse import urlparse, parse_qs
 import config
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
-_PMIS_UPLOAD_NAMES = set(config.PMIS_FILES_ACTIVE.values()) | set(config.PMIS_FILES_CLOSED.values())
+_PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
 
 
 def is_valid_pmis_name(name: str) -> bool:
-    """仅允许 7 个 PMIS 固定文件名(防目录穿越/任意写)。"""
+    """仅允许 9 个 PMIS 固定文件名(七表+里程碑两表;防目录穿越/任意写)。"""
     return bool(name) and name in _PMIS_UPLOAD_NAMES
 
 
@@ -41,8 +41,31 @@ _INPUT_UPLOAD_NAMES = set(config.INPUT_UPLOAD_NAMES)
 
 
 def is_valid_input_name(name: str) -> bool:
-    """仅允许 3 个项目主域固定文件名(防目录穿越/任意写)。"""
+    """仅允许项目主域固定文件名(防目录穿越/任意写)。"""
     return bool(name) and name in _INPUT_UPLOAD_NAMES
+
+
+def merged_pmis_links(saved):
+    """链接读取:默认直链兜底——仅补未保存的键,已保存键(含显式空串)胜出。"""
+    return {**config.DEFAULT_LINKS, **(saved or {})}
+
+
+def _mtime_str(path: str):
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d %H:%M')
+    except OSError:
+        return None
+
+
+def collect_file_status(base_dir: str):
+    """已知数据文件 → 最近修改时间(显示用);固定名单防任意路径,缺失为 None。"""
+    out = {}
+    pmis_dir = os.path.join(base_dir, 'input', config.PMIS_DIRNAME)
+    for name in config.PMIS_ALL_FILENAMES:
+        out[name] = _mtime_str(os.path.join(pmis_dir, name))
+    for name in config.INPUT_UPLOAD_NAMES:
+        out[name] = _mtime_str(os.path.join(base_dir, 'input', name))
+    return out
 
 
 # ── Playwright 依赖预导入（确保 PyInstaller 打包时追踪完整依赖链） ──
@@ -344,6 +367,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_sync_status()
         elif parsed.path == '/api/pmis/links':
             self.handle_pmis_links_get()
+        elif parsed.path == '/api/files/status':
+            self.handle_files_status()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -850,7 +875,18 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        self.wfile.write(json.dumps({"links": links}, ensure_ascii=False).encode('utf-8'))
+        self.wfile.write(json.dumps({"links": merged_pmis_links(links),
+                                     "defaults": config.DEFAULT_LINKS},
+                                    ensure_ascii=False).encode('utf-8'))
+
+    def handle_files_status(self):
+        """GET /api/files/status - 已知数据文件的最近修改时间(数据管理页行内展示)"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps({"files": collect_file_status(BASE_DIR)},
+                                    ensure_ascii=False).encode('utf-8'))
 
     def handle_pmis_links_post(self):
         """POST /api/pmis/links - 保存 PMIS 链接配置"""
