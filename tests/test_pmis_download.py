@@ -29,6 +29,12 @@ def test_run_downloads_uses_injected_fetch(tmp_path):
     assert calls and calls[0][0] == "http://x/a"
 
 
+def test_milestone_downloadable_and_wps_key_filtered():
+    links = {"在建项目里程碑计划数据.xlsx": "http://x", "回款数据": "http://wps", "项目中心.xlsx": ""}
+    plan = D.plan_downloads(links)
+    assert {p["name"] for p in plan} == {"在建项目里程碑计划数据.xlsx"}
+
+
 def test_run_downloads_counts_only_success(tmp_path):
     def flaky(url, dest):
         if "bad" in url:
