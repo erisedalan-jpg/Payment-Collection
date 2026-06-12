@@ -111,48 +111,48 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
 </template>
 
 <style scoped>
-.overview-view { padding: 16px; }
-.ov-body { display: grid; grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr); gap: 16px; align-items: start; }
-.ov-kpis { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-.ov-kpi { flex: 1; min-width: 110px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 16px; display: block; text-decoration: none; }
+.overview-view { padding: var(--sp-4); }
+.ov-body { display: grid; grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr); gap: var(--sp-4); align-items: start; }
+.ov-kpis { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.ov-kpi { flex: 1; min-width: 110px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); display: block; text-decoration: none; }
 .ov-kpi:hover { background: var(--hover-tint); }
 .ov-kpi.accent { border-color: var(--accent); }
 .ov-kpi.accent .ov-kpi-v { color: var(--accent); }
 .ov-kpi-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight, 1.15); }
-.ov-kpi-k { font-size: var(--fs-1); color: var(--mut); margin-top: 4px; }
-.ov-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 16px; }
-.ov-card-head { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.ov-kpi-k { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-1); }
+.ov-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-4) var(--sp-4); margin-bottom: var(--sp-4); }
+.ov-card-head { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-3); display: flex; justify-content: space-between; align-items: center; }
 .ov-more { font-size: var(--fs-1); color: var(--accent); text-decoration: none; font-weight: 600; }
-.ov-health-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 10px; }
+.ov-health-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); margin-bottom: var(--sp-3); }
 /* 三档计数行放大(用户反馈):数字升 --fs-4,徽章随 --fs-2 */
-.ov-health-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--txt); }
+.ov-health-chip { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-2); color: var(--txt); }
 .ov-health-chip b { font-size: var(--fs-4); }
 .ov-health-chip :deep(.health-badge) { font-size: var(--fs-2); }
 .ov-dim { font-size: var(--fs-1); color: var(--sub); }
 .ov-dim b { color: var(--txt); }
-.ov-risk-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.ov-risk-card { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--card2); border-radius: var(--r-sm); padding: 6px 10px; font-size: var(--fs-2); color: var(--txt); cursor: pointer; }
+.ov-risk-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ov-risk-card { display: inline-flex; align-items: center; gap: var(--sp-2); border: 1px solid var(--line); background: var(--card2); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-2); color: var(--txt); cursor: pointer; }
 .ov-risk-card:hover { background: var(--hover-tint); }
 .ov-risk-name { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-pay { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.ov-pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-.ov-pay-block { display: block; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; text-decoration: none; }
+.ov-pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--sp-3); }
+.ov-pay-block { display: block; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-3) var(--sp-3); text-decoration: none; }
 .ov-pay-block:hover { background: var(--hover-tint); }
-.ov-pay-bar { height: 8px; background: var(--line); border-radius: var(--r-full); overflow: hidden; margin-bottom: 6px; }
+.ov-pay-bar { height: 8px; background: var(--line); border-radius: var(--r-full); overflow: hidden; margin-bottom: var(--sp-2); }
 .ov-pay-fill { height: 100%; background: var(--accent); }
 .ov-pay-v { font-size: var(--fs-3); font-weight: 700; color: var(--txt); white-space: nowrap; }
 .ov-pay-k { font-size: var(--fs-1); color: var(--mut); margin-top: 2px; }
-.ov-top-item { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: none; background: none; padding: 3px 0; font-size: var(--fs-1); color: var(--txt); cursor: pointer; text-align: left; }
+.ov-top-item { display: flex; justify-content: space-between; gap: var(--sp-2); width: 100%; border: none; background: none; padding: 3px 0; font-size: var(--fs-1); color: var(--txt); cursor: pointer; text-align: left; }
 .ov-top-item:hover { color: var(--accent); }
 /* flex:1+min-width:0 缺一不可——flex 子项默认 min-width:auto 不收缩,59 字真实项目名会撑破卡片 */
 .ov-top-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-empty-mini { font-size: var(--fs-1); color: var(--mut); }
-.ov-focus { display: flex; gap: 12px; }
-.ov-focus-card { flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: var(--r-md); font-size: var(--fs-2); font-weight: 600; text-decoration: none; border: 1px solid var(--line); }
+.ov-focus { display: flex; gap: var(--sp-3); }
+.ov-focus-card { flex: 1; display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); font-size: var(--fs-2); font-weight: 600; text-decoration: none; border: 1px solid var(--line); }
 .ov-focus-card b { font-size: var(--fs-4); }
 .ov-focus-card.danger { background: var(--danger-bg); color: var(--danger-text); }
 .ov-focus-card.warn { background: var(--warn-bg); color: var(--warn-text); }
-.ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
-.ov-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: 8px; }
+.ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); }
+.ov-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 @media (max-width: 1200px) { .ov-body { grid-template-columns: 1fr; } }
 </style>

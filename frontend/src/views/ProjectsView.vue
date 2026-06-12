@@ -108,12 +108,12 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
 </template>
 
 <style scoped>
-.projects-view { padding: 16px; }
-.pv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.pv-origin { margin-left: 6px; padding: 0 6px; border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); }
-.pv-empty { color: var(--mut); padding: 40px 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
-.pv-tags { display: flex; gap: 8px; margin-bottom: 10px; }
-.pv-tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); font-weight: 600; }
+.projects-view { padding: var(--sp-4); }
+.pv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.pv-origin { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); }
+.pv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.pv-tags { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.pv-tag { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 2px var(--sp-3); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); font-weight: 600; }
 .pv-tag button { border: none; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: var(--fs-1); }
 </style>

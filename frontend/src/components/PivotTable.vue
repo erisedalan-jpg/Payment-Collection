@@ -44,7 +44,7 @@ function has(rowKey: string, colKey: string): boolean {
 <style scoped>
 .pv-wrap { overflow-x: auto; }
 .pv { border-collapse: collapse; font-size: var(--fs-2); width: 100%; }
-.pv th, .pv td { border: 1px solid var(--line); padding: 6px 10px; white-space: nowrap; }
+.pv th, .pv td { border: 1px solid var(--line); padding: var(--sp-2) var(--sp-3); white-space: nowrap; }
 .pv-rowdim { background: var(--card2); color: var(--mut); text-align: left; font-weight: 600; }
 .pv-colhead { background: var(--card2); color: var(--sub); font-weight: 600; text-align: right; }
 .pv-rowval { background: var(--card2); color: var(--txt); text-align: left; font-weight: 600; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
@@ -52,5 +52,5 @@ function has(rowKey: string, colKey: string): boolean {
 .pv-click { cursor: pointer; }
 .pv-click:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .pv-zero { color: var(--mut); }
-.pv-empty { color: var(--mut); padding: 16px; text-align: center; }
+.pv-empty { color: var(--mut); padding: var(--sp-4); text-align: center; }
 </style>
