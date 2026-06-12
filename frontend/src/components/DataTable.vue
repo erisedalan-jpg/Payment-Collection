@@ -45,6 +45,9 @@ const count = computed(() => props.rows.length)
         :sortable="!!col.sortable"
         show-overflow-tooltip
       >
+        <template #header>
+          <slot :name="`header-${col.key}`" :col="col">{{ col.label }}</slot>
+        </template>
         <template #default="scope">
           <slot :name="`cell-${col.key}`" :row="scope.row" :value="scope.row[col.key]">
             {{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}

@@ -119,7 +119,6 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('未到期')
     expect(w.text()).toContain('2026-03-01')
     expect(w.text()).toContain('项目里程碑')
-    expect(w.find('tr.ms-high').exists()).toBe(true)
     expect(w.text()).toContain('到货款1，70.00%')
     expect(w.text()).toContain('回款里程碑')
   })

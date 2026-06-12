@@ -62,7 +62,7 @@ const chartOption = computed(() => {
     grid: { left: 60, right: 20, top: 30, bottom: 60 },
     xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
     yAxis: { type: 'value', name: kind === 'money' ? `${label}(万)` : label },
-    series: [{ name: label, type: 'bar', data: top.value.map((g) => +(((g[metricKey.value] ?? 0) as number) / div).toFixed(4)) }],
+    series: [{ name: label, type: 'bar', colorBy: 'data', data: top.value.map((g) => +(((g[metricKey.value] ?? 0) as number) / div).toFixed(4)) }],
   }
 })
 const RANK_COLS = computed<DataColumn[]>(() => [

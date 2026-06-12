@@ -9,13 +9,11 @@ const ITEMS = [
 ] as any
 
 describe('MilestoneTable', () => {
-  it('行级三色 class + 列内容 + 完成状态', () => {
+  it('列内容与完成状态(S1 去色,priority 仅数据保留)', () => {
     const w = mount(MilestoneTable, { props: { items: ITEMS } })
     const trs = w.findAll('tbody tr')
     expect(trs).toHaveLength(3)
-    expect(trs[0].classes()).toContain('ms-high')
-    expect(trs[1].classes()).toContain('ms-mid')
-    expect(trs[2].classes()).toContain('ms-low')
+    expect(trs[0].classes()).not.toContain('ms-high')   // S1:行级三色已移除
     expect(trs[0].text()).toContain('终验款，100.00%')
     expect(trs[0].text()).toContain('未完成')
     expect(trs[1].text()).toContain('已完成')   // 有实际时间
