@@ -34,7 +34,7 @@ const groups = computed(() => groupEventsByDate(props.events))
 .ev-type.tone-ok { background: var(--ok-bg); color: var(--ok-text); }
 .ev-type.tone-warn { background: var(--warn-bg); color: var(--warn-text); }
 .ev-type.tone-danger { background: var(--danger-bg); color: var(--danger-text); }
-.ev-proj { color: var(--accent); text-decoration: none; font-weight: 600; flex-shrink: 0; }
+.ev-proj { color: var(--accent); text-decoration: none; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .ev-proj:hover { text-decoration: underline; }
-.ev-summary { color: var(--txt); }
+.ev-summary { color: var(--txt); min-width: 0; overflow-wrap: anywhere; }
 </style>
