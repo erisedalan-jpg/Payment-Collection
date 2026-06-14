@@ -1242,6 +1242,10 @@ def main():
                 _contract(p.get("relatedClosedId") or ""))
         print("  [OK] 回款完成率已切换为 流水累计÷合同总额 口径")
 
+    # === S2: 整体超支金额回填(同源 profit.overspend_amount;无 profit 数据自动 None,供详情页风险徽章,与事件快照同口径) ===
+    for p in dept_projects:
+        p["overspendAmount"] = profit_mod.overspend_amount(project_profit.get(p["projectId"]))
+
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {

@@ -103,6 +103,7 @@ export type NoName29 = number | null;
 export type NoName30 = number | null;
 export type NoName31 = number | null;
 export type Deliverycosts = DeliveryCostItem[];
+export type Overspendamount = number | null;
 export type Progressabnormal = boolean;
 export type Riskabnormal = boolean;
 export type Costabnormal = boolean;
@@ -334,6 +335,7 @@ export interface Project {
   relatedClosedId?: Relatedclosedid;
   payment?: ProjectPayment;
   deliveryCosts?: Deliverycosts;
+  overspendAmount?: Overspendamount;
   health?: ProjectHealth;
   [k: string]: unknown;
 }
