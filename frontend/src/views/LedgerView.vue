@@ -5,7 +5,7 @@ import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { groupByProject } from '@/lib/dashboardStats'
 import {
-  naguanFilter,
+  excludeFilter,
   filterLedgerProjects,
   ledgerSummary,
   ledgerTierStats,
@@ -34,10 +34,10 @@ const statusSel = ref('')
 const rawNodes = computed(() => (data.data?.rawNodes ?? []) as Record<string, any>[])
 const baseProjs = computed(() =>
   groupByProject(
-    naguanFilter(
+    excludeFilter(
       rawNodes.value as any,
-      filter.naguanOn,
-      (data.data?.naguanExclude ?? {}) as Record<string, boolean>,
+      filter.excludeOn,
+      filter.excludedIds,
     ),
   ),
 )

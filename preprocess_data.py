@@ -869,6 +869,25 @@ def process_project_overview(sheet_json):
     return projects, naguan_map, naguan_exclude, clean_headers
 
 
+def derive_tag_seed(project_rows):
+    """2C 标签播种：扫 config.TAG_SEED_COLUMNS 两列文字，命中 config.TAG_SEED_WHITELIST
+    的给项目挂对应标签（两列并集、去重、忽略图片公式与非白名单文字）。返回 {pid: [tag,...]}。"""
+    wl = set(config.TAG_SEED_WHITELIST)
+    seed = {}
+    for p in project_rows or []:
+        pid = str(p.get("项目编号", "")).strip()
+        if not pid:
+            continue
+        tags = []
+        for col in config.TAG_SEED_COLUMNS:
+            val = str(p.get(col, "")).strip()
+            if val in wl and val not in tags:
+                tags.append(val)
+        if tags:
+            seed[pid] = tags
+    return seed
+
+
 def compute_classification(projects):
     """计算Content 1: 项目分类分布数据
     返回 9 个分类的统计数据（count/percentage/amount），供 Treemap 使用
@@ -1293,6 +1312,7 @@ def main():
         "paymentRecords": payment_records,
         "paymentNodes": payment_nodes,
         "projectProfit": project_profit,
+        "tagSeed": derive_tag_seed(project_overview),
     }
 
     # === 9d. 快照/diff/事件流/周期对比(Phase P3) ===

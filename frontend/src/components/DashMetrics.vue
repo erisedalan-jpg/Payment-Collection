@@ -10,8 +10,8 @@ const filter = useFilterStore()
 
 const summary = computed(() =>
   computeDashboardSummary(filter.filteredNodes, data.data?.projectOverview?.projects ?? [], {
-    naguanOn: filter.naguanOn,
-    naguanExclude: (data.data?.naguanExclude ?? {}) as Record<string, boolean>,
+    excludeActive: filter.excludeOn,
+    excludedIds: filter.excludedIds,
     viewMode: filter.viewMode,
     viewL4: filter.viewL4,
     viewPM: filter.viewPM,

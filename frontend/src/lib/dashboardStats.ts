@@ -148,11 +148,11 @@ export interface DashSummary {
 export function computeDashboardSummary(
   nodes: RawNode[],
   projectOverview: Record<string, any>[],
-  opts: { naguanOn: boolean; naguanExclude: Record<string, boolean>; viewMode: ViewMode; viewL4: string; viewPM: string },
+  opts: { excludeActive: boolean; excludedIds: Record<string, boolean>; viewMode: ViewMode; viewL4: string; viewPM: string },
 ): DashSummary {
   const projs = groupByProject(nodes)
   const totalProjects = projectOverview.filter((p) => {
-    if (opts.naguanOn && opts.naguanExclude && opts.naguanExclude[p.projectId]) return false
+    if (opts.excludeActive && opts.excludedIds && opts.excludedIds[p.projectId]) return false
     if (opts.viewMode === 'l4' && opts.viewL4 && p['项目经理L4部门'] !== opts.viewL4) return false
     if (opts.viewMode === 'pm' && opts.viewPM && p['项目经理'] !== opts.viewPM) return false
     return true

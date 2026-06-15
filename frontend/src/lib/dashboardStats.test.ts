@@ -46,7 +46,7 @@ describe('computeDashboardSummary', () => {
       { projectId: 'P2', 项目经理L4部门: '上海', 项目经理: '李四' },
     ]
     const sum = computeDashboardSummary(NODES, overview, {
-      naguanOn: true, naguanExclude: { P2: true }, viewMode: 'global', viewL4: '', viewPM: '',
+      excludeActive: true, excludedIds: { P2: true }, viewMode: 'global', viewL4: '', viewPM: '',
     })
     expect(sum.relatedNodeCount).toBe(2)
     expect(sum.totalProjects).toBe(1)
@@ -58,7 +58,7 @@ describe('computeDashboardSummary', () => {
 })
 
 describe('computeDashboardSummary delayedProjects', () => {
-  const opts = { naguanOn: false, naguanExclude: {}, viewMode: 'global' as const, viewL4: '', viewPM: '' }
+  const opts = { excludeActive: false, excludedIds: {}, viewMode: 'global' as const, viewL4: '', viewPM: '' }
   it('统计回款状态为「延期」的项目数', () => {
     const nodes = [
       { projectId: 'P1', tier: '100万以上', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 100, actualPayment: 0, planMonth: '2026-01' },

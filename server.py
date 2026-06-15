@@ -195,6 +195,47 @@ def _save_followup_records(records):
     with open(FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
         json.dump(records, f, ensure_ascii=False, indent=2)
 
+# ── 项目标签库（2C，本地 JSON store，首次按 analysis_data.json 的 tagSeed 播种，此后本地为准、不回写云） ──
+PROJECT_TAGS_FILE = os.path.join(BASE_DIR, 'data', 'project_tags.json')
+ANALYSIS_FILE = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
+_tags_lock = threading.Lock()
+
+
+def _build_initial_tags():
+    """首次播种：读 analysis_data.json 的 tagSeed，标签库=实际出现的白名单项(按白名单序)。"""
+    seed = {}
+    try:
+        with open(ANALYSIS_FILE, 'r', encoding='utf-8') as f:
+            seed = json.load(f).get('tagSeed', {}) or {}
+    except Exception:
+        seed = {}
+    appeared = set()
+    for tags in seed.values():
+        appeared.update(tags)
+    vocab = [{"name": n} for n in config.TAG_SEED_WHITELIST if n in appeared]
+    return {"version": 1, "tags": vocab, "assignments": seed}
+
+
+def _load_project_tags():
+    """本地标签 store；不存在则按 tagSeed 首次播种并落盘，此后本地为准。"""
+    with _tags_lock:
+        if os.path.exists(PROJECT_TAGS_FILE):
+            try:
+                with open(PROJECT_TAGS_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        store = _build_initial_tags()
+    _save_project_tags(store)
+    return store
+
+
+def _save_project_tags(store):
+    with _tags_lock:
+        os.makedirs(os.path.dirname(PROJECT_TAGS_FILE), exist_ok=True)
+        with open(PROJECT_TAGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
+
 def _get_next_record_num(today_str):
     """获取当日下一个记录序号"""
     records = _load_followup_records()
@@ -371,6 +412,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_types()
         elif parsed.path.startswith('/api/followup/sync-status'):
             self.handle_followup_sync_status()
+        elif parsed.path == '/api/tags':
+            self.handle_tags_get()
         elif parsed.path == '/api/pmis/links':
             self.handle_pmis_links_get()
         elif parsed.path == '/api/files/status':
@@ -447,6 +490,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_delete()
         elif parsed.path == '/api/followup/update':
             self.handle_followup_update()
+        elif parsed.path == '/api/tags':
+            self.handle_tags_save()
         elif parsed.path == '/api/pmis/links':
             self.handle_pmis_links_post()
         elif parsed.path == '/api/pmis/upload':
@@ -858,7 +903,35 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             "跟进类型": FOLLOWUP_TYPES,
             "跟进状态": FOLLOWUP_STATUSES
         })
-    
+
+    def handle_tags_get(self):
+        """GET /api/tags — 返回标签库与挂载（首次自动播种）。"""
+        try:
+            store = _load_project_tags()
+            self._json_response({"success": True, "tags": store.get("tags", []),
+                                 "assignments": store.get("assignments", {})})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取标签失败: {e}"))
+
+    def handle_tags_save(self):
+        """POST /api/tags — 整存标签库与挂载（不回写云）。"""
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception as e:
+            self._json_response(_error_payload(ERR_PARSE, f"请求解析失败: {e}"))
+            return
+        tags = body.get("tags")
+        assignments = body.get("assignments")
+        if not isinstance(tags, list) or not isinstance(assignments, dict):
+            self._json_response(_error_payload(ERR_VALIDATION, "tags 须为数组、assignments 须为对象"))
+            return
+        try:
+            _save_project_tags({"version": 1, "tags": tags, "assignments": assignments})
+            self._json_response({"success": True})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存标签失败: {e}"))
+
     def handle_followup_sync_status(self):
         """GET /api/followup/sync-status?recordId=xxx - 查询跟进记录云同步状态"""
         qs = self.parse_path()

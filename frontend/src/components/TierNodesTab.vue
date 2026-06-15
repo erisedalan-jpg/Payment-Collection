@@ -17,8 +17,8 @@ const rows = computed(() => {
     viewMode: filter.viewMode,
     viewL4: filter.viewL4,
     viewPM: filter.viewPM,
-    naguanOn: filter.naguanOn,
-    naguanExclude: data.data?.naguanExclude ?? {},
+    excludeActive: filter.excludeOn,
+    excludedIds: filter.excludedIds,
   })
   return paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
 })

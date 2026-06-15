@@ -7,8 +7,8 @@ export interface FilterOpts {
   viewMode: ViewMode
   viewL4: string
   viewPM: string
-  naguanOn: boolean
-  naguanExclude: Record<string, boolean>
+  excludeActive: boolean
+  excludedIds: Record<string, boolean>
 }
 
 const Q_RANGE: Record<string, [string, string]> = {
@@ -21,7 +21,7 @@ export function filterNodes(rawNodes: RawNode[], opts: FilterOpts): RawNode[] {
   let nodes = rawNodes
   if (opts.viewMode === 'l4' && opts.viewL4) nodes = nodes.filter((n) => n.orgL4 === opts.viewL4)
   if (opts.viewMode === 'pm' && opts.viewPM) nodes = nodes.filter((n) => n.projectManager === opts.viewPM)
-  if (opts.naguanOn && opts.naguanExclude) nodes = nodes.filter((n) => !opts.naguanExclude[n.projectId])
+  if (opts.excludeActive && opts.excludedIds) nodes = nodes.filter((n) => !opts.excludedIds[n.projectId])
 
   const fy = opts.filterYear
   if (fy === 'all') return nodes
