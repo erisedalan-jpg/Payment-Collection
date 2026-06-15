@@ -1,12 +1,12 @@
 /* 全局主题变量（设计底层规范令牌）+ 基线 reset + Element Plus 桥接 + 滚动条适配。
    令牌取值与角色见 docs/superpowers/specs/2026-06-10-design-foundation-design.md。
    :root 为浅色；html.dark 覆盖为深色。
-   --fs-base 由 settings store 运行时写到 <html>（小14/中16/大18），六级字号按 rem 整体缩放。
+   --fs-base 由 settings store 运行时写到 <html>（小16/中18/大20），六级字号按 rem 整体缩放。
    本文件须在 main.ts 中于 element-plus 的 index.css 与 dark/css-vars.css 之后引入，
        使下面对 --el-* 的覆盖按源码顺序生效。 */
 
 :root {
-  --fs-base: 16px;
+  --fs-base: 18px;
   --font-sans: -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
 
   /* 调色板 · 结构色（浅色，蓝色系基调） */
@@ -58,7 +58,7 @@
   --chart-7: #fec187;
   --chart-8: #a7c190;
 
-  /* 字号 rem 令牌（随 --fs-base 缩放；px 标注 @中16） */
+  /* 字号 rem 令牌（随 --fs-base 缩放；px 标注 @16基准，当前默认中=18 整体 ×1.125） */
   --fs-1: 0.75rem;   /* 12 角标/标签/列头 */
   --fs-2: 0.875rem;  /* 14 次要/表格元信息 */
   --fs-3: 1rem;      /* 16 正文基准 */
@@ -188,7 +188,7 @@ html.dark {
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { font-size: var(--fs-base, 16px); }
+html { font-size: var(--fs-base, 18px); }
 
 body {
   margin: 0;

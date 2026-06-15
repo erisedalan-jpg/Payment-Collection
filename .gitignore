@@ -43,5 +43,7 @@ Thumbs.db
 # brainstorming 可视化草图（本机临时）
 .superpowers/
 .vite/
+# oh-my-claudecode 运行时状态/检查点（本机临时，不入库）
+.omc/
 # 根级 node_modules（若有）
 /node_modules/
