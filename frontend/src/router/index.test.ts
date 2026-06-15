@@ -3,7 +3,7 @@ import { router } from './index'
 
 describe('router', () => {
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/panalysis/board', '/calendar', '/followup', '/ledger', '/data', '/about', '/projects', '/activity', '/payment', '/insight']) {
+    for (const path of ['/', '/panalysis/board', '/calendar', '/ledger', '/data', '/about', '/projects', '/activity', '/payment', '/insight']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })

@@ -39,8 +39,8 @@ describe('AppSidebar', () => {
     expect(text).toContain('数据管理')        // 工具组
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('多维看板')    // P6 归并入「回款分析」,旧 label 退场
-    // 回款组为低一级呈现（缩进样式类存在）;P6 后为 5 项
-    expect(wrapper.findAll('.nav-sub').length).toBe(5)
+    // 回款组为低一级呈现（缩进样式类存在）;2D 删「临期跟进」后为 4 项
+    expect(wrapper.findAll('.nav-sub').length).toBe(4)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
