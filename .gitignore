@@ -25,6 +25,8 @@ input/
 # 快照与事件流（运行时生成，Phase P3）
 data/snapshots/
 data/events.json
+# 数据历史版本（含真实源数据副本，运行时生成，不入库）
+data/history/
 # 本地跟进记录（运行时用户数据）
 data/followup_records.json
 
