@@ -171,6 +171,7 @@ ERR_NOT_FOUND = "not_found"           # 记录不存在
 ERR_INTERNAL = "internal_error"       # 其它内部错误
 
 _history_lock = threading.Lock()
+history_state = {"running": False}   # 回滚/撤销进行中标志,供 sync/import/pmis/reprocess 反向互斥
 
 
 def _error_payload(code, message):
@@ -466,7 +467,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         qs = self.parse_path()
         url_vals = qs.get('url', [])
         sync_url = url_vals[0] if url_vals else ''
-        # 互斥检查：导入进行中时禁止同步
+        # 互斥检查：回滚/导入进行中时禁止同步
+        if history_state.get("running"):
+            self._json_response({"running": False, "progress": 0, "message": "数据回滚进行中，请稍后再同步"})
+            return
         if import_state["running"]:
             self._json_response({"running": False, "progress": 0, "message": "导入正在进行中，请等待完成或停止导入后再同步"})
             return
@@ -560,6 +564,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         """POST /api/import - 接收前端上传的Excel JSON数据"""
         global import_state
         # 互斥检查
+        if history_state.get("running"):
+            self._json_response(_error_payload(ERR_BUSY, "数据回滚进行中，请稍后再导入"))
+            return
         if sync_state["running"]:
             self._json_response(_error_payload(ERR_BUSY, "同步正在进行中，请等待完成或停止同步后再导入"))
             return
@@ -978,6 +985,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def handle_pmis_download(self):
         """GET /api/pmis/download - 启动 PMIS 下载，SSE 流式返回进度"""
         global pmis_state
+        if history_state.get("running"):
+            self._json_response({"running": False, "progress": 0, "message": "数据回滚进行中，请稍后再下载"})
+            return
         if pmis_state.get("running"):
             self._json_response(pmis_state)
             return
@@ -998,7 +1008,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def handle_reprocess(self):
         """GET /api/reprocess - 仅重跑预处理，不抓取/下载，SSE 流式返回进度"""
         global reprocess_state
-        if sync_state.get("running") or import_state.get("running") or pmis_state.get("running"):
+        if (sync_state.get("running") or import_state.get("running")
+                or pmis_state.get("running") or history_state.get("running")):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
             return
         if reprocess_state.get("running"):
@@ -1045,16 +1056,19 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not vid:
             self._json_response(_error_payload(ERR_VALIDATION, "缺少版本 id"))
             return
-        with _history_lock:
-            try:
+        history_state["running"] = True
+        try:
+            with _history_lock:
                 res = data_history.rollback(BASE_DIR, vid)
-            except FileNotFoundError as e:
-                self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
-                return
-            except Exception as e:
-                logger.error(f"回滚失败: {e}", exc_info=True)
-                self._json_response(_error_payload(ERR_INTERNAL, f"回滚失败: {e}"))
-                return
+        except FileNotFoundError as e:
+            self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
+            return
+        except Exception as e:
+            logger.error(f"回滚失败: {e}", exc_info=True)
+            self._json_response(_error_payload(ERR_INTERNAL, f"回滚失败: {e}"))
+            return
+        finally:
+            history_state["running"] = False
         self._json_response({"success": True, "message": f"已回滚到 {res['id']}", **res})
 
     def handle_data_history_undo(self):
@@ -1062,16 +1076,19 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if self._history_busy():
             self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中,请稍后再撤销"))
             return
-        with _history_lock:
-            try:
+        history_state["running"] = True
+        try:
+            with _history_lock:
                 res = data_history.undo_rollback(BASE_DIR)
-            except FileNotFoundError as e:
-                self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
-                return
-            except Exception as e:
-                logger.error(f"撤销回滚失败: {e}", exc_info=True)
-                self._json_response(_error_payload(ERR_INTERNAL, f"撤销回滚失败: {e}"))
-                return
+        except FileNotFoundError as e:
+            self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
+            return
+        except Exception as e:
+            logger.error(f"撤销回滚失败: {e}", exc_info=True)
+            self._json_response(_error_payload(ERR_INTERNAL, f"撤销回滚失败: {e}"))
+            return
+        finally:
+            history_state["running"] = False
         self._json_response({"success": True, "message": "已撤销上次回滚", **res})
 
     def _json_response(self, data):
