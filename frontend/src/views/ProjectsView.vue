@@ -72,7 +72,7 @@ const columns: DataColumn[] = [
   { key: 'costRatio', label: '预算消耗比', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'paymentRatio', label: '回款完成率', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'health', label: '健康度', width: 90 },
-  { key: 'tags', label: '标签', width: 160 },
+  { key: 'tags', label: '标签', width: 160, formatter: (v) => (Array.isArray(v) && v.length ? v.join('、') : '') },
 ]
 
 function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId}`) }
