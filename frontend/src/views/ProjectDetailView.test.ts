@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ProjectDetailView from './ProjectDetailView.vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
+
+vi.mock('@/lib/projectTagsApi', () => ({
+  getTags: () => Promise.resolve({ tags: [], assignments: {} }),
+  saveTags: () => Promise.resolve({ success: true }),
+}))
 
 let router: Router
 beforeEach(() => {
@@ -308,5 +314,16 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('到货')
     expect(w.text()).toContain('已达成')
     expect(w.text()).toContain('延期')
+  })
+
+  it('渲染项目标签块，显示已挂标签(2C)', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.tags = [{ name: 'BH项目' }, { name: '框架合同' }] as any
+    tags.assignments = { 'P-1': ['BH项目'] } as any
+    tags.loaded = true
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('项目标签')
+    expect(w.text()).toContain('BH项目')
   })
 })
