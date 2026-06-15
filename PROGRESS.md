@@ -39,7 +39,7 @@
 - [x] **S1 反馈修缮批次**（spec：2026-06-12-S1-feedback-fixes-design.md，V1.0.1）：动态事件规则与 tone 染色/清单分页多选/科目树全量/回款完成率迁流水口径/分析配色，已合并 master（eb810b2）。
 - [x] **S2 详情页修缮批次**（spec：2026-06-14-S2-detail-fixes-design.md，V1.0.2）：右栏动态长项目编号换行适配（EventTimeline overflow-wrap）；详情页头部三类超支风险徽章（总体预算超支 5000 元阈值分级红/黄；交付外包服务成本、交付部门人工成本超支即红）；总体超支金额经 9e 后端回填，同源 profit.overspend_amount。已合并 master（9d66a6e；真实数据核对 26 红/34 黄/572 不显示，抽样回填值==重算值）。
 - [x] **三档字号统一+2**（V1.0.3）：settings store `FONT_PX` 小/中/大 14/16/18 → 16/18/20（单一来源），theme.css 默认 `--fs-base` 与 html 兜底同步为 18，六级 `--fs-1..6` rem 不变随之整体缩放；契约/store 测试与设计 spec/CLAUDE.md 文档同步；.gitignore 补 .omc/。已合并 master（7027797）。
-- [~] **数据历史版本化与回滚**（spec：2026-06-15-data-history-rollback-design.md，V1.1.0）：每次"更新数据"成功自动存整份数据快照(产出 analysis_data/events/snapshots + 源 yundocs_data/input)，按处理次数留近 3 份；新模块 `data_history.py`(归档/列表/回滚/撤销/剪枝，pytest 6 项) + 3 API + DataView「数据历史/回滚」卡；回滚前自动备份 `_pre_rollback` 可撤销；终审补全 sync/import/pmis/reprocess 与回滚的双向互斥；.gitignore 加 data/history、.spec 入 data_history。分支 data-history-rollback 待合并。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）。
+- [x] **数据历史版本化与回滚**（spec：2026-06-15-data-history-rollback-design.md，V1.1.0）：每次"更新数据"成功自动存整份数据快照(产出 analysis_data/events/snapshots + 源 yundocs_data/input，实测单份~77MB)，按处理次数留近 3 份；新模块 `data_history.py`(归档/列表/回滚/撤销/剪枝，还原 copy-then-swap 近原子，pytest 7 项) + 3 API + DataView「数据历史/回滚」卡；回滚前自动备份 `_pre_rollback` 可撤销；终审补全 sync/import/pmis/reprocess 与回滚的双向互斥；.gitignore 加 data/history、.spec 入 data_history。已合并 master（be5f44e；真实数据冒烟 archive+rollback 跑通无残留）。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）、历史快照体积优化（源可选/压缩，~77MB×3）。
 
 ---
 
