@@ -1,56 +1,47 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { setActivePinia, createPinia } from 'pinia'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
+import { useDataStore } from '@/stores/data'
 import TierNodesTab from './TierNodesTab.vue'
 import DataTable from '@/components/DataTable.vue'
-import { useDataStore } from '@/stores/data'
-
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
 function seed() {
-  const ds = useDataStore()
-  ds.data = {
-    meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
-    rawNodes: [
-      { projectId: 'P1', projectName: '甲', tier: '100万以上', nodeName: '终验款', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 1000000, actualPayment: 0, planMonth: '2026-02' },
-      { projectId: 'PX', projectName: '别档', tier: '50万以下', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 1, actualPayment: 0, planMonth: '2026-02' },
-    ],
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {},
-    displayColumns: {
-      '100万以上': [
-        { key: 'projectId', label: '项目编号', visible: true },
-        { key: 'projectName', label: '项目名称', visible: true },
-        { key: 'expectedPayment', label: '计划回款', visible: true },
-        { key: 'nodeStatus', label: '状态', visible: true },
-        { key: 'planMonth', label: '计划月份', visible: false },
-      ],
-    },
-    followupRecords: {},
+  const data = useDataStore()
+  data.data = {
+    projects: [{ projectId: 'A', projectName: '甲', orgL4: '组1', paymentPmis: { contract: 2_000_000, paymentRatio: 0.5 } }],
+    paymentNodes: { A: [
+      { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.7, expectedPayment: 1_400_000, reached: true, status: '已达成' },
+      { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 600_000, reached: false, status: '延期' },
+    ] },
+    projectPmis: { A: { progress: { 项目阶段: '实施' } } },
+    naguanExclude: {},
   } as any
 }
 
 describe('TierNodesTab', () => {
-  it('passes visible columns + tier-filtered rows to DataTable', async () => {
+  beforeEach(() => { setActivePinia(createPinia()) })
+
+  it('渲染节点行 + 汇总条(总数/已达成/延期/待达成) + 状态徽章', () => {
     seed()
-    const wrapper = mount(TierNodesTab, { props: { tier: '100万以上' }, global: { plugins: [ElementPlus] } })
-    await flushPromises()
-    const dt = wrapper.findComponent(DataTable)
+    const w = mount(TierNodesTab, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
+    // 汇总条文字
+    expect(w.text()).toContain('节点总数')
+    expect(w.text()).toContain('已达成')
+    expect(w.text()).toContain('延期')
+    // el-table 在 JSDOM 不渲染行内容，改为验证 DataTable rows prop 含节点数据
+    const dt = w.findComponent(DataTable)
     expect(dt.exists()).toBe(true)
-    // visible only (planMonth visible:false excluded) → 4 columns
-    expect((dt.props('columns') as any[]).length).toBe(4)
-    // only the 100万以上 node (PX excluded by tier)
-    expect((dt.props('rows') as any[]).length).toBe(1)
-    expect((dt.props('rows') as any[])[0].projectId).toBe('P1')
+    const rows = dt.props('rows') as Array<Record<string, unknown>>
+    expect(rows.length).toBe(2)
+    expect(rows.some((r) => r.stage === '到货')).toBe(true)
+    expect(rows.some((r) => r.status === '已达成')).toBe(true)
+    expect(rows.some((r) => r.status === '延期')).toBe(true)
   })
 
-  it('formats cells via formatCellValue (amount + status)', async () => {
-    seed()
-    const wrapper = mount(TierNodesTab, { props: { tier: '100万以上' }, global: { plugins: [ElementPlus] } })
-    await flushPromises()
-    const cols = wrapper.findComponent(DataTable).props('columns') as any[]
-    const amountCol = cols.find((c) => c.key === 'expectedPayment')!
-    expect(amountCol.formatter(1000000, {})).toBe('1,000,000')
+  it('空数据不崩', () => {
+    const data = useDataStore()
+    data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
+    expect(mount(TierNodesTab, { props: { dim: 'tier' }, global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 })
