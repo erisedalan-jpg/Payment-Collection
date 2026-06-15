@@ -95,3 +95,16 @@ def test_archive_skips_absent_items(tmp_path):
     mf = DH.archive_version(base, version_id="20260615-100000")
     assert mf["contents"] == ["analysis_data.json"]
     assert mf["projectCount"] == 0
+
+
+def test_no_tmp_residue_after_archive_and_rollback(tmp_path):
+    """copy-then-swap 应 os.replace 换入,成功后不留任何 .tmp 残渣。"""
+    base = str(tmp_path)
+    _seed(base)
+    DH.archive_version(base, version_id="20260615-100000")
+    _set_marker(base, "v2")
+    DH.rollback(base, "20260615-100000")
+    leftovers = [os.path.join(root, n)
+                 for root, dirs, files in os.walk(base)
+                 for n in list(dirs) + list(files) if n.endswith(".tmp")]
+    assert leftovers == []

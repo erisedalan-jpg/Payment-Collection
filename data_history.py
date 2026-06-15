@@ -40,14 +40,23 @@ def _dir_size(path: str) -> int:
 
 
 def _copy_item(src: str, dst: str, kind: str) -> None:
-    """把项复制到 dst(已知 src 存在)。file 直接 copy2;dir 整目录 copytree(dst 先清)。"""
+    """把项复制到 dst(已知 src 存在),copy-then-swap 近原子:
+    先全量拷到同级 .tmp,成功后才用 os.replace 换入 dst(同盘近原子),
+    避免拷贝中途失败留下半残的 live 目录/文件(设计 §3 安全要求)。"""
+    os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+    tmp = dst + ".tmp"
     if kind == "file":
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        shutil.copy2(src, tmp)
+        os.replace(tmp, dst)          # 文件:原子覆盖
     else:
+        if os.path.exists(tmp):
+            shutil.rmtree(tmp)
+        shutil.copytree(src, tmp)     # 全量拷到 tmp,成功后才动 dst
         if os.path.exists(dst):
             shutil.rmtree(dst)
-        shutil.copytree(src, dst)
+        os.replace(tmp, dst)          # 目录:同盘近原子换入(窗口仅 rmtree→replace)
 
 
 def _snapshot_live_into(base_dir: str, dest_dir: str) -> List[str]:
