@@ -40,6 +40,7 @@
 - [x] **S2 详情页修缮批次**（spec：2026-06-14-S2-detail-fixes-design.md，V1.0.2）：右栏动态长项目编号换行适配（EventTimeline overflow-wrap）；详情页头部三类超支风险徽章（总体预算超支 5000 元阈值分级红/黄；交付外包服务成本、交付部门人工成本超支即红）；总体超支金额经 9e 后端回填，同源 profit.overspend_amount。已合并 master（9d66a6e；真实数据核对 26 红/34 黄/572 不显示，抽样回填值==重算值）。
 - [x] **三档字号统一+2**（V1.0.3）：settings store `FONT_PX` 小/中/大 14/16/18 → 16/18/20（单一来源），theme.css 默认 `--fs-base` 与 html 兜底同步为 18，六级 `--fs-1..6` rem 不变随之整体缩放；契约/store 测试与设计 spec/CLAUDE.md 文档同步；.gitignore 补 .omc/。已合并 master（7027797）。
 - [x] **数据历史版本化与回滚**（spec：2026-06-15-data-history-rollback-design.md，V1.1.0）：每次"更新数据"成功自动存整份数据快照(产出 analysis_data/events/snapshots + 源 yundocs_data/input，实测单份~77MB)，按处理次数留近 3 份；新模块 `data_history.py`(归档/列表/回滚/撤销/剪枝，还原 copy-then-swap 近原子，pytest 7 项) + 3 API + DataView「数据历史/回滚」卡；回滚前自动备份 `_pre_rollback` 可撤销；终审补全 sync/import/pmis/reprocess 与回滚的双向互斥；.gitignore 加 data/history、.spec 入 data_history。已合并 master（be5f44e；真实数据冒烟 archive+rollback 跑通无残留）。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）、历史快照体积优化（源可选/压缩，~77MB×3）。
+- [~] **回款看板重建程序（项目清单为底座，2026-06-15 立项）**：用户钦定 `/projects` 为平台唯一逐项目数据底座（项目管理/回款管理皆派生），PMIS 为核心源，废 `/panalysis` 5 tab。**关键修正**：节点级计划回款比例在 PMIS 里程碑 `关联回款阶段`（如"到货款1，70.00%"，milestones.py 未解析），实测 1823 项目有比例、与云文档 215一致/15分歧。分期：①第一期诊断比对报告（spec 2026-06-15-payment-compare-report-design.md，含数据源归属清单，一次性脚本，待审/待计划）→②2A 数据底座→③2B 回款看板重建/2C 项目标签体系（替代纳管，本地可编辑+导出 xlsx）/2D 跟进记录重调（迁入项目清单，仅本地留存不回写云文档）。每子项独立 spec→plan。
 
 ---
 
