@@ -116,7 +116,9 @@ paymentNodes[pid] = [ { stage, planDate, actualDate, payRatio,
 
 ## 5. 售前 → 原项目（eff 口径）
 
-9f 对每个项目算 `eff_id`：本项目 PMIS 有合同则 `eff=pid`；否则若 `relatedClosedId` 命中则 `eff=relatedClosedId` 且 `fromOrigin=True`。`contract` 取 `project_pmis[eff].customer.合同总额`、`milestones` 取 `project_milestones[eff]`、`pay_record` 取 `payment_records[eff]`。`relatedClosedId` 已由现管线（projects.read_mapping）填入项目行，原项目 PMIS/里程碑经 `extra_closed_ids`/`keep_ids` 已收录（9e 现状）。
+9f 对每个项目算 `eff_id`：本项目 PMIS 有合同则 `eff=pid`；否则若 `relatedClosedId` 命中则 `eff=relatedClosedId` 且 `fromOrigin=True`。`contract` 取 `project_pmis[eff].customer.合同总额`、`milestones` 取 `project_milestones[eff]`（计划侧结构走 eff＝售前取原项目）。
+
+**流水口径修正（真实数据验证后定）**：`pay_record` **本项目优先、缺则回退原项目**（`payment_records[pid] or payment_records[rid]`），**不**走 eff。原因：实测在建域售前 309 个中自身有流水 220 个、而原项目（已结项）在 `payment_records` 回款流水里 **0 个有流水**——若流水也走 eff（原项目）会丢掉全部售前自身流水，致售前 paymentRatio 全 None。修正后售前 paymentRatio 非空 183/309、全域 337/633，与第一期"售前=自身流水÷原项目合同"口径一致。`relatedClosedId` 已由现管线（projects.read_mapping）填入项目行，原项目 PMIS/里程碑经 `extra_closed_ids`/`keep_ids` 已收录（9e 现状）。
 
 ## 6. `/project/:id` 接入（最小）
 
