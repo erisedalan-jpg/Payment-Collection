@@ -3,12 +3,11 @@ import Modal from './Modal.vue'
 import DataTable, { type DataColumn } from './DataTable.vue'
 import { formatCellValue } from '@/lib/cellFormat'
 import { useProjectDetailStore } from '@/stores/projectDetail'
-import type { ProjectAgg } from '@/lib/dashboardStats'
 
 const props = defineProps<{
   modelValue: boolean
   title: string
-  projects: ProjectAgg[]
+  projects: Record<string, any>[]
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 

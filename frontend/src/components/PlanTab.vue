@@ -1,157 +1,101 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
+import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
-import { PLAN_BOARDS, boardStats, planSummaryTotals, planStatusCounts } from '@/lib/planBoards'
-import { fmtWan, pct } from '@/lib/format'
-import { TIERS } from '@/nav'
-import PlanBoard from './PlanBoard.vue'
+import ColumnFilter from './ColumnFilter.vue'
+import { formatCellValue } from '@/lib/cellFormat'
+import { fmtWan, fmtRatio } from '@/lib/format'
+import { projectPaymentRows, progressBuckets, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 
-const props = defineProps<{ tier: string }>()
+defineProps<{ dim: string }>()
 const data = useDataStore()
 const filter = useFilterStore()
+const pd = useProjectDetailStore()
 const cf = useCrossFilterStore()
+const TABLE_ID = 'panalysis-progress'
 
-const tableIds = PLAN_BOARDS.map((_, i) => `planBoard_${i}`)
-
-const allNodes = computed(
-  () =>
-    filter.filteredNodes.filter(
-      (n) => (props.tier === '' || n.tier === props.tier) && (n as Record<string, any>).isPaymentRelated,
-    ) as Record<string, any>[],
+const rows = computed(() =>
+  projectPaymentRows(
+    filterProjects(data.data?.projects ?? [], {
+      viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
+      naguanOn: filter.naguanOn, naguanExclude: data.data?.naguanExclude ?? {},
+    }),
+    data.data?.projectPmis ?? {},
+  ),
 )
+const buckets = computed(() => progressBuckets(rows.value))
 
-const columns = computed(() => {
-  const cols = (data.data?.displayColumns as Record<string, any[]> | undefined)?.[props.tier] ?? (data.data?.displayColumns as Record<string, any[]> | undefined)?.[TIERS[0].label] ?? []
-  const mapped = cols
-    .filter((c) => c.visible !== false)
-    .map((c) => ({ key: c.key as string, label: c.label as string }))
-  if (props.tier === '') {
-    return [{ key: 'tier', label: '档位' }, ...mapped]
-  }
-  return mapped
-})
-
-const boards = computed(() =>
-  PLAN_BOARDS.map((b, i) => {
-    const boardNodes = allNodes.value.filter((n) => n.nodeStatus === b.status)
-    const nodes = applyColumnFilters(boardNodes, cf.tableFilters(tableIds[i]))
-    return { board: b, tableId: tableIds[i], nodes, stats: boardStats(nodes as any) }
-  }),
-)
-
-const combined = computed(() => boards.value.flatMap((d) => d.nodes))
-const totals = computed(() => planSummaryTotals(boards.value.map((d) => d.nodes) as any))
-// 忠实移植 updatePlanSummary：状态计数取合并后(已CF过滤)节点；为空时回退全量
-const counts = computed(() =>
-  planStatusCounts((combined.value.length > 0 ? combined.value : allNodes.value) as any),
-)
-
-const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(--c-pending)' : 'var(--danger)')
-
-// 忠实移植 navTier 的 CF._filters={} 重置：进入页面/切换档位时清空本页 6 看板筛选
-function resetFilters() {
-  cf.clearGroup(tableIds)
-}
-onMounted(resetFilters)
-watch(() => props.tier, resetFilters)
+const COLS = [
+  { key: 'projectId', label: '项目编号' },
+  { key: 'projectName', label: '项目名称' },
+  { key: 'dept', label: '部门' },
+  { key: 'progress', label: '进度态' },
+  { key: 'contract', label: '合同(万)' },
+  { key: 'actualTotal', label: '已回款(万)' },
+  { key: 'paymentRatio', label: '完成率' },
+]
+const filteredRows = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)))
+const fmtCol = (key: string, v: any) =>
+  key === 'contract' || key === 'actualTotal' ? fmtWan(v) : key === 'paymentRatio' ? fmtRatio(v) : formatCellValue(v, key)
+function onRow(r: Record<string, any>) { pd.open(r.projectId) }
 </script>
 
 <template>
-  <div class="plan-tab">
-    <div class="summary-bar">
-      <div class="sb-item"><div class="sb-label">节点计划回款金额(万)</div><div class="sb-val" style="color:var(--accent)">{{ fmtWan(totals.totalExp) }}</div></div>
-      <div class="sb-item"><div class="sb-label">节点已回款金额(万)</div><div class="sb-val green">{{ fmtWan(totals.totalAct) }}</div></div>
-      <div class="sb-item"><div class="sb-label">节点待回款金额(万)</div><div class="sb-val red">{{ fmtWan(totals.totalRem) }}</div></div>
-      <div class="sb-item"><div class="sb-label">完成率</div><div class="sb-val" :style="{ color: rateColor(totals.rate) }">{{ pct(totals.rate) }}</div></div>
-    </div>
+  <div class="progress-tab">
+    <section class="buckets">
+      <div v-for="b in buckets.buckets" :key="b.key" class="bk">
+        <div class="bk-title">{{ b.key }}</div>
+        <div class="bk-main u-num">{{ b.projectCount }}<span class="bk-unit"> 个</span></div>
+        <div class="bk-sub u-num">
+          合同Σ {{ fmtWan(b.contractSum) }} 万 · 已回Σ {{ fmtWan(b.actualSum) }} 万 ·
+          完成率 <span :style="{ color: rateColorPmis(b.rate) }">{{ fmtRatio(b.rate) }}</span>
+        </div>
+      </div>
+      <div v-if="buckets.unknown" class="bk-unknown">另有 {{ buckets.unknown }} 个项目无合同（未知，不计入进度桶）</div>
+    </section>
 
-    <div class="status-grid">
-      <div class="st-card"><div class="st-label">加资源可提前</div><div class="st-val" style="color:var(--accent)">{{ counts.canAdvance }}</div></div>
-      <div class="st-card"><div class="st-label">达到回款条件</div><div class="st-val" style="color:var(--c-pending)">{{ counts.reachedCondition }}</div></div>
-      <div class="st-card"><div class="st-label">已提前回款</div><div class="st-val" style="color:var(--c-paid)">{{ counts.advance }}</div></div>
-      <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:var(--c-paid)">{{ counts.fullPaid }}</div></div>
-      <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:var(--danger)">{{ counts.delayed }}</div></div>
-      <div class="st-card"><div class="st-label">正常实施中</div><div class="st-val" style="color:var(--accent)">{{ counts.onTime }}</div></div>
+    <div class="cf-bar">共 {{ filteredRows.length }} / {{ rows.length }} 个项目
+      <button class="cf-clear" @click="cf.clearAll(TABLE_ID)">清除筛选</button>
     </div>
-
-    <div class="toolbar">
-      <el-button
-        size="small"
-        :type="cf.linkageOn ? 'primary' : 'default'"
-        @click="cf.toggleLinkage()"
-      >
-        {{ cf.linkageOn ? '筛选联动(已启用)' : '筛选联动' }}
-      </el-button>
-      <el-button v-if="cf.groupHasFilters(tableIds)" size="small" @click="cf.clearGroup(tableIds)">
-        清除所有筛选
-      </el-button>
-    </div>
-
-    <div class="plan-boards">
-      <PlanBoard
-        v-for="d in boards"
-        :key="d.tableId"
-        :board="d.board"
-        :table-id="d.tableId"
-        :nodes="d.nodes as Record<string, any>[]"
-        :stats="d.stats"
-        :columns="columns"
-        :source-rows="allNodes"
-        :group="tableIds"
-      />
+    <div class="tbl-wrap">
+      <table class="ptbl u-num">
+        <thead>
+          <tr>
+            <th v-for="c in COLS" :key="c.key">
+              <span class="th-l">{{ c.label }}</span>
+              <ColumnFilter :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" :group="[]" />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in filteredRows.slice(0, 300)" :key="r.projectId" class="prow" @click="onRow(r)">
+            <td v-for="c in COLS" :key="c.key" :style="c.key === 'paymentRatio' ? { color: rateColorPmis(r.paymentRatio) } : undefined">
+              {{ fmtCol(c.key, r[c.key]) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
 
 <style scoped>
-.plan-tab {
-  padding: 12px 16px;
-}
-.summary-bar,
-.status-grid {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.summary-bar {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-.status-grid {
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-}
-.sb-item,
-.st-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 14px;
-}
-.sb-label,
-.st-label {
-  font-size: 12px;
-  color: var(--mut);
-}
-.sb-val {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--txt);
-}
-.sb-val.green {
-  color: var(--c-paid);
-}
-.sb-val.red {
-  color: var(--danger);
-}
-.st-val {
-  font-size: 20px;
-  font-weight: 700;
-}
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
+.buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--gap-card); margin-bottom: var(--gap-section); }
+.bk { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); }
+.bk-title { font-size: var(--fs-2); color: var(--sub); margin-bottom: var(--sp-1); }
+.bk-main { font-size: var(--fs-6); font-weight: 700; color: var(--txt); }
+.bk-unit { font-size: var(--fs-2); color: var(--mut); font-weight: 400; }
+.bk-sub { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-1); }
+.bk-unknown { grid-column: 1 / -1; font-size: var(--fs-1); color: var(--mut); }
+.cf-bar { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-2); }
+.cf-clear { font-size: var(--fs-1); color: var(--accent); background: none; border: none; cursor: pointer; }
+.tbl-wrap { overflow-x: auto; }
+.ptbl { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+.ptbl th, .ptbl td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; white-space: nowrap; }
+.ptbl th { background: var(--card2); color: var(--sub); }
+.prow { cursor: pointer; }
+.prow:hover { background: var(--hover-tint); }
 </style>

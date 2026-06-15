@@ -12,10 +12,15 @@ function seed() {
   const ds = useDataStore()
   ds.data = {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
-    rawNodes: [
-      { projectId: 'P1', tier: '100万以上', orgL4: '北京', orgL3: '华北', projectManager: '张三', projectType: '集成', signUnit: '甲', isPaymentRelated: true, nodeStatus: '延期', expectedPayment: 1000000, actualPayment: 600000, planMonth: '2026-01' },
-      { projectId: 'P2', tier: '50万以下', orgL4: '上海', orgL3: '华东', projectManager: '李四', projectType: '运维', signUnit: '乙', isPaymentRelated: true, nodeStatus: '正常实施中', expectedPayment: 300000, actualPayment: 300000, planMonth: '2026-02' },
+    rawNodes: [],
+    projects: [
+      { projectId: 'P1', projectName: '甲项目', orgL4: '北京', projectManager: '张三', paymentPmis: { contract: 2000000, actualTotal: 600000, expectedTotal: 1500000, paymentRatio: 0.3, delayedCount: 2, nodeCount: 3, reachedCount: 1, fromOrigin: true } },
+      { projectId: 'P2', projectName: '乙项目', orgL4: '上海', projectManager: '李四', paymentPmis: { contract: 300000, actualTotal: 300000, expectedTotal: 300000, paymentRatio: 1, delayedCount: 0, nodeCount: 1, reachedCount: 1, fromOrigin: true } },
     ],
+    projectPmis: {
+      P1: { progress: { 项目阶段: '实施' }, customer: { 行业: '金融' } },
+      P2: { progress: { 项目阶段: '验收' }, customer: { 行业: '政务' } },
+    },
     projectOverview: { projects: [], columns: [] },
     naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
   } as any
@@ -30,6 +35,19 @@ describe('BoardView', () => {
     expect(w.findAll('.bv-body').length).toBe(2)
     expect(w.text()).toContain('北京')
     expect(w.text()).toContain('上海')
+  })
+
+  it('维度与指标标签按 PMIS 项目级口径渲染', () => {
+    seed()
+    const w = mount(BoardView, opts)
+    // 维度标签（DimPicker/SegToggle）
+    expect(w.text()).toContain('部门')
+    expect(w.text()).toContain('金额档')
+    expect(w.text()).toContain('进度态')
+    // 单维排名表指标列标签
+    expect(w.text()).toContain('合同总额(万)')
+    expect(w.text()).toContain('已回款(万)')
+    expect(w.text()).toContain('完成率')
   })
 
   it('单维点击行打开下钻', async () => {

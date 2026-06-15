@@ -1,62 +1,69 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
+import { useProjectDetailStore } from '@/stores/projectDetail'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
-import { riskGroups, getNodeRemaining } from '@/lib/riskGroups'
-import { fmtYuan, fmtRatio, pct } from '@/lib/format'
+import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
+import { projectPaymentRows, paymentNodeRows, pmisRiskGroups, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 
-const props = defineProps<{ tier: string; now?: Date }>()
+defineProps<{ dim: string }>()
+const data = useDataStore()
 const filter = useFilterStore()
+const pd = useProjectDetailStore()
 
-const tierNodes = computed(() => filter.filteredNodes.filter((n) => props.tier === '' || n.tier === props.tier))
-const groups = computed(() => riskGroups(tierNodes.value, props.now ?? new Date()))
-
-const nodeCols = computed<DataColumn[]>(() => {
-  const base: DataColumn[] = [
-    { key: 'projectId', label: '项目编号' },
-    { key: 'projectName', label: '项目名称' },
-    { key: 'planDate', label: '计划日期' },
-    { key: 'remaining', label: '待回款(元)', formatter: (_v, row) => fmtYuan(getNodeRemaining(row)) },
-    { key: 'actualPaymentRatio', label: '实际比例', formatter: (v) => fmtRatio(v, '待上报') },
-    { key: 'orgL4', label: '服务组' },
-  ]
-  return props.tier === '' ? [{ key: 'tier', label: '档位' }, ...base] : base
+const ctx = computed(() => {
+  const ps = filterProjects(data.data?.projects ?? [], {
+    viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
+    naguanOn: filter.naguanOn, naguanExclude: data.data?.naguanExclude ?? {},
+  })
+  const rows = projectPaymentRows(ps, data.data?.projectPmis ?? {})
+  const nodeRows = paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
+  return pmisRiskGroups(rows, nodeRows)
 })
 
-const highRiskCols = computed<DataColumn[]>(() => {
-  const base: DataColumn[] = [
-    { key: 'projectId', label: '项目编号' },
-    { key: 'projectName', label: '项目名称' },
-    { key: 'projectAmount', label: '项目金额(元)', formatter: (v) => fmtYuan(v as number) },
-    { key: 'remainingAmount', label: '待回款金额(元)', formatter: (v) => fmtYuan(v as number) },
-    { key: 'paymentRatio', label: '完成率', formatter: (v) => pct(v) },
-    { key: 'orgL4', label: '服务组' },
-  ]
-  return props.tier === '' ? [{ key: 'tier', label: '档位' }, ...base] : base
-})
+const NODE_COLS: DataColumn[] = [
+  { key: 'projectName', label: '项目' },
+  { key: 'stage', label: '阶段' },
+  { key: 'planDate', label: '计划日' },
+  { key: 'expectedPayment', label: '计划金额(万)', formatter: (v) => fmtWan(v) },
+]
+const LOW_COLS: DataColumn[] = [
+  { key: 'projectName', label: '项目' },
+  { key: 'contract', label: '合同(万)', formatter: (v) => fmtWan(v) },
+  { key: 'actualTotal', label: '已回(万)', formatter: (v) => fmtWan(v) },
+  { key: 'paymentRatio', label: '完成率' },
+]
+const OVER_COLS: DataColumn[] = [
+  { key: 'projectName', label: '项目' },
+  { key: 'dept', label: '部门' },
+  { key: 'overspendAmount', label: '超支金额(元)', formatter: (v) => fmtYuan(v) },
+]
+function onRow(r: Record<string, any>) { pd.open(r.projectId) }
 </script>
 
 <template>
   <div class="risk-tab">
-    <section class="risk-card">
-      <div class="rc-header orange">临近到期节点 <span class="rc-sub">7天内到期且未100%回款</span></div>
-      <DataTable :columns="nodeCols" :rows="groups.nearDue as Record<string, any>[]" />
+    <section class="rg">
+      <h3 class="rg-h">延期节点（{{ ctx.delayedNodes.length }}）</h3>
+      <DataTable :columns="NODE_COLS" :rows="ctx.delayedNodes" clickable @row-click="onRow" />
     </section>
-    <section class="risk-card">
-      <div class="rc-header primary">可提前但未行动 <span class="rc-sub">具备提前完成条件但未行动</span></div>
-      <DataTable :columns="nodeCols" :rows="groups.canAdvance as Record<string, any>[]" />
+    <section class="rg">
+      <h3 class="rg-h">低回款项目（完成率&lt;30% 且有合同，Top10）</h3>
+      <DataTable :columns="LOW_COLS" :rows="ctx.lowPayment" clickable @row-click="onRow">
+        <template #cell-paymentRatio="{ value }">
+          <span class="u-num" :style="{ color: rateColorPmis(value) }">{{ fmtRatio(value) }}</span>
+        </template>
+      </DataTable>
     </section>
-    <section class="risk-card">
-      <div class="rc-header red">高金额低完成率 <span class="rc-sub">回款完成率&lt;30%且金额最高</span></div>
-      <DataTable :columns="highRiskCols" :rows="groups.highRisk as Record<string, any>[]" />
+    <section class="rg">
+      <h3 class="rg-h">超支项目（{{ ctx.overspend.length }}）</h3>
+      <DataTable :columns="OVER_COLS" :rows="ctx.overspend" clickable @row-click="onRow" />
     </section>
   </div>
 </template>
 
 <style scoped>
-.risk-tab { padding: 12px 16px; display: flex; flex-direction: column; gap: 16px; }
-.risk-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
-.rc-header { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
-.rc-header.orange { color: var(--c-pending); } .rc-header.primary { color: var(--accent); } .rc-header.red { color: var(--danger); }
-.rc-sub { font-weight: 400; font-size: 12px; color: var(--mut); margin-left: 6px; }
+.rg { margin-bottom: var(--gap-section); }
+.rg-h { font-size: var(--fs-3); color: var(--txt); font-weight: 700; margin: 0 0 var(--sp-2); }
 </style>
