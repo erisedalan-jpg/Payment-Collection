@@ -131,6 +131,48 @@ def payment_ratio_from_records(records_total: Optional[float], contract: Optiona
     return round((records_total or 0) / denom, 4)
 
 
+PAY_STAGES = ("到货", "初验", "终验", "驻场")   # 有"关联回款阶段"的里程碑名
+
+
+def _node_status(plan_date: str, reached: bool, today: str) -> str:
+    if reached:
+        return "已达成"
+    if plan_date and plan_date < today:
+        return "延期"
+    return "待达成"
+
+
+def build_payment_pmis(contract, milestones, pay_record, today):
+    """PMIS 核心回款:计划侧=里程碑关联回款阶段比例×合同;实际侧=项目流水(不分摊节点)。
+    返回 (summary, nodes)。入参已是 eff 口径(售前回退在调用方完成)。"""
+    nodes = []
+    for ms in milestones or []:
+        if ms.get("name") not in PAY_STAGES or ms.get("payRatio") is None:
+            continue
+        reached = bool(ms.get("actualDate"))
+        pr = ms["payRatio"]
+        plan = ms.get("planDate") or ""
+        nodes.append({
+            "stage": ms["name"], "planDate": plan, "actualDate": ms.get("actualDate") or "",
+            "payRatio": pr, "expectedPayment": round((contract or 0) * pr, 2),
+            "reached": reached, "status": _node_status(plan, reached, today),
+        })
+    actual_total = (pay_record or {}).get("total")
+    summary = {
+        "contract": contract,
+        "actualTotal": actual_total,
+        "paymentCount": (pay_record or {}).get("count", 0),
+        "paymentRatio": round(actual_total / contract, 4) if (actual_total is not None and contract) else None,
+        "expectedTotal": round(sum(n["expectedPayment"] for n in nodes), 2),
+        "nodeCount": len(nodes),
+        "reachedCount": sum(1 for n in nodes if n["reached"]),
+        "delayedCount": sum(1 for n in nodes if n["status"] == "延期"),
+        "lastPaymentDate": (pay_record or {}).get("lastDate", ""),
+        "fromOrigin": False,
+    }
+    return summary, nodes
+
+
 def aggregate_payment(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """项目的回款子域聚合(仅 isPaymentRelated 节点;明细仍在 rawNodes,不复制)。"""
     rel = [n for n in nodes if n.get("isPaymentRelated")]
