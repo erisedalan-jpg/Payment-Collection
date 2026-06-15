@@ -217,7 +217,9 @@ def _build_initial_tags():
 
 
 def _load_project_tags():
-    """本地标签 store；不存在则按 tagSeed 首次播种并落盘，此后本地为准。"""
+    """本地标签 store；不存在则按 tagSeed 首次播种并落盘，此后本地为准。
+    种子为空(analysis 尚未处理/无 tagSeed)时只返回空 store 不落盘，避免空文件永久
+    local-wins——否则首次启动早于"更新数据"会让标签永不播种。"""
     with _tags_lock:
         if os.path.exists(PROJECT_TAGS_FILE):
             try:
@@ -226,7 +228,8 @@ def _load_project_tags():
             except Exception:
                 pass
         store = _build_initial_tags()
-    _save_project_tags(store)
+    if store.get('tags') or store.get('assignments'):
+        _save_project_tags(store)
     return store
 
 
