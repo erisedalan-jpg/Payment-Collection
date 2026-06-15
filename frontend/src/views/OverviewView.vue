@@ -79,7 +79,7 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
               <div class="ov-pay-v u-num">{{ fmtWan(band.monthPending) }} 万</div>
               <div class="ov-pay-k">本月待回款</div>
             </RouterLink>
-            <RouterLink class="ov-pay-block" to="/followup">
+            <RouterLink class="ov-pay-block" to="/payment">
               <div class="ov-pay-v u-num">{{ band.dueSoon7 }}</div>
               <div class="ov-pay-k">7 天临期</div>
             </RouterLink>

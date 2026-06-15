@@ -8,6 +8,7 @@ import { buildProjectRows, filterProjectRows, distinctOptions, type ProjectFilte
 import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
+import FollowupModal from '@/components/FollowupModal.vue'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
@@ -73,9 +74,17 @@ const columns: DataColumn[] = [
   { key: 'paymentRatio', label: '回款完成率', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'health', label: '健康度', width: 90 },
   { key: 'tags', label: '标签', width: 160, formatter: (v) => (Array.isArray(v) && v.length ? v.join('、') : '') },
+  { key: 'action', label: '操作', width: 80 },
 ]
 
 function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId}`) }
+
+const fuOpen = ref(false)
+const fuProject = ref<{ projectId: string; projectName: string }>({ projectId: '', projectName: '' })
+function openFollowup(row: Record<string, any>) {
+  fuProject.value = { projectId: row.projectId, projectName: row.projectName || '' }
+  fuOpen.value = true
+}
 </script>
 
 <template>
@@ -133,6 +142,9 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
       <template #cell-tags="{ value }">
         <span v-for="t in (value || [])" :key="t" class="lst-tag">{{ t }}</span>
       </template>
+      <template #cell-action="{ row }">
+        <button class="pv-fu-btn" @click.stop="openFollowup(row)">跟进</button>
+      </template>
       <template #header-health>
         <span class="pv-health-head">健康度
           <el-tooltip placement="top">
@@ -144,6 +156,8 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
         </span>
       </template>
     </DataTable>
+
+    <FollowupModal v-model="fuOpen" :project-id="fuProject.projectId" :project-name="fuProject.projectName" />
 
     <div v-if="rows.length" class="pv-pager">
       <span class="pv-total u-num">共 {{ filtered.length }} 条</span>
@@ -168,4 +182,5 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
 .pv-health-head { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .pv-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: var(--r-full); border: 1px solid var(--sub); color: var(--sub); font-size: 10px; font-style: italic; cursor: help; line-height: 1; }
 .lst-tag { display: inline-block; padding: 1px 6px; margin: 1px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
+.pv-fu-btn { font-size: var(--fs-1); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 8px; cursor: pointer; }
 </style>

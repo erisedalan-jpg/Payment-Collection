@@ -15,7 +15,6 @@ beforeEach(() => {
       { path: '/projects', component: { template: '<div />' } },
       { path: '/project/:id', component: { template: '<div />' } },
       { path: '/payment', component: { template: '<div />' } },
-      { path: '/followup', component: { template: '<div />' } },
       { path: '/activity', component: { template: '<div />' } },
     ],
   })

@@ -140,20 +140,6 @@ import_state = {"running": False, "progress": 0, "message": ""}
 pmis_state = {"running": False, "progress": 0, "message": ""}
 # 重新预处理状态（独立更新数据，不抓取）
 reprocess_state = {"running": False, "progress": 0, "message": ""}
-followup_sync_state = {}  # key: 记录编号, value: {status:'syncing'|'success'|'failed', message:''}
-_followup_lock = threading.Lock()
-_write_followup_lock = threading.Lock()  # 云文档写入串行化，防并发覆盖
-_FOLLOWUP_STATE_MAX = 200  # 限制规模，防止只增不删导致内存缓慢增长（H-6）
-
-
-def _set_followup_state(record_id, state):
-    """线程安全地设置跟进同步状态，并限制字典规模（超出按插入顺序丢弃最旧）。"""
-    with _followup_lock:
-        followup_sync_state[record_id] = state
-        while len(followup_sync_state) > _FOLLOWUP_STATE_MAX:
-            oldest = next(iter(followup_sync_state))
-            del followup_sync_state[oldest]
-
 
 # 子进程引用（用于停止同步/导入时终止）
 active_process = None
@@ -277,71 +263,6 @@ def _get_node_action_date(project_id):
         return ''
     return node_action_date_from_data(data, project_id)
 
-def _write_followup_async(record, cloud_url):
-    """异步写入跟进记录到云文档（含进度追踪）"""
-    record_id = record.get('记录编号', '')
-    with _write_followup_lock:
-        try:
-            # 初始化同步状态追踪
-            _set_followup_state(record_id, {"status": "syncing", "message": "正在连接云文档..."})
-            logger.info(f"[followup-sync] {record_id} 开始同步到云文档")
-
-            write_script, write_cwd = _find_script("write_followup.py")
-            if not write_script:
-                logger.error("写入脚本 write_followup.py 不存在")
-                _set_followup_state(record_id, {"status": "failed", "message": "写入脚本不存在，同步失败"})
-                _update_followup_sync_status(record_id, '同步失败')
-                return
-            if getattr(sys, 'frozen', False):
-                # 打包模式：直接导入运行
-                _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
-                old_argv = sys.argv[:]
-                sys.argv = [write_script, cloud_url, json.dumps(record, ensure_ascii=False)]
-                try:
-                    _run_script_direct(write_script, 'write_followup', write_cwd)
-                    _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
-                    logger.info(f"跟进记录 {record_id} 写入云文档成功")
-                    _update_followup_sync_status(record_id, '已同步')
-                except Exception as e:
-                    logger.error(f"异步写入云文档失败: {e}")
-                    _set_followup_state(record_id, {"status": "failed", "message": f"同步失败: {str(e)[:80]}"})
-                    _update_followup_sync_status(record_id, '同步失败')
-                finally:
-                    sys.argv = old_argv
-            else:
-                # 开发模式：subprocess
-                _set_followup_state(record_id, {"status": "syncing", "message": "正在写入云文档..."})
-                cmd = [sys.executable, '-u', write_script, cloud_url,
-                       json.dumps(record, ensure_ascii=False)]
-                result = subprocess.run(cmd, capture_output=True, text=True,
-                                       cwd=write_cwd, encoding='utf-8', errors='replace', timeout=300)
-                if result.returncode == 0:
-                    _set_followup_state(record_id, {"status": "success", "message": "✅ 已同步到云文档"})
-                    logger.info(f"跟进记录 {record_id} 写入云文档成功")
-                    _update_followup_sync_status(record_id, '已同步')
-                else:
-                    err_msg = (result.stderr or result.stdout or '未知错误')[:100]
-                    _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步失败: {err_msg}"})
-                    logger.error(f"跟进记录写入云文档失败: stderr={result.stderr[:200] if result.stderr else ''} stdout={result.stdout[:200] if result.stdout else ''}")
-                    _update_followup_sync_status(record_id, '同步失败')
-        except Exception as e:
-            logger.error(f"异步写入云文档异常: {e}", exc_info=True)
-            _set_followup_state(record_id, {"status": "failed", "message": f"✕ 同步异常: {str(e)[:80]}"})
-            _update_followup_sync_status(record_id, '同步失败')
-
-def _update_followup_sync_status(record_id, sync_status):
-    """更新本地JSON中指定记录的syncStatus字段"""
-    try:
-        records = _load_followup_records()
-        for r in records:
-            if r.get('记录编号') == record_id:
-                r['syncStatus'] = sync_status
-                break
-        _save_followup_records(records)
-        logger.info(f"[followup-sync] {record_id} syncStatus 更新为: {sync_status}")
-    except Exception as e:
-        logger.error(f"[followup-sync] 更新syncStatus失败: {e}")
-
 def should_spa_fallback(path: str) -> bool:
     """判断 GET 路径是否应回退到 dist/index.html(Vue Router history 模式)。
     /api/、/data/、/yundocs_data/ 子路径不回退(后端接口/数据文件);带文件扩展名的(静态资源)不回退;
@@ -413,8 +334,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_list()
         elif parsed.path == '/api/followup/types':
             self.handle_followup_types()
-        elif parsed.path.startswith('/api/followup/sync-status'):
-            self.handle_followup_sync_status()
         elif parsed.path == '/api/tags':
             self.handle_tags_get()
         elif parsed.path == '/api/pmis/links':
@@ -684,8 +603,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         threading.Thread(target=_shutdown, daemon=False).start()
     
     def handle_followup_add(self):
-        """POST /api/followup/add - 添加跟进记录"""
-        global sync_url
+        """POST /api/followup/add - 添加跟进记录（纯本地，不回写云）"""
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
@@ -736,32 +654,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         # 下次跟进计划日期默认=节点动作完成时间
         if not data.get('下次跟进计划日期') and node_action_date:
             data['下次跟进计划日期'] = node_action_date
-        
-        # 标记同步状态
-        data['syncStatus'] = '待同步'
-        
-        # 暂存本地JSON
+
+        # 保存到本地JSON
         records = _load_followup_records()
         records.append(data)
         _save_followup_records(records)
-        logger.info(f"跟进记录已暂存本地: {data['记录编号']}")
-        
-        # 异步写入云文档
-        cloud_url = sync_url or data.get('cloudUrl', '')
-        if cloud_url:
-            threading.Thread(target=_write_followup_async, args=[data, cloud_url], daemon=True).start()
-        else:
-            logger.warning("未设置云文档URL，跟进记录仅保存在本地")
-        
+        logger.info(f"跟进记录已保存本地: {data['记录编号']}")
+
         self._json_response({
             "success": True,
             "记录编号": data['记录编号'],
-            "message": "跟进记录已保存" + ("，正在同步到云文档" if cloud_url else "（仅本地保存）")
+            "message": "已保存到本地"
         })
     
     def handle_followup_delete(self):
-        """POST /api/followup/delete - 删除跟进记录"""
-        global sync_url
+        """POST /api/followup/delete - 删除跟进记录（纯本地，不回写云）"""
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
@@ -787,22 +694,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         _save_followup_records(records)
         logger.info(f"跟进记录已删除: {record_id}")
 
-        # 清理同步状态
-        with _followup_lock:
-            followup_sync_state.pop(record_id, None)
-
-        # 云文档同步：根据记录编号删除云文档中对应行
-        cloud_url = sync_url or data.get('cloudUrl', '')
-        if cloud_url:
-            delete_record = {"__action__": "delete", "记录编号": record_id}
-            threading.Thread(target=_write_followup_async, args=[delete_record, cloud_url], daemon=True).start()
-            self._json_response({"success": True, "message": f"跟进记录 {record_id} 已删除，正在同步到云文档"})
-        else:
-            self._json_response({"success": True, "message": f"跟进记录 {record_id} 已删除（仅本地）"})
+        self._json_response({"success": True, "message": f"跟进记录 {record_id} 已删除"})
     
     def handle_followup_update(self):
-        """POST /api/followup/update - 编辑跟进记录"""
-        global sync_url
+        """POST /api/followup/update - 编辑跟进记录（纯本地，不回写云）"""
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
@@ -840,39 +735,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 for field in editable_fields:
                     if field in data and data[field]:
                         r[field] = data[field]
-                # 标记为待重新同步
-                r['syncStatus'] = '待同步'
                 found = True
                 break
-        
+
         if not found:
             self._json_response(_error_payload(ERR_NOT_FOUND, f"未找到记录: {record_id}"))
             return
-        
+
         _save_followup_records(records)
         logger.info(f"跟进记录已更新: {record_id}")
-        
-        # 异步重新写入云文档
-        updated_record = None
-        for r in records:
-            if r.get('记录编号') == record_id:
-                updated_record = r
-                break
-        
-        cloud_url = sync_url or data.get('cloudUrl', '')
-        if cloud_url and updated_record:
-            # 清理旧同步状态
-            with _followup_lock:
-                followup_sync_state.pop(record_id, None)
-            updated_record['__action__'] = 'update'
-            threading.Thread(target=_write_followup_async, args=[updated_record, cloud_url], daemon=True).start()
-        else:
-            logger.warning("未设置云文档URL，更新仅保存在本地")
-        
+
         self._json_response({
             "success": True,
             "记录编号": record_id,
-            "message": "跟进记录已更新" + ("，正在同步到云文档" if cloud_url else "（仅本地保存）")
+            "message": "已更新（本地）"
         })
     
     def handle_followup_list(self):
@@ -885,7 +761,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         qs = self.parse_path()
         limit = int(qs.get('limit', [5])[0])
         
-        # 合并本地记录和云文档同步的记录
+        # 读取本地记录（纯本地，无云同步）
         all_records = _load_followup_records()
         project_records = [r for r in all_records if r.get('项目编号') == project_id]
         
@@ -935,20 +811,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"保存标签失败: {e}"))
 
-    def handle_followup_sync_status(self):
-        """GET /api/followup/sync-status?recordId=xxx - 查询跟进记录云同步状态"""
-        qs = self.parse_path()
-        record_id = qs.get('recordId', [''])[0]
-        if not record_id:
-            # 返回所有正在同步的状态（锁内快照，避免与限容清理并发迭代）
-            with _followup_lock:
-                states = dict(followup_sync_state)
-            self._json_response({"success": True, "states": states})
-            return
-        with _followup_lock:
-            state = followup_sync_state.get(record_id, {"status": "unknown", "message": "未找到同步状态"})
-        self._json_response({"success": True, "recordId": record_id, "state": state})
-    
     def _pmis_links_path(self):
         """返回 pmis_links.json 的绝对路径"""
         return os.path.join(BASE_DIR, 'data', 'pmis_links.json')

@@ -3,7 +3,6 @@ import DashboardView from '@/views/DashboardView.vue'
 import PayAnalysisView from '@/views/PayAnalysisView.vue'
 import LedgerView from '@/views/LedgerView.vue'
 import CalendarView from '@/views/CalendarView.vue'
-import FollowupView from '@/views/FollowupView.vue'
 import DataView from '@/views/DataView.vue'
 import AboutView from '@/views/AboutView.vue'
 import DataQualityView from '@/views/DataQualityView.vue'
@@ -29,7 +28,6 @@ export const router = createRouter({
     { path: '/activity', name: 'activity', component: ActivityView, meta: { title: '项目动态', hideFilter: true } },
     { path: '/insight', name: 'insight', component: InsightView, meta: { title: '项目分析', hideFilter: true } },
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
-    { path: '/followup', name: 'followup', component: FollowupView, meta: { title: '临期跟进' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
     // 回款分析归并页:多维看板(board) + 业务分析五 tab;:tab? 缺省视为 board;六 tab 全依赖 FilterBar(不 hideFilter)
     { path: '/panalysis/:tab?', name: 'panalysis', component: PayAnalysisView, meta: { title: '回款分析' } },
