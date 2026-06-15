@@ -27,30 +27,16 @@ function withData() {
 }
 
 describe('filter store', () => {
-  it('defaults: year=all, view=global, naguan on', () => {
+  it('defaults: year=all, view=global', () => {
     const f = useFilterStore()
     expect(f.filterYear).toBe('all')
     expect(f.viewMode).toBe('global')
-    expect(f.naguanOn).toBe(true)
   })
 
   it('filteredNodes applies year filter over dataStore rawNodes', () => {
     const f = withData()
-    f.naguanOn = false
     f.setYear('2026')
     expect(f.filteredNodes.map((n: any) => n.projectId)).toEqual(['P1'])
-  })
-
-  it('naguan on excludes flagged ids', () => {
-    const f = withData()
-    expect(f.filteredNodes.map((n: any) => n.projectId)).toEqual(['P1'])
-  })
-
-  it('toggleNaguan persists to localStorage', () => {
-    const f = useFilterStore()
-    f.toggleNaguan(false)
-    expect(f.naguanOn).toBe(false)
-    expect(localStorage.getItem('naguan_on')).toBe('false')
   })
 
   it('yearOptions include all + current year', () => {

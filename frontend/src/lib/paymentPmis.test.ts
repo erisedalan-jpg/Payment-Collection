@@ -89,7 +89,7 @@ describe('filterProjects（视角/纳管，不复用 filterNodes）', () => {
     proj({ projectId: 'B', orgL4: '组2', projectManager: '李四' }),
     proj({ projectId: 'C', orgL4: '组1', projectManager: '李四' }),
   ]
-  const base = { viewMode: 'global' as const, viewL4: '', viewPM: '', naguanOn: false, naguanExclude: {} }
+  const base = { viewMode: 'global' as const, viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} }
   it('global 全量', () => {
     expect(filterProjects(ps, base).map((p) => p.projectId)).toEqual(['A', 'B', 'C'])
   })
@@ -99,11 +99,11 @@ describe('filterProjects（视角/纳管，不复用 filterNodes）', () => {
   it('pm 视角按 projectManager', () => {
     expect(filterProjects(ps, { ...base, viewMode: 'pm', viewPM: '李四' }).map((p) => p.projectId)).toEqual(['B', 'C'])
   })
-  it('纳管开启排除 naguanExclude', () => {
-    expect(filterProjects(ps, { ...base, naguanOn: true, naguanExclude: { B: true } }).map((p) => p.projectId)).toEqual(['A', 'C'])
+  it('排除开启时剔除 excludedIds', () => {
+    expect(filterProjects(ps, { ...base, excludeActive: true, excludedIds: { B: true } }).map((p) => p.projectId)).toEqual(['A', 'C'])
   })
-  it('纳管关闭不排除', () => {
-    expect(filterProjects(ps, { ...base, naguanOn: false, naguanExclude: { B: true } }).length).toBe(3)
+  it('排除关闭时不剔除', () => {
+    expect(filterProjects(ps, { ...base, excludeActive: false, excludedIds: { B: true } }).length).toBe(3)
   })
 })
 

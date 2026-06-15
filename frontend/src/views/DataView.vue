@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
 import { api } from '@/api/client'
 import { useCloudSync } from '@/composables/useCloudSync'
 import { useExcelImport } from '@/composables/useExcelImport'
@@ -12,7 +11,6 @@ import { useReprocess } from '@/composables/useReprocess'
 import { useDataHistory } from '@/composables/useDataHistory'
 
 const data = useDataStore()
-const filter = useFilterStore()
 
 const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 const lastPmis = computed(() => (data.data as any)?.dataQuality?.summary?.lastPmisUpdate || '-')
@@ -85,7 +83,6 @@ async function onUndoRollback() {
   await doUndo()
 }
 
-const naguanOn = computed({ get: () => filter.naguanOn, set: (v: boolean) => filter.toggleNaguan(v) })
 const clearState = ref('')
 const clearing = ref(false)
 async function onClear() {
@@ -173,7 +170,6 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
       </div>
       <div class="dv-card">
         <div class="dv-card-head">设置</div>
-        <div class="dv-row"><span class="dv-label">纳管开关</span><el-switch v-model="naguanOn" /><span class="dv-hint">关闭后不再排除纳管项目(全站联动)</span></div>
         <div class="dv-row"><span class="dv-label">清空数据</span><button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button><span v-if="clearState" class="dv-hint ok">{{ clearState }}</span></div>
       </div>
     </div>

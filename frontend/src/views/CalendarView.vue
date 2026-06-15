@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { naguanFilter } from '@/lib/ledger'
+import { excludeFilter } from '@/lib/ledger'
 import {
   calFilterOptions,
   calDashboardStats,
@@ -48,10 +48,10 @@ const calFilters = computed<CalFilters>(() => ({
 const rawNodes = computed(() => (data.data?.rawNodes ?? []) as Record<string, any>[])
 const naguanNodes = computed(
   () =>
-    naguanFilter(
+    excludeFilter(
       rawNodes.value as any,
-      filter.naguanOn,
-      (data.data?.naguanExclude ?? {}) as Record<string, boolean>,
+      filter.excludeOn,
+      filter.excludedIds,
     ) as Record<string, any>[],
 )
 

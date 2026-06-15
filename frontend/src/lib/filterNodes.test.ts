@@ -11,7 +11,7 @@ const NODES: any[] = [
 function opts(over: Partial<FilterOpts> = {}): FilterOpts {
   return {
     filterYear: 'all', viewMode: 'global', viewL4: '', viewPM: '',
-    naguanOn: false, naguanExclude: {}, ...over,
+    excludeActive: false, excludedIds: {}, ...over,
   }
 }
 
@@ -42,7 +42,7 @@ describe('filterNodes', () => {
     expect(filterNodes(NODES, opts({ viewMode: 'pm', viewPM: '李四' })).map((n) => n.projectId)).toEqual(['P2'])
   })
   it('naguan excludes flagged projectIds when on', () => {
-    const r = filterNodes(NODES, opts({ naguanOn: true, naguanExclude: { P2: true } }))
+    const r = filterNodes(NODES, opts({ excludeActive: true, excludedIds: { P2: true } }))
     expect(r.map((n) => n.projectId)).toEqual(['P1', 'P3', 'P4'])
   })
   it('view + year combine', () => {

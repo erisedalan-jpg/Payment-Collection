@@ -30,16 +30,6 @@ describe('FilterBar', () => {
     expect(f.filterYear).toBe('2026')
   })
 
-  it('naguan checkbox toggles store + persists', async () => {
-    seed()
-    const f = useFilterStore()
-    const wrapper = mount(FilterBar)
-    expect(f.naguanOn).toBe(true)
-    await wrapper.get('[data-test="naguan-toggle"]').setValue(false)
-    expect(f.naguanOn).toBe(false)
-    expect(localStorage.getItem('naguan_on')).toBe('false')
-  })
-
   it('view select to L4 then choose dept updates store', async () => {
     seed()
     const f = useFilterStore()
