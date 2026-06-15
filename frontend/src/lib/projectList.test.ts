@@ -74,7 +74,7 @@ describe('buildProjectRows', () => {
   })
 })
 
-const F0: ProjectFilters = { search: '', manager: [], orgL4: [], stage: [], projectStatus: [], riskLevel: [], projectLevel: [], paymentStatus: [], health: [], presale: '', paused: '', overspend: '' }
+const F0: ProjectFilters = { search: '', manager: [], orgL4: [], stage: [], projectStatus: [], riskLevel: [], projectLevel: [], paymentStatus: [], health: [], presale: '', paused: '', overspend: '', tags: [] }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -123,6 +123,18 @@ describe('distinctOptions', () => {
   it('去重且剔除空与占位 -', () => {
     const rows = buildProjectRows([proj(), proj({ projectId: 'NO-PMIS' })], PMIS)
     expect(distinctOptions(rows, 'stage')).toEqual(['项目执行'])
+  })
+})
+
+describe('标签筛选', () => {
+  it('按标签多选过滤(并集 OR)', () => {
+    const rows = [
+      { projectId: 'A', tags: ['BH项目'] },
+      { projectId: 'B', tags: ['框架合同'] },
+      { projectId: 'C', tags: [] },
+    ] as any
+    expect(filterProjectRows(rows, { ...F0, tags: ['BH项目', '框架合同'] }).map((r) => r.projectId)).toEqual(['A', 'B'])
+    expect(filterProjectRows(rows, { ...F0, tags: [] }).length).toBe(3)
   })
 })
 

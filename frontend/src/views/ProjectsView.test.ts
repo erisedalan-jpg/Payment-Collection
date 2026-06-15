@@ -5,10 +5,14 @@ import ElementPlus from 'element-plus'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ProjectsView from './ProjectsView.vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
 
 let router: Router
 beforeEach(() => {
   setActivePinia(createPinia())
+  // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+  const tagsStore = useProjectTagsStore()
+  tagsStore.load = vi.fn().mockResolvedValue(undefined)
   router = createRouter({
     history: createMemoryHistory(),
     routes: [

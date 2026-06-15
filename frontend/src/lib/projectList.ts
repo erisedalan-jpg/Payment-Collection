@@ -23,6 +23,7 @@ export interface ProjectRow {
   hasClosed: boolean
   paused: boolean
   overspend: boolean
+  tags?: string[]
 }
 
 export interface ProjectFilters {
@@ -38,6 +39,7 @@ export interface ProjectFilters {
   presale: string // '' | 'yes' | 'no'
   paused: string   // '' | 'yes'（URL-only,风险焦点行跳入）
   overspend: string // '' | 'yes'（URL-only,风险焦点行跳入）
+  tags: string[]
 }
 
 /** 项目级回款状态四态：无节点 / 延期 / 已回清 / 回款中。
@@ -50,7 +52,7 @@ export function paymentStatusOf(p: Project): string {
   return '回款中'
 }
 
-export function buildProjectRows(projects: Project[], pmisMap: Record<string, ProjectPmis>): ProjectRow[] {
+export function buildProjectRows(projects: Project[], pmisMap: Record<string, ProjectPmis>, assignments?: Record<string, string[]>): ProjectRow[] {
   return projects.map((p) => {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     const prog = m.progress ?? {}
@@ -80,6 +82,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       hasClosed: !!p.relatedClosedId,
       paused: status.是否暂停 === true,
       overspend: cost.超支 === true,
+      tags: assignments?.[p.projectId] ?? [],
     }
   })
 }
@@ -102,6 +105,10 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
     if (f.overspend === 'yes' && !r.overspend) return false
     if (f.presale === 'yes' && !r.isPresale) return false
     if (f.presale === 'no' && r.isPresale) return false
+    if (f.tags && f.tags.length) {
+      const sel = new Set(f.tags)
+      if (!(r.tags ?? []).some((t) => sel.has(t))) return false
+    }
     return true
   })
 }
