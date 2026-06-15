@@ -197,6 +197,7 @@ class MilestoneItem(_Base):
     planDate: str = ""
     actualDate: str = ""
     payStage: str = ""
+    payRatio: Optional[float] = None
     pct: Optional[float] = None  # 0-100 原值
     priority: str = "low"  # high | mid | low
 
