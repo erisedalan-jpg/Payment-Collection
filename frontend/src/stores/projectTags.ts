@@ -26,10 +26,11 @@ export const useProjectTagsStore = defineStore('projectTags', () => {
   function renameTag(oldName: string, newName: string) {
     const nn = newName.trim()
     if (!nn || oldName === nn) return
+    if (tags.value.some((t) => t.name === nn)) return // 拒绝改成已存在标签名（防库内/挂载重复）
     tags.value = tags.value.map((t) => (t.name === oldName ? { ...t, name: nn } : t))
     const next: Record<string, string[]> = {}
     for (const [pid, names] of Object.entries(assignments.value)) {
-      next[pid] = names.map((x) => (x === oldName ? nn : x))
+      next[pid] = [...new Set(names.map((x) => (x === oldName ? nn : x)))]
     }
     assignments.value = next
   }
