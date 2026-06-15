@@ -31,9 +31,5 @@ describe('followupApi', () => {
     await followupApi.remove('FU-9')
     expect(JSON.parse((f.mock.calls[0][1] as any).body)).toEqual({ 记录编号: 'FU-9' })
   })
-  it('syncStatus 解析 state', async () => {
-    mockFetch({ success: true, recordId: 'FU-1', state: { status: 'success', message: 'ok' } })
-    const r = await followupApi.syncStatus('FU-1')
-    expect(r.state.status).toBe('success')
-  })
+
 })

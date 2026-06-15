@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { followupApi, type FollowupRecord, type FollowupFormData } from '@/lib/followupApi'
-import { useFollowupSync } from '@/composables/useFollowupSync'
 import FollowupRecordForm from './FollowupRecordForm.vue'
 
 const props = defineProps<{ projectId: string; projectName: string; defaultNextDate?: string }>()
@@ -12,7 +12,6 @@ const statuses = ref<string[]>([])
 const showForm = ref(false)
 const editRecord = ref<FollowupRecord | null>(null)
 const expandedIdx = ref(-1)
-const { toasts, notify } = useFollowupSync()
 
 const latest = computed(() => records.value[0] || null)
 const history = computed(() => records.value.slice(1))
@@ -63,9 +62,9 @@ async function onSubmit(data: FollowupFormData) {
     const res = data.记录编号 ? await followupApi.update(data) : await followupApi.add(data)
     showForm.value = false
     editRecord.value = null
-    notify(res.message, res.记录编号 || data.记录编号 || '')
+    ElMessage.success(res.message || '已保存到本地')
   } catch (e: any) {
-    notify('保存失败: ' + (e?.message || ''), '')
+    ElMessage.error('保存失败: ' + (e?.message || ''))
   } finally {
     await loadRecords()
   }
@@ -76,10 +75,10 @@ async function onDelete(r: FollowupRecord) {
   if (!window.confirm(`确定要删除此跟进记录吗？\n\n记录编号: ${id}\n删除后无法恢复。`)) return
   try {
     const res = await followupApi.remove(id)
-    notify(res.message, id)
+    ElMessage.success(res.message || '已删除')
     await loadRecords()
   } catch (e: any) {
-    notify('删除失败: ' + (e?.message || ''), '')
+    ElMessage.error('删除失败: ' + (e?.message || ''))
   }
 }
 defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
@@ -145,9 +144,6 @@ defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
       @cancel="cancelForm"
     />
 
-    <div class="fr-toasts">
-      <div v-for="t in toasts" :key="t.id" class="fr-toast" :class="t.status">{{ t.text }}</div>
-    </div>
   </div>
 </template>
 
@@ -170,9 +166,4 @@ defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
 .fr-hist-label { font-size: 10px; color: var(--mut); }
 .fr-hist-btn { border: 1px solid var(--accent); color: var(--accent); background: var(--card); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
 .fr-hist-btn.active { background: var(--accent); color: var(--on-accent); }
-.fr-toasts { position: fixed; bottom: 24px; right: 24px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; }
-.fr-toast { padding: 10px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); font-size: 13px; }
-.fr-toast.success { color: var(--c-paid); }
-.fr-toast.failed { color: var(--danger); }
-.fr-toast.local { color: var(--c-pending); }
 </style>
