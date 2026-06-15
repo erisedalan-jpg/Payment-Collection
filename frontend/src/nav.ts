@@ -12,9 +12,8 @@ export const TIERS: TierOpt[] = [
 export const TIER_TABS: TierTab[] = [
   { label: '项目总览', tab: 'projects' },
   { label: '回款节点', tab: 'nodes' },
-  { label: '回款状态', tab: 'plan' },
+  { label: '回款进度', tab: 'plan' },
   { label: '风险项目', tab: 'risk' },
-  { label: '数据质检', tab: 'integrity' },
 ]
 
 // 项目主域（P2 起逐期补全：P3 项目动态 /activity、P4 项目总览 /、P5 项目分析 /insight）
