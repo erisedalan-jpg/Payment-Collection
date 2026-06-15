@@ -22,7 +22,6 @@ export interface FollowupFormData {
   跟进状态: string
   下次跟进计划日期?: string
   记录编号?: string
-  cloudUrl?: string
 }
 
 interface TypesResp {
@@ -44,11 +43,6 @@ interface DelResp {
   success: true
   message: string
 }
-interface SyncResp {
-  success: true
-  recordId: string
-  state: { status: string; message: string }
-}
 
 /** 跟进记录后端调用（忠实对接 server.py handle_followup_*）。 */
 export const followupApi = {
@@ -57,8 +51,5 @@ export const followupApi = {
     api.get<ListResp>(`/api/followup/list/${encodeURIComponent(projectId)}?limit=${limit}`),
   add: (data: FollowupFormData) => api.post<MutResp>('/api/followup/add', data),
   update: (data: FollowupFormData) => api.post<MutResp>('/api/followup/update', data),
-  remove: (recordId: string, cloudUrl?: string) =>
-    api.post<DelResp>('/api/followup/delete', cloudUrl ? { 记录编号: recordId, cloudUrl } : { 记录编号: recordId }),
-  syncStatus: (recordId: string) =>
-    api.get<SyncResp>(`/api/followup/sync-status?recordId=${encodeURIComponent(recordId)}`),
+  remove: (recordId: string) => api.post<DelResp>('/api/followup/delete', { 记录编号: recordId }),
 }
