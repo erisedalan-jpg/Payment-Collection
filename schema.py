@@ -163,6 +163,7 @@ class Project(_Base):
     relatedClosedId: str = ""
     payment: ProjectPayment = ProjectPayment()
     deliveryCosts: List[DeliveryCostItem] = []
+    overspendAmount: Optional[float] = None   # S2:整体超支金额(元,同源 profit.overspend_amount,可为负=未超支)
     health: ProjectHealth = ProjectHealth()
 
 

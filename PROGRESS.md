@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.0.1**
-- 最近更新：2026-06-12（S1 反馈修缮：动态事件规则/清单分页多选/科目树全量/回款完成率迁流水口径/分析配色）
+- 当前版本：**V1.0.2**
+- 最近更新：2026-06-14（S2 详情页修缮：右栏动态换行适配 + 头部三类超支风险徽章）
 - 维护语言：简体中文
 
 ---
@@ -36,7 +36,8 @@
 
 - [x] **Phase P 项目主域整体看板**：P1-P6、P8 已合并 master（V7.0.0-V7.6.0，P8 合并提交 59ad935），P7 暂停取消出排期（回款子域待全量重设计立项）。spec：2026-06-10-project-domain-dashboard-design.md + 2026-06-12-P8-governance-tools-design.md。
 - [x] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md）：R1-R4 四期全部合并（V7.7.0→V1.0.0；a11aceb / 1a0a39b / 997fe15 / 55a5aba），**Phase R 收官**。
-- [~] **S1 反馈修缮批次**（spec：2026-06-12-S1-feedback-fixes-design.md，V1.0.1）：动态事件规则与 tone 染色/清单分页多选/科目树全量/回款完成率迁流水口径/分析配色，已完成，分支 feat/phase-s1-feedback-fixes 待合并（见 Handoff）。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）。
+- [x] **S1 反馈修缮批次**（spec：2026-06-12-S1-feedback-fixes-design.md，V1.0.1）：动态事件规则与 tone 染色/清单分页多选/科目树全量/回款完成率迁流水口径/分析配色，已合并 master（eb810b2）。
+- [~] **S2 详情页修缮批次**（spec：2026-06-14-S2-detail-fixes-design.md，V1.0.2）：右栏动态长项目编号换行适配（EventTimeline overflow-wrap）；详情页头部三类超支风险徽章（总体预算超支 5000 元阈值分级红/黄；交付外包服务成本、交付部门人工成本超支即红）；总体超支金额经 9e 后端回填，同源 profit.overspend_amount。分支 s2-detail-fixes 待合并。后续候选：回款子域全量重设计（含 P7 移交项与 L-21 余量）、P-next 用户待办、打包专项（快捷方式/exe 更名随此期）。
 
 ---
 
