@@ -1246,6 +1246,27 @@ def main():
     for p in dept_projects:
         p["overspendAmount"] = profit_mod.overspend_amount(project_profit.get(p["projectId"]))
 
+    # === 9f. PMIS 核心回款模型(2A):节点级计划比例×合同 + 项目流水;售前回退原项目 ===
+    def _pmis_contract(_pid):
+        return ((project_pmis.get(_pid) or {}).get("customer") or {}).get("合同总额")
+    _today = datetime.now().strftime("%Y-%m-%d")
+    payment_nodes = {}
+    for p in dept_projects:
+        _pid = p["projectId"]
+        _rid = p.get("relatedClosedId") or ""
+        _eff, _from_origin = _pid, False
+        if not _pmis_contract(_pid) and _rid and _pmis_contract(_rid):
+            _eff, _from_origin = _rid, True
+        # 合同/里程碑取 eff(售前=原项目);流水本项目优先(售前自身有流水,原项目已结项无流水),缺再回退原项目
+        _rec = payment_records.get(_pid) or (payment_records.get(_rid) if _rid else None)
+        _summary, _nodes = projects_mod.build_payment_pmis(
+            _pmis_contract(_eff), project_milestones.get(_eff) or [], _rec, _today)
+        _summary["fromOrigin"] = _from_origin
+        p["paymentPmis"] = _summary
+        payment_nodes[_pid] = _nodes
+    print(f"  [OK] PMIS 回款模型已回填 {len(dept_projects)} 项目"
+          f"(售前取原项目 {sum(1 for p in dept_projects if p['paymentPmis']['fromOrigin'])})")
+
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {
@@ -1270,6 +1291,7 @@ def main():
         "projectsQuality": projects_quality,
         "projectMilestones": project_milestones,
         "paymentRecords": payment_records,
+        "paymentNodes": payment_nodes,
         "projectProfit": project_profit,
     }
 

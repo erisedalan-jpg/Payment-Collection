@@ -154,6 +154,29 @@ class ProjectHealth(_Base):
     overall: str = "健康"
 
 
+class PaymentNodePmis(_Base):
+    stage: str
+    planDate: str = ""
+    actualDate: str = ""
+    payRatio: Optional[float] = None
+    expectedPayment: float = 0
+    reached: bool = False
+    status: str = ""
+
+
+class ProjectPaymentPmis(_Base):
+    contract: Optional[float] = None
+    actualTotal: Optional[float] = None
+    paymentCount: int = 0
+    paymentRatio: Optional[float] = None
+    expectedTotal: float = 0
+    nodeCount: int = 0
+    reachedCount: int = 0
+    delayedCount: int = 0
+    lastPaymentDate: str = ""
+    fromOrigin: bool = False
+
+
 class Project(_Base):
     projectId: str
     projectName: str = ""
@@ -164,6 +187,7 @@ class Project(_Base):
     payment: ProjectPayment = ProjectPayment()
     deliveryCosts: List[DeliveryCostItem] = []
     overspendAmount: Optional[float] = None   # S2:整体超支金额(元,同源 profit.overspend_amount,可为负=未超支)
+    paymentPmis: Optional[ProjectPaymentPmis] = None   # 2A:PMIS 核心回款摘要(售前回退原项目)
     health: ProjectHealth = ProjectHealth()
 
 
@@ -291,6 +315,7 @@ class AnalysisData(_Base):
     projectsQuality: Optional[ProjectsQuality] = None
     projectMilestones: Dict[str, List[MilestoneItem]] = {}
     paymentRecords: Dict[str, PaymentRecordsEntry] = {}
+    paymentNodes: Dict[str, List[PaymentNodePmis]] = {}   # 2A:PMIS 核心回款逐节点
     projectProfit: Dict[str, ProjectProfit] = {}
     events: List[Event] = []
     periodCompare: Optional[PeriodCompare] = None

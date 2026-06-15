@@ -104,6 +104,16 @@ export type NoName30 = number | null;
 export type NoName31 = number | null;
 export type Deliverycosts = DeliveryCostItem[];
 export type Overspendamount = number | null;
+export type Contract = number | null;
+export type Actualtotal1 = number | null;
+export type Paymentcount = number;
+export type Paymentratio1 = number | null;
+export type Expectedtotal1 = number;
+export type Nodecount = number;
+export type Reachedcount = number;
+export type Delayedcount1 = number;
+export type Lastpaymentdate = string;
+export type Fromorigin = boolean;
 export type Progressabnormal = boolean;
 export type Riskabnormal = boolean;
 export type Costabnormal = boolean;
@@ -130,6 +140,7 @@ export type Name = string;
 export type Plandate1 = string;
 export type Actualdate = string;
 export type Paystage = string;
+export type Payratio = number | null;
 export type Pct = number | null;
 export type Priority = string;
 export type Total = number;
@@ -146,6 +157,13 @@ export type Currency = string;
 export type Rate = number | null;
 export type Note = string;
 export type Records = PaymentRecord[];
+export type Stage = string;
+export type Plandate2 = string;
+export type Actualdate1 = string;
+export type Payratio1 = number | null;
+export type Expectedpayment1 = number;
+export type Reached = boolean;
+export type Status = string;
 export type Code = string;
 export type Name1 = string;
 export type Level = number;
@@ -191,6 +209,7 @@ export interface AnalysisData {
   projectsQuality?: ProjectsQuality | null;
   projectMilestones?: Projectmilestones;
   paymentRecords?: Paymentrecords;
+  paymentNodes?: Paymentnodes;
   projectProfit?: Projectprofit;
   events?: Events;
   periodCompare?: PeriodCompare | null;
@@ -336,6 +355,7 @@ export interface Project {
   payment?: ProjectPayment;
   deliveryCosts?: Deliverycosts;
   overspendAmount?: Overspendamount;
+  paymentPmis?: ProjectPaymentPmis | null;
   health?: ProjectHealth;
   [k: string]: unknown;
 }
@@ -354,6 +374,19 @@ export interface DeliveryCostItem {
   实际发生?: NoName29;
   剩余预算?: NoName30;
   消耗率?: NoName31;
+  [k: string]: unknown;
+}
+export interface ProjectPaymentPmis {
+  contract?: Contract;
+  actualTotal?: Actualtotal1;
+  paymentCount?: Paymentcount;
+  paymentRatio?: Paymentratio1;
+  expectedTotal?: Expectedtotal1;
+  nodeCount?: Nodecount;
+  reachedCount?: Reachedcount;
+  delayedCount?: Delayedcount1;
+  lastPaymentDate?: Lastpaymentdate;
+  fromOrigin?: Fromorigin;
   [k: string]: unknown;
 }
 export interface ProjectHealth {
@@ -453,6 +486,7 @@ export interface MilestoneItem {
   planDate?: Plandate1;
   actualDate?: Actualdate;
   payStage?: Paystage;
+  payRatio?: Payratio;
   pct?: Pct;
   priority?: Priority;
   [k: string]: unknown;
@@ -478,6 +512,19 @@ export interface PaymentRecord {
   currency?: Currency;
   rate?: Rate;
   note?: Note;
+  [k: string]: unknown;
+}
+export interface Paymentnodes {
+  [k: string]: PaymentNodePmis[];
+}
+export interface PaymentNodePmis {
+  stage: Stage;
+  planDate?: Plandate2;
+  actualDate?: Actualdate1;
+  payRatio?: Payratio1;
+  expectedPayment?: Expectedpayment1;
+  reached?: Reached;
+  status?: Status;
   [k: string]: unknown;
 }
 export interface Projectprofit {
