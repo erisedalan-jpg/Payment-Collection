@@ -29,7 +29,6 @@ export const PAYMENT_LINKS: NavLink[] = [
   { label: '回款总览', to: '/payment' },
   { label: '回款分析', to: '/panalysis/board' },
   { label: '回款日历', to: '/calendar' },
-  { label: '临期跟进', to: '/followup' },
   { label: '回款台账', to: '/ledger' },
 ]
 
