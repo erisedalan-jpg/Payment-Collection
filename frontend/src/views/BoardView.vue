@@ -54,7 +54,7 @@ const boardRows = computed(() =>
   buildPayBoardRows(
     filterProjects(data.data?.projects ?? [], {
       viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
-      naguanOn: filter.naguanOn, naguanExclude: data.data?.naguanExclude ?? {},
+      excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
     }),
     data.data?.projectPmis ?? {},
   ),

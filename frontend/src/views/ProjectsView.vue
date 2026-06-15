@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, distinctOptions, type ProjectFilters } from '@/lib/projectList'
 import { fmtRatio } from '@/lib/format'
@@ -9,17 +10,22 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 
 const data = useDataStore()
+const projectTags = useProjectTagsStore()
 const route = useRoute()
 const router = useRouter()
-onMounted(() => { if (!data.data) data.load() })
+onMounted(() => {
+  if (!data.data) data.load()
+  if (!projectTags.loaded) projectTags.load()
+})
 
 const rows = computed(() =>
   buildProjectRows(
     (data.data?.projects ?? []) as Project[],
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
+    projectTags.assignments,
   ),
 )
-const filters = reactive<ProjectFilters>({ search: '', manager: [], orgL4: [], stage: [], projectStatus: [], riskLevel: [], projectLevel: [], paymentStatus: [], health: [], presale: '', paused: '', overspend: '' })
+const filters = reactive<ProjectFilters>({ search: '', manager: [], orgL4: [], stage: [], projectStatus: [], riskLevel: [], projectLevel: [], paymentStatus: [], health: [], presale: '', paused: '', overspend: '', tags: [] })
 
 // 路由 query → 初始筛选:多选键收单值为 [v]/数组(KPI 单值链接如 ?riskLevel=高 仍工作),单值键收 string
 const MULTI_KEYS = ['manager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'paymentStatus', 'health'] as const
@@ -66,6 +72,7 @@ const columns: DataColumn[] = [
   { key: 'costRatio', label: '预算消耗比', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'paymentRatio', label: '回款完成率', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'health', label: '健康度', width: 90 },
+  { key: 'tags', label: '标签', width: 160 },
 ]
 
 function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId}`) }
@@ -105,6 +112,9 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
         <el-option value="yes" label="售前整合" />
         <el-option value="no" label="非售前" />
       </el-select>
+      <el-select v-model="filters.tags" size="small" multiple collapse-tags clearable placeholder="标签" style="width: 140px">
+        <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
+      </el-select>
     </div>
 
     <div v-if="filters.paused === 'yes' || filters.overspend === 'yes'" class="pv-tags">
@@ -119,6 +129,9 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
       </template>
       <template #cell-health="{ row }">
         <HealthBadge :overall="row.health" />
+      </template>
+      <template #cell-tags="{ value }">
+        <span v-for="t in (value || [])" :key="t" class="lst-tag">{{ t }}</span>
       </template>
       <template #header-health>
         <span class="pv-health-head">健康度
@@ -154,4 +167,5 @@ function onRow(row: Record<string, any>) { router.push(`/project/${row.projectId
 .pv-total { font-size: var(--fs-1); color: var(--sub); }
 .pv-health-head { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .pv-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: var(--r-full); border: 1px solid var(--sub); color: var(--sub); font-size: 10px; font-style: italic; cursor: help; line-height: 1; }
+.lst-tag { display: inline-block; padding: 1px 6px; margin: 1px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
 </style>

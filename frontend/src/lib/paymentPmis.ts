@@ -58,12 +58,12 @@ export interface FilterOpts {
   viewMode: 'global' | 'l4' | 'pm'
   viewL4: string
   viewPM: string
-  naguanOn: boolean
-  naguanExclude: Record<string, boolean>
+  excludeActive: boolean
+  excludedIds: Record<string, boolean>
 }
 export function filterProjects(projects: Project[], opts: FilterOpts): Project[] {
   return projects.filter((p) => {
-    if (opts.naguanOn && opts.naguanExclude && opts.naguanExclude[p.projectId]) return false
+    if (opts.excludeActive && opts.excludedIds && opts.excludedIds[p.projectId]) return false
     if (opts.viewMode === 'l4' && opts.viewL4) return (p.orgL4 ?? '') === opts.viewL4
     if (opts.viewMode === 'pm' && opts.viewPM) return (p.projectManager ?? '') === opts.viewPM
     return true

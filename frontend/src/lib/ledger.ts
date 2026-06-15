@@ -1,14 +1,14 @@
 import type { RawNode } from '@/types/analysis'
 import type { ProjectAgg } from './dashboardStats'
 
-/** 仅纳管过滤（忠实移植 _filteredRawNodes：台账数据源不含年份/视角过滤）。 */
-export function naguanFilter(
+/** 仅排除过滤（忠实移植 _filteredRawNodes：台账数据源不含年份/视角过滤）。 */
+export function excludeFilter(
   rawNodes: RawNode[],
-  naguanOn: boolean,
-  naguanExclude: Record<string, boolean>,
+  excludeActive: boolean,
+  excludedIds: Record<string, boolean>,
 ): RawNode[] {
-  if (!naguanOn || !naguanExclude) return rawNodes
-  return rawNodes.filter((n) => !naguanExclude[(n as Record<string, any>).projectId])
+  if (!excludeActive || !excludedIds) return rawNodes
+  return rawNodes.filter((n) => !excludedIds[(n as Record<string, any>).projectId])
 }
 
 export interface LedgerFilterOpts {

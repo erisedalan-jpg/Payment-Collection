@@ -319,6 +319,7 @@ class AnalysisData(_Base):
     projectProfit: Dict[str, ProjectProfit] = {}
     events: List[Event] = []
     periodCompare: Optional[PeriodCompare] = None
+    tagSeed: Dict[str, List[str]] = {}
 
 
 def validate_and_write_json(final_data: dict, output_dir: str) -> str:

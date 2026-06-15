@@ -29,6 +29,8 @@ data/events.json
 data/history/
 # 本地跟进记录（运行时用户数据）
 data/followup_records.json
+# 项目标签库（运行时用户数据，2C）
+data/project_tags.json
 # 回款比对报告（含真实业务数据，一次性诊断产物，不入库）
 report/
 

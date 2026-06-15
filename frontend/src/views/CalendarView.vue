@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { naguanFilter } from '@/lib/ledger'
+import { excludeFilter } from '@/lib/ledger'
 import {
   calFilterOptions,
   calDashboardStats,
@@ -46,34 +46,34 @@ const calFilters = computed<CalFilters>(() => ({
 }))
 
 const rawNodes = computed(() => (data.data?.rawNodes ?? []) as Record<string, any>[])
-const naguanNodes = computed(
+const excludedNodes = computed(
   () =>
-    naguanFilter(
+    excludeFilter(
       rawNodes.value as any,
-      filter.naguanOn,
-      (data.data?.naguanExclude ?? {}) as Record<string, boolean>,
+      filter.excludeOn,
+      filter.excludedIds,
     ) as Record<string, any>[],
 )
 
-const options = computed(() => calFilterOptions(naguanNodes.value as any))
+const options = computed(() => calFilterOptions(excludedNodes.value as any))
 const dashboard = computed(() => calDashboardStats(filter.filteredNodes as any, calFilters.value, new Date()))
 const gridNodes = computed(() =>
   applyCalFilters(
-    calExcludePaid(naguanNodes.value.filter((n) => n.isPaymentRelated && n.planDate) as any),
+    calExcludePaid(excludedNodes.value.filter((n) => n.isPaymentRelated && n.planDate) as any),
     calFilters.value,
   ),
 )
 const gridDateData = computed(() => calDateData(gridNodes.value))
 const yearHeat = computed(() => calYearHeat(gridNodes.value as any, state.year))
 const listNodes = computed(() =>
-  calListNodes(naguanNodes.value as any, calFilters.value, {
+  calListNodes(excludedNodes.value as any, calFilters.value, {
     year: state.year,
     month: state.month,
     selectedDate: state.selectedDate,
   }),
 )
 const listGroups = computed(() => calListGroups(listNodes.value))
-const upcoming = computed(() => calUpcoming(naguanNodes.value as any, calFilters.value, new Date()))
+const upcoming = computed(() => calUpcoming(excludedNodes.value as any, calFilters.value, new Date()))
 
 const listTitle = computed(() => (state.selectedDate ? `${state.selectedDate} 回款节点` : '当月/次月回款节点'))
 
@@ -83,7 +83,7 @@ const VIEW_OPTS = [
   { value: 'agenda', label: '议程列表' },
 ]
 const agendaNodes = computed(() =>
-  calListNodes(naguanNodes.value as any, calFilters.value, {
+  calListNodes(excludedNodes.value as any, calFilters.value, {
     year: state.year,
     month: state.month,
     selectedDate: '',

@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import DataView from './DataView.vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
 
 const DEFAULTS = {
   回款数据: 'https://yundocs.qianxin-inc.cn/weboffice/l/sRs8GgCmE2ygb',
@@ -91,5 +92,18 @@ describe('DataView(R3 重排)', () => {
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
     expect(calls.some((u: string) => u.includes('/api/pmis/links'))).toBe(true)
     expect(calls.some((u: string) => u.includes('/api/files/status'))).toBe(true)
+  })
+
+  it('渲染标签库管理 + 按标签排除配置', async () => {
+    const tags = useProjectTagsStore()
+    tags.load = vi.fn(async () => {
+      tags.$patch({ tags: [{ name: 'BH项目' }, { name: '框架合同' }], loaded: true })
+    })
+    const w = mount(DataView, { global: { plugins: [ElementPlus], stubs: { 'el-switch': true } } })
+    await flushPromises()
+    expect(w.text()).toContain('项目标签')
+    expect(w.text()).toContain('按标签排除')
+    // tag 名称渲染在 input[value] 属性上，用 html() 检查
+    expect(w.html()).toContain('BH项目')
   })
 })
