@@ -5,7 +5,11 @@ import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useSettingsStore } from '@/stores/settings'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
-import { DIMENSIONS, groupByDims, crossMatrix, pivotTable, METRICS, METRIC_BY_KEY, type PivotGroup } from '@/lib/pivot'
+import {
+  PAY_BOARD_DIMENSIONS as DIMENSIONS, PAY_BOARD_METRICS as METRICS, PAY_BOARD_METRIC_BY_KEY as METRIC_BY_KEY,
+  buildPayBoardRows, groupPayBoard, payBoardCross, payBoardPivot, type PayBoardGroup,
+} from '@/lib/paymentBoard'
+import { filterProjects } from '@/lib/paymentPmis'
 import { fmtWan, pct } from '@/lib/format'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
@@ -27,24 +31,34 @@ const MODE_OPTS = [
   { value: 'pivot', label: '透视' },
 ]
 const SORT_OPTS = [
-  { value: 'actualAmount', label: '已回款' },
-  { value: 'completionRate', label: '完成率' },
+  { value: 'actualSum', label: '已回款' },
+  { value: 'rate', label: '完成率' },
   { value: 'projectCount', label: '项目数' },
-  { value: 'delayedCount', label: '延期数' },
+  { value: 'delayedNodeSum', label: '延期数' },
 ]
 
 const initDim =
   typeof route.query.dim === 'string' && DIMENSIONS.some((d) => d.key === route.query.dim)
     ? (route.query.dim as string)
-    : 'orgL4'
+    : 'dept'
 
 const mode = ref('single')
 const dimKey = ref(initDim)
-const sortKey = ref('actualAmount')
+const sortKey = ref('actualSum')
 const secondDim = ref('')
-const metricKey = ref<(typeof METRICS)[number]['key']>('actualAmount')
+const metricKey = ref<(typeof METRICS)[number]['key']>('contractSum')
 const rowDims = ref<string[]>([initDim])
 const colDims = ref<string[]>([])
+
+const boardRows = computed(() =>
+  buildPayBoardRows(
+    filterProjects(data.data?.projects ?? [], {
+      viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
+      naguanOn: filter.naguanOn, naguanExclude: data.data?.naguanExclude ?? {},
+    }),
+    data.data?.projectPmis ?? {},
+  ),
+)
 
 const SECOND_OPTS = computed(() => [
   { value: '', label: '无' },
@@ -56,10 +70,10 @@ watch(dimKey, () => {
 })
 
 // ---- 单维 ----
-const groups = computed<PivotGroup[]>(() => {
-  const gs = groupByDims(filter.filteredNodes, [dimKey.value])
-  const k = sortKey.value as keyof PivotGroup
-  return [...gs].sort((a, b) => (b[k] as number) - (a[k] as number))
+const groups = computed<PayBoardGroup[]>(() => {
+  const gs = groupPayBoard(boardRows.value, [dimKey.value])
+  const k = sortKey.value as keyof PayBoardGroup
+  return [...gs].sort((a, b) => ((b[k] as number) ?? 0) - ((a[k] as number) ?? 0))
 })
 const top = computed(() => groups.value.slice(0, 15))
 const chartOption = computed(() => {
@@ -71,8 +85,8 @@ const chartOption = computed(() => {
     xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
     yAxis: { type: 'value', name: '金额(万)' },
     series: [
-      { name: '已回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.actualAmount / 10000).toFixed(2)), itemStyle: { color: sc.ok } },
-      { name: '待回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.remainingAmount / 10000).toFixed(2)), itemStyle: { color: sc.warn } },
+      { name: '已回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.actualSum / 10000).toFixed(2)), itemStyle: { color: sc.ok } },
+      { name: '待回款', type: 'bar', stack: 'a', data: top.value.map((g) => +(g.pendingSum / 10000).toFixed(2)), itemStyle: { color: sc.warn } },
     ],
   }
 })
@@ -87,7 +101,7 @@ const metricFormat = computed(() => {
 // ---- 交叉 ----
 const matrix = computed(() =>
   mode.value === 'cross' && secondDim.value
-    ? crossMatrix(filter.filteredNodes, dimKey.value, secondDim.value, metricKey.value)
+    ? payBoardCross(boardRows.value, dimKey.value, secondDim.value, metricKey.value)
     : null,
 )
 const crossChartOption = computed(() => {
@@ -116,14 +130,14 @@ const crossChartOption = computed(() => {
 // ---- 透视 ----
 const pivot = computed(() =>
   mode.value === 'pivot' && rowDims.value.length
-    ? pivotTable(filter.filteredNodes, rowDims.value, colDims.value, metricKey.value)
+    ? payBoardPivot(boardRows.value, rowDims.value, colDims.value, metricKey.value)
     : null,
 )
 
 // ---- 下钻（共用） ----
 const drillOpen = ref(false)
-const drillGroup = ref<PivotGroup | null>(null)
-function openDrill(g: PivotGroup) {
+const drillGroup = ref<PayBoardGroup | null>(null)
+function openDrill(g: PayBoardGroup) {
   drillGroup.value = g
   drillOpen.value = true
 }
@@ -201,18 +215,18 @@ defineExpose({ drillOpen })
           <div class="bv-table">
             <div class="bv-row bv-head">
               <span class="bv-c-name">{{ DIM_OPTS.find((d) => d.value === dimKey)?.label }}</span>
-              <span>项目数</span><span>计划回款(万)</span><span>已回款(万)</span><span>待回款(万)</span>
-              <span>完成率</span><span>延期</span><span>延期率</span>
+              <span>项目数</span><span>合同总额(万)</span><span>计划回款(万)</span><span>已回款(万)</span>
+              <span>待回款(万)</span><span>完成率</span><span>延期节点</span>
             </div>
             <div v-for="g in groups" :key="g.key" v-activate class="bv-row bv-body" @click="openDrill(g)">
               <span class="bv-c-name" :title="g.key">{{ g.key }}</span>
               <span>{{ g.projectCount }}</span>
-              <span>{{ fmtWan(g.expectedAmount) }}</span>
-              <span class="bv-paid">{{ fmtWan(g.actualAmount) }}</span>
-              <span class="bv-remain">{{ fmtWan(g.remainingAmount) }}</span>
-              <span>{{ pct(g.completionRate) }}</span>
-              <span :class="{ 'bv-danger': g.delayedCount > 0 }">{{ g.delayedCount }}</span>
-              <span>{{ pct(g.delayRate) }}</span>
+              <span>{{ fmtWan(g.contractSum) }}</span>
+              <span>{{ fmtWan(g.expectedSum) }}</span>
+              <span class="bv-paid">{{ fmtWan(g.actualSum) }}</span>
+              <span class="bv-remain">{{ fmtWan(g.pendingSum) }}</span>
+              <span>{{ pct(g.rate) }}</span>
+              <span :class="{ 'bv-danger': g.delayedNodeSum > 0 }">{{ g.delayedNodeSum }}</span>
             </div>
             <div v-if="!groups.length" class="bv-empty">暂无数据</div>
           </div>
@@ -251,7 +265,7 @@ defineExpose({ drillOpen })
       <BoardDrilldownModal
         v-model="drillOpen"
         :title="drillGroup?.key || ''"
-        :projects="drillGroup?.projects || []"
+        :projects="drillGroup?.rows || []"
       />
     </template>
   </div>
