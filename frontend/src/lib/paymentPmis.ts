@@ -1,4 +1,4 @@
-import type { Project, ProjectPaymentPmis, ProjectPmis } from '@/types/analysis'
+import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis } from '@/types/analysis'
 
 // ── 阈值常量（集中定义，spec §2）──
 export const TIER_HIGH = 1_000_000
@@ -158,4 +158,117 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
       }
     })
     .sort((a, b) => b.contractSum - a.contractSum)
+}
+
+// ── 节点级回款行（扁平化 + 维度 join）──
+export interface PayNodeRow {
+  projectId: string
+  projectName: string
+  stage: string
+  planDate: string
+  actualDate: string
+  payRatio: number | null
+  expectedPayment: number
+  status: string
+  dept: string
+  projStage: string
+  tier: string
+  progress: string
+}
+
+export function paymentNodeRows(
+  paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
+  projects: Project[],
+  pmisMap?: Record<string, ProjectPmis>,
+): PayNodeRow[] {
+  if (!paymentNodes) return []
+  const byId = new Map(projects.map((p) => [p.projectId, p]))
+  const rows: PayNodeRow[] = []
+  for (const [pid, nodes] of Object.entries(paymentNodes)) {
+    const p = byId.get(pid)
+    if (!p) continue
+    const dept = deriveDept(p)
+    const tier = deriveTier(p.paymentPmis?.contract)
+    const progress = deriveProgress(p.paymentPmis ?? null)
+    const projStage = deriveStage(pid, pmisMap)
+    for (const n of nodes) {
+      rows.push({
+        projectId: pid,
+        projectName: p.projectName || pid,
+        stage: n.stage,
+        planDate: n.planDate || '',
+        actualDate: n.actualDate || '',
+        payRatio: n.payRatio ?? null,
+        expectedPayment: n.expectedPayment ?? 0,
+        status: n.status || '',
+        dept,
+        projStage,
+        tier,
+        progress,
+      })
+    }
+  }
+  return rows
+}
+
+export interface NodeSummary {
+  total: number
+  reached: number
+  delayed: number
+  pending: number
+  expectedTotal: number
+}
+export function nodeSummary(rows: PayNodeRow[]): NodeSummary {
+  return {
+    total: rows.length,
+    reached: rows.filter((r) => r.status === '已达成').length,
+    delayed: rows.filter((r) => r.status === '延期').length,
+    pending: rows.filter((r) => r.status === '待达成').length,
+    expectedTotal: rows.reduce((s, r) => s + r.expectedPayment, 0),
+  }
+}
+
+// ── 进度桶（项目级 3 互斥桶）──
+const PROGRESS_ORDER = ['已全额回款', '部分回款', '未回款'] as const
+export interface ProgressBucket {
+  key: string
+  projectCount: number
+  contractSum: number
+  actualSum: number
+  rate: number | null
+}
+export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucket[]; unknown: number } {
+  let unknown = 0
+  const map: Record<string, PayProjectRow[]> = {}
+  for (const r of rows) {
+    if (r.progress === '未知') { unknown++; continue }
+    ;(map[r.progress] ||= []).push(r)
+  }
+  const buckets = PROGRESS_ORDER.map((key) => {
+    const grp = map[key] || []
+    const contractSum = grp.reduce((s, r) => s + r.contract, 0)
+    const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
+    return { key, projectCount: grp.length, contractSum, actualSum, rate: contractSum > 0 ? actualSum / contractSum : null }
+  })
+  return { buckets, unknown }
+}
+
+// ── 风险三类 ──
+export interface PmisRiskGroups {
+  delayedNodes: PayNodeRow[]
+  lowPayment: PayProjectRow[]
+  overspend: PayProjectRow[]
+}
+export function pmisRiskGroups(rows: PayProjectRow[], nodeRows: PayNodeRow[]): PmisRiskGroups {
+  const delayedNodes = nodeRows
+    .filter((n) => n.status === '延期')
+    .sort((a, b) => (a.planDate || '').localeCompare(b.planDate || ''))
+  const lowPayment = rows
+    .filter((r) => r.contract > 0 && (r.paymentRatio ?? 0) < 0.3)
+    .sort((a, b) => b.contract - a.contract)
+    .slice(0, 10)
+  const overspend = rows
+    .filter((r) => r.overspendAmount > 0)
+    .sort((a, b) => b.overspendAmount - a.overspendAmount)
+  return { delayedNodes, lowPayment, overspend }
 }
