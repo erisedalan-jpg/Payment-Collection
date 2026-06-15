@@ -5,6 +5,7 @@
 优先级(母 spec §2/R 批次决策):高=终验、服务完成、关联回款阶段非空;中=项目关闭;低=其他。
 """
 import os
+import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pmis import read_pmis_sheet
@@ -77,6 +78,16 @@ def _norm_pct(v: Any) -> Optional[float]:
         return None
 
 
+def parse_pay_stage_ratio(pay_stage):
+    """'到货款1，70.00%' / 多期 '到货款1，70%；到货款2，30%' → 计划回款比例(累加所有期 %/100);无 % → None。"""
+    if not pay_stage:
+        return None
+    pcts = re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*%", str(pay_stage))
+    if not pcts:
+        return None
+    return round(sum(float(p) for p in pcts) / 100, 4)
+
+
 def row_to_milestones(row: Dict[str, Any]) -> List[Dict[str, Any]]:
     """一行宽表 → 非全空类目的里程碑列表(按 MILESTONE_DEFS 顺序)。"""
     out = []
@@ -88,7 +99,7 @@ def row_to_milestones(row: Dict[str, Any]) -> List[Dict[str, Any]]:
         if not (plan or actual or pay or pct is not None):
             continue
         out.append({"name": name, "planDate": plan, "actualDate": actual,
-                    "payStage": pay, "pct": pct,
+                    "payStage": pay, "pct": pct, "payRatio": parse_pay_stage_ratio(pay),
                     "priority": milestone_priority(name, pay)})
     return out
 

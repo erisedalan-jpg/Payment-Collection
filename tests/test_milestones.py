@@ -45,7 +45,7 @@ class TestRowToMilestones:
         assert [i["name"] for i in items] == ["项目启动", "终验"]
         assert items[0] == {"name": "项目启动", "planDate": "2026-01-01",
                             "actualDate": "2026-01-02", "payStage": "", "pct": None,
-                            "priority": "low"}
+                            "payRatio": None, "priority": "low"}
         assert items[1]["priority"] == "high"
 
     def test_paystage_newline_normalized_and_pct(self):
@@ -89,3 +89,20 @@ class TestLoadMilestones:
         ms, sa, sc = M.load_milestones(str(tmp_path), {"SS-1"})
         assert ms == {}
         assert sa["provided"] is False and sc["provided"] is False
+
+
+def test_parse_pay_stage_ratio():
+    import milestones as M
+    assert M.parse_pay_stage_ratio("到货款1，70.00%") == 0.70
+    assert M.parse_pay_stage_ratio("到货款1，70%；到货款2，30%") == 1.0   # 多期累加
+    assert M.parse_pay_stage_ratio("终验款，100.00%") == 1.0
+    assert M.parse_pay_stage_ratio("") is None
+    assert M.parse_pay_stage_ratio("无比例") is None
+
+
+def test_row_to_milestones_has_payratio():
+    import milestones as M
+    rows = M.row_to_milestones({"项目编号": "P1", "计划到货时间": "2026-06-01",
+                                "到货关联回款阶段": "到货款1，70.00%"})
+    arrival = next(x for x in rows if x["name"] == "到货")
+    assert arrival["payRatio"] == 0.70
