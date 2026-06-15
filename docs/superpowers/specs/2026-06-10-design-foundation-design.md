@@ -110,7 +110,7 @@ ECharts 画在 canvas 里,读不到 CSS 变量,因此 `frontend/src/charts/echar
 
 ### 2.1 六级层级（每级一个职责,字号·字重·色锁定）
 
-| 令牌 | rem | px @中(16) | 字重 | 文字色 | 职责 |
+| 令牌 | rem | px @16基准 | 字重 | 文字色 | 职责 |
 |---|---|---|---|---|---|
 | `--fs-6` | 2.15rem | ~34px | 700 | `--txt` | 大数字 / KPI 主值(card 主信息) |
 | `--fs-5` | 1.55rem | ~25px | 700 | `--txt` | 页面 / 区块标题 |
@@ -127,9 +127,9 @@ ECharts 画在 canvas 里,读不到 CSS 变量,因此 `frontend/src/charts/echar
 
 | 档位 | `--fs-base` |
 |---|---|
-| 小 | `14px` |
-| 中(默认) | `16px` |
-| 大 | `18px` |
+| 小 | `16px` |
+| 中(默认) | `18px` |
+| 大 | `20px` |
 
 ### 2.3 card「1 主 2 辅」映射
 
@@ -279,7 +279,7 @@ CSS 的 `@media` 不能引用自定义属性,断点作为**文档常量**(与 th
 2. **命名兼容:** 沿用现有 `--bg/--card/--card2/--line/--line2/--txt/--sub/--mut/--accent/--on-accent/--fs-base/--fs-1..5/--c-*` 名称,只改取值并**新增** `--accent2/--highlight/--fs-6/--sp-*/--card-pad/--gap-*/--r-*/--shadow-*/--dur-*/--ease/--chart-*`。最大限度不动现有 567 处 `var(--…)` 引用。
    V2 再新增:`--c-advance`、`--ok-bg/--warn-bg/--danger-bg/--urgent-bg/--advance-bg`、`--ok-text/--warn-text/--danger-text/--urgent-text/--advance-text`、`--font-sans`、`--lh-tight/--lh-dense/--lh-base`、`--ls-wide`、`--hover-tint/--selected-tint/--disabled-opacity`、`--z-sticky/--z-panel/--z-toast`,工具类 `.u-num`;修改取值:浅色 `--mut`。仍零改名。
 3. **现有页面不迁移:** 本轮只换令牌底座;页面逐个换用新卡片/间距/层级,放到后续"内容层"重构。
-4. **三档字号机制:** 复用 settings store 写 `--fs-base` 的现有机制,把可选值定为 14 / 16 / 18,默认 16。
+4. **三档字号机制:** 复用 settings store 写 `--fs-base` 的现有机制,把可选值定为 16 / 18 / 20,默认 18(2026-06-15 三档统一+2;六级 rem 比率恒定)。
 5. **验证:** 改动后跑 `bash verify.sh`(前端 typecheck/vitest/build 须绿)。契约测试覆盖:V1 全部令牌 + V2 新令牌存在性与取值、`.u-num`、ECharts 双源一致性(浅/暗调色板、结构映射、字体栈)。手动启动确认 light/dark 切换、三档字号切换、图表配色已换为 `--chart-1..8` 无异常。
 
 ---
