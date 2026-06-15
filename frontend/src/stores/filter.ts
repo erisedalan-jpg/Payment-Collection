@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDataStore } from './data'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { filterNodes, type ViewMode } from '@/lib/filterNodes'
 
 const NAGUAN_KEY = 'naguan_on'
+const EXCLUDE_ON_KEY = 'pa_exclude_on'
+const EXCLUDE_TAGS_KEY = 'pa_exclude_tags'
 
 export interface YearOption { key: string; label: string }
 
@@ -89,9 +92,31 @@ export const useFilterStore = defineStore('filter', () => {
     localStorage.setItem(NAGUAN_KEY, on ? 'true' : 'false')
   }
 
+  const projectTags = useProjectTagsStore()
+  const excludeOn = ref(localStorage.getItem(EXCLUDE_ON_KEY) === 'true')
+  const excludeTags = ref<string[]>(JSON.parse(localStorage.getItem(EXCLUDE_TAGS_KEY) || '[]'))
+
+  const excludedIds = computed<Record<string, boolean>>(() => {
+    if (!excludeOn.value || excludeTags.value.length === 0) return {}
+    const sel = new Set(excludeTags.value)
+    const out: Record<string, boolean> = {}
+    for (const [pid, names] of Object.entries(projectTags.assignments)) {
+      if (names.some((n) => sel.has(n))) out[pid] = true
+    }
+    return out
+  })
+
+  function setExclude(on: boolean, tags: string[]) {
+    excludeOn.value = on
+    excludeTags.value = [...tags]
+    localStorage.setItem(EXCLUDE_ON_KEY, on ? 'true' : 'false')
+    localStorage.setItem(EXCLUDE_TAGS_KEY, JSON.stringify(tags))
+  }
+
   return {
     filterYear, viewMode, viewL4, viewPM, naguanOn,
     yearOptions, l4Options, pmOptions, filteredNodes,
     setYear, setViewGlobal, setViewL4, setViewPM, toggleNaguan,
+    excludeOn, excludeTags, excludedIds, setExclude,
   }
 })
