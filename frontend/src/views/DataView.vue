@@ -9,6 +9,7 @@ import { usePmisSync } from '@/composables/usePmisSync'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
 import { useReprocess } from '@/composables/useReprocess'
+import { useDataHistory } from '@/composables/useDataHistory'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -71,6 +72,19 @@ async function onUploadInputs() {
 // —— 更新数据 / 设置 ——
 const { progress: repProgress, message: repMessage, running: repRunning, start: startReprocess } =
   useReprocess({ onDone: () => { data.reload(); loadFileStatus() } })
+const { versions: historyVersions, preRollback: historyPre, busy: historyBusy,
+        message: historyMsg, load: loadHistory, rollback: doRollback, undo: doUndo } =
+  useDataHistory({ onChange: () => { data.reload(); loadFileStatus() } })
+function fmtMB(bytes?: number) { return bytes ? (bytes / 1048576).toFixed(1) + ' MB' : '-' }
+async function onRollback(id: string) {
+  if (!window.confirm(`确定回滚到 ${id}？将用该版本覆盖当前数据与源数据，当前状态会先备份可撤销。`)) return
+  await doRollback(id)
+}
+async function onUndoRollback() {
+  if (!window.confirm('确定撤销上次回滚，恢复回滚前的状态？')) return
+  await doUndo()
+}
+
 const naguanOn = computed({ get: () => filter.naguanOn, set: (v: boolean) => filter.toggleNaguan(v) })
 const clearState = ref('')
 const clearing = ref(false)
@@ -85,7 +99,7 @@ async function onClear() {
   setTimeout(() => { clearState.value = '' }, 2000)
 }
 
-onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus() })
+onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus(); loadHistory() })
 </script>
 
 <template>
@@ -162,6 +176,22 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
         <div class="dv-row"><span class="dv-label">纳管开关</span><el-switch v-model="naguanOn" /><span class="dv-hint">关闭后不再排除纳管项目(全站联动)</span></div>
         <div class="dv-row"><span class="dv-label">清空数据</span><button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button><span v-if="clearState" class="dv-hint ok">{{ clearState }}</span></div>
       </div>
+    </div>
+
+    <div class="dv-card">
+      <div class="dv-card-head">数据历史 / 回滚</div>
+      <div v-if="historyPre" class="dv-row">
+        <span class="dv-label">撤销</span>
+        <button class="dv-btn ghost" :disabled="historyBusy" @click="onUndoRollback">撤销上次回滚</button>
+        <span class="dv-hint">恢复到最近一次回滚前的状态</span>
+      </div>
+      <div v-if="!historyVersions.length" class="dv-hint">暂无历史版本，"更新数据"成功后会自动保存（保留最近 3 份）。</div>
+      <div v-for="v in historyVersions" :key="v.id" class="dv-row" data-test="history-row">
+        <span class="dv-label u-num">{{ v.createdAt || v.id }}</span>
+        <span class="dv-hint u-num">项目 {{ v.projectCount ?? '-' }} · 节点 {{ v.paymentNodeCount ?? '-' }} · {{ fmtMB(v.sizeBytes) }}</span>
+        <button class="dv-btn" :disabled="historyBusy" data-test="history-rollback" @click="onRollback(v.id)">回滚到此</button>
+      </div>
+      <div v-if="historyMsg" class="dv-hint ok">{{ historyMsg }}</div>
     </div>
   </div>
 </template>
