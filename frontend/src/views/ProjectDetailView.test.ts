@@ -236,4 +236,56 @@ describe('ProjectDetailView', () => {
     const w = await mountAt('/project/P-2')
     expect(w.find('.pd-aside').text()).toContain('暂无该项目动态')
   })
+
+  it('头部超支徽章:总体超支>5000 红', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].overspendAmount = 60000
+    const w = await mountAt('/project/P-1')
+    const badge = w.find('.pd-badge.over-danger')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('总体预算超支')
+    expect(badge.text()).toContain('6万')
+  })
+
+  it('头部超支徽章:总体超支≤5000 黄', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].overspendAmount = 3000
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-badge.over-warn').exists()).toBe(true)
+    expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
+    expect(w.text()).toContain('总体预算超支')
+  })
+
+  it('头部超支徽章:未超支(负/缺)不显示总体徽章', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].overspendAmount = -500
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
+    expect(w.find('.pd-badge.over-warn').exists()).toBe(false)
+    expect(w.text()).not.toContain('总体预算超支')
+  })
+
+  it('头部超支徽章:两类交付超支按白名单出标签,非白名单不出', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].deliveryCosts = [
+      { 类别: '交付外包服务成本', 预算金额: 100, 实际发生: 200, 剩余预算: -100, 消耗率: 2 },
+      { 类别: '交付部门人工成本', 预算金额: 100, 实际发生: 150, 剩余预算: -50, 消耗率: 1.5 },
+      { 类别: '差旅费', 预算金额: 100, 实际发生: 300, 剩余预算: -200, 消耗率: 3 },
+    ]
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('交付外包服务成本超支')
+    expect(w.text()).toContain('交付部门人工成本超支')
+    expect(w.text()).not.toContain('差旅费超支')
+  })
+
+  it('头部超支徽章:基线项目(无超支金额+无交付超支)不渲染任何超支徽章', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
+    expect(w.find('.pd-badge.over-warn').exists()).toBe(false)
+  })
 })

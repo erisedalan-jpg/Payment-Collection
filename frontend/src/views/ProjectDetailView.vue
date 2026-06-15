@@ -33,6 +33,19 @@ const stage = computed(() => m.value.progress?.项目阶段 || '')
 const paused = computed(() => m.value.status?.是否暂停 === true)
 const rating = computed(() => m.value.status?.评级 || '')
 
+// —— S2:三类超支风险标记 ——
+const overBudget = computed(() => {
+  const amt = p.value?.overspendAmount
+  if (amt == null || amt <= 0) return null
+  return { amount: amt, level: amt > 5000 ? 'danger' : 'warn' }
+})
+const DELIVERY_OVER_CATS = ['交付外包服务成本', '交付部门人工成本']
+const deliveryOverBadges = computed(() =>
+  (p.value?.deliveryCosts ?? [])
+    .filter((c) => DELIVERY_OVER_CATS.includes(c.类别) && c.预算金额 != null && c.实际发生 != null && c.实际发生 > c.预算金额)
+    .map((c) => c.类别),
+)
+
 const metrics = computed(() => [
   { k: '完工进展', v: fmtRatio(m.value.progress?.完工进展) },
   { k: '里程碑状态', v: m.value.progress?.里程碑进度状态 || '-' },
@@ -208,6 +221,8 @@ const originInfo = computed(() => [
             <span v-if="rating" class="pd-badge rating">评级 {{ rating }}</span>
             <span v-if="p.isPresale" class="pd-badge origin" title="含已关闭原项目信息">原项目</span>
             <HealthBadge :overall="p.health?.overall || '无数据'" />
+            <span v-if="overBudget" class="pd-badge" :class="`over-${overBudget.level}`">总体预算超支 {{ fmtWan(overBudget.amount) }}万</span>
+            <span v-for="cat in deliveryOverBadges" :key="cat" class="pd-badge over-danger">{{ cat }}超支</span>
           </div>
           <div class="pd-meta">
             <span>编号 <b>{{ p.projectId }}</b></span>
@@ -336,6 +351,8 @@ const originInfo = computed(() => [
 .pd-badge.paused { background: var(--warn-bg); color: var(--warn-text); }
 .pd-badge.rating { background: var(--card2); color: var(--sub); }
 .pd-badge.origin { background: var(--selected-tint); color: var(--accent); }
+.pd-badge.over-danger { background: var(--danger-bg); color: var(--danger-text); }
+.pd-badge.over-warn { background: var(--warn-bg); color: var(--warn-text); }
 .pd-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4); font-size: var(--fs-2); color: var(--sub); margin-bottom: var(--sp-3); }
 .pd-meta b { color: var(--txt); }
 .pd-metrics { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
