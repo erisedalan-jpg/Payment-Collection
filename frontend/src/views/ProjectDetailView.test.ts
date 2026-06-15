@@ -288,4 +288,25 @@ describe('ProjectDetailView', () => {
     expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
     expect(w.find('.pd-badge.over-warn').exists()).toBe(false)
   })
+
+  it('回款 tab:PMIS 回款摘要与节点表(2A)', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].paymentPmis = {
+      contract: 1000000, actualTotal: 700000, paymentCount: 2, paymentRatio: 0.7,
+      expectedTotal: 1000000, nodeCount: 2, reachedCount: 1, delayedCount: 1,
+      lastPaymentDate: '2026-06-04', fromOrigin: false,
+    }
+    ;(ds.data as any).paymentNodes = { 'P-1': [
+      { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-02', payRatio: 0.7,
+        expectedPayment: 700000, reached: true, status: '已达成' },
+      { stage: '终验', planDate: '2020-01-01', actualDate: '', payRatio: 0.3,
+        expectedPayment: 300000, reached: false, status: '延期' },
+    ] }
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('PMIS 回款')
+    expect(w.text()).toContain('到货')
+    expect(w.text()).toContain('已达成')
+    expect(w.text()).toContain('延期')
+  })
 })

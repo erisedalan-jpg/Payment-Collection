@@ -68,7 +68,32 @@ const showOrigin = computed(() => !!p.value?.isPresale)
 // 同组件复用(/project/A → /project/B)时回到默认回款 Tab——否则售前→非售前会留下无高亮的孤立 origin 内容
 watch(() => route.params.id, () => { tab.value = 'payment' })
 
-// —— 回款 ——
+// —— 回款（PMIS 口径）——
+const pmisPay = computed(() => p.value?.paymentPmis ?? null)
+const pmisNodes = computed(() =>
+  ((data.data?.paymentNodes ?? {}) as Record<string, any[]>)[p.value?.projectId || ''] ?? [])
+const pmisPaySummary = computed(() => {
+  const s = pmisPay.value
+  if (!s) return []
+  return [
+    { k: '合同总额(万)', v: fmtWan(s.contract) },
+    { k: '流水累计(万)', v: fmtWan(s.actualTotal) },
+    { k: '回款笔数', v: String(s.paymentCount ?? 0) },
+    { k: '完成率', v: fmtRatio(s.paymentRatio) },
+    { k: '计划回款(万)', v: fmtWan(s.expectedTotal) },
+    { k: '达成/节点', v: `${s.reachedCount ?? 0}/${s.nodeCount ?? 0}` },
+  ]
+})
+const PMIS_NODE_COLS: DataColumn[] = [
+  { key: 'stage', label: '回款阶段' },
+  { key: 'planDate', label: '计划日期', formatter: (v) => fmtDateCell(v) },
+  { key: 'actualDate', label: '实际日期', formatter: (v) => fmtDateCell(v) },
+  { key: 'payRatio', label: '计划比例', formatter: (v) => fmtRatio(v) },
+  { key: 'expectedPayment', label: '计划回款(万)', formatter: (v) => fmtWan(v as number) },
+  { key: 'status', label: '状态' },
+]
+
+// —— 回款（云文档口径）——
 const paySummary = computed(() => {
   const pay = p.value?.payment
   return [
@@ -248,6 +273,15 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in paySummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
+            <template v-if="pmisPay">
+              <div class="pd-section-title">PMIS 回款（系统核心口径<span v-if="pmisPay.fromOrigin">·取原项目</span>）</div>
+              <div class="pd-chips">
+                <div v-for="it in pmisPaySummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
+              </div>
+              <DataTable v-if="pmisNodes.length" :columns="PMIS_NODE_COLS" :rows="pmisNodes as any[]" :show-count="false" />
+              <div v-else class="pd-note">该项目无 PMIS 关联回款阶段节点。</div>
+              <div class="pd-section-title">云文档回款节点（旧口径，2B 将下线）</div>
+            </template>
             <div class="pd-note">完成率=回款流水累计÷合同总额（payment_records.csv；售前项目取原项目合同总额）；计划/已回/待回与下表为云文档节点口径。</div>
             <DataTable :columns="NODE_COLS" :rows="page.nodes" />
             <div class="pd-section-title">跟进记录</div>
