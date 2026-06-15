@@ -213,6 +213,7 @@ export interface AnalysisData {
   projectProfit?: Projectprofit;
   events?: Events;
   periodCompare?: PeriodCompare | null;
+  tagSeed?: Tagseed;
   [k: string]: unknown;
 }
 export interface Meta {
@@ -588,4 +589,7 @@ export interface PeriodCompareEntry {
   newOverspendProjects?: Newoverspendprojects;
   paymentRatioChange?: Paymentratiochange;
   [k: string]: unknown;
+}
+export interface Tagseed {
+  [k: string]: string[];
 }
