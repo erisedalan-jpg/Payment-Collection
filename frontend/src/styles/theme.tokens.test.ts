@@ -19,7 +19,7 @@ const dark = block('html.dark {')
 
 describe('theme.css 令牌契约 · :root(浅色)', () => {
   it('结构色(蓝色系基调)', () => {
-    expect(root).toContain('--fs-base: 16px')
+    expect(root).toContain('--fs-base: 18px')
     expect(root).toContain('--bg: #eef3f7')
     expect(root).toContain('--card: #ffffff')
     expect(root).toContain('--txt: #1e2a33')
