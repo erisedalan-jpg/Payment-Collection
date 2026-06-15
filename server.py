@@ -761,7 +761,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         qs = self.parse_path()
         limit = int(qs.get('limit', [5])[0])
         
-        # 合并本地记录和云文档同步的记录
+        # 读取本地记录（纯本地，无云同步）
         all_records = _load_followup_records()
         project_records = [r for r in all_records if r.get('项目编号') == project_id]
         

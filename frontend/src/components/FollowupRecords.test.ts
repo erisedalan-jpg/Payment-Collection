@@ -19,9 +19,9 @@ vi.mock('@/lib/followupApi', () => ({
       ],
       total: 2,
     }),
-    add: vi.fn().mockResolvedValue({ 记录编号: 'FU-3', message: '跟进记录已保存（仅本地保存）' }),
-    update: vi.fn().mockResolvedValue({ 记录编号: 'FU-1', message: '跟进记录已更新（仅本地保存）' }),
-    remove: vi.fn().mockResolvedValue({ message: '已删除（仅本地）' }),
+    add: vi.fn().mockResolvedValue({ 记录编号: 'FU-3', message: '已保存到本地' }),
+    update: vi.fn().mockResolvedValue({ 记录编号: 'FU-1', message: '已更新（本地）' }),
+    remove: vi.fn().mockResolvedValue({ message: '跟进记录 FU-2 已删除' }),
   },
 }))
 

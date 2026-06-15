@@ -22,7 +22,6 @@ export interface FollowupFormData {
   跟进状态: string
   下次跟进计划日期?: string
   记录编号?: string
-  cloudUrl?: string
 }
 
 interface TypesResp {
