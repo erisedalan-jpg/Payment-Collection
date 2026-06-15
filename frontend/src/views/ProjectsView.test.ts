@@ -149,4 +149,23 @@ describe('ProjectsView', () => {
     await flushPromises()
     expect(w.text()).toContain('共 1 条')
   })
+
+  it('操作列「跟进」按钮存在，点击后 FollowupModal 打开，@click.stop 不触发行跳转', async () => {
+    seed()
+    const push = vi.spyOn(router, 'push')
+    const w = mount(ProjectsView, {
+      global: {
+        plugins: [ElementPlus, router],
+        stubs: { FollowupModal: true },
+      },
+    })
+    await flushPromises()
+    const btn = w.find('.pv-fu-btn')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    // click.stop 阻止了行点击，router.push 不应被调用
+    expect(push).not.toHaveBeenCalled()
+    // fuOpen 应为 true
+    expect((w.vm as any).fuOpen).toBe(true)
+  })
 })
