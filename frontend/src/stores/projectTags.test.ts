@@ -39,6 +39,14 @@ describe('projectTags store', () => {
     expect(s.activeTags.map((t) => t.name)).not.toContain('框架合同')
   })
 
+  it('renameTag 改成已存在标签名 → 拒绝(防重复挂载)', async () => {
+    const s = useProjectTagsStore(); await s.load()
+    s.setProjectTags('A', ['BH项目', '框架合同'])
+    s.renameTag('BH项目', '框架合同')          // 撞已存在名 → no-op
+    expect(s.tags.map((t) => t.name)).toEqual(['BH项目', '框架合同'])
+    expect(s.assignments.A).toEqual(['BH项目', '框架合同'])
+  })
+
   it('save 调用 api 整存', async () => {
     const s = useProjectTagsStore(); await s.load()
     await s.save()
