@@ -39,6 +39,14 @@ describe('TierNodesTab', () => {
     expect(rows.some((r) => r.status === '延期')).toBe(true)
   })
 
+  it('按选中维度分组(dim 联动)：dim=dept 出部门分组与组值', () => {
+    seed()
+    const w = mount(TierNodesTab, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
+    // 原生分组表在 JSDOM 可渲染：维度 join 到节点所属项目 orgL4
+    expect(w.text()).toContain('部门分组')
+    expect(w.text()).toContain('组1')
+  })
+
   it('空数据不崩', () => {
     const data = useDataStore()
     data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any

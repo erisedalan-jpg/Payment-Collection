@@ -73,7 +73,8 @@ watch(dimKey, () => {
 const groups = computed<PayBoardGroup[]>(() => {
   const gs = groupPayBoard(boardRows.value, [dimKey.value])
   const k = sortKey.value as keyof PayBoardGroup
-  return [...gs].sort((a, b) => ((b[k] as number) ?? 0) - ((a[k] as number) ?? 0))
+  // rate 可为 null（无合同组）：降序时 null 统一沉底，避免与真实 0% 组混排
+  return [...gs].sort((a, b) => ((b[k] as number | null) ?? -Infinity) - ((a[k] as number | null) ?? -Infinity))
 })
 const top = computed(() => groups.value.slice(0, 15))
 const chartOption = computed(() => {
