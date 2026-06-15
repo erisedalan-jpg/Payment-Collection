@@ -83,6 +83,7 @@ import openpyxl  # noqa: E402
 import milestones as milestones_mod  # noqa: E402
 import pmis as pmis_mod  # noqa: E402
 import profit as profit_mod  # noqa: E402
+import projects as projects_mod  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -199,17 +200,31 @@ def load_pmis_stage_ratios(pmis_dir):
 def build_rows(base_dir):
     master = load_cloud_master(os.path.join(base_dir, CLOUD_XLSX))
     nodes = load_cloud_nodes(os.path.join(base_dir, CLOUD_XLSX))
+    # 售前→原项目映射(A.xlsx):售前项目自身无 PMIS 合同/流水/里程碑,回退到原项目(已关闭)检索
+    origin = {mm["current"]: mm["closed"]
+              for mm in projects_mod.read_mapping(os.path.join(base_dir, INPUT_DIR, "A.xlsx"))}
+    closed_ids = set(origin.values())
     keep = set(master.keys())
-    pay, _ = profit_mod.load_payment_records(os.path.join(base_dir, INPUT_DIR), keep)
-    pmis_map, _ = pmis_mod.load_project_pmis(os.path.join(base_dir, PMIS_DIR), keep)
-    pmis_stage = load_pmis_stage_ratios(os.path.join(base_dir, PMIS_DIR))
-    ms, _, _ = milestones_mod.load_milestones(os.path.join(base_dir, PMIS_DIR), keep)
+    keep_ext = keep | closed_ids
+    pay, _ = profit_mod.load_payment_records(os.path.join(base_dir, INPUT_DIR), keep_ext)
+    pmis_map, _ = pmis_mod.load_project_pmis(os.path.join(base_dir, PMIS_DIR), keep, extra_closed_ids=closed_ids)
+    pmis_stage = load_pmis_stage_ratios(os.path.join(base_dir, PMIS_DIR))   # 全量,自带原项目
+    ms, _, _ = milestones_mod.load_milestones(os.path.join(base_dir, PMIS_DIR), keep_ext)
     rows = []
     for pid, m in master.items():
-        # 合同总额:PMIS 优先(系统级,符合 spec §4 流水÷合同口径),缺则回退云文档主表
+        oid = origin.get(pid, "")
+        used_origin = False
+        # 合同总额:本项目 PMIS 优先;售前等自身无则回退原项目(oid);再缺回退云文档主表(spec §4)
         pmis_contract = _num(((pmis_map.get(pid) or {}).get("customer") or {}).get("合同总额"))
+        if not pmis_contract and oid:
+            oc = _num(((pmis_map.get(oid) or {}).get("customer") or {}).get("合同总额"))
+            if oc:
+                pmis_contract, used_origin = oc, True
         contract = pmis_contract if pmis_contract else _num(m["合同总额"])
+        # 流水:本项目优先,自身无则回退原项目
         rec = pay.get(pid) or {}
+        if not rec.get("total") and oid and (pay.get(oid) or {}).get("total"):
+            rec, used_origin = pay.get(oid), True
         pmis_total = rec.get("total")
         pmis_count = rec.get("count", 0)
         pmis_ratio = round(pmis_total / contract, 4) if (pmis_total is not None and contract) else None
@@ -217,10 +232,13 @@ def build_rows(base_dir):
         ratio_diff = (None if (pmis_ratio is None or m["手填已回款比例"] is None)
                       else round(pmis_ratio - m["手填已回款比例"], 4))
         ratio_anom = diff_flag(pmis_ratio, m["手填已回款比例"], THRESH_RATIO_PP)
-        # 节点级计划比例逐阶段分歧
+        # 节点级计划比例逐阶段分歧(里程碑侧本项目优先,售前回退原项目)
         cnodes = (nodes.get(pid) or {}).get("nodes", {})
         camount = (nodes.get(pid) or {}).get("_amount")
-        pstage = pmis_stage.get(pid, {})
+        eff = pid
+        if not pmis_stage.get(pid) and oid and pmis_stage.get(oid):
+            eff, used_origin = oid, True
+        pstage = pmis_stage.get(eff, {})
         ratio_mismatch_stages = []
         for st, prt in pstage.items():
             crt = next((v["plan_ratio"] for k, v in cnodes.items() if st in k), None)
@@ -241,7 +259,7 @@ def build_rows(base_dir):
         date_anom_stages = []
         for st in pstage:
             c_node = next((v for k, v in cnodes.items() if st in k), None)
-            p_ms = next((it_ for key, it_ in ((i.get("name"), i) for i in (ms.get(pid) or []))
+            p_ms = next((it_ for key, it_ in ((i.get("name"), i) for i in (ms.get(eff) or []))
                          if key and st in str(key)), None)
             if c_node and p_ms:
                 dd = days_between(c_node["plan_date"], p_ms.get("planDate"))
@@ -261,8 +279,11 @@ def build_rows(base_dir):
             flags.append("节点个数不一致")
         if cloud_paid_nodes != pmis_count:
             flags.append("笔数不一致")
+        if used_origin:
+            flags.append("售前取原项目")
         rows.append({
             "pid": pid, "项目名称": m["项目名称"], "L4": m["L4"], "项目经理": m["项目经理"],
+            "原项目编号": oid if used_origin else "",
             "合同编号": m["合同编号"], "合同总额": contract, "项目状态": m["项目状态"],
             "手填已回款比例": m["手填已回款比例"], "PMIS流水比例": pmis_ratio, "比例差": ratio_diff,
             "比例异常": ratio_anom, "节点比例分歧阶段": "；".join(ratio_mismatch_stages),
@@ -275,7 +296,7 @@ def build_rows(base_dir):
     return rows, {"master": len(master), "pay": len(pay), "pmis_stage": len(pmis_stage)}
 
 
-CSV_COLS = ["pid", "项目名称", "L4", "项目经理", "合同编号", "合同总额", "项目状态",
+CSV_COLS = ["pid", "项目名称", "L4", "项目经理", "原项目编号", "合同编号", "合同总额", "项目状态",
             "手填已回款比例", "PMIS流水比例", "比例差", "比例异常", "节点比例分歧阶段",
             "云已回款金额", "PMIS流水累计", "金额差", "金额异常",
             "云已回款节点数", "PMIS笔数", "云回款节点数", "PMIS关联回款里程碑数",
