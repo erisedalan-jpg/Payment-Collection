@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import FollowupRecords from './FollowupRecords.vue'
 
+vi.mock('element-plus', () => ({
+  ElMessage: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
+
 vi.mock('@/lib/followupApi', () => ({
   followupApi: {
     types: vi.fn().mockResolvedValue({ 跟进类型: ['邮件推动', '电话沟通'], 跟进状态: ['跟进中', '已解决'] }),
@@ -15,7 +22,6 @@ vi.mock('@/lib/followupApi', () => ({
     add: vi.fn().mockResolvedValue({ 记录编号: 'FU-3', message: '跟进记录已保存（仅本地保存）' }),
     update: vi.fn().mockResolvedValue({ 记录编号: 'FU-1', message: '跟进记录已更新（仅本地保存）' }),
     remove: vi.fn().mockResolvedValue({ message: '已删除（仅本地）' }),
-    syncStatus: vi.fn(),
   },
 }))
 
