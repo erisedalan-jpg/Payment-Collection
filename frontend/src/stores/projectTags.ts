@@ -1,0 +1,58 @@
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
+import { getTags, saveTags, type TagDef } from '@/lib/projectTagsApi'
+
+export const useProjectTagsStore = defineStore('projectTags', () => {
+  const tags = ref<TagDef[]>([])
+  const assignments = ref<Record<string, string[]>>({})
+  const loaded = ref(false)
+  const saving = ref(false)
+
+  const activeTags = computed(() => tags.value.filter((t) => !t.disabled))
+  const tagsOf = (pid: string): string[] => assignments.value[pid] ?? []
+
+  async function load() {
+    const r = await getTags()
+    tags.value = r.tags ?? []
+    assignments.value = r.assignments ?? {}
+    loaded.value = true
+  }
+
+  function addTag(name: string) {
+    const n = name.trim()
+    if (!n || tags.value.some((t) => t.name === n)) return
+    tags.value = [...tags.value, { name: n }]
+  }
+  function renameTag(oldName: string, newName: string) {
+    const nn = newName.trim()
+    if (!nn || oldName === nn) return
+    tags.value = tags.value.map((t) => (t.name === oldName ? { ...t, name: nn } : t))
+    const next: Record<string, string[]> = {}
+    for (const [pid, names] of Object.entries(assignments.value)) {
+      next[pid] = names.map((x) => (x === oldName ? nn : x))
+    }
+    assignments.value = next
+  }
+  function disableTag(name: string, on: boolean) {
+    tags.value = tags.value.map((t) => (t.name === name ? { ...t, disabled: on } : t))
+  }
+  function setProjectTags(pid: string, names: string[]) {
+    assignments.value = { ...assignments.value, [pid]: [...new Set(names)] }
+  }
+  function toggleTag(pid: string, name: string) {
+    const cur = new Set(assignments.value[pid] ?? [])
+    cur.has(name) ? cur.delete(name) : cur.add(name)
+    setProjectTags(pid, [...cur])
+  }
+  async function save() {
+    saving.value = true
+    try {
+      await saveTags({ tags: tags.value, assignments: assignments.value })
+    } finally {
+      saving.value = false
+    }
+  }
+
+  return { tags, assignments, loaded, saving, activeTags, tagsOf,
+           load, addTag, renameTag, disableTag, setProjectTags, toggleTag, save }
+})
