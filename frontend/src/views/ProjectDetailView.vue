@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis, RawNode, Event, MilestoneItem, PaymentRecordsEntry, ProjectProfit } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
 import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
@@ -15,7 +16,32 @@ import ProfitTree from '@/components/ProfitTree.vue'
 
 const route = useRoute()
 const data = useDataStore()
-onMounted(() => { if (!data.data) data.load() })
+const projectTags = useProjectTagsStore()
+onMounted(() => {
+  if (!data.data) data.load()
+  if (!projectTags.loaded) projectTags.load()
+})
+
+const pid = computed(() => String(route.params.id || ''))
+const myTags = computed(() => projectTags.tagsOf(pid.value))
+const addInput = ref('')
+function assignExisting(name: string) {
+  if (!myTags.value.includes(name)) {
+    projectTags.setProjectTags(pid.value, [...myTags.value, name])
+    projectTags.save()
+  }
+}
+function addOne() {
+  const name = addInput.value.trim()
+  if (!name) return
+  projectTags.addTag(name)
+  assignExisting(name)
+  addInput.value = ''
+}
+function removeOne(name: string) {
+  projectTags.setProjectTags(pid.value, myTags.value.filter((t) => t !== name))
+  projectTags.save()
+}
 
 const page = computed(() =>
   buildProjectPage(
@@ -264,6 +290,16 @@ const originInfo = computed(() => [
             </div>
           </div>
 
+          <section class="pd-tags">
+            <span class="pdt-label">项目标签</span>
+            <span v-for="t in myTags" :key="t" class="tag-chip">{{ t }}<span class="tag-x" @click="removeOne(t)">✕</span></span>
+            <span v-if="!myTags.length" class="pdt-empty">未打标签</span>
+            <el-select v-model="addInput" size="small" filterable allow-create default-first-option
+                       placeholder="加标签" style="width: 150px" @change="addOne">
+              <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
+            </el-select>
+          </section>
+
           <nav class="pd-tabs">
             <button v-for="t in TABS" :key="t.key" class="pd-tab" :class="{ active: tab === t.key }" @click="tab = t.key">{{ t.label }}</button>
             <button v-if="showOrigin" class="pd-tab" :class="{ active: tab === 'origin' }" @click="tab = 'origin'">原项目</button>
@@ -408,4 +444,10 @@ const originInfo = computed(() => [
 .pd-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); }
 .pd-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 @media (max-width: 1200px) { .pd-body { grid-template-columns: 1fr; } }
+.pd-tags { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0 var(--gap-section); }
+.pdt-label { font-size: var(--fs-2); color: var(--sub); }
+.pdt-empty { font-size: var(--fs-1); color: var(--mut); }
+.tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
+.tag-x { cursor: pointer; color: var(--mut); }
+.tag-x:hover { color: var(--danger-text); }
 </style>
