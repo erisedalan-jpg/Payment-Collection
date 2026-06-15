@@ -171,31 +171,3 @@ export function computeDashboardSummary(
     delayedProjects,
   }
 }
-
-export interface TierSummaryBar {
-  projectCount: number
-  relatedNodeCount: number
-  totalActual: number
-  totalExpected: number
-  rate: number
-  projCanAdvance: number
-  projReachedCondition: number
-  projDelayed: number
-}
-
-/** 忠实移植 renderTier 的汇总条计算（项目级状态计数 + 金额，单位元）。 */
-export function tierSummaryBar(nodes: RawNode[]): TierSummaryBar {
-  const projs = groupByProject(nodes)
-  const totalActual = projs.reduce((s, p) => s + (p.actualPayment || 0), 0)
-  const totalExpected = projs.reduce((s, p) => s + (p.expectedPayment || 0), 0)
-  return {
-    projectCount: projs.length,
-    relatedNodeCount: nodes.filter((n) => (n as Record<string, any>).isPaymentRelated).length,
-    totalActual,
-    totalExpected,
-    rate: totalExpected > 0 ? totalActual / totalExpected : 0,
-    projCanAdvance: projs.filter((p) => p.paymentStatus === '加资源可提前').length,
-    projReachedCondition: projs.filter((p) => p.paymentStatus === '达到回款条件').length,
-    projDelayed: projs.filter((p) => p.paymentStatus === '延期').length,
-  }
-}
