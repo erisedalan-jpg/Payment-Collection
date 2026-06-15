@@ -68,7 +68,7 @@ const rateColor = (r: number) => (r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(-
     </div>
 
     <BoardView v-if="tab === 'board'" />
-    <ProjectsOverviewTab v-else-if="tab === 'projects'" :tier="tier" />
+    <ProjectsOverviewTab v-else-if="tab === 'projects'" dim="dept" />
     <TierNodesTab v-else-if="tab === 'nodes'" :tier="tier" />
     <PlanTab v-else-if="tab === 'plan'" :tier="tier" />
     <RiskTab v-else-if="tab === 'risk'" :tier="tier" />
