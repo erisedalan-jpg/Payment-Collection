@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import {
-  naguanFilter,
+  excludeFilter,
   filterLedgerProjects,
   ledgerSummary,
   ledgerTierStats,
   ledgerStatusCounts,
 } from './ledger'
 
-describe('naguanFilter', () => {
+describe('excludeFilter', () => {
   const nodes = [{ projectId: 'P1' }, { projectId: 'P2' }] as any[]
   it('关闭时返回全部', () => {
-    expect(naguanFilter(nodes, false, { P1: true })).toHaveLength(2)
+    expect(excludeFilter(nodes, false, { P1: true })).toHaveLength(2)
   })
-  it('开启时排除 naguanExclude 命中的项目', () => {
-    expect(naguanFilter(nodes, true, { P1: true }).map((n: any) => n.projectId)).toEqual(['P2'])
+  it('开启时排除 excludedIds 命中的项目', () => {
+    expect(excludeFilter(nodes, true, { P1: true }).map((n: any) => n.projectId)).toEqual(['P2'])
   })
 })
 

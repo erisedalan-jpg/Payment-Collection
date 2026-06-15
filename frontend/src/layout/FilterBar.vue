@@ -53,12 +53,6 @@ const mode = computed({
       </select>
     </label>
 
-    <label class="fb-item naguan">
-      纳管
-      <input data-test="naguan-toggle" type="checkbox" :checked="f.naguanOn"
-        @change="f.toggleNaguan(($event.target as HTMLInputElement).checked)" />
-      <span>{{ f.naguanOn ? '已开启' : '已关闭' }}</span>
-    </label>
   </div>
 </template>
 
@@ -68,5 +62,4 @@ const mode = computed({
 .fb-item { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .fb-item select { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line2); border-radius: var(--r-sm);
   font-size: var(--fs-1); background: var(--card2); color: var(--txt); }
-.naguan { margin-left: auto; }
 </style>

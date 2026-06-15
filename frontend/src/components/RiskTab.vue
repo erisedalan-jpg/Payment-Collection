@@ -15,7 +15,7 @@ const pd = useProjectDetailStore()
 const ctx = computed(() => {
   const ps = filterProjects(data.data?.projects ?? [], {
     viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
-    naguanOn: filter.naguanOn, naguanExclude: data.data?.naguanExclude ?? {},
+    excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
   })
   const rows = projectPaymentRows(ps, data.data?.projectPmis ?? {})
   const nodeRows = paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
