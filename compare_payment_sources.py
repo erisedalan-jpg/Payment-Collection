@@ -206,7 +206,9 @@ def build_rows(base_dir):
     ms, _, _ = milestones_mod.load_milestones(os.path.join(base_dir, PMIS_DIR), keep)
     rows = []
     for pid, m in master.items():
-        contract = _num(m["合同总额"])
+        # 合同总额:PMIS 优先(系统级,符合 spec §4 流水÷合同口径),缺则回退云文档主表
+        pmis_contract = _num(((pmis_map.get(pid) or {}).get("customer") or {}).get("合同总额"))
+        contract = pmis_contract if pmis_contract else _num(m["合同总额"])
         rec = pay.get(pid) or {}
         pmis_total = rec.get("total")
         pmis_count = rec.get("count", 0)
@@ -251,7 +253,7 @@ def build_rows(base_dir):
             flags.append("手填比例未填")
         if pmis_total is None:
             flags.append("PMIS无流水")
-        if not contract:
+        if not pmis_contract:
             flags.append("PMIS无合同总额")
         if not pstage:
             flags.append("PMIS无关联回款比例")
