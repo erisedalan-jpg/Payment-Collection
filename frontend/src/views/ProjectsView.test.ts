@@ -6,6 +6,7 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ProjectsView from './ProjectsView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
+import * as followupApiModule from '@/lib/followupApi'
 
 let router: Router
 beforeEach(() => {
@@ -167,5 +168,21 @@ describe('ProjectsView', () => {
     expect(push).not.toHaveBeenCalled()
     // fuOpen 应为 true
     expect((w.vm as any).fuOpen).toBe(true)
+  })
+
+  it('toolbar 有导出按钮，点击后 exOpen 为 true', async () => {
+    seed()
+    vi.spyOn(followupApiModule.followupApi, 'all').mockResolvedValue({ records: [], total: 0 } as any)
+    const w = mount(ProjectsView, {
+      global: {
+        plugins: [ElementPlus, router],
+        stubs: { FollowupModal: true, Modal: true },
+      },
+    })
+    await flushPromises()
+    const exportBtn = w.find('.pv-export-btn')
+    expect(exportBtn.exists()).toBe(true)
+    await exportBtn.trigger('click')
+    expect((w.vm as any).exOpen).toBe(true)
   })
 })

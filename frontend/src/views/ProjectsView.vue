@@ -9,6 +9,10 @@ import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupModal from '@/components/FollowupModal.vue'
+import Modal from '@/components/Modal.vue'
+import { exportSheets } from '@/lib/exportXlsx'
+import { buildExportSheets, type ExportScope } from '@/lib/projectExport'
+import { followupApi } from '@/lib/followupApi'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
@@ -85,6 +89,29 @@ function openFollowup(row: Record<string, any>) {
   fuProject.value = { projectId: row.projectId, projectName: row.projectName || '' }
   fuOpen.value = true
 }
+
+const exOpen = ref(false)
+const exScope = ref<ExportScope[]>(['list', 'tags', 'followup'])
+const EX_OPTS: { value: ExportScope; label: string }[] = [
+  { value: 'list', label: '项目清单' },
+  { value: 'tags', label: '项目标签' },
+  { value: 'followup', label: '跟进记录' },
+  { value: 'nodes', label: '回款节点' },
+  { value: 'milestones', label: '里程碑' },
+]
+async function doExport() {
+  const fu = exScope.value.includes('followup') ? (await followupApi.all()).records : []
+  const sheets = buildExportSheets(exScope.value, {
+    rows: filtered.value,
+    projects: (data.data?.projects ?? []) as any,
+    assignments: projectTags.assignments,
+    followup: fu as any,
+    paymentNodes: (data.data?.paymentNodes ?? {}) as any,
+    milestones: (data.data?.projectMilestones ?? {}) as any,
+  })
+  exportSheets(`项目数据导出_${filtered.value.length}项.xlsx`, sheets)
+  exOpen.value = false
+}
 </script>
 
 <template>
@@ -124,6 +151,7 @@ function openFollowup(row: Record<string, any>) {
       <el-select v-model="filters.tags" size="small" multiple collapse-tags clearable placeholder="标签" style="width: 140px">
         <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
       </el-select>
+      <button class="pv-export-btn" @click="exOpen = true">导出</button>
     </div>
 
     <div v-if="filters.paused === 'yes' || filters.overspend === 'yes'" class="pv-tags">
@@ -159,6 +187,17 @@ function openFollowup(row: Record<string, any>) {
 
     <FollowupModal v-model="fuOpen" :project-id="fuProject.projectId" :project-name="fuProject.projectName" />
 
+    <Modal v-model="exOpen" title="导出范围" width="420px">
+      <el-checkbox-group v-model="exScope">
+        <el-checkbox v-for="o in EX_OPTS" :key="o.value" :value="o.value">{{ o.label }}</el-checkbox>
+      </el-checkbox-group>
+      <div style="margin-top: var(--gap-card)">
+        <button class="pv-fu-btn" :disabled="!exScope.length" @click="doExport">
+          导出 xlsx（当前筛选 {{ filtered.length }} 项）
+        </button>
+      </div>
+    </Modal>
+
     <div v-if="rows.length" class="pv-pager">
       <span class="pv-total u-num">共 {{ filtered.length }} 条</span>
       <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
@@ -183,4 +222,5 @@ function openFollowup(row: Record<string, any>) {
 .pv-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: var(--r-full); border: 1px solid var(--sub); color: var(--sub); font-size: 10px; font-style: italic; cursor: help; line-height: 1; }
 .lst-tag { display: inline-block; padding: 1px 6px; margin: 1px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
 .pv-fu-btn { font-size: var(--fs-1); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 8px; cursor: pointer; }
+.pv-export-btn { font-size: var(--fs-1); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 10px; cursor: pointer; }
 </style>

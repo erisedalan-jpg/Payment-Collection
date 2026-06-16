@@ -6,6 +6,14 @@ import DataView from './DataView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 
+vi.mock('@/lib/manualApi', () => ({
+  manualApi: {
+    backups: vi.fn(async () => ({ success: true, versions: [] })),
+    import: vi.fn(async () => ({ success: true, message: '导入成功' })),
+    rollback: vi.fn(async () => ({ success: true, message: '已回滚' })),
+  },
+}))
+
 const DEFAULTS = {
   回款数据: 'https://yundocs.qianxin-inc.cn/weboffice/l/sRs8GgCmE2ygb',
   '项目状态信息数据.xlsx': 'https://pmis.example/status0',
@@ -92,6 +100,16 @@ describe('DataView(R3 重排)', () => {
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
     expect(calls.some((u: string) => u.includes('/api/pmis/links'))).toBe(true)
     expect(calls.some((u: string) => u.includes('/api/files/status'))).toBe(true)
+  })
+
+  it('渲染「人工数据导入 / 回滚」卡', async () => {
+    const w = await mountView()
+    expect(w.text()).toContain('人工数据导入')
+    expect(w.text()).toContain('回滚')
+    const card = w.find('[data-test="manual-import-card"]')
+    expect(card.exists()).toBe(true)
+    expect(card.text()).toContain('项目标签')
+    expect(card.text()).toContain('跟进记录')
   })
 
   it('渲染标签库管理 + 按标签排除配置', async () => {
