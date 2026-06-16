@@ -27,6 +27,8 @@ from logging.handlers import TimedRotatingFileHandler
 from urllib.parse import urlparse, parse_qs
 import config
 import data_history
+import manual_import
+import manual_history
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -225,6 +227,30 @@ def _save_project_tags(store):
         with open(PROJECT_TAGS_FILE, 'w', encoding='utf-8') as f:
             json.dump(store, f, ensure_ascii=False, indent=2)
 
+
+def _valid_project_ids():
+    """从 analysis_data.json 读取有效项目编号集合（供人工导入校验）。"""
+    try:
+        with open(ANALYSIS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {str(p.get('projectId')) for p in (data.get('projects') or []) if p.get('projectId')}
+    except Exception:
+        return set()
+
+
+def _apply_manual_import(result, source_name):
+    """写入前先快照，再按 result 替换写（仅含的类才写）。返回摘要。"""
+    mf = manual_history.backup_manual(BASE_DIR, trigger='import', source_name=source_name)
+    summary = {'backupId': mf['id']}
+    if result.get('tags') is not None:
+        _save_project_tags(result['tags'])
+        summary['tags'] = {'projects': len(result['tags'].get('assignments', {})),
+                           'tagsCount': len(result['tags'].get('tags', []))}
+    if result.get('followup') is not None:
+        _save_followup_records(result['followup'])
+        summary['followup'] = {'count': len(result['followup'])}
+    return summary
+
 def _get_next_record_num(today_str):
     """获取当日下一个记录序号"""
     records = _load_followup_records()
@@ -332,8 +358,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_stop_server()
         elif parsed.path.startswith('/api/followup/list'):
             self.handle_followup_list()
+        elif parsed.path == '/api/followup/all':
+            self.handle_followup_all()
         elif parsed.path == '/api/followup/types':
             self.handle_followup_types()
+        elif parsed.path == '/api/manual/backups':
+            self.handle_manual_backups()
         elif parsed.path == '/api/tags':
             self.handle_tags_get()
         elif parsed.path == '/api/pmis/links':
@@ -424,6 +454,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_data_history_rollback()
         elif parsed.path == '/api/data-history/undo-rollback':
             self.handle_data_history_undo()
+        elif parsed.path == '/api/manual/import':
+            self.handle_manual_import()
+        elif parsed.path == '/api/manual/rollback':
+            self.handle_manual_rollback()
         else:
             self.send_response(404)
             self.end_headers()
@@ -782,6 +816,86 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             "跟进类型": FOLLOWUP_TYPES,
             "跟进状态": FOLLOWUP_STATUSES
         })
+
+    def handle_followup_all(self):
+        """GET /api/followup/all - 全部跟进记录（供导出）。"""
+        recs = _load_followup_records()
+        for r in recs:
+            r.pop('syncStatus', None)
+        self._json_response({"success": True, "records": recs, "total": len(recs)})
+
+    def handle_manual_import(self):
+        """POST /api/manual/import {sheets} - 校验→快照→替换写。"""
+        if self._history_busy():
+            self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中，请稍后再导入"))
+            return
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception as e:
+            self._json_response(_error_payload(ERR_PARSE, f"请求解析失败: {e}"))
+            return
+        sheets = body.get('sheets') or {}
+        if not isinstance(sheets, dict) or not any(k in sheets for k in ('项目标签', '跟进记录')):
+            self._json_response(_error_payload(ERR_VALIDATION, "未发现可导入的「项目标签」或「跟进记录」sheet"))
+            return
+        errors, result = manual_import.validate_and_build(
+            sheets, _valid_project_ids(),
+            datetime.now().strftime('%Y%m%d'), datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            FOLLOWUP_TYPES, FOLLOWUP_STATUSES)
+        if errors:
+            self._json_response({"success": False, "code": ERR_VALIDATION,
+                                 "message": f"校验未通过，共 {len(errors)} 处错误", "errors": errors})
+            return
+        history_state["running"] = True
+        try:
+            with _history_lock:
+                summary = _apply_manual_import(result, body.get('fileName', ''))
+        except Exception as e:
+            logger.error(f"人工数据导入写入失败: {e}", exc_info=True)
+            self._json_response(_error_payload(ERR_INTERNAL, f"导入写入失败: {e}"))
+            return
+        finally:
+            history_state["running"] = False
+        self._json_response({"success": True, "message": "导入成功", **summary})
+
+    def handle_manual_backups(self):
+        """GET /api/manual/backups - 列出人工导入快照。"""
+        try:
+            self._json_response({"success": True, **manual_history.list_backups(BASE_DIR)})
+        except Exception as e:
+            logger.error(f"列出人工快照失败: {e}", exc_info=True)
+            self._json_response(_error_payload(ERR_INTERNAL, f"列快照失败: {e}"))
+
+    def handle_manual_rollback(self):
+        """POST /api/manual/rollback {id} - 回滚到指定人工导入快照。"""
+        if self._history_busy():
+            self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中，请稍后再回滚"))
+            return
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception as e:
+            self._json_response(_error_payload(ERR_PARSE, f"请求解析失败: {e}"))
+            return
+        vid = str(data.get('id') or '').strip()
+        if not vid:
+            self._json_response(_error_payload(ERR_VALIDATION, "缺少版本 id"))
+            return
+        history_state["running"] = True
+        try:
+            with _history_lock:
+                res = manual_history.rollback_manual(BASE_DIR, vid)
+        except FileNotFoundError as e:
+            self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
+            return
+        except Exception as e:
+            logger.error(f"人工快照回滚失败: {e}", exc_info=True)
+            self._json_response(_error_payload(ERR_INTERNAL, f"回滚失败: {e}"))
+            return
+        finally:
+            history_state["running"] = False
+        self._json_response({"success": True, "message": f"已回滚到 {vid}", **res})
 
     def handle_tags_get(self):
         """GET /api/tags — 返回标签库与挂载（首次自动播种）。"""
