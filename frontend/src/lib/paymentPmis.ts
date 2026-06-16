@@ -221,9 +221,9 @@ export interface NodeSummary {
 export function nodeSummary(rows: PayNodeRow[]): NodeSummary {
   return {
     total: rows.length,
-    reached: rows.filter((r) => r.status === '已达成').length,
+    reached: rows.filter((r) => r.status === '已回款').length,
     delayed: rows.filter((r) => r.status === '延期').length,
-    pending: rows.filter((r) => r.status === '待达成').length,
+    pending: rows.filter((r) => r.status !== '已回款' && r.status !== '延期').length,
     expectedTotal: rows.reduce((s, r) => s + r.expectedPayment, 0),
   }
 }
