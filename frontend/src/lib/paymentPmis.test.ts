@@ -152,15 +152,15 @@ describe('paymentNodeRows（扁平化 + 维度 join 到所属项目）', () => {
   const pmisMap: Record<string, ProjectPmis> = { A: { progress: { 项目阶段: '实施' } } as ProjectPmis }
   const nodes: Record<string, PaymentNodePmis[]> = {
     A: [
-      { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.7, expectedPayment: 1_400_000, reached: true, status: '已达成' },
+      { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.7, expectedPayment: 1_400_000, reached: true, status: '已回款' },
       { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 600_000, reached: false, status: '延期' },
     ],
-    GHOST: [{ stage: '到货', status: '待达成' } as PaymentNodePmis],
+    GHOST: [{ stage: '到货', status: '待回款' } as PaymentNodePmis],
   }
   it('仅在册项目的节点入表，带 dept/projStage/tier/progress', () => {
     const rows = paymentNodeRows(nodes, projects, pmisMap)
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ projectId: 'A', projectName: '甲', stage: '到货', status: '已达成', dept: '组1', projStage: '实施', tier: '100万以上', progress: '部分回款' })
+    expect(rows[0]).toMatchObject({ projectId: 'A', projectName: '甲', stage: '到货', status: '已回款', dept: '组1', projStage: '实施', tier: '100万以上', progress: '部分回款' })
     expect(rows.every((r) => r.projectId === 'A')).toBe(true)
   })
   it('paymentNodes 缺失 → 空数组', () => {
@@ -173,13 +173,15 @@ describe('nodeSummary（节点三态计数 + 计划回款Σ）', () => {
     const projects = [proj({ projectId: 'A', paymentPmis: pm({ contract: 100 }) })]
     const nodes: Record<string, PaymentNodePmis[]> = {
       A: [
-        { stage: '到货', status: '已达成', expectedPayment: 70 } as PaymentNodePmis,
+        { stage: '到货', status: '已回款', expectedPayment: 70 } as PaymentNodePmis,
         { stage: '终验', status: '延期', expectedPayment: 30 } as PaymentNodePmis,
-        { stage: '驻场', status: '待达成', expectedPayment: 10 } as PaymentNodePmis,
+        { stage: '驻场', status: '待回款', expectedPayment: 10 } as PaymentNodePmis,
+        { stage: '阶段', status: '部分回款', expectedPayment: 5 } as PaymentNodePmis,
+        { stage: '质保', status: '质保期', expectedPayment: 5 } as PaymentNodePmis,
       ],
     }
     const s = nodeSummary(paymentNodeRows(nodes, projects, {}))
-    expect(s).toEqual({ total: 3, reached: 1, delayed: 1, pending: 1, expectedTotal: 110 })
+    expect(s).toEqual({ total: 5, reached: 1, delayed: 1, pending: 3, expectedTotal: 120 })
   })
 })
 
