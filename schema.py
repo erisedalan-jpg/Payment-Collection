@@ -156,10 +156,15 @@ class ProjectHealth(_Base):
 
 class PaymentNodePmis(_Base):
     stage: str
+    category: str = ""
     planDate: str = ""
     actualDate: str = ""
     payRatio: Optional[float] = None
     expectedPayment: float = 0
+    receivedAmount: float = 0
+    unpaidAmount: float = 0
+    actualRatio: Optional[float] = None
+    termDays: Optional[int] = None
     reached: bool = False
     status: str = ""
 

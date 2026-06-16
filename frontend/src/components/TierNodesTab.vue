@@ -34,9 +34,9 @@ const byDim = computed(() => {
     const key = String((r as Record<string, any>)[dimField.value] ?? '未指定')
     const g = (m[key] ||= { count: 0, reached: 0, delayed: 0, pending: 0, exp: 0 })
     g.count++
-    if (r.status === '已达成') g.reached++
+    if (r.status === '已回款') g.reached++
     else if (r.status === '延期') g.delayed++
-    else if (r.status === '待达成') g.pending++
+    else g.pending++
     g.exp += r.expectedPayment
   }
   return Object.entries(m)
@@ -53,7 +53,7 @@ const COLS: DataColumn[] = [
   { key: 'expectedPayment', label: '计划金额(万)', sortable: true, formatter: (v) => fmtWan(v) },
   { key: 'status', label: '状态' },
 ]
-const STATUS_CLASS: Record<string, string> = { 已达成: 'st-ok', 延期: 'st-danger', 待达成: 'st-warn' }
+const STATUS_CLASS: Record<string, string> = { 已回款: 'st-ok', 延期: 'st-danger', 待回款: 'st-warn', 部分回款: 'st-warn', 质保期: 'st-warn' }
 function onRow(row: Record<string, any>) { pd.open(row.projectId) }
 </script>
 
@@ -61,16 +61,16 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
   <div class="nodes-tab">
     <section class="nsum u-num">
       <div class="ns"><span class="ns-l">节点总数</span><span class="ns-v">{{ sum.total }}</span></div>
-      <div class="ns"><span class="ns-l">已达成</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></div>
+      <div class="ns"><span class="ns-l">已回款</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></div>
       <div class="ns"><span class="ns-l">延期</span><span class="ns-v" style="color:var(--danger-text)">{{ sum.delayed }}</span></div>
-      <div class="ns"><span class="ns-l">待达成</span><span class="ns-v" style="color:var(--warn-text)">{{ sum.pending }}</span></div>
+      <div class="ns"><span class="ns-l">待回款</span><span class="ns-v" style="color:var(--warn-text)">{{ sum.pending }}</span></div>
       <div class="ns"><span class="ns-l">计划回款Σ(万)</span><span class="ns-v">{{ fmtWan(sum.expectedTotal) }}</span></div>
     </section>
     <section class="dim-summary">
       <div class="ds-head">{{ dimLabel }}分组</div>
       <table class="ds-table u-num">
         <thead>
-          <tr><th>{{ dimLabel }}</th><th>节点数</th><th>已达成</th><th>延期</th><th>待达成</th><th>计划回款Σ(万)</th></tr>
+          <tr><th>{{ dimLabel }}</th><th>节点数</th><th>已回款</th><th>延期</th><th>待回款</th><th>计划回款Σ(万)</th></tr>
         </thead>
         <tbody>
           <tr v-for="g in byDim" :key="g.value">

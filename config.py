@@ -6,6 +6,9 @@ SHEET_PAYMENT_NODES = "项目回款节点（里程碑）清单"
 SHEET_PROJECT_OVERVIEW = "项目验收日期、回款条件信息收集"
 SHEET_FOLLOWUP = "项目回款跟进记录"
 
+# ── 收款阶段台账（系统核心口径回款源，位于 input/）──
+COLLECTION_STAGES_FILE = "collection_stages.csv"
+
 # ── 金额分层阈值（元）与标签 ──
 TIER_ABOVE_1M = 1_000_000
 TIER_ABOVE_500K = 500_000
