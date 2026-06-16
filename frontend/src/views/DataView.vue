@@ -76,7 +76,7 @@ async function onUploadInputs() {
 // —— 更新数据 / 设置 ——
 const { progress: repProgress, message: repMessage, running: repRunning, start: startReprocess } =
   useReprocess({ onDone: () => { data.reload(); loadFileStatus() } })
-const { versions: historyVersions, preRollback: historyPre, busy: historyBusy,
+const { versions: historyVersions, preRollback: historyPre, source: historySource, busy: historyBusy,
         message: historyMsg, load: loadHistory, rollback: doRollback, undo: doUndo } =
   useDataHistory({ onChange: () => { data.reload(); loadFileStatus() } })
 function fmtMB(bytes?: number) { return bytes ? (bytes / 1048576).toFixed(1) + ' MB' : '-' }
@@ -268,11 +268,14 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
         <button class="dv-btn ghost" :disabled="historyBusy" @click="onUndoRollback">撤销上次回滚</button>
         <span class="dv-hint">恢复到最近一次回滚前的状态</span>
       </div>
-      <div v-if="!historyVersions.length" class="dv-hint">暂无历史版本，"更新数据"成功后会自动保存（保留最近 3 份）。</div>
+      <div v-if="!historyVersions.length" class="dv-hint">暂无历史版本，"更新数据"成功后会自动保存（保留最近 5 份）。</div>
       <div v-for="v in historyVersions" :key="v.id" class="dv-row" data-test="history-row">
         <span class="dv-label u-num">{{ v.createdAt || v.id }}</span>
         <span class="dv-hint u-num">项目 {{ v.projectCount ?? '-' }} · 节点 {{ v.paymentNodeCount ?? '-' }} · {{ fmtMB(v.sizeBytes) }}</span>
         <button class="dv-btn" :disabled="historyBusy" data-test="history-rollback" @click="onRollback(v.id)">回滚到此</button>
+      </div>
+      <div class="dv-row dv-hint" data-test="history-source-note">
+        源数据仅保留最新 1 份<template v-if="historySource?.refreshedAt">（来自 {{ historySource.refreshedAt }}{{ historySource.sizeBytes ? ' · ' + fmtMB(historySource.sizeBytes) : '' }}）</template>，回滚仅还原看板数据。
       </div>
       <div v-if="historyMsg" class="dv-hint ok">{{ historyMsg }}</div>
     </div>

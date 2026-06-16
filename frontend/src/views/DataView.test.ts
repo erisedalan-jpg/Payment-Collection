@@ -112,6 +112,14 @@ describe('DataView(R3 重排)', () => {
     expect(card.text()).toContain('跟进记录')
   })
 
+  it('数据历史卡渲染源说明行', async () => {
+    const w = await mountView()
+    const note = w.find('[data-test="history-source-note"]')
+    expect(note.exists()).toBe(true)
+    expect(note.text()).toContain('源数据仅保留最新 1 份')
+    expect(note.text()).toContain('回滚仅还原看板数据')
+  })
+
   it('渲染标签库管理 + 按标签排除配置', async () => {
     const tags = useProjectTagsStore()
     tags.load = vi.fn(async () => {
