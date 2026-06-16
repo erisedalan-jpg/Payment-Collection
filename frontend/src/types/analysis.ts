@@ -158,10 +158,15 @@ export type Rate = number | null;
 export type Note = string;
 export type Records = PaymentRecord[];
 export type Stage = string;
+export type Category = string;
 export type Plandate2 = string;
 export type Actualdate1 = string;
 export type Payratio1 = number | null;
 export type Expectedpayment1 = number;
+export type Receivedamount = number;
+export type Unpaidamount = number;
+export type Actualratio = number | null;
+export type Termdays = number | null;
 export type Reached = boolean;
 export type Status = string;
 export type Code = string;
@@ -520,10 +525,15 @@ export interface Paymentnodes {
 }
 export interface PaymentNodePmis {
   stage: Stage;
+  category?: Category;
   planDate?: Plandate2;
   actualDate?: Actualdate1;
   payRatio?: Payratio1;
   expectedPayment?: Expectedpayment1;
+  receivedAmount?: Receivedamount;
+  unpaidAmount?: Unpaidamount;
+  actualRatio?: Actualratio;
+  termDays?: Termdays;
   reached?: Reached;
   status?: Status;
   [k: string]: unknown;
