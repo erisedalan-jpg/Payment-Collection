@@ -112,21 +112,18 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('评级 C')
     expect(w.text()).toContain('项目执行')
     expect(w.find('.health-badge').text()).toBe('风险')
-    expect(w.text()).toContain('初验款')       // 节点明细
-    expect(w.text()).toContain('延期节点')     // 回款汇总 chip
+    expect(w.text()).toContain('初验款')       // 项目动态事件
+    expect(w.text()).toContain('系统核心口径')  // 回款（系统核心口径）区块标题
     expect(w.findComponent({ name: 'FollowupRecords' }).exists()).toBe(true)
   })
 
-  it('进度里程碑 tab:项目里程碑三色表+回款里程碑保留(R2)', async () => {
+  it('进度里程碑 tab:仅 PMIS 项目里程碑表(3A 已下线回款里程碑表)', async () => {
     seed()
     const w = await mountAt('/project/P-1')
     await w.findAll('.pd-tab').find((b) => b.text() === '进度里程碑')!.trigger('click')
-    expect(w.text()).toContain('初验款')
-    expect(w.text()).toContain('未到期')
-    expect(w.text()).toContain('2026-03-01')
     expect(w.text()).toContain('项目里程碑')
-    expect(w.text()).toContain('到货款1，70.00%')
-    expect(w.text()).toContain('回款里程碑')
+    expect(w.text()).toContain('到货款1，70.00%')   // PMIS 里程碑关联回款阶段
+    expect(w.text()).not.toContain('回款里程碑')     // 旧云文档口径表已下线
   })
 
   it('回款数据 tab:流水汇总 chips+明细表+非 CNY 汇率(R2)', async () => {
@@ -304,15 +301,17 @@ describe('ProjectDetailView', () => {
       lastPaymentDate: '2026-06-04', fromOrigin: false,
     }
     ;(ds.data as any).paymentNodes = { 'P-1': [
-      { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-02', payRatio: 0.7,
-        expectedPayment: 700000, reached: true, status: '已达成' },
-      { stage: '终验', planDate: '2020-01-01', actualDate: '', payRatio: 0.3,
-        expectedPayment: 300000, reached: false, status: '延期' },
+      { stage: '到货款', category: '到货款', planDate: '2026-01-01', actualDate: '2026-01-02',
+        payRatio: 0.7, expectedPayment: 700000, receivedAmount: 700000, unpaidAmount: 0,
+        actualRatio: 1, termDays: 90, reached: true, status: '已回款' },
+      { stage: '终验款', category: '终验款', planDate: '2020-01-01', actualDate: '',
+        payRatio: 0.3, expectedPayment: 300000, receivedAmount: 0, unpaidAmount: 300000,
+        actualRatio: 0, termDays: 20, reached: false, status: '延期' },
     ] }
     const w = await mountAt('/project/P-1')
-    expect(w.text()).toContain('PMIS 回款')
+    expect(w.text()).toContain('系统核心口径')
     expect(w.text()).toContain('到货')
-    expect(w.text()).toContain('已达成')
+    expect(w.text()).toContain('已回款')
     expect(w.text()).toContain('延期')
   })
 
