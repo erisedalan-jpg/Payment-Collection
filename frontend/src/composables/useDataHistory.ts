@@ -10,11 +10,19 @@ export interface HistoryVersion {
   sizeBytes?: number
   contents?: string[]
 }
-interface HistoryResp { versions: HistoryVersion[]; preRollback: HistoryVersion | null }
+export interface HistorySource {
+  id?: string
+  refreshedFrom?: string
+  refreshedAt?: string
+  sizeBytes?: number
+  contents?: string[]
+}
+interface HistoryResp { versions: HistoryVersion[]; preRollback: HistoryVersion | null; source?: HistorySource | null }
 
 export function useDataHistory(opts: { onChange?: () => void } = {}) {
   const versions = ref<HistoryVersion[]>([])
   const preRollback = ref<HistoryVersion | null>(null)
+  const source = ref<HistorySource | null>(null)
   const busy = ref(false)
   const message = ref('')
 
@@ -23,6 +31,7 @@ export function useDataHistory(opts: { onChange?: () => void } = {}) {
       const r = await api.get<HistoryResp>('/api/data-history')
       versions.value = r.versions ?? []
       preRollback.value = r.preRollback ?? null
+      source.value = r.source ?? null
     } catch (e) {
       message.value = e instanceof ApiRequestError ? e.message : '加载历史失败'
     }
@@ -56,5 +65,5 @@ export function useDataHistory(opts: { onChange?: () => void } = {}) {
     }
   }
 
-  return { versions, preRollback, busy, message, load, rollback, undo }
+  return { versions, preRollback, source, busy, message, load, rollback, undo }
 }
