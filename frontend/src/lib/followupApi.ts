@@ -49,6 +49,7 @@ export const followupApi = {
   types: () => api.get<TypesResp>('/api/followup/types'),
   list: (projectId: string, limit = 20) =>
     api.get<ListResp>(`/api/followup/list/${encodeURIComponent(projectId)}?limit=${limit}`),
+  all: () => api.get<ListResp>('/api/followup/all'),
   add: (data: FollowupFormData) => api.post<MutResp>('/api/followup/add', data),
   update: (data: FollowupFormData) => api.post<MutResp>('/api/followup/update', data),
   remove: (recordId: string) => api.post<DelResp>('/api/followup/delete', { 记录编号: recordId }),
