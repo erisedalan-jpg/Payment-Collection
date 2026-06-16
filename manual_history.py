@@ -95,6 +95,9 @@ def list_backups(base_dir):
 
 def rollback_manual(base_dir, version_id):
     """把某版本两文件覆盖回 live（copy-then-swap）。版本不存在抛 FileNotFoundError。"""
+    # 防目录穿越：version_id 必须是 manual_backups 下的纯目录名，不得含路径分隔/.. 逃逸根目录
+    if not version_id or version_id in ('.', '..') or version_id != os.path.basename(version_id):
+        raise FileNotFoundError(f'快照版本不存在: {version_id}')
     vdir = os.path.join(_root(base_dir), version_id)
     if not os.path.isdir(vdir):
         raise FileNotFoundError(f'快照版本不存在: {version_id}')

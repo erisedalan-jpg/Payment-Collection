@@ -1,5 +1,8 @@
 import json
 import os
+
+import pytest
+
 import manual_history as mh
 
 
@@ -45,3 +48,20 @@ def test_rollback_restores(tmp_path):
     # 无 .tmp 残渣
     vdir = os.path.join(base, 'data', 'manual_backups', vid)
     assert not any(n.endswith('.tmp') for n in os.listdir(os.path.join(base, 'data')))
+
+
+def test_rollback_rejects_path_traversal(tmp_path):
+    base = str(tmp_path)
+    _seed(base)
+    mh.backup_manual(base, trigger='import', source_name='x')
+    # 在 base 上一级放一个同名诱饵目录，含可被覆盖的同名文件——穿越成功就会写坏它
+    bait = os.path.join(base, 'bait')
+    os.makedirs(bait, exist_ok=True)
+    with open(os.path.join(bait, 'project_tags.json'), 'w', encoding='utf-8') as f:
+        json.dump({'sentinel': True}, f)
+    for bad in ['../bait', '../../etc', 'a/b', '..', '.', '', 'foo/..', os.path.join('..', 'bait')]:
+        with pytest.raises(FileNotFoundError):
+            mh.rollback_manual(base, bad)
+    # 诱饵文件未被覆盖
+    with open(os.path.join(bait, 'project_tags.json'), encoding='utf-8') as f:
+        assert json.load(f) == {'sentinel': True}

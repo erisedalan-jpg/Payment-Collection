@@ -108,14 +108,14 @@ async function onManImport() {
     const res = await manualApi.import(sheets, f.name)
     if (!res.success) { manErrors.value = res.errors ?? []; manMsg.value = res.message || '校验未通过'; return }
     manMsg.value = `导入成功（${res.tags ? '标签 ' + res.tags.projects + ' 项' : ''}${res.followup ? ' 跟进 ' + res.followup.count + ' 条' : ''}）`
-    await loadManBackups(); await data.reload()
+    await loadManBackups(); await data.reload(); await projectTags.load()
   } catch (e) {
     manMsg.value = '导入异常：' + (e instanceof Error ? e.message : String(e))
   } finally { manBusy.value = false; if (manImportInput.value) manImportInput.value.value = '' }
 }
 async function onManRollback(id: string) {
   manBusy.value = true
-  try { await manualApi.rollback(id); manMsg.value = '已回滚'; await data.reload() }
+  try { await manualApi.rollback(id); manMsg.value = '已回滚'; await data.reload(); await projectTags.load() }
   catch (e) { manMsg.value = '回滚失败：' + (e instanceof Error ? e.message : String(e)) }
   finally { manBusy.value = false }
 }
