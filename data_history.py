@@ -7,7 +7,7 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 HISTORY_DIRNAME = "history"
 PRE_ROLLBACK = "_pre_rollback"
@@ -63,7 +63,7 @@ def _copy_item(src: str, dst: str, kind: str) -> None:
         os.replace(tmp, dst)          # 目录:同盘近原子换入(窗口仅 rmtree→replace)
 
 
-def _snapshot_live_into(base_dir: str, dest_dir: str, items: List[tuple]) -> List[str]:
+def _snapshot_live_into(base_dir: str, dest_dir: str, items: List[Tuple[str, str]]) -> List[str]:
     """把当前 items 中存在项复制进 dest_dir,返回顶层名列表。"""
     os.makedirs(dest_dir, exist_ok=True)
     saved = []
@@ -76,7 +76,7 @@ def _snapshot_live_into(base_dir: str, dest_dir: str, items: List[tuple]) -> Lis
     return saved
 
 
-def _restore_into_live(base_dir: str, src_dir: str, items: List[tuple]) -> List[str]:
+def _restore_into_live(base_dir: str, src_dir: str, items: List[Tuple[str, str]]) -> List[str]:
     """把 src_dir 内各项(按 items 映射)覆盖回 base_dir 的 live 位置。返回已还原名列表。"""
     restored = []
     for rel, kind in items:
@@ -176,6 +176,11 @@ def prune(base_dir: str, keep: int = KEEP) -> List[str]:
 
 def rollback(base_dir: str, version_id: str) -> Dict[str, Any]:
     """回滚:①备份当前 JSON 产出到 _pre_rollback ②覆盖回 live ③中途失败从备份回退并抛错。不动 live 源。"""
+    # 防目录穿越:version_id 必须是 history/ 下的纯版本目录名,不得含路径分隔/.. 逃逸,
+    # 也不得是内部目录名(_source/_pre_rollback)。(对齐 manual_history 同款防护)
+    if (not version_id or version_id in (".", "..", PRE_ROLLBACK, SOURCE_DIRNAME)
+            or version_id != os.path.basename(version_id)):
+        raise FileNotFoundError(f"历史版本不存在: {version_id}")
     root = _history_root(base_dir)
     src = os.path.join(root, version_id)
     if not os.path.isdir(src):

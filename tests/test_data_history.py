@@ -105,6 +105,24 @@ def test_rollback_missing_version_raises(tmp_path):
         DH.rollback(base, "nope")
 
 
+def test_rollback_rejects_path_traversal_and_internal_names(tmp_path):
+    """version_id 含 ../ 或为内部目录名(_source/_pre_rollback)时拒绝,不得覆盖 live。"""
+    import pytest
+    base = str(tmp_path)
+    _seed(base)
+    DH.archive_version(base, version_id="20260616-100000")
+    evil = os.path.join(base, "data", "evil")
+    os.makedirs(evil, exist_ok=True)
+    with open(os.path.join(evil, "analysis_data.json"), "w", encoding="utf-8") as f:
+        json.dump({"meta": {}, "marker": "EVIL"}, f)
+    _set_marker(base, "live")
+    for bad in ["../evil", "..", ".", "", "a/b", "_source", "_pre_rollback"]:
+        with pytest.raises(FileNotFoundError):
+            DH.rollback(base, bad)
+    with open(os.path.join(base, "data", "analysis_data.json"), encoding="utf-8") as f:
+        assert json.load(f)["marker"] == "live"
+
+
 def test_archive_skips_absent_items(tmp_path):
     base = str(tmp_path)
     os.makedirs(os.path.join(base, "data"), exist_ok=True)
