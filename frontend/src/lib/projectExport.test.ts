@@ -6,7 +6,7 @@ const ctx = {
   rows: [{ projectId: 'P1', projectName: '甲', tags: ['BH项目', '框架合同'] }] as any,
   assignments: { P1: ['BH项目', '框架合同'] },
   followup: [{ 记录编号: 'FU-1', 项目编号: 'P1', 跟进人: '张' }, { 记录编号: 'FU-2', 项目编号: 'P2' }] as any,
-  paymentNodes: { P1: [{ stage: '到货', planDate: '2026-01-01', status: '已达成', expectedPayment: 100 }] } as any,
+  paymentNodes: { P1: [{ stage: '到货', planDate: '2026-01-01', status: '已回款', expectedPayment: 100 }] } as any,
   milestones: { P1: [{ name: '终验', planDate: '2026-03-01', priority: 'high' }] } as any,
 }
 
