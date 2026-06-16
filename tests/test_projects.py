@@ -292,34 +292,24 @@ class TestPaymentRatioFromRecords:
         assert PJ.payment_ratio_from_records(500.0, 0, 0) is None
 
 
-class TestBuildPaymentPmis:
-    def _ms(self, name, plan, actual, ratio):
-        return {"name": name, "planDate": plan, "actualDate": actual, "payRatio": ratio}
+class TestBuildPaymentSummary:
+    def _node(self, stage, expected, reached, status):
+        return {"stage": stage, "expectedPayment": expected, "reached": reached, "status": status}
 
-    def test_nodes_and_summary(self):
+    def test_summary_from_nodes(self):
         import projects as PJ
-        ms = [self._ms("到货", "2026-01-01", "2026-01-02", 0.7),   # 已达成
-              self._ms("终验", "2020-01-01", "", 0.3),             # planDate<today 未达成→延期
-              self._ms("项目启动", "2026-01-01", "", None)]        # 非回款阶段/无比例→不计
+        nodes = [self._node("到货款", 700000.0, True, "已回款"),
+                 self._node("终验款", 300000.0, False, "延期")]
         rec = {"total": 700000.0, "count": 2, "lastDate": "2026-06-04"}
-        s, nodes = PJ.build_payment_pmis(1000000.0, ms, rec, "2026-06-15")
-        assert len(nodes) == 2
-        n0 = next(n for n in nodes if n["stage"] == "到货")
-        assert n0["expectedPayment"] == 700000.0 and n0["reached"] is True and n0["status"] == "已达成"
-        n1 = next(n for n in nodes if n["stage"] == "终验")
-        assert n1["status"] == "延期" and n1["reached"] is False
+        s = PJ.build_payment_summary(1000000.0, nodes, rec)
         assert s["contract"] == 1000000.0 and s["actualTotal"] == 700000.0 and s["paymentCount"] == 2
         assert s["paymentRatio"] == 0.7 and s["expectedTotal"] == 1000000.0
         assert s["nodeCount"] == 2 and s["reachedCount"] == 1 and s["delayedCount"] == 1
+        assert s["lastPaymentDate"] == "2026-06-04" and s["fromOrigin"] is False
 
     def test_robust_none(self):
         import projects as PJ
-        s, nodes = PJ.build_payment_pmis(None, [], None, "2026-06-15")
-        assert nodes == [] and s["paymentRatio"] is None and s["actualTotal"] is None
+        s = PJ.build_payment_summary(None, [], None)
+        assert s["paymentRatio"] is None and s["actualTotal"] is None
         assert s["expectedTotal"] == 0 and s["nodeCount"] == 0
-
-    def test_pending_status(self):
-        import projects as PJ
-        ms = [{"name": "初验", "planDate": "2099-01-01", "actualDate": "", "payRatio": 0.5}]
-        _, nodes = PJ.build_payment_pmis(1000000.0, ms, None, "2026-06-15")
-        assert nodes[0]["status"] == "待达成"
+        assert s["reachedCount"] == 0 and s["delayedCount"] == 0
