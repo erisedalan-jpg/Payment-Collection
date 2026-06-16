@@ -27,6 +27,8 @@ data/snapshots/
 data/events.json
 # 数据历史版本（含真实源数据副本，运行时生成，不入库）
 data/history/
+# 人工数据导入快照（运行时生成，含本地用户数据，2E）
+data/manual_backups/
 # 本地跟进记录（运行时用户数据）
 data/followup_records.json
 # 项目标签库（运行时用户数据，2C）
