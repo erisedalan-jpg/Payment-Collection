@@ -11,6 +11,8 @@ import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
 import { useReprocess } from '@/composables/useReprocess'
 import { useDataHistory } from '@/composables/useDataHistory'
+import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
+import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
@@ -87,6 +89,37 @@ async function onUndoRollback() {
   await doUndo()
 }
 
+// —— 人工数据导入 / 快照回滚 ——
+const manImportInput = ref<HTMLInputElement | null>(null)
+const manErrors = ref<ManualError[]>([])
+const manMsg = ref('')
+const manBackups = ref<ManualBackup[]>([])
+const manBusy = ref(false)
+async function loadManBackups() {
+  try { manBackups.value = (await manualApi.backups()).versions ?? [] } catch { /* 无快照时忽略 */ }
+}
+async function onManImport() {
+  const f = manImportInput.value?.files?.[0]; if (!f) return
+  manBusy.value = true; manErrors.value = []; manMsg.value = ''
+  try {
+    const buf = await f.arrayBuffer()
+    const sheets = parseManualSheets(readWorkbook(buf))
+    if (!Object.keys(sheets).length) { manMsg.value = '未发现「项目标签」或「跟进记录」sheet'; return }
+    const res = await manualApi.import(sheets, f.name)
+    if (!res.success) { manErrors.value = res.errors ?? []; manMsg.value = res.message || '校验未通过'; return }
+    manMsg.value = `导入成功（${res.tags ? '标签 ' + res.tags.projects + ' 项' : ''}${res.followup ? ' 跟进 ' + res.followup.count + ' 条' : ''}）`
+    await loadManBackups(); await data.reload()
+  } catch (e) {
+    manMsg.value = '导入异常：' + (e instanceof Error ? e.message : String(e))
+  } finally { manBusy.value = false; if (manImportInput.value) manImportInput.value.value = '' }
+}
+async function onManRollback(id: string) {
+  manBusy.value = true
+  try { await manualApi.rollback(id); manMsg.value = '已回滚'; await data.reload() }
+  catch (e) { manMsg.value = '回滚失败：' + (e instanceof Error ? e.message : String(e)) }
+  finally { manBusy.value = false }
+}
+
 const clearState = ref('')
 const clearing = ref(false)
 async function onClear() {
@@ -107,7 +140,7 @@ function onDisable(name: string, on: boolean) { projectTags.disableTag(name, on)
 const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => filter.setExclude(v, filter.excludeTags) })
 const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
 
-onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus(); loadHistory(); if (!projectTags.loaded) projectTags.load() })
+onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load() })
 </script>
 
 <template>
@@ -206,6 +239,28 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
       </div>
     </div>
 
+    <div class="dv-card" data-test="manual-import-card">
+      <div class="dv-card-head">人工数据导入 / 回滚</div>
+      <div class="dv-row">
+        <span class="dv-label">导入 xlsx</span>
+        <input ref="manImportInput" type="file" accept=".xlsx,.xls" class="dv-file" @change="onManImport" :disabled="manBusy" />
+        <span class="dv-hint">仅「项目标签」「跟进记录」sheet 整表替换；导入前自动快照</span>
+      </div>
+      <div v-if="manMsg" class="dv-row dv-hint ok">{{ manMsg }}</div>
+      <table v-if="manErrors.length" class="dv-err u-num">
+        <thead><tr><th>Sheet</th><th>行</th><th>列</th><th>错误</th></tr></thead>
+        <tbody>
+          <tr v-for="(e, i) in manErrors" :key="i">
+            <td>{{ e.sheet }}</td><td>{{ e.row }}</td><td>{{ e.col || '-' }}</td><td>{{ e.message }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-for="b in manBackups" :key="b.id" class="dv-row" data-test="man-backup-row">
+        <span class="dv-label u-num">{{ b.createdAt || b.id }}（标签{{ b.tagProjects ?? 0 }}/跟进{{ b.followupCount ?? 0 }}）</span>
+        <button class="dv-btn" :disabled="manBusy" @click="onManRollback(b.id)">回滚到此</button>
+      </div>
+    </div>
+
     <div class="dv-card">
       <div class="dv-card-head">数据历史 / 回滚</div>
       <div v-if="historyPre" class="dv-row">
@@ -264,4 +319,6 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
 .dv-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .dv-tag.off { opacity: .5; }
 .dv-tag-name { width: 84px; border: none; background: transparent; color: var(--txt); font-size: var(--fs-1); }
+.dv-err { width: 100%; border-collapse: collapse; font-size: var(--fs-1); margin: var(--sp-2) 0; }
+.dv-err th, .dv-err td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; color: var(--danger-text); }
 </style>
