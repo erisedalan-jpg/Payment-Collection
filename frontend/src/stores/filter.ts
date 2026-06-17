@@ -42,8 +42,8 @@ export const useFilterStore = defineStore('filter', () => {
 
   const l4Options = computed(() => {
     const set = new Set<string>()
-    for (const n of data.data?.rawNodes ?? []) {
-      const v = (n as { orgL4?: string }).orgL4
+    for (const p of data.data?.projects ?? []) {
+      const v = (p as { orgL4?: string }).orgL4
       if (v) set.add(v)
     }
     return [...set]
@@ -51,8 +51,8 @@ export const useFilterStore = defineStore('filter', () => {
 
   const pmOptions = computed(() => {
     const set = new Set<string>()
-    for (const n of data.data?.rawNodes ?? []) {
-      const v = (n as { projectManager?: string }).projectManager
+    for (const p of data.data?.projects ?? []) {
+      const v = (p as { projectManager?: string }).projectManager
       if (v) set.add(v)
     }
     return [...set]

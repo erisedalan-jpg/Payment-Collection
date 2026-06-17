@@ -1,17 +1,20 @@
-import type { RawNode } from '@/types/analysis'
-import { groupByProject, type ProjectAgg } from './dashboardStats'
+import type { Project, ProjectPmis } from '@/types/analysis'
+import { paymentNodeRows, type PayNodeRow } from './paymentPmis'
+import { ledgerRows, type LedgerProjectRow } from './ledger'
 
 export interface ProjectDetail {
-  project: ProjectAgg | null
-  nodes: RawNode[]
+  project: LedgerProjectRow | null
+  nodes: PayNodeRow[]
 }
 
-/**
- * 按 projectId 从全量 rawNodes 构建项目详情：项目聚合(复用 groupByProject) + 该项目全部节点。
- * 详情是对单个项目的"下钻查看"，不经纳管/年份/视角过滤——展示项目完整面貌。
- */
-export function buildProjectDetail(rawNodes: RawNode[], projectId: string): ProjectDetail {
-  const nodes = rawNodes.filter((n) => (n as Record<string, any>).projectId === projectId)
-  if (!nodes.length) return { project: null, nodes: [] }
-  return { project: groupByProject(nodes)[0], nodes }
+/** 单项目下钻：复用 3C ledgerRows 聚合(进度3态+延期)取目标项目行 + 其收款阶段节点。不经纳管/年份/视角过滤。 */
+export function buildProjectDetail(
+  paymentNodes: Parameters<typeof paymentNodeRows>[0],
+  projects: Project[],
+  projectPmis: Record<string, ProjectPmis> | undefined,
+  projectId: string,
+): ProjectDetail {
+  const rows = paymentNodeRows(paymentNodes, projects, projectPmis)
+  const row = ledgerRows(rows, projects).find((r) => r.projectId === projectId) ?? null
+  return { project: row, nodes: row?.nodes ?? [] }
 }

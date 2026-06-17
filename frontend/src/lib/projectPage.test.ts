@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Project, ProjectPmis, RawNode } from '@/types/analysis'
+import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from './projectPage'
 
 const PROJECTS = [
@@ -16,37 +16,25 @@ const PMIS = {
   'OLD-9': { source: '已关闭', team: { 项目名称: '某局一期', 项目经理: '王五' }, customer: { 最终客户: '某局', 合同总额: 1000000 } },
 } as unknown as Record<string, ProjectPmis>
 
-const NODES = [
-  { projectId: 'P-1', nodeName: '初验', nodeStatus: '正常实施中', isPaymentRelated: true },
-  { projectId: 'P-1', nodeName: '非回款里程碑', nodeStatus: '正常实施中', isPaymentRelated: false },
-  { projectId: 'OLD-9', nodeName: '终验', nodeStatus: '已全额回款', isPaymentRelated: true },
-  { projectId: 'X', nodeName: '无关', nodeStatus: '延期', isPaymentRelated: true },
-] as unknown as RawNode[]
-
 describe('buildProjectPage', () => {
-  it('命中项目：带 pmis 与本项目节点', () => {
-    const pg = buildProjectPage(PROJECTS, PMIS, NODES, 'P-1')
+  it('命中项目：带 pmis，无 relatedClosedId', () => {
+    const pg = buildProjectPage(PROJECTS, PMIS, 'P-1')
     expect(pg.project?.projectId).toBe('P-1')
     expect((pg.pmis as any)?.status?.项目状态).toBe('实施中')
-    expect(pg.nodes).toHaveLength(1) // 非回款节点(isPaymentRelated=false)被排除,与后端聚合口径一致
-    expect(pg.nodes[0].nodeName).toBe('初验')
     expect(pg.closedId).toBe('')
     expect(pg.closedPmis).toBeNull()
-    expect(pg.closedNodes).toHaveLength(0)
   })
-  it('售前整合项目：closedPmis 与原项目节点', () => {
-    const pg = buildProjectPage(PROJECTS, PMIS, NODES, 'P-2')
+  it('售前整合项目：closedPmis 正确取原项目', () => {
+    const pg = buildProjectPage(PROJECTS, PMIS, 'P-2')
     expect(pg.closedId).toBe('OLD-9')
     expect((pg.closedPmis as any)?.team?.项目名称).toBe('某局一期')
-    expect(pg.closedNodes).toHaveLength(1)
-    expect(pg.closedNodes[0].nodeName).toBe('终验')
   })
-  it('未知 id → project null 且各集合为空', () => {
-    const pg = buildProjectPage(PROJECTS, PMIS, NODES, 'NOPE')
+  it('未知 id → project null，各字段为 null/空', () => {
+    const pg = buildProjectPage(PROJECTS, PMIS, 'NOPE')
     expect(pg.project).toBeNull()
     expect(pg.pmis).toBeNull()
-    expect(pg.nodes).toHaveLength(0)
-    expect(pg.closedNodes).toHaveLength(0)
+    expect(pg.closedId).toBe('')
+    expect(pg.closedPmis).toBeNull()
   })
 })
 

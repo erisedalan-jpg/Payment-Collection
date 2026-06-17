@@ -40,12 +40,16 @@ function seed() {
       'P-1': { status: { 项目状态: '实施中', 是否暂停: false }, cost: { 超支: true } },
       'P-2': { status: { 项目状态: '实施中', 是否暂停: true }, cost: {} },
     },
-    rawNodes: [
-      { projectId: 'P-1', projectName: '风险甲', nodeName: '延期款', isPaymentRelated: true, nodeStatus: '延期',
-        planDate: inDays(-30), planMonth: iso(now).slice(0, 7), expectedPayment: 300000, actualPayment: 0 },
-      { projectId: 'P-1', projectName: '风险甲', nodeName: '临期款', isPaymentRelated: true, nodeStatus: '正常实施中',
-        planDate: inDays(2), planMonth: iso(now).slice(0, 7), expectedPayment: 200000, actualPayment: 0 },
-    ],
+    rawNodes: [],
+    // 回款重点带换收款阶段口径(3E-2):band 取 paymentNodeRows(paymentNodes,projects)。当月节点用本月固定日避免跨月脆弱
+    paymentNodes: {
+      'P-1': [
+        { stage: '延期款', planDate: `${iso(now).slice(0, 7)}-15`, actualDate: '', payRatio: null, actualRatio: null,
+          expectedPayment: 300000, receivedAmount: 0, unpaidAmount: 300000, status: '延期' },
+        { stage: '临期款', planDate: `${iso(now).slice(0, 7)}-15`, actualDate: '', payRatio: null, actualRatio: null,
+          expectedPayment: 200000, receivedAmount: 0, unpaidAmount: 200000, status: '待回款' },
+      ],
+    },
     events: Array.from({ length: 12 }, (_, i) => ({
       date: iso(now), type: '到账', domain: 'payment', projectId: 'P-1', projectName: '风险甲', summary: `事件${i}`,
     })),

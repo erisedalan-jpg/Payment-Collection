@@ -2,8 +2,9 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
-import type { Event, Project, ProjectPmis, RawNode } from '@/types/analysis'
+import type { Event, Project, ProjectPmis } from '@/types/analysis'
 import { computeKpis, healthSummary, paymentBand } from '@/lib/overview'
+import { paymentNodeRows } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import HealthBadge from '@/components/HealthBadge.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
@@ -17,7 +18,8 @@ const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, 
 
 const kpis = computed(() => computeKpis(projects.value, pmisMap.value))
 const health = computed(() => healthSummary(projects.value))
-const band = computed(() => paymentBand((data.data?.rawNodes ?? []) as RawNode[], new Date()))
+const band = computed(() => paymentBand(
+  paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis), new Date()))
 const recentEvents = computed(() => ((data.data?.events ?? []) as Event[]).slice(0, 10))
 
 // KPI 卡带跳转(用户实测反馈 2026-06-11,推翻原"不可点击"决策):前五张带筛选进清单,达成率进回款总览
@@ -85,7 +87,7 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
             </RouterLink>
             <div class="ov-pay-block">
               <div class="ov-pay-k">延期 Top3（待回金额）</div>
-              <button v-for="t in band.delayedTop" :key="`${t.projectId}-${t.nodeName}`" class="ov-top-item" @click="router.push(`/project/${t.projectId}`)">
+              <button v-for="t in band.delayedTop" :key="`${t.projectId}-${t.stage}`" class="ov-top-item" @click="router.push(`/project/${t.projectId}`)">
                 <span class="ov-top-name">{{ t.projectName || t.projectId }}</span>
                 <span class="u-num">{{ fmtWan(t.remaining) }} 万</span>
               </button>
