@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import type { Project, ProjectPmis, RawNode, Event, MilestoneItem, PaymentRecordsEntry, ProjectProfit } from '@/types/analysis'
+import type { Project, ProjectPmis, Event, MilestoneItem, PaymentRecordsEntry, ProjectProfit } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
 import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
 import { formatCellValue } from '@/lib/cellFormat'
@@ -47,7 +47,6 @@ const page = computed(() =>
   buildProjectPage(
     (data.data?.projects ?? []) as Project[],
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
-    (data.data?.rawNodes ?? []) as RawNode[],
     String(route.params.id || ''),
   ),
 )
@@ -122,17 +121,6 @@ const PMIS_NODE_COLS: DataColumn[] = [
   { key: 'payTerm', label: '收款条件', width: 240, wrap: true, formatter: (v) => (v ? String(v) : '-') },
   { key: 'status', label: '状态' },
 ]
-
-// —— 云文档节点列（旧口径，仅"原项目"tab 展示原项目回款节点；回款 tab 已脱离）——
-const NODE_COLS: DataColumn[] = [
-  { key: 'nodeName', label: '节点' },
-  { key: 'planDate', label: '计划日期' },
-  { key: 'expectedPayment', label: '计划回款' },
-  { key: 'actualPayment', label: '已回款' },
-  { key: 'actualPaymentRatio', label: '实际比例' },
-  { key: 'nodeStatus', label: '状态' },
-  { key: 'delayDays', label: '延期天数' },
-].map((c) => ({ ...c, formatter: (v: unknown) => formatCellValue(v, c.key) }))
 
 // —— 进度里程碑 ——
 const progressInfo = computed(() => [
@@ -372,10 +360,6 @@ const originInfo = computed(() => [
               <div class="pd-chips">
                 <div v-for="it in originInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
               </div>
-              <template v-if="page.closedNodes.length">
-                <div class="pd-section-title">原项目回款节点（不计入当前汇总）</div>
-                <DataTable :columns="NODE_COLS" :rows="page.closedNodes" :show-count="false" />
-              </template>
               <template v-if="originMilestones.length">
                 <div class="pd-section-title">原项目里程碑（不计入当前汇总）</div>
                 <MilestoneTable :items="originMilestones" />
