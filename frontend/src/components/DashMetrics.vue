@@ -2,19 +2,16 @@
 import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { computeDashboardSummary } from '@/lib/dashboardStats'
+import { payDashSummary } from '@/lib/payDashboard'
 import { fmtWan, pct } from '@/lib/format'
 
 const data = useDataStore()
 const filter = useFilterStore()
 
 const summary = computed(() =>
-  computeDashboardSummary(filter.filteredNodes, data.data?.projectOverview?.projects ?? [], {
-    excludeActive: filter.excludeOn,
-    excludedIds: filter.excludedIds,
-    viewMode: filter.viewMode,
-    viewL4: filter.viewL4,
-    viewPM: filter.viewPM,
+  payDashSummary(filter.filteredPayNodes, data.data?.projects ?? [], {
+    excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
+    viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
   }),
 )
 

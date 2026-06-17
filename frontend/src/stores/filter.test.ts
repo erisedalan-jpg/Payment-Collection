@@ -71,3 +71,29 @@ describe('filter excludedIds（按标签全局排除）', () => {
     expect(f.excludedIds).toEqual({})
   })
 })
+
+describe('filteredPayNodes(3B)', () => {
+  it('随 viewMode/filterYear 过滤收款阶段节点', () => {
+    const ds = useDataStore()
+    ds.data = {
+      meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] },
+      naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, rawNodes: [],
+      projects: [
+        { projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } },
+        { projectId: 'P2', projectName: '乙', projectManager: '李四', orgL4: 'B组', paymentPmis: { contract: 100000 } },
+      ],
+      projectPmis: {},
+      paymentNodes: {
+        P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.7, expectedPayment: 700000, receivedAmount: 0, unpaidAmount: 700000, status: '待回款' }],
+        P2: [{ stage: '预付款', planDate: '2026-08-01', actualDate: '', payRatio: 1, expectedPayment: 100000, receivedAmount: 0, unpaidAmount: 100000, status: '待回款' }],
+      },
+    } as any
+    const f = useFilterStore()
+    expect(f.filteredPayNodes.length).toBe(2)
+    f.setViewL4('A组')
+    expect(f.filteredPayNodes.map((r) => r.projectId)).toEqual(['P1'])
+    f.setViewGlobal()
+    f.setYear('2026-Q1')
+    expect(f.filteredPayNodes.map((r) => r.projectId)).toEqual(['P1'])
+  })
+})

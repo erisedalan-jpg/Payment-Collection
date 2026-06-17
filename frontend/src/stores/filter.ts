@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { useDataStore } from './data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { filterNodes, type ViewMode } from '@/lib/filterNodes'
+import { paymentNodeRows } from '@/lib/paymentPmis'
+import { filterPayNodes } from '@/lib/payDashboard'
 
 const EXCLUDE_ON_KEY = 'pa_exclude_on'
 const EXCLUDE_TAGS_KEY = 'pa_exclude_tags'
@@ -81,6 +83,16 @@ export const useFilterStore = defineStore('filter', () => {
     }),
   )
 
+  const payNodeRowsAll = computed(() =>
+    paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
+  )
+  const filteredPayNodes = computed(() =>
+    filterPayNodes(payNodeRowsAll.value, {
+      filterYear: filterYear.value, viewMode: viewMode.value, viewL4: viewL4.value, viewPM: viewPM.value,
+      excludeActive: excludeOn.value, excludedIds: excludedIds.value,
+    }),
+  )
+
   function setYear(key: string) {
     filterYear.value = key
   }
@@ -109,7 +121,7 @@ export const useFilterStore = defineStore('filter', () => {
 
   return {
     filterYear, viewMode, viewL4, viewPM,
-    yearOptions, l4Options, pmOptions, filteredNodes,
+    yearOptions, l4Options, pmOptions, filteredNodes, filteredPayNodes,
     setYear, setViewGlobal, setViewL4, setViewPM,
     excludeOn, excludeTags, excludedIds, setExclude,
   }

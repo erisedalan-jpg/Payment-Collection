@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFilterStore } from '@/stores/filter'
-import { rankByOrg } from '@/lib/dashboardCharts'
+import { payOrgRanking } from '@/lib/payDashboard'
 import { goBoard } from '@/lib/navContext'
 import { fmtWan, pct } from '@/lib/format'
 import SegToggle from './SegToggle.vue'
@@ -16,7 +16,7 @@ const SORT_OPTS = [
 ]
 
 const ranked = computed(() =>
-  rankByOrg(filter.filteredNodes, '', sortBy.value as 'actualTotal' | 'achievementRate').slice(0, 8),
+  payOrgRanking(filter.filteredPayNodes, sortBy.value as 'actualTotal' | 'achievementRate').slice(0, 8),
 )
 const maxActual = computed(() => Math.max(1, ...ranked.value.map((o) => o.actualTotal)))
 

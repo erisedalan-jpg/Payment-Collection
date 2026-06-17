@@ -169,6 +169,9 @@ export interface PayNodeRow {
   actualDate: string
   payRatio: number | null
   expectedPayment: number
+  receivedAmount: number
+  unpaidAmount: number
+  projectManager: string
   status: string
   dept: string
   projStage: string
@@ -200,6 +203,9 @@ export function paymentNodeRows(
         actualDate: n.actualDate || '',
         payRatio: n.payRatio ?? null,
         expectedPayment: n.expectedPayment ?? 0,
+        receivedAmount: n.receivedAmount ?? 0,
+        unpaidAmount: n.unpaidAmount ?? 0,
+        projectManager: (p.projectManager ?? '').trim() || '未指定',
         status: n.status || '',
         dept,
         projStage,
