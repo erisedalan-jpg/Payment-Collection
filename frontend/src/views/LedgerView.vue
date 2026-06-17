@@ -3,13 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
-import { groupByProject } from '@/lib/dashboardStats'
+import { paymentNodeRows } from '@/lib/paymentPmis'
 import {
-  excludeFilter,
-  filterLedgerProjects,
-  ledgerSummary,
-  ledgerTierStats,
-  ledgerStatusCounts,
+  ledgerRows,
+  filterLedgerRows,
+  ledgerSummaryPmis,
+  ledgerTierStatsPmis,
+  ledgerStatusCountsPmis,
 } from '@/lib/ledger'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { fmtWan, fmtYuan, pct } from '@/lib/format'
@@ -17,7 +17,7 @@ import LedgerTable from '@/components/LedgerTable.vue'
 
 const TABLE_ID = 'ledgerTable'
 const TIER_OPTS = ['100万以上', '50-100万', '50万以下']
-const STATUS_OPTS = ['正常实施中', '已提前回款', '延期', '加资源可提前', '已全额回款', '达到回款条件']
+const STATUS_OPTS = ['已全额回款', '部分回款', '未回款', '延期']
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -31,30 +31,24 @@ const search = ref('')
 const tierSel = ref('')
 const statusSel = ref('')
 
-const rawNodes = computed(() => (data.data?.rawNodes ?? []) as Record<string, any>[])
-const baseProjs = computed(() =>
-  groupByProject(
-    excludeFilter(
-      rawNodes.value as any,
-      filter.excludeOn,
-      filter.excludedIds,
-    ),
+const allRows = computed(() =>
+  ledgerRows(
+    paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
+    data.data?.projects ?? [],
   ),
 )
+const baseProjs = computed(() =>
+  filter.excludeOn ? allRows.value.filter((r) => !filter.excludedIds[r.projectId]) : allRows.value,
+)
 const searched = computed(() =>
-  filterLedgerProjects(baseProjs.value, {
-    search: search.value,
-    tier: tierSel.value,
-    status: statusSel.value,
-  }),
+  filterLedgerRows(baseProjs.value, { search: search.value, tier: tierSel.value, status: statusSel.value }),
 )
 const displayed = computed(
   () => applyColumnFilters(searched.value as any, cf.tableFilters(TABLE_ID)) as any[],
 )
-
-const summary = computed(() => ledgerSummary(displayed.value as any))
-const tierStats = computed(() => ledgerTierStats(displayed.value as any))
-const statusCounts = computed(() => ledgerStatusCounts(displayed.value as any))
+const summary = computed(() => ledgerSummaryPmis(displayed.value as any))
+const tierStats = computed(() => ledgerTierStatsPmis(displayed.value as any))
+const statusCounts = computed(() => ledgerStatusCountsPmis(displayed.value as any))
 
 const rateColor = (r: number) =>
   r >= 0.8 ? 'var(--c-paid)' : r >= 0.5 ? 'var(--c-pending)' : 'var(--danger)'
@@ -97,12 +91,10 @@ const columns = [
     </div>
 
     <div class="status-row">
-      <div class="st-card"><div class="st-label">加资源可提前</div><div class="st-val" style="color:var(--accent)">{{ statusCounts.canAdvance }}</div></div>
-      <div class="st-card"><div class="st-label">达到回款条件</div><div class="st-val" style="color:var(--c-pending)">{{ statusCounts.reachedCondition }}</div></div>
-      <div class="st-card"><div class="st-label">已提前回款</div><div class="st-val" style="color:var(--c-paid)">{{ statusCounts.advance }}</div></div>
       <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:var(--c-paid)">{{ statusCounts.fullPaid }}</div></div>
+      <div class="st-card"><div class="st-label">部分回款</div><div class="st-val" style="color:var(--c-pending)">{{ statusCounts.partial }}</div></div>
+      <div class="st-card"><div class="st-label">未回款</div><div class="st-val" style="color:var(--accent)">{{ statusCounts.unpaid }}</div></div>
       <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:var(--danger)">{{ statusCounts.delayed }}</div></div>
-      <div class="st-card"><div class="st-label">正常实施中</div><div class="st-val" style="color:var(--accent)">{{ statusCounts.onTime }}</div></div>
     </div>
 
     <div class="tier-cards">
