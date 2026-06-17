@@ -128,12 +128,24 @@ describe('ProjectDetailView', () => {
 
   it('回款数据 tab:流水汇总 chips+明细表+非 CNY 汇率(R2)', async () => {
     seed()
+    const ds0 = useDataStore()
+    ;(ds0.data as any).paymentRecords['P-1'].records[0] = {
+      ...(ds0.data as any).paymentRecords['P-1'].records[0],
+      billType: '背书', billDueDate: '2026-03-10', billProtocol: '',
+    }
+    ;(ds0.data as any).paymentRecords['P-1'].records[1] = {
+      ...(ds0.data as any).paymentRecords['P-1'].records[1],
+      billType: '', billDueDate: '', billProtocol: 'PROT-9',
+    }
     const w = await mountAt('/project/P-1')
     await w.findAll('.pd-tab').find((b) => b.text() === '回款数据')!.trigger('click')
     expect(w.text()).toContain('累计回款(万)')
     expect(w.text()).toContain('BANK-1')
     expect(w.text()).toContain('马春艳')
     expect(w.text()).toContain('USD(汇率 7.1)')
+    expect(w.text()).toContain('票据')            // 列表头
+    expect(w.text()).toContain('背书·2026-03-10')  // 类型·到期日
+    expect(w.text()).toContain('互抵:PROT-9')      // 仅协议号兜底
   })
 
   it('回款数据 tab:无流水显示未提供空态(R2)', async () => {
@@ -303,7 +315,7 @@ describe('ProjectDetailView', () => {
     ;(ds.data as any).paymentNodes = { 'P-1': [
       { stage: '到货款', category: '到货款', planDate: '2026-01-01', actualDate: '2026-01-02',
         payRatio: 0.7, expectedPayment: 700000, receivedAmount: 700000, unpaidAmount: 0,
-        actualRatio: 1, termDays: 90, reached: true, status: '已回款' },
+        actualRatio: 1, termDays: 90, payTerm: '到货后20天内付款70%', reached: true, status: '已回款' },
       { stage: '终验款', category: '终验款', planDate: '2020-01-01', actualDate: '',
         payRatio: 0.3, expectedPayment: 300000, receivedAmount: 0, unpaidAmount: 300000,
         actualRatio: 0, termDays: 20, reached: false, status: '延期' },
@@ -313,6 +325,8 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('到货')
     expect(w.text()).toContain('已回款')
     expect(w.text()).toContain('延期')
+    expect(w.text()).toContain('收款条件')          // 列表头
+    expect(w.text()).toContain('到货后20天内付款70%') // 收款条件全文显示
   })
 
   it('渲染项目标签块，显示已挂标签(2C)', async () => {

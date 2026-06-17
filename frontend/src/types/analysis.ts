@@ -156,6 +156,9 @@ export type Orderno = string;
 export type Currency = string;
 export type Rate = number | null;
 export type Note = string;
+export type Billtype = string;
+export type Billduedate = string;
+export type Billprotocol = string;
 export type Records = PaymentRecord[];
 export type Stage = string;
 export type Category = string;
@@ -167,6 +170,7 @@ export type Receivedamount = number;
 export type Unpaidamount = number;
 export type Actualratio = number | null;
 export type Termdays = number | null;
+export type Payterm = string;
 export type Reached = boolean;
 export type Status = string;
 export type Code = string;
@@ -518,6 +522,9 @@ export interface PaymentRecord {
   currency?: Currency;
   rate?: Rate;
   note?: Note;
+  billType?: Billtype;
+  billDueDate?: Billduedate;
+  billProtocol?: Billprotocol;
   [k: string]: unknown;
 }
 export interface Paymentnodes {
@@ -534,6 +541,7 @@ export interface PaymentNodePmis {
   unpaidAmount?: Unpaidamount;
   actualRatio?: Actualratio;
   termDays?: Termdays;
+  payTerm?: Payterm;
   reached?: Reached;
   status?: Status;
   [k: string]: unknown;

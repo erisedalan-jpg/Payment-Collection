@@ -202,6 +202,9 @@ def load_payment_records(input_dir: str, keep_ids: Set[str]
             "currency": str(r.get("币种") or "").strip(),
             "rate": _num(r.get("汇率")),
             "note": str(r.get("备注") or "").strip(),
+            "billType": str(r.get("票据_调整类型") or "").strip(),
+            "billDueDate": str(r.get("票据_到期日期") or "").strip()[:10],
+            "billProtocol": str(r.get("票据_互抵协议号") or "").strip(),
         }
         e = out.setdefault(pid, {"total": 0.0, "count": 0, "lastDate": "", "records": []})
         e["records"].append(rec)
