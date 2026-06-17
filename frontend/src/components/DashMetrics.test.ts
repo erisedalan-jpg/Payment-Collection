@@ -26,5 +26,7 @@ describe('DashMetrics', () => {
     expect(text).toContain('项目数')
     expect(text).toContain('回款节点')
     expect(text).toContain('延期')
+    // 数值断言:完成率=Σ已收600000÷Σ计划1000000=60%(旧空 rawNodes 口径给 0%,确保真换源)
+    expect(text).toContain('60%')
   })
 })
