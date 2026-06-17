@@ -42,6 +42,13 @@ PAY_CSV = (
     "SS-99,乙项目,C-9,实际回款,BANK-9,别家,5.0,2026-01-01,张三,,N-9,CNY,1.0,\n"
 )
 
+PAY_BILL_CSV = (
+    "项目编号,回款类型,收款流水号,付款金额,回款确认日期,票据_互抵协议号,票据_到期日期,票据_调整类型\n"
+    "SS-1,实际回款,B-1,100.0,2026-06-04,,2026-03-10,背书\n"   # 有调整类型+到期日
+    "SS-1,实际回款,B-2,200.0,2026-06-05,PROT-9,,\n"           # 仅互抵协议号
+    "SS-1,实际回款,B-3,300.0,2026-06-06,,,\n"                 # 无票据信息
+)
+
 
 class TestParseProfitRows:
     def test_tree_levels_and_all_none_pruning(self):
@@ -101,6 +108,18 @@ class TestPaymentRecords:
     def test_missing(self, tmp_path):
         recs, stat = P.load_payment_records(str(tmp_path), {"SS-1"})
         assert recs == {} and stat["provided"] is False
+
+    def test_bill_fields(self, tmp_path):
+        _write(tmp_path, "payment_records.csv", PAY_BILL_CSV)
+        recs, _ = P.load_payment_records(str(tmp_path), {"SS-1"})
+        rs = {r["serial"]: r for r in recs["SS-1"]["records"]}
+        assert rs["B-1"]["billType"] == "背书"
+        assert rs["B-1"]["billDueDate"] == "2026-03-10"
+        assert rs["B-1"]["billProtocol"] == ""
+        assert rs["B-2"]["billProtocol"] == "PROT-9"
+        assert rs["B-2"]["billType"] == "" and rs["B-2"]["billDueDate"] == ""
+        assert rs["B-3"]["billType"] == "" and rs["B-3"]["billDueDate"] == ""
+        assert rs["B-3"]["billProtocol"] == ""
 
 
 class TestOverspendAmount:
