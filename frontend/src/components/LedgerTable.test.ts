@@ -10,14 +10,13 @@ const columns = [
   { key: 'projectId', label: '项目编号' },
   { key: 'projectName', label: '项目名称' },
 ]
-const projects = [{ projectId: 'P1', projectName: '甲' }]
-const rawNodes = [
-  { projectId: 'P1', isPaymentRelated: true, milestone: '节点A', planDate: '2026-06-06', expectedPayment: 200000, actualPayment: 50000, actualPaymentRatio: 0.25, nodeStatus: '延期' },
-]
+const projects = [{ projectId: 'P1', projectName: '甲', nodes: [
+  { stage: '到货款', planDate: '2026-06-06', receivedAmount: 50000, unpaidAmount: 150000, actualRatio: 0.25, status: '部分回款' },
+] }]
 
 function mountLT() {
   return mount(LedgerTable, {
-    props: { tableId: 'ledgerTable', projects, columns, sourceRows: projects, rawNodes },
+    props: { tableId: 'ledgerTable', projects, columns, sourceRows: projects },
     global: { plugins: [ElementPlus] },
   })
 }
@@ -30,11 +29,11 @@ describe('LedgerTable', () => {
     expect(w.text()).toContain('共 1 条记录')
     expect(w.findAllComponents({ name: 'ColumnFilter' }).length).toBe(2)
   })
-  it('点击行展开回款节点明细，再点收起', async () => {
+  it('点击行展开收款阶段节点明细，再点收起', async () => {
     const w = mountLT()
     await w.find('tr.lt-row').trigger('click')
     expect(w.text()).toContain('回款节点明细')
-    expect(w.text()).toContain('节点A')
+    expect(w.text()).toContain('到货款')
     await w.find('tr.lt-row').trigger('click')
     expect(w.text()).not.toContain('回款节点明细')
   })

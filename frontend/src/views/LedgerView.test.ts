@@ -13,30 +13,32 @@ beforeEach(() => {
 function seed() {
   const ds = useDataStore()
   ds.data = {
-    meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
-    dashboard: {},
-    summary: {},
-    rawNodes: [
-      { projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: '北京', tier: '100万以上', isPaymentRelated: true, nodeStatus: '延期', projectAmount: 2000000, expectedPayment: 1000000, actualPayment: 0 },
-      { projectId: 'P2', projectName: '乙', projectManager: '李', orgL4: '上海', tier: '50万以下', isPaymentRelated: true, nodeStatus: '正常实施中', projectAmount: 300000, expectedPayment: 200000, actualPayment: 200000 },
+    meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
+    rawNodes: [], projectOverview: { projects: [], columns: [] },
+    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    projects: [
+      { projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: '北京', paymentPmis: { contract: 2000000 } },
+      { projectId: 'P2', projectName: '乙', projectManager: '李', orgL4: '上海', paymentPmis: { contract: 300000 } },
     ],
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {},
-    naguanExclude: {},
-    displayColumns: {},
-    followupRecords: {},
+    projectPmis: {},
+    paymentNodes: {
+      P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.5, expectedPayment: 1000000, receivedAmount: 0, unpaidAmount: 1000000, actualRatio: 0, status: '延期' }],
+      P2: [{ stage: '预付款', planDate: '2026-02-01', actualDate: '2026-02-02', payRatio: 1, expectedPayment: 200000, receivedAmount: 200000, unpaidAmount: 0, actualRatio: 1, status: '已回款' }],
+    },
   } as any
 }
 
 describe('LedgerView', () => {
-  it('渲染汇总条/状态行/分层卡/表格', () => {
+  it('渲染汇总条/状态行(4卡)/分层卡/表格(收款阶段口径)', () => {
     seed()
     const w = mount(LedgerView, { global: { plugins: [ElementPlus] } })
     expect(w.text()).toContain('计划回款总金额(万)')
-    // 汇总 fmtWan(1000000+200000)=120
     expect(w.text()).toContain('120')
     expect(w.text()).toContain('P1')
     expect(w.text()).toContain('P2')
+    expect(w.text()).toContain('已全额回款')
+    expect(w.text()).toContain('未回款')
+    expect(w.text()).toContain('延期')
     expect(w.findComponent({ name: 'LedgerTable' }).exists()).toBe(true)
   })
 
