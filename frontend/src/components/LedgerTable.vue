@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import ColumnFilter from './ColumnFilter.vue'
-import { getNodeRemaining } from '@/lib/riskGroups'
 import { fmtYuan, fmtRatio } from '@/lib/format'
 
 interface LedgerCol {
@@ -15,7 +14,6 @@ const props = defineProps<{
   projects: Record<string, any>[]
   columns: LedgerCol[]
   sourceRows: Record<string, any>[]
-  rawNodes: Record<string, any>[]
 }>()
 
 const expandedIdx = ref(-1)
@@ -28,9 +26,6 @@ watch(
 )
 function toggle(idx: number) {
   expandedIdx.value = expandedIdx.value === idx ? -1 : idx
-}
-function projNodes(projectId: string) {
-  return props.rawNodes.filter((n) => n.projectId === projectId && n.isPaymentRelated)
 }
 function cell(row: Record<string, any>, col: LedgerCol) {
   return col.formatter ? col.formatter(row[col.key], row) : String(row[col.key] ?? '-')
@@ -62,21 +57,22 @@ function cell(row: Record<string, any>, col: LedgerCol) {
                   {{ p.projectName || p.projectId }}
                   <span class="lt-detail-id">项目编号: {{ p.projectId }}</span>
                 </div>
-                <div v-if="projNodes(p.projectId).length" class="lt-nodes">
-                  <div class="lt-nodes-title">回款节点明细 ({{ projNodes(p.projectId).length }})</div>
+                <div v-if="(p.nodes || []).length" class="lt-nodes">
+                  <div class="lt-nodes-title">回款节点明细 ({{ p.nodes.length }})</div>
                   <table class="lt-node-table">
                     <thead>
                       <tr>
-                        <th>节点</th><th>计划日期</th><th>待回款(元)</th><th>实际比例</th><th>状态</th>
+                        <th>阶段</th><th>计划日期</th><th>已收(元)</th><th>未收(元)</th><th>实际比例</th><th>状态</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(n, ni) in projNodes(p.projectId)" :key="ni">
-                        <td>{{ n.milestone || n.stageName || n.nodeName || '-' }}</td>
+                      <tr v-for="(n, ni) in p.nodes" :key="ni">
+                        <td>{{ n.stage || '-' }}</td>
                         <td>{{ n.planDate || '-' }}</td>
-                        <td>{{ fmtYuan(getNodeRemaining(n)) }}</td>
-                        <td>{{ fmtRatio(n.actualPaymentRatio, '待上报') }}</td>
-                        <td>{{ n.nodeStatus }}</td>
+                        <td>{{ fmtYuan(n.receivedAmount) }}</td>
+                        <td>{{ fmtYuan(n.unpaidAmount) }}</td>
+                        <td>{{ fmtRatio(n.actualRatio, '待上报') }}</td>
+                        <td>{{ n.status }}</td>
                       </tr>
                     </tbody>
                   </table>

@@ -168,6 +168,7 @@ export interface PayNodeRow {
   planDate: string
   actualDate: string
   payRatio: number | null
+  actualRatio: number | null
   expectedPayment: number
   receivedAmount: number
   unpaidAmount: number
@@ -202,6 +203,7 @@ export function paymentNodeRows(
         planDate: n.planDate || '',
         actualDate: n.actualDate || '',
         payRatio: n.payRatio ?? null,
+        actualRatio: n.actualRatio ?? null,
         expectedPayment: n.expectedPayment ?? 0,
         receivedAmount: n.receivedAmount ?? 0,
         unpaidAmount: n.unpaidAmount ?? 0,
