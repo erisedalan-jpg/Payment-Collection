@@ -119,6 +119,7 @@ const PMIS_NODE_COLS: DataColumn[] = [
   { key: 'receivedAmount', label: '已收(万)', formatter: (v) => fmtWan(v as number) },
   { key: 'unpaidAmount', label: '未收(万)', formatter: (v) => fmtWan(v as number) },
   { key: 'termDays', label: '账期(天)', formatter: (v) => (v == null ? '-' : String(v)) },
+  { key: 'payTerm', label: '收款条件', width: 240, wrap: true, formatter: (v) => (v ? String(v) : '-') },
   { key: 'status', label: '状态' },
 ]
 
