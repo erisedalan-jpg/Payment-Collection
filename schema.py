@@ -165,6 +165,7 @@ class PaymentNodePmis(_Base):
     unpaidAmount: float = 0
     actualRatio: Optional[float] = None
     termDays: Optional[int] = None
+    payTerm: str = ""
     reached: bool = False
     status: str = ""
 

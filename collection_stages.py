@@ -80,6 +80,7 @@ def _row_to_node(row: Dict[str, str], today: str) -> Dict[str, Any]:
         "unpaidAmount": _num(row.get("未收金额")),
         "actualRatio": round(ar, 4),
         "termDays": _int(row.get("关联日期")),
+        "payTerm": (row.get("收款条件") or "").strip(),
         "reached": ar >= 1,                         # 全额回款
         "status": stage_status(category, plan, ar, today),
     }
