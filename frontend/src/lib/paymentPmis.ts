@@ -175,6 +175,7 @@ export interface PayNodeRow {
   projectManager: string
   status: string
   dept: string
+  orgL3: string
   projStage: string
   tier: string
   progress: string
@@ -210,6 +211,7 @@ export function paymentNodeRows(
         projectManager: (p.projectManager ?? '').trim() || '未指定',
         status: n.status || '',
         dept,
+        orgL3: (p.orgL3 ?? '').trim(),
         projStage,
         tier,
         progress,

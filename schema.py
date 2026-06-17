@@ -188,6 +188,7 @@ class Project(_Base):
     projectName: str = ""
     projectManager: str = ""
     orgL4: str = ""
+    orgL3: str = ""
     isPresale: bool = False
     relatedClosedId: str = ""
     payment: ProjectPayment = ProjectPayment()

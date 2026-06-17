@@ -244,3 +244,11 @@ describe('paymentNodeRows actualRatio(3C)', () => {
     expect(paymentNodeRows(paymentNodes, projects)[0].actualRatio).toBe(0.6)
   })
 })
+
+describe('paymentNodeRows orgL3(3D)', () => {
+  it('节点行带 orgL3(取自 project)', () => {
+    const projects = [{ projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A', orgL3: '三部一组', paymentPmis: { contract: 100 } }] as any
+    const paymentNodes = { P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.7, actualRatio: 0, expectedPayment: 100, receivedAmount: 0, unpaidAmount: 100, status: '待回款' }] } as any
+    expect(paymentNodeRows(paymentNodes, projects)[0].orgL3).toBe('三部一组')
+  })
+})

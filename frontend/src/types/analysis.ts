@@ -89,6 +89,7 @@ export type Projectid1 = string;
 export type Projectname1 = string;
 export type Projectmanager = string;
 export type Orgl4 = string;
+export type Orgl3 = string;
 export type Ispresale = boolean;
 export type Relatedclosedid = string;
 export type Relatednodecount = number;
@@ -360,6 +361,7 @@ export interface Project {
   projectName?: Projectname1;
   projectManager?: Projectmanager;
   orgL4?: Orgl4;
+  orgL3?: Orgl3;
   isPresale?: Ispresale;
   relatedClosedId?: Relatedclosedid;
   payment?: ProjectPayment;

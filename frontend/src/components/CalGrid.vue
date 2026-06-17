@@ -100,12 +100,9 @@ function onClick(ds: string) {
 .cal-day.has-nodes:hover { background: color-mix(in srgb, var(--sc) 24%, transparent); }
 .cal-day.selected { box-shadow: 0 0 0 2px var(--accent) inset; }
 .st-delayed { --sc: var(--danger); }
-.st-ontime { --sc: var(--accent); }
-.st-advance { --sc: var(--ok); }
-.st-canadvance { --sc: var(--cyan); }
-.st-reached { --sc: var(--warn); }
-.st-fullpaid { --sc: var(--ok); }
 .st-pending { --sc: var(--mut); }
+.st-partial { --sc: var(--accent); }
+.st-warranty { --sc: var(--warn); }
 .st-mixed { --sc: var(--accent); }
 .cd-top { display: flex; align-items: center; justify-content: space-between; }
 .cd-num { font-weight: 700; }

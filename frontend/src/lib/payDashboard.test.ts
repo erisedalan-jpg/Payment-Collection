@@ -6,7 +6,7 @@ function node(p: Partial<PayNodeRow>): PayNodeRow {
   return {
     projectId: 'P1', projectName: '甲', stage: '到货款', planDate: '2026-02-01', actualDate: '',
     payRatio: null, actualRatio: null, expectedPayment: 0, receivedAmount: 0, unpaidAmount: 0, projectManager: '张三',
-    status: '待回款', dept: 'A组', projStage: '', tier: '100万以上', progress: '部分回款', ...p,
+    status: '待回款', dept: 'A组', orgL3: '', projStage: '', tier: '100万以上', progress: '部分回款', ...p,
   }
 }
 
