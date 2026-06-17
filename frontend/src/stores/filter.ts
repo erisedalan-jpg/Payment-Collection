@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDataStore } from './data'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import { filterNodes, type ViewMode } from '@/lib/filterNodes'
+import type { ViewMode } from '@/lib/filterNodes'
 import { paymentNodeRows } from '@/lib/paymentPmis'
 import { filterPayNodes } from '@/lib/payDashboard'
 
@@ -72,17 +72,6 @@ export const useFilterStore = defineStore('filter', () => {
     return out
   })
 
-  const filteredNodes = computed(() =>
-    filterNodes(data.data?.rawNodes ?? [], {
-      filterYear: filterYear.value,
-      viewMode: viewMode.value,
-      viewL4: viewL4.value,
-      viewPM: viewPM.value,
-      excludeActive: excludeOn.value,
-      excludedIds: excludedIds.value,
-    }),
-  )
-
   const payNodeRowsAll = computed(() =>
     paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
   )
@@ -121,7 +110,7 @@ export const useFilterStore = defineStore('filter', () => {
 
   return {
     filterYear, viewMode, viewL4, viewPM,
-    yearOptions, l4Options, pmOptions, filteredNodes, filteredPayNodes,
+    yearOptions, l4Options, pmOptions, filteredPayNodes,
     setYear, setViewGlobal, setViewL4, setViewPM,
     excludeOn, excludeTags, excludedIds, setExclude,
   }

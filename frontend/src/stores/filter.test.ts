@@ -33,12 +33,6 @@ describe('filter store', () => {
     expect(f.viewMode).toBe('global')
   })
 
-  it('filteredNodes applies year filter over dataStore rawNodes', () => {
-    const f = withData()
-    f.setYear('2026')
-    expect(f.filteredNodes.map((n: any) => n.projectId)).toEqual(['P1'])
-  })
-
   it('yearOptions include all + current year', () => {
     const f = useFilterStore()
     const keys = f.yearOptions.map((o) => o.key)
