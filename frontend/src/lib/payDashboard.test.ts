@@ -68,3 +68,42 @@ describe('payTierStats', () => {
     expect(s.paidCount).toBe(1)
   })
 })
+
+import { payOrgRanking, payMonthlyTrend, payQuarterlyTrend } from './payDashboard'
+
+describe('payOrgRanking', () => {
+  const rows = [
+    node({ dept: 'A组', expectedPayment: 1000, receivedAmount: 800 }),
+    node({ dept: 'B组', expectedPayment: 1000, receivedAmount: 100 }),
+  ]
+  it('OrgRank 形态 + 按 actualTotal 降序', () => {
+    const r = payOrgRanking(rows, 'actualTotal')
+    expect(r[0].org).toBe('A组')
+    expect(r[0].actualTotal).toBe(800)
+    expect(r[0].achievementRate).toBeCloseTo(0.8)
+  })
+  it('按 achievementRate 降序', () => {
+    expect(payOrgRanking(rows, 'achievementRate')[0].org).toBe('A组')
+  })
+})
+
+describe('payMonthlyTrend/payQuarterlyTrend', () => {
+  const rows = [
+    node({ tier: '100万以上', planDate: '2026-02-10', unpaidAmount: 10000, status: '待回款' }),
+    node({ tier: '100万以上', planDate: '2026-05-10', unpaidAmount: 20000, status: '延期' }),
+    node({ tier: '100万以上', planDate: '2026-02-10', unpaidAmount: 99999, status: '已回款' }),
+  ]
+  it('月度按 planDate 月份分桶,已回款不计', () => {
+    const s = payMonthlyTrend(rows, 'all')
+    expect(s.categories).toContain('2026-02')
+    const t = s.series.find((x) => x.tier === '100万以上')!
+    const i = s.categories.indexOf('2026-02')
+    expect(t.data[i]).toBeCloseTo(1)
+  })
+  it('指定年份补满 12 月', () => {
+    expect(payMonthlyTrend(rows, '2026').categories.length).toBe(12)
+  })
+  it('季度分桶 key 形如 2026-Q1', () => {
+    expect(payQuarterlyTrend(rows, 'all').categories).toContain('2026-Q1')
+  })
+})

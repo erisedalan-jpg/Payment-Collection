@@ -91,3 +91,79 @@ export function payTierStats(tier: string, rows: PayNodeRow[]): PayTierStat {
     paidCount: grp.filter((r) => r.status === '已回款').length,
   }
 }
+
+export interface OrgRank {
+  org: string
+  expectedTotal: number
+  actualTotal: number
+  actualTotalWan: number
+  achievementRate: number
+}
+
+/** 服务组(dept)达成排名。sortBy: 'actualTotal' | 'achievementRate'。降序全量(组件自行 slice)。 */
+export function payOrgRanking(rows: PayNodeRow[], sortBy: 'actualTotal' | 'achievementRate'): OrgRank[] {
+  const m: Record<string, OrgRank> = {}
+  for (const r of rows) {
+    const org = r.dept || '未指定'
+    if (!m[org]) m[org] = { org, expectedTotal: 0, actualTotal: 0, actualTotalWan: 0, achievementRate: 0 }
+    m[org].expectedTotal += r.expectedPayment
+    m[org].actualTotal += r.receivedAmount
+  }
+  const list = Object.values(m).map((o) => ({
+    ...o,
+    achievementRate: o.expectedTotal > 0 ? o.actualTotal / o.expectedTotal : 0,
+    actualTotalWan: o.actualTotal / 10000,
+  }))
+  return list.sort((a, b) => b[sortBy] - a[sortBy])
+}
+
+export interface PeriodSeries {
+  categories: string[]
+  series: { tier: string; data: number[] }[]
+}
+
+const TIER_KEYS = ['100万以上', '50-100万', '50万以下'] as const
+
+function isSpecificYear(filterYear: string): boolean {
+  return filterYear !== 'all' && !filterYear.startsWith('upto') && !filterYear.includes('-Q')
+}
+function quarterOf(planMonth: string): string {
+  const [y, moStr] = planMonth.split('-')
+  const mo = parseInt(moStr, 10)
+  const q = mo <= 3 ? 'Q1' : mo <= 6 ? 'Q2' : mo <= 9 ? 'Q3' : 'Q4'
+  return `${y}-${q}`
+}
+
+/** 待回款趋势：未全额回款(status≠已回款)的节点按 planDate 月份/季度分桶,待回款=Σunpaid(万),按 tier 分层。 */
+function buildPaySeries(rows: PayNodeRow[], keyOf: (planMonth: string) => string, fillKeys: string[]): PeriodSeries {
+  const byTier: Record<string, Record<string, number>> = {}
+  TIER_KEYS.forEach((t) => (byTier[t] = {}))
+  const catSet: Record<string, true> = {}
+  for (const r of rows) {
+    if (r.status === '已回款') continue
+    const m = (r.planDate || '').slice(0, 7)
+    if (!m) continue
+    const k = keyOf(m)
+    const tier = r.tier
+    if (!byTier[tier]) continue
+    byTier[tier][k] = (byTier[tier][k] || 0) + r.unpaidAmount / 10000
+    catSet[k] = true
+  }
+  for (const k of fillKeys) {
+    catSet[k] = true
+    TIER_KEYS.forEach((t) => { if (byTier[t][k] === undefined) byTier[t][k] = 0 })
+  }
+  const categories = Object.keys(catSet).sort()
+  return { categories, series: TIER_KEYS.map((t) => ({ tier: t, data: categories.map((c) => byTier[t][c] || 0) })) }
+}
+
+export function payQuarterlyTrend(rows: PayNodeRow[], filterYear: string): PeriodSeries {
+  const fill = isSpecificYear(filterYear) ? ['Q1', 'Q2', 'Q3', 'Q4'].map((q) => `${filterYear}-${q}`) : []
+  return buildPaySeries(rows, quarterOf, fill)
+}
+export function payMonthlyTrend(rows: PayNodeRow[], filterYear: string): PeriodSeries {
+  const fill = isSpecificYear(filterYear)
+    ? Array.from({ length: 12 }, (_, i) => `${filterYear}-${String(i + 1).padStart(2, '0')}`)
+    : []
+  return buildPaySeries(rows, (m) => m, fill)
+}
