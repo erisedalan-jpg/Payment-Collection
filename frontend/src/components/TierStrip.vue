@@ -1,25 +1,28 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { computeTierStats, groupByProject, type ProjectAgg } from '@/lib/dashboardStats'
+import { payTierStats } from '@/lib/payDashboard'
+import { projectPaymentRows, type PayProjectRow } from '@/lib/paymentPmis'
 import { fmtWan, pct } from '@/lib/format'
 import { TIERS } from '@/nav'
 import BoardDrilldownModal from './BoardDrilldownModal.vue'
 
+const data = useDataStore()
 const filter = useFilterStore()
 
 const rows = computed(() =>
   TIERS.map((t) => {
-    const s = computeTierStats(t.label, filter.filteredNodes) as Record<string, any>
-    const expectedWan = s.expectedAmountWan as number
-    const actualWan = s.actualAmountWan as number
+    const s = payTierStats(t.label, filter.filteredPayNodes)
+    const expectedWan = s.expectedAmountWan
+    const actualWan = s.actualAmountWan
     return {
       tier: t.label,
-      projectCount: s.projectCount as number,
+      projectCount: s.projectCount,
       expectedWan,
       actualWan,
       completion: expectedWan > 0 ? actualWan / expectedWan : 0,
-      delayedCount: s.delayedCount as number,
+      delayedCount: s.delayedCount,
     }
   }),
 )
@@ -30,12 +33,12 @@ function barColor(r: number): string {
 
 const drillOpen = ref(false)
 const drillTitle = ref('')
-const drillProjects = ref<ProjectAgg[]>([])
+const drillProjects = ref<PayProjectRow[]>([])
 function openTier(tier: string) {
   drillTitle.value = tier
-  drillProjects.value = groupByProject(
-    filter.filteredNodes.filter((n) => (n as Record<string, any>).tier === tier),
-  )
+  const pids = new Set(filter.filteredPayNodes.filter((r) => r.tier === tier).map((r) => r.projectId))
+  drillProjects.value = projectPaymentRows(data.data?.projects ?? [], data.data?.projectPmis)
+    .filter((r) => pids.has(r.projectId))
   drillOpen.value = true
 }
 defineExpose({ drillOpen })
