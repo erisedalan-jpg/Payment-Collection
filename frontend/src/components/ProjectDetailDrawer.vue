@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { RawNode, Project } from '@/types/analysis'
+import type { Project } from '@/types/analysis'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useDataStore } from '@/stores/data'
 import { buildProjectDetail } from '@/lib/projectDetail'
-import { formatCellValue } from '@/lib/cellFormat'
 import { fmtYuan, fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from './DataTable.vue'
 
@@ -33,19 +32,19 @@ const visible = computed({
 
 const detail = computed(() =>
   pd.openId
-    ? buildProjectDetail((data.data?.rawNodes ?? []) as RawNode[], pd.openId)
+    ? buildProjectDetail(data.data?.paymentNodes, (data.data?.projects ?? []) as Project[], data.data?.projectPmis, pd.openId)
     : { project: null, nodes: [] },
 )
 
 const NODE_COLS: DataColumn[] = [
-  { key: 'nodeName', label: '节点' },
+  { key: 'stage', label: '阶段' },
   { key: 'planDate', label: '计划日期' },
-  { key: 'expectedPayment', label: '计划回款' },
-  { key: 'actualPayment', label: '已回款' },
-  { key: 'actualPaymentRatio', label: '实际比例' },
-  { key: 'nodeStatus', label: '状态' },
-  { key: 'delayDays', label: '延期天数' },
-].map((c) => ({ ...c, formatter: (v: unknown) => formatCellValue(v, c.key) }))
+  { key: 'expectedPayment', label: '计划回款', formatter: (v: unknown) => fmtYuan(v as number) },
+  { key: 'receivedAmount', label: '已回款', formatter: (v: unknown) => fmtYuan(v as number) },
+  { key: 'unpaidAmount', label: '未回款', formatter: (v: unknown) => fmtYuan(v as number) },
+  { key: 'actualRatio', label: '实际比例', formatter: (v: unknown) => fmtRatio(v as number) },
+  { key: 'status', label: '状态' },
+]
 
 const summary = computed(() => {
   const p = detail.value.project
@@ -55,10 +54,10 @@ const summary = computed(() => {
     { k: '项目名称', v: p.projectName || '-' },
     { k: '服务组(L4)', v: p.orgL4 || '-' },
     { k: '项目经理', v: p.projectManager || '-' },
-    { k: '项目类型', v: p.projectType || '-' },
     { k: '金额区间', v: p.tier || '-' },
     { k: '项目金额', v: fmtYuan(p.projectAmount) },
     { k: '回款状态', v: p.paymentStatus },
+    { k: '延期', v: p.delayed ? '有延期节点' : '无' },
     { k: '完成率', v: fmtRatio(p.paymentRatio) },
     { k: '计划回款', v: fmtYuan(p.expectedPayment) },
     { k: '已回款', v: fmtYuan(p.actualPayment) },
