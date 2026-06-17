@@ -16,14 +16,21 @@ function seed() {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
     dashboard: {},
     summary: {},
-    rawNodes: [
-      { projectId: 'P1', projectName: '甲', tier: '100万以上', orgL3: 'L3A', orgL4: '北京', projectManager: '张', isPaymentRelated: true, nodeStatus: '延期', planDate: '2026-06-10', expectedPayment: 200000, actualPayment: 0, actualPaymentRatio: 0 },
-    ],
+    rawNodes: [],
     projectOverview: { projects: [], columns: [] },
     naguanMap: {},
     naguanExclude: {},
     displayColumns: {},
     followupRecords: {},
+    projects: [
+      { projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A组', orgL3: '三部一组', paymentPmis: { contract: 1000000 } },
+    ],
+    projectPmis: {},
+    paymentNodes: {
+      P1: [
+        { stage: '到货款', planDate: '2026-02-10', actualDate: '', payRatio: 0.5, actualRatio: 0, expectedPayment: 500000, receivedAmount: 0, unpaidAmount: 500000, status: '待回款' },
+      ],
+    },
   } as any
 }
 
