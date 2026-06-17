@@ -41,9 +41,30 @@ describe('filter store', () => {
   })
 
   it('l4Options / pmOptions derive distinct values from data', () => {
-    const f = withData()
+    const ds = useDataStore()
+    ds.data = {
+      ...SAMPLE,
+      projects: [
+        { projectId: 'P1', orgL4: '北京服务组', projectManager: '张三' },
+        { projectId: 'P2', orgL4: '上海一服务组', projectManager: '李四' },
+      ],
+      paymentNodes: {}, projectPmis: {},
+    } as any
+    const f = useFilterStore()
     expect(f.l4Options.slice().sort()).toEqual(['上海一服务组', '北京服务组'])
     expect(f.pmOptions.slice().sort()).toEqual(['张三', '李四'].slice().sort())
+  })
+
+  it('l4Options/pmOptions 取自 projects 去重', () => {
+    const ds = useDataStore()
+    ds.data = { projects: [
+      { projectId: 'P1', orgL4: '北京组', projectManager: '张' },
+      { projectId: 'P2', orgL4: '上海组', projectManager: '李' },
+      { projectId: 'P3', orgL4: '北京组', projectManager: '张' },
+    ], paymentNodes: {}, projectPmis: {} } as any
+    const f = useFilterStore()
+    expect([...f.l4Options].sort()).toEqual(['上海组', '北京组'])
+    expect([...f.pmOptions].sort()).toEqual(['张', '李'].sort())
   })
 })
 

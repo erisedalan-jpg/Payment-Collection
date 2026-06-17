@@ -15,7 +15,8 @@ function seed() {
   ds.data = {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
     dashboard: {}, summary: {},
-    rawNodes: [{ projectId: 'P1', orgL4: '北京服务组', projectManager: '张三', planMonth: '2026-02' }],
+    rawNodes: [],
+    projects: [{ projectId: 'P1', orgL4: '北京服务组', projectManager: '张三' }],
     projectOverview: { projects: [], columns: [] },
     naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
   } as any

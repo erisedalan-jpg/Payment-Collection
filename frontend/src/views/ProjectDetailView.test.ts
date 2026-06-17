@@ -201,7 +201,7 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('总预算(万)')
   })
 
-  it('售前整合项目：原项目 tab 展示已关闭信息与原项目回款节点', async () => {
+  it('售前整合项目：原项目 tab 展示已关闭信息(3E-2 原项目回款节点表已下线)', async () => {
     seed()
     const w = await mountAt('/project/P-2')
     const originTab = w.findAll('.pd-tab').find((b) => b.text() === '原项目')
@@ -209,8 +209,9 @@ describe('ProjectDetailView', () => {
     await originTab!.trigger('click')
     expect(w.text()).toContain('某局一期')
     expect(w.text()).toContain('OLD-9')
-    expect(w.text()).toContain('终验款')
     expect(w.text()).toContain('不计入当前')
+    // closedNodes 表（原项目回款节点）已于 3E-2 下线：经调研确认结构性恒空
+    expect(w.text()).not.toContain('原项目回款节点（不计入当前汇总）')
   })
 
   it('非售前项目不显示原项目 tab', async () => {

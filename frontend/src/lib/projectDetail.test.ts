@@ -1,26 +1,22 @@
 import { describe, it, expect } from 'vitest'
 import { buildProjectDetail } from './projectDetail'
-import type { RawNode } from '@/types/analysis'
-
-const nodes = [
-  { projectId: 'P1', projectName: '甲项目', orgL4: '一部', projectManager: '张', tier: '100万以上', isPaymentRelated: true, expectedPayment: 200000, actualPayment: 50000, nodeStatus: '延期' },
-  { projectId: 'P1', projectName: '甲项目', isPaymentRelated: false, nodeStatus: '' },
-  { projectId: 'P2', projectName: '乙项目', isPaymentRelated: true, expectedPayment: 100000, actualPayment: 100000, nodeStatus: '已全额回款' },
-] as unknown as RawNode[]
-
-describe('buildProjectDetail', () => {
-  it('聚合该项目并返回其全部节点(含非回款节点)', () => {
-    const d = buildProjectDetail(nodes, 'P1')
-    expect(d.project?.projectId).toBe('P1')
-    expect(d.project?.projectName).toBe('甲项目')
-    expect(d.nodes.length).toBe(2)
-    expect(d.project?.expectedPayment).toBe(200000)
-    expect(d.project?.actualPayment).toBe(50000)
-    expect(d.project?.paymentStatus).toBe('延期')
+describe('buildProjectDetail(收款阶段)', () => {
+  const projects = [{ projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A组', paymentPmis: { contract: 2000000 } }] as any
+  const paymentNodes = { P1: [
+    { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.5, actualRatio: 0.3, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
+    { stage: '验收款', planDate: '2026-03-01', actualDate: '', payRatio: 0.5, actualRatio: 0, expectedPayment: 1000000, receivedAmount: 0, unpaidAmount: 1000000, status: '延期' },
+  ] } as any
+  it('摘要取 ledgerRows 口径 + nodes 为 PayNodeRow', () => {
+    const d = buildProjectDetail(paymentNodes, projects, {}, 'P1')
+    expect(d.project?.expectedPayment).toBe(2000000)
+    expect(d.project?.actualPayment).toBe(600000)
+    expect(d.project?.remainingAmount).toBe(1400000)
+    expect(d.project?.paymentStatus).toBe('部分回款')
+    expect(d.project?.delayed).toBe(true)
+    expect(d.nodes).toHaveLength(2)
+    expect(d.nodes[0].stage).toBe('到货款')
   })
-  it('未知 id 返回 project=null、nodes=[]', () => {
-    const d = buildProjectDetail(nodes, 'NOPE')
-    expect(d.project).toBeNull()
-    expect(d.nodes).toEqual([])
+  it('项目不存在返回空', () => {
+    expect(buildProjectDetail(paymentNodes, projects, {}, 'X')).toEqual({ project: null, nodes: [] })
   })
 })
