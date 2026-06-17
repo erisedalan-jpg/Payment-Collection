@@ -53,6 +53,7 @@ const count = computed(() => props.rows.length)
         </template>
         <template #default="scope">
           <slot :name="`cell-${col.key}`" :row="scope.row" :value="scope.row[col.key]">
+            <!-- wrap 列双重打 dt-wrap-col 类:cell-class-name 给 <td>(浏览器换行)、内层 span 给 jsdom 测试可靠定位(cell-class-name 在 jsdom 不渲染到 td);勿删 span -->
             <span v-if="col.wrap" class="dt-wrap-col">{{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}</span>
             <template v-else>{{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}</template>
           </slot>
