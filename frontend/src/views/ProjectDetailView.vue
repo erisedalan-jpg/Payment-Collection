@@ -156,6 +156,13 @@ const payRecSummary = computed(() => [
   { k: '回款笔数', v: String(payRec.value?.count ?? 0) },
   { k: '最近回款日', v: payRec.value?.lastDate || '-' },
 ])
+function fmtBill(r: Record<string, any>): string {
+  const td = [r.billType, r.billDueDate].filter(Boolean).join('·')
+  if (td) return td
+  if (r.billProtocol) return `互抵:${r.billProtocol}`
+  return ''
+}
+
 const PAYREC_COLS: DataColumn[] = [
   { key: 'type', label: '回款类型', width: 100 },
   { key: 'amount', label: '付款金额(元)', width: 130, formatter: (v) => fmtYuan(v as number) },
@@ -164,6 +171,7 @@ const PAYREC_COLS: DataColumn[] = [
   { key: 'serial', label: '收款流水号', width: 150 },
   { key: 'claimer', label: '认领人', width: 90 },
   { key: 'currency', label: '币种', width: 120, formatter: (v, r) => (!v || v === 'CNY' ? 'CNY' : `${v}(汇率 ${r.rate ?? '-'})`) },
+  { key: 'bill', label: '票据', width: 150, formatter: (_v, r) => fmtBill(r) },
 ]
 
 const profit = computed(() =>
