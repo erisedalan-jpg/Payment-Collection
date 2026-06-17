@@ -25,10 +25,16 @@ const DrawerStub = {
   template: '<div class="drawer-stub"><slot /></div>',
 }
 
-const rawNodes = [
-  { projectId: 'P1', projectName: '甲项目', orgL4: '一部', projectManager: '张', projectType: '集成', tier: '100万以上', projectAmount: 1500000, isPaymentRelated: true, nodeName: '验收款', planDate: '2026-06-08', expectedPayment: 200000, actualPayment: 50000, actualPaymentRatio: 0.25, nodeStatus: '延期', delayDays: 12 },
-  { projectId: 'P1', projectName: '甲项目', isPaymentRelated: false, nodeName: '启动会', nodeStatus: '' },
+// 收款阶段口径 mock data（对齐换源后的 buildProjectDetail 签名）
+const projects = [
+  { projectId: 'P1', projectName: '甲项目', orgL4: '一部', projectManager: '张', paymentPmis: { contract: 1500000 } },
 ]
+const paymentNodes = {
+  P1: [
+    { stage: '验收款', planDate: '2026-06-08', actualDate: '', payRatio: 1, actualRatio: 0.25, expectedPayment: 200000, receivedAmount: 50000, unpaidAmount: 150000, status: '部分回款' },
+    { stage: '到货款', planDate: '2026-05-01', actualDate: '', payRatio: 0.5, actualRatio: 0, expectedPayment: 100000, receivedAmount: 0, unpaidAmount: 100000, status: '延期' },
+  ],
+}
 
 function mountDrawer(router = makeRouter()) {
   return mount(ProjectDetailDrawer, {
@@ -39,7 +45,7 @@ function mountDrawer(router = makeRouter()) {
 describe('ProjectDetailDrawer', () => {
   it('打开时渲染项目汇总与节点明细', async () => {
     const data = useDataStore()
-    data.data = { rawNodes } as any
+    data.data = { paymentNodes, projects } as any
     useProjectDetailStore().open('P1')
     const w = mountDrawer()
     await flushPromises()
@@ -51,7 +57,7 @@ describe('ProjectDetailDrawer', () => {
 
   it('未知项目显示空态', async () => {
     const data = useDataStore()
-    data.data = { rawNodes } as any
+    data.data = { paymentNodes, projects } as any
     useProjectDetailStore().open('NOPE')
     const w = mountDrawer()
     await flushPromises()
@@ -62,10 +68,7 @@ describe('ProjectDetailDrawer', () => {
 describe('查看完整详情入口', () => {
   it('主域项目显示入口，点击关闭抽屉并跳详情页', async () => {
     const ds = useDataStore()
-    ds.data = {
-      rawNodes,
-      projects: [{ projectId: 'P1', projectName: '甲项目', payment: {}, deliveryCosts: [], health: {} }],
-    } as any
+    ds.data = { paymentNodes, projects } as any
     const pd = useProjectDetailStore()
     pd.open('P1')
     const router = makeRouter()
@@ -82,9 +85,7 @@ describe('查看完整详情入口', () => {
   it('非主域项目（不在 projects[]）不显示入口', async () => {
     const ds = useDataStore()
     ds.data = {
-      rawNodes: [
-        { projectId: 'P-9', projectName: '乙项目', isPaymentRelated: true, nodeName: '验收款', nodeStatus: '' },
-      ],
+      paymentNodes: { 'P-9': [{ stage: '验收款', planDate: '', actualDate: '', payRatio: 1, actualRatio: 0, expectedPayment: 100000, receivedAmount: 0, unpaidAmount: 100000, status: '未回款' }] },
       projects: [],
     } as any
     const pd = useProjectDetailStore()
