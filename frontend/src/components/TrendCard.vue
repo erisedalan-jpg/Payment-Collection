@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useFilterStore } from '@/stores/filter'
-import { aggregateMonthly, aggregateQuarterly } from '@/lib/dashboardCharts'
+import { payMonthlyTrend, payQuarterlyTrend } from '@/lib/payDashboard'
 import PendingBarChart from './PendingBarChart.vue'
 import SegToggle from './SegToggle.vue'
 
@@ -14,8 +14,8 @@ const PERIOD_OPTS = [
 
 const series = computed(() =>
   period.value === 'month'
-    ? aggregateMonthly(filter.filteredNodes, filter.filterYear)
-    : aggregateQuarterly(filter.filteredNodes, filter.filterYear),
+    ? payMonthlyTrend(filter.filteredPayNodes, filter.filterYear)
+    : payQuarterlyTrend(filter.filteredPayNodes, filter.filterYear),
 )
 </script>
 
