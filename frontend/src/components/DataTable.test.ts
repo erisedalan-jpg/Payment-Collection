@@ -63,3 +63,22 @@ describe('DataTable cell 插槽', () => {
     expect(w.text()).toContain('y') // 未提供插槽的列仍走默认渲染
   })
 })
+
+describe('DataTable wrap 列', () => {
+  it('wrap:true 列单元格挂 dt-wrap-col 类、普通列不挂', async () => {
+    const w = mount(DataTable, {
+      props: {
+        columns: [
+          { key: 'term', label: '收款条件', wrap: true },
+          { key: 'x', label: 'X' },
+        ] as DataColumn[],
+        rows: [{ term: '合同签订后付款30%，剩余货款4个月帐期', x: '1' }],
+      },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    const wrapCell = w.find('.dt-wrap-col')
+    expect(wrapCell.exists()).toBe(true)
+    expect(wrapCell.text()).toContain('剩余货款4个月帐期')
+  })
+})
