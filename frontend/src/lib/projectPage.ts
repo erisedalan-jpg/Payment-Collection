@@ -1,33 +1,28 @@
-import type { Project, ProjectPmis, RawNode } from '@/types/analysis'
+import type { Project, ProjectPmis } from '@/types/analysis'
 
-// 详情页数据装配：projects[](主域) + projectPmis[id] + rawNodes；
+// 详情页数据装配：projects[](主域) + projectPmis[id]；
 // 售前整合项目（relatedClosedId 非空）额外取原(已关闭)项目侧信息——两份信息并存，不合并（spec 3.2）
+// nodes/closedNodes 已下线（3E-2）：主回款 tab 3A 已改走 paymentNodes；原项目 tab 的 closedNodes 经调研确认结构性恒空
 export interface ProjectPageData {
   project: Project | null
   pmis: ProjectPmis | null
   closedId: string
   closedPmis: ProjectPmis | null
-  closedNodes: RawNode[]
-  nodes: RawNode[]
 }
 
 export function buildProjectPage(
   projects: Project[],
   pmisMap: Record<string, ProjectPmis>,
-  rawNodes: RawNode[],
   id: string,
 ): ProjectPageData {
   const project = projects.find((p) => p.projectId === id) ?? null
-  if (!project) return { project: null, pmis: null, closedId: '', closedPmis: null, closedNodes: [], nodes: [] }
+  if (!project) return { project: null, pmis: null, closedId: '', closedPmis: null }
   const closedId = project.relatedClosedId || ''
-  // 回款表只取 isPaymentRelated 节点——与后端 aggregate_payment 聚合口径一致(chips 与表格计数对得上)
   return {
     project,
     pmis: pmisMap[id] ?? null,
     closedId,
     closedPmis: closedId ? (pmisMap[closedId] ?? null) : null,
-    nodes: rawNodes.filter((n) => n.projectId === id && n.isPaymentRelated),
-    closedNodes: closedId ? rawNodes.filter((n) => n.projectId === closedId && n.isPaymentRelated) : [],
   }
 }
 
