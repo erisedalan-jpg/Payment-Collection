@@ -303,7 +303,7 @@ describe('ProjectDetailView', () => {
     ;(ds.data as any).paymentNodes = { 'P-1': [
       { stage: '到货款', category: '到货款', planDate: '2026-01-01', actualDate: '2026-01-02',
         payRatio: 0.7, expectedPayment: 700000, receivedAmount: 700000, unpaidAmount: 0,
-        actualRatio: 1, termDays: 90, reached: true, status: '已回款' },
+        actualRatio: 1, termDays: 90, payTerm: '到货后20天内付款70%', reached: true, status: '已回款' },
       { stage: '终验款', category: '终验款', planDate: '2020-01-01', actualDate: '',
         payRatio: 0.3, expectedPayment: 300000, receivedAmount: 0, unpaidAmount: 300000,
         actualRatio: 0, termDays: 20, reached: false, status: '延期' },
@@ -313,6 +313,8 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('到货')
     expect(w.text()).toContain('已回款')
     expect(w.text()).toContain('延期')
+    expect(w.text()).toContain('收款条件')          // 列表头
+    expect(w.text()).toContain('到货后20天内付款70%') // 收款条件全文显示
   })
 
   it('渲染项目标签块，显示已挂标签(2C)', async () => {
