@@ -143,7 +143,6 @@ const columns = [
       :projects="displayed"
       :columns="columns"
       :source-rows="baseProjs as Record<string, any>[]"
-      :raw-nodes="rawNodes"
     />
   </div>
 </template>
