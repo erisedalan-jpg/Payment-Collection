@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import ChartBox from '@/charts/ChartBox.vue'
-import type { PeriodSeries } from '@/lib/dashboardCharts'
+import type { PeriodSeries } from '@/lib/payDashboard'
 
 const props = defineProps<{
   categories: string[]
