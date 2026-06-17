@@ -1,4 +1,5 @@
-import type { Project, ProjectPmis, RawNode } from '@/types/analysis'
+import type { Project, ProjectPmis } from '@/types/analysis'
+import type { PayNodeRow } from './paymentPmis'
 
 // 项目总览(/)的纯计算层(spec 4.1)。两套口径:KPI 用主域 projects[] 聚合;
 // 回款重点带与 /payment 同口径(全部门 isPaymentRelated 节点)——微块点击钻的就是 /payment。
@@ -58,7 +59,7 @@ export function healthSummary(projects: Project[]): HealthSummary {
 export interface DelayedTopItem {
   projectId: string
   projectName: string
-  nodeName: string
+  stage: string
   remaining: number
 }
 
@@ -74,8 +75,8 @@ function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** 回款重点带——now 注入便于测试(HX-6 约定);口径与 /payment 一致(全 isPaymentRelated 节点) */
-export function paymentBand(rawNodes: RawNode[], now: Date): PaymentBand {
+/** 回款重点带——now 注入便于测试;收款阶段节点级口径(计划=expectedPayment/已收=receivedAmount/未收=unpaidAmount/状态5态)。 */
+export function paymentBand(rows: PayNodeRow[], now: Date): PaymentBand {
   const year = String(now.getFullYear())
   const month = isoDate(now).slice(0, 7)
   const today = isoDate(now)
@@ -86,24 +87,16 @@ export function paymentBand(rawNodes: RawNode[], now: Date): PaymentBand {
   let monthPending = 0
   let dueSoon7 = 0
   const delayed: DelayedTopItem[] = []
-  for (const n of rawNodes) {
-    if (!n.isPaymentRelated) continue
-    const exp = Number(n.expectedPayment ?? 0)
-    const act = Number(n.actualPayment ?? 0)
+  for (const n of rows) {
     const plan = String(n.planDate ?? '')
     if (plan.startsWith(year)) {
-      yearExpected += exp
-      yearActual += act
+      yearExpected += n.expectedPayment
+      yearActual += n.receivedAmount
     }
-    if (String(n.planMonth ?? '') === month) monthPending += Math.max(exp - act, 0)
-    if (plan >= today && plan <= until && act < exp) dueSoon7++
-    if (n.nodeStatus === '延期') {
-      delayed.push({
-        projectId: String(n.projectId ?? ''),
-        projectName: String(n.projectName ?? ''),
-        nodeName: String((n as Record<string, any>).nodeName ?? ''),
-        remaining: Math.max(exp - act, 0),
-      })
+    if (plan.slice(0, 7) === month) monthPending += n.unpaidAmount
+    if (plan >= today && plan <= until && n.status !== '已回款') dueSoon7++
+    if (n.status === '延期') {
+      delayed.push({ projectId: n.projectId, projectName: n.projectName, stage: n.stage, remaining: n.unpaidAmount })
     }
   }
   delayed.sort((a, b) => b.remaining - a.remaining)
