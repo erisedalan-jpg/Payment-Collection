@@ -243,6 +243,9 @@ class PaymentRecord(_Base):
     currency: str = ""
     rate: Optional[float] = None
     note: str = ""
+    billType: str = ""
+    billDueDate: str = ""
+    billProtocol: str = ""
 
 
 class PaymentRecordsEntry(_Base):
