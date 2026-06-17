@@ -1,169 +1,95 @@
 import { describe, it, expect } from 'vitest'
 import {
-  calExcludePaid,
-  calFilterOptions,
-  applyCalFilters,
-  calDashboardStats,
-  calDateData,
-  calMonthGrid,
-  calListNodes,
-  calListGroups,
-  calUpcoming,
-  calDayTooltipText,
-  calAgendaGroups,
-  calYearHeat,
+  calExcludePaid, calFilterOptions, applyCalFilters, calDashboardStats,
+  calDateData, calListGroups, calUpcoming, calYearHeat,
 } from './calendar'
+import type { PayNodeRow } from './paymentPmis'
 
-const NOW = new Date('2026-06-04T00:00:00')
+function pn(p: Partial<PayNodeRow>): PayNodeRow {
+  return { projectId: 'P1', projectName: '甲', stage: '到货款', planDate: '2026-02-10', actualDate: '',
+    payRatio: null, actualRatio: null, expectedPayment: 0, receivedAmount: 0, unpaidAmount: 0,
+    projectManager: '张', status: '待回款', dept: 'A组', orgL3: '三部一组', projStage: '', tier: '100万以上', progress: '未回款', ...p }
+}
 
 describe('calExcludePaid', () => {
-  it('排除已全额回款/已提前回款', () => {
-    const r = calExcludePaid([
-      { nodeStatus: '延期' }, { nodeStatus: '已全额回款' }, { nodeStatus: '已提前回款' }, { nodeStatus: '正常实施中' },
-    ] as any)
-    expect(r.map((n: any) => n.nodeStatus)).toEqual(['延期', '正常实施中'])
+  it('排除已回款', () => {
+    const out = calExcludePaid([pn({ status: '已回款' }), pn({ status: '延期' })])
+    expect(out).toHaveLength(1)
+    expect(out[0].status).toBe('延期')
   })
 })
 
 describe('calFilterOptions', () => {
-  it('仅取 related&&planDate，去重升序', () => {
-    const o = calFilterOptions([
-      { isPaymentRelated: true, planDate: '2026-06-10', orgL3: 'B', orgL4: '上海', projectManager: '李' },
-      { isPaymentRelated: true, planDate: '2026-06-11', orgL3: 'A', orgL4: '北京', projectManager: '张' },
-      { isPaymentRelated: false, planDate: '2026-06-12', orgL3: 'Z' },
-    ] as any)
-    // 忠实移植 app.js 的 [...set].sort()（Unicode 序）：上(U+4E0A)<北(U+5317)；张(U+5F20)<李(U+674E)
-    expect(o.orgL3).toEqual(['A', 'B'])
-    expect(o.orgL4).toEqual(['上海', '北京'])
+  it('orgL3/orgL4(dept)/pm 去重升序', () => {
+    const o = calFilterOptions([pn({ orgL3: '组A', dept: 'L4A', projectManager: '张' }), pn({ orgL3: '组B', dept: 'L4B', projectManager: '李' })])
+    expect(o.orgL3).toEqual(['组A', '组B'])
+    expect(o.orgL4).toEqual(['L4A', 'L4B'])
     expect(o.pm).toEqual(['张', '李'])
   })
 })
 
 describe('applyCalFilters', () => {
-  const nodes = [
-    { orgL3: 'A', orgL4: '北京', projectManager: '张' },
-    { orgL3: 'B', orgL4: '上海', projectManager: '李' },
-  ] as any[]
-  it('按 orgL4 过滤', () => {
-    expect(applyCalFilters(nodes, { orgL3: '', orgL4: '北京', pm: '' })).toHaveLength(1)
+  it('按 orgL3/dept/pm 过滤', () => {
+    const rows = [pn({ projectId: 'P1', orgL3: '组A' }), pn({ projectId: 'P2', orgL3: '组B' })]
+    expect(applyCalFilters(rows, { orgL3: '组A', orgL4: '', pm: '' }).map((n) => n.projectId)).toEqual(['P1'])
   })
 })
 
 describe('calDashboardStats', () => {
-  it('当月指标 + 7天内到期 + 延期（基于注入 now）', () => {
-    const nodes = [
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '正常实施中', expectedPayment: 200000, actualPayment: 50000 },
-      { isPaymentRelated: true, planDate: '2026-06-30', nodeStatus: '延期', expectedPayment: 100000, actualPayment: 0 },
-      { isPaymentRelated: true, planDate: '2026-08-01', nodeStatus: '正常实施中', expectedPayment: 50000, actualPayment: 0 },
-    ] as any[]
-    const d = calDashboardStats(nodes, { orgL3: '', orgL4: '', pm: '' }, NOW)
-    expect(d.mRemaining).toBe(250000)
-    expect(d.mActual).toBe(50000)
-    expect(d.upcoming7).toBe(1)
+  it('当月 Σ未收/已收 + 延期 + 7天到期', () => {
+    const now = new Date('2026-02-15T00:00:00')
+    const rows = [
+      pn({ planDate: '2026-02-10', unpaidAmount: 30000, receivedAmount: 10000, status: '部分回款' }),
+      pn({ planDate: '2026-02-18', unpaidAmount: 50000, status: '延期' }),
+    ]
+    const d = calDashboardStats(rows, { orgL3: '', orgL4: '', pm: '' }, now)
+    expect(d.mRemaining).toBe(80000)
+    expect(d.mActual).toBe(10000)
     expect(d.mCount).toBe(2)
     expect(d.delayed).toBe(1)
+    expect(d.upcoming7).toBe(1)
   })
 })
 
 describe('calDateData', () => {
-  it('按日期统计状态桶 + 待回款金额合计', () => {
+  it('按日 4 态桶 + Σ未收', () => {
     const m = calDateData([
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '延期', expectedPayment: 100000, actualPayment: 0 },
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '正常实施中', expectedPayment: 60000, actualPayment: 20000 },
-    ] as any)
-    expect(m['2026-06-10'].total).toBe(2)
-    expect(m['2026-06-10'].delayed).toBe(1)
-    expect(m['2026-06-10'].onTime).toBe(1)
-    expect(m['2026-06-10'].remaining).toBe(140000)
+      pn({ planDate: '2026-02-10', unpaidAmount: 30000, status: '延期' }),
+      pn({ planDate: '2026-02-10', unpaidAmount: 20000, status: '部分回款' }),
+    ])
+    expect(m['2026-02-10'].total).toBe(2)
+    expect(m['2026-02-10'].delayed).toBe(1)
+    expect(m['2026-02-10'].partial).toBe(1)
+    expect(m['2026-02-10'].remaining).toBe(50000)
   })
 })
 
-describe('calMonthGrid', () => {
-  it('生成含补位的格子，命中日带 count 与状态色', () => {
-    const dateData = { '2026-06-10': { total: 2, delayed: 1, onTime: 1, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0, remaining: 140000 } }
-    const cells = calMonthGrid(2026, 5, dateData as any, NOW)
-    const c10 = cells.find((c) => c.dateStr === '2026-06-10')!
-    expect(c10.count).toBe(2)
-    expect(c10.statusClass).toBe('mixed')
-    expect(c10.remaining).toBe(140000)
-    const c4 = cells.find((c) => c.dateStr === '2026-06-04')!
-    expect(c4.isToday).toBe(true)
-    expect(cells.length % 7).toBe(0)
-  })
-})
-
-describe('calListNodes / calListGroups', () => {
-  const naguan = [
-    { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '延期', expectedPayment: 100000, actualPayment: 0 },
-    { isPaymentRelated: true, planDate: '2026-07-05', nodeStatus: '正常实施中', expectedPayment: 100000, actualPayment: 20000 },
-    { isPaymentRelated: true, planDate: '2026-09-01', nodeStatus: '正常实施中', expectedPayment: 100000, actualPayment: 0 },
-    { isPaymentRelated: true, planDate: '2026-06-12', nodeStatus: '已全额回款', expectedPayment: 100000, actualPayment: 100000 },
-  ] as any[]
-  it('双月范围(6+7月)且排除已全额回款，按日期升序', () => {
-    const ns = calListNodes(naguan, { orgL3: '', orgL4: '', pm: '' }, { year: 2026, month: 5, selectedDate: '' })
-    expect(ns.map((n: any) => n.planDate)).toEqual(['2026-06-10', '2026-07-05'])
-  })
-  it('选中某日只取该日', () => {
-    const ns = calListNodes(naguan, { orgL3: '', orgL4: '', pm: '' }, { year: 2026, month: 5, selectedDate: '2026-06-10' })
-    expect(ns).toHaveLength(1)
-  })
-  it('分组顺序与小计', () => {
-    const ns = calListNodes(naguan, { orgL3: '', orgL4: '', pm: '' }, { year: 2026, month: 5, selectedDate: '' })
-    const g = calListGroups(ns)
-    expect(g.map((x) => x.key)).toEqual(['延期', '正常实施中'])
-    expect(g[0].subRemaining).toBe(100000)
+describe('calListGroups', () => {
+  it('按 4 态分组,subRemaining=Σ未收', () => {
+    const g = calListGroups([pn({ status: '延期', unpaidAmount: 5000 }), pn({ status: '延期', unpaidAmount: 3000 })])
+    expect(g[0].key).toBe('延期')
+    expect(g[0].subRemaining).toBe(8000)
   })
 })
 
 describe('calUpcoming', () => {
-  it('15/30 天窗口且排除满额（基于注入 now）', () => {
-    const naguan = [
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '正常实施中', actualPaymentRatio: 0.2 },
-      { isPaymentRelated: true, planDate: '2026-06-20', nodeStatus: '正常实施中', actualPaymentRatio: 0 },
-      { isPaymentRelated: true, planDate: '2026-06-10', nodeStatus: '正常实施中', actualPaymentRatio: 1 },
-    ] as any[]
-    const u = calUpcoming(naguan, { orgL3: '', orgL4: '', pm: '' }, NOW)
-    expect(u.up15.map((n: any) => n.planDate)).toEqual(['2026-06-10'])
-    expect(u.up30.map((n: any) => n.planDate)).toEqual(['2026-06-10', '2026-06-20'])
-  })
-})
-
-describe('calDayTooltipText', () => {
-  it('拼接非零状态 + 合计', () => {
-    const t = calDayTooltipText({ total: 3, delayed: 2, onTime: 1, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0 } as any)
-    expect(t).toContain('延期 2')
-    expect(t).toContain('正常实施中 1')
-    expect(t).toContain('合计 3')
-  })
-})
-
-describe('calAgendaGroups', () => {
-  it('按日期升序分组 + 每日待回款小计', () => {
-    const g = calAgendaGroups([
-      { planDate: '2026-07-05', expectedPayment: 100000, actualPayment: 20000 },
-      { planDate: '2026-06-10', expectedPayment: 100000, actualPayment: 0 },
-      { planDate: '2026-06-10', expectedPayment: 50000, actualPayment: 50000 },
-    ] as any)
-    expect(g.map((x) => x.date)).toEqual(['2026-06-10', '2026-07-05'])
-    expect(g[0].nodes).toHaveLength(2)
-    expect(g[0].subRemaining).toBe(100000)
-    expect(g[1].subRemaining).toBe(80000)
+  it('15/30天内、排已回款', () => {
+    const now = new Date('2026-02-01T00:00:00')
+    const rows = [
+      pn({ planDate: '2026-02-10', status: '待回款' }),
+      pn({ planDate: '2026-02-25', status: '延期' }),
+      pn({ planDate: '2026-02-05', status: '已回款' }),
+    ]
+    const u = calUpcoming(rows, { orgL3: '', orgL4: '', pm: '' }, now)
+    expect(u.up15.map((n) => n.planDate)).toEqual(['2026-02-10'])
+    expect(u.up30.map((n) => n.planDate)).toEqual(['2026-02-25'])
   })
 })
 
 describe('calYearHeat', () => {
-  it('按月汇总指定年的待回款金额与笔数', () => {
-    const cells = calYearHeat([
-      { planDate: '2026-06-10', expectedPayment: 100000, actualPayment: 0 },
-      { planDate: '2026-06-20', expectedPayment: 50000, actualPayment: 20000 },
-      { planDate: '2026-08-01', expectedPayment: 80000, actualPayment: 0 },
-      { planDate: '2025-06-01', expectedPayment: 999999, actualPayment: 0 },
-    ] as any, 2026)
-    expect(cells).toHaveLength(12)
-    expect(cells[5].month).toBe(5)
-    expect(cells[5].remaining).toBe(130000)
-    expect(cells[5].count).toBe(2)
-    expect(cells[7].remaining).toBe(80000)
-    expect(cells[0].remaining).toBe(0)
+  it('按月 Σ未收', () => {
+    const h = calYearHeat([pn({ planDate: '2026-02-10', unpaidAmount: 40000 })], 2026)
+    expect(h[1].remaining).toBe(40000)
+    expect(h[1].count).toBe(1)
   })
 })

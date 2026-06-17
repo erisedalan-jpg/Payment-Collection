@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { fmtYuan, fmtRatio } from '@/lib/format'
-import { getNodeRemaining } from '@/lib/riskGroups'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 
 const props = withDefaults(defineProps<{ nodes: Record<string, any>[]; maxShow?: number }>(), {
@@ -18,7 +17,6 @@ const pd = useProjectDetailStore()
         <tr>
           <th>项目编号</th>
           <th>项目名称</th>
-          <th class="r">项目金额(元)</th>
           <th class="r">待回款金额(元)</th>
           <th>金额区间</th>
           <th>服务组</th>
@@ -35,17 +33,16 @@ const pd = useProjectDetailStore()
         <tr v-for="(n, i) in rows" :key="i" v-activate class="cnt-row" @click="pd.open(n.projectId)">
           <td>{{ n.projectId }}</td>
           <td :title="n.projectName || ''">{{ n.projectName || '-' }}</td>
-          <td class="r">{{ fmtYuan(n.projectAmount) }}</td>
-          <td class="r remain">{{ fmtYuan(getNodeRemaining(n)) }}</td>
+          <td class="r remain">{{ fmtYuan(n.unpaidAmount) }}</td>
           <td>{{ n.tier }}</td>
-          <td>{{ n.orgL4 || '-' }}</td>
+          <td>{{ n.dept || '-' }}</td>
           <td>{{ n.projectManager || '-' }}</td>
-          <td>{{ n.nodeStatus }}</td>
-          <td>{{ n.milestone || n.stageName || '-' }}</td>
+          <td>{{ n.status }}</td>
+          <td>{{ n.stage || '-' }}</td>
           <td>{{ n.planDate || '-' }}</td>
-          <td>{{ fmtRatio(n.actualPaymentRatio, '待上报') }}</td>
+          <td>{{ fmtRatio(n.actualRatio, '待上报') }}</td>
           <td class="r">{{ fmtYuan(n.expectedPayment) }}</td>
-          <td class="r">{{ fmtYuan(n.actualPayment) }}</td>
+          <td class="r">{{ fmtYuan(n.receivedAmount) }}</td>
         </tr>
       </tbody>
     </table>

@@ -5,7 +5,7 @@ import type { CalDayData } from '@/lib/calendar'
 
 const today = new Date('2026-06-04T00:00:00')
 const dateData: Record<string, CalDayData> = {
-  '2026-06-10': { total: 2, delayed: 1, onTime: 1, advance: 0, canAdvance: 0, reachedCondition: 0, fullPaid: 0, pending: 0, remaining: 140000 },
+  '2026-06-10': { total: 2, delayed: 1, pending: 1, partial: 0, warranty: 0, remaining: 140000 },
 }
 
 describe('CalGrid', () => {

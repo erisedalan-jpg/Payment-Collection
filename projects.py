@@ -66,6 +66,20 @@ def read_org_names(path: str) -> Tuple[set, set, int]:
     return names, l4s, len(rows)
 
 
+def read_org_l3_map(path: str) -> Dict[str, str]:
+    """组织架构表 → {姓名: 新L3-1组织}。同 read_org_names 选 sheet 与交付实施三部过滤。"""
+    rows = _read_header_sheet(path, "工号")
+    if rows and any(r.get("新L3组织") for r in rows):
+        rows = [r for r in rows if str(r.get("新L3组织") or "").strip() == config.DEPT_L3]
+    out: Dict[str, str] = {}
+    for r in rows:
+        name = str(r.get("姓名") or "").strip()
+        l3 = str(r.get("新L3-1组织") or "").strip()
+        if name and l3:
+            out[name] = l3
+    return out
+
+
 def read_mapping(path: str) -> List[Dict[str, str]]:
     """A.xlsx(无表头):A列=当前项目号 B列=桥接负责人 C列=已关闭项目号。AC 全有才收。"""
     wb = _open_workbook(path)
@@ -183,9 +197,11 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
 
 def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
                    mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
-                   all_nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                   all_nodes: List[Dict[str, Any]],
+                   org_l3_map: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/回款/成本/健康度。
     matched=False 守卫为防御性分支(现行 _assemble 恒 matched=True),供未来非 PMIS 来源项目使用。"""
+    org_l3_map = org_l3_map or {}
     nodes_by_pid: Dict[str, List[Dict[str, Any]]] = {}
     for n in all_nodes:
         pid = str(n.get("projectId") or "").strip()
@@ -223,6 +239,7 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
             "projectName": name,
             "projectManager": manager,
             "orgL4": str(team.get("L4部门") or "").strip(),
+            "orgL3": org_l3_map.get(manager, ""),
             "isPresale": name.startswith(config.PRESALE_PREFIX),
             "relatedClosedId": (m["closed"] if m else ""),
             "payment": payment,
@@ -286,8 +303,9 @@ def load_dept_projects(input_dir: str, project_pmis: Dict[str, Dict[str, Any]],
                        ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """读组织架构+delivery → build_projects + 质量。mapping 由调用方先读(9a 也要用)。"""
     names, l4s, org_rows = read_org_names(os.path.join(input_dir, config.ORG_FILE))
+    l3_map = read_org_l3_map(os.path.join(input_dir, config.ORG_FILE))
     delivery = read_delivery(os.path.join(input_dir, config.DELIVERY_FILE))
-    projects = build_projects(project_pmis, names, l4s, mapping, delivery, all_nodes)
+    projects = build_projects(project_pmis, names, l4s, mapping, delivery, all_nodes, l3_map)
     quality = compute_projects_quality(projects, project_pmis, names, l4s, org_rows,
                                        mapping, delivery)
     return projects, quality
