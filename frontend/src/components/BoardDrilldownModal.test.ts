@@ -4,7 +4,6 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import BoardDrilldownModal from './BoardDrilldownModal.vue'
 import { useProjectDetailStore } from '@/stores/projectDetail'
-import type { ProjectAgg } from '@/lib/dashboardStats'
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
@@ -13,7 +12,7 @@ const ModalStub = { template: '<div class="modal-stub"><slot /></div>' }
 
 const PROJECTS = [
   { projectId: 'P1', projectName: '甲', tier: '100万以上', orgL4: '北京', projectManager: '张三', projectType: '', orgL3: '', projectAmount: 2000000, paymentStatus: '延期', paymentRatio: 0.4, expectedPayment: 1500000, actualPayment: 600000, remainingAmount: 900000, canAdvance: false, nodes: [] },
-] as unknown as ProjectAgg[]
+] as Record<string, any>[]
 
 describe('BoardDrilldownModal', () => {
   it('渲染组内项目并在点击行时唤起详情面板', async () => {
