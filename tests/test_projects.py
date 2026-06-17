@@ -313,3 +313,23 @@ class TestBuildPaymentSummary:
         assert s["paymentRatio"] is None and s["actualTotal"] is None
         assert s["expectedTotal"] == 0 and s["nodeCount"] == 0
         assert s["reachedCount"] == 0 and s["delayedCount"] == 0
+
+
+class TestOrgL3Map:
+    def test_read_org_l3_map(self, tmp_path):
+        path = _make_xlsx(tmp_path, "组织架构.xlsx", [
+            ("Sheet1", [
+                ("工号", "姓名", "员工类别", "新L2组织", "新L3组织", "新L3-1组织", "新L4组织"),
+                ("1", "张三", "正式", "L2", "交付实施三部", "三部一组", "北京服务组"),
+                ("2", "李四", "正式", "L2", "别的部门", "别组", "别L4"),
+            ]),
+        ])
+        m = P.read_org_l3_map(path)
+        assert m.get("张三") == "三部一组"
+        assert "李四" not in m
+
+    def test_build_projects_sets_orgL3(self):
+        pmis = {"P1": {"source": "在建", "matched": True,
+                       "team": {"项目经理": "张三", "项目名称": "甲", "L4部门": "北京服务组"}}}
+        projs = P.build_projects(pmis, {"张三"}, {"北京服务组"}, [], [], [], {"张三": "三部一组"})
+        assert projs[0]["orgL3"] == "三部一组"
