@@ -55,7 +55,7 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
   const meta = data.meta ?? ({} as AnalysisData['meta'])
   const dq = data.dataQuality ?? null
   const pq = data.projectsQuality ?? null
-  const yundocsOk = (data.rawNodes?.length ?? 0) > 0
+  const yundocsOk = (data.projects?.length ?? 0) > 0
 
   const themes = (dq?.themes ?? []) as { theme?: string; coveragePct?: number; verdict?: string }[]
   const themesOk = themes.filter((t) => t.verdict === 'green').length

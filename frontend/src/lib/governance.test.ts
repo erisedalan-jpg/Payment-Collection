@@ -6,6 +6,7 @@ function makeData(over: Record<string, any> = {}): AnalysisData {
   return {
     meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
     dashboard: {}, summary: {}, projectOverview: {},
+    projects: [{ projectId: 'P-1' }],
     rawNodes: [{ projectId: 'P-1', tier: '100万以上', isPaymentRelated: true }],
     dataQuality: {
       summary: { pmisProvided: true, joinRate: 0.95, matchedActive: 8, matchedClosed: 2, unmatched: 0, lastPmisUpdate: '2026-06-11' },
@@ -62,10 +63,21 @@ describe('buildHealthReport', () => {
   })
 
   it('云文档缺失 → 红(优先级最高)', () => {
-    const r = buildHealthReport(makeData({ rawNodes: [] }))
+    const r = buildHealthReport(makeData({ projects: [] }))
     expect(r.verdict).toBe('red')
     expect(r.title).toContain('数据不可用')
     expect(r.sources.find((s) => s.key === 'yundocs')!.provided).toBe(false)
+  })
+
+  it('yundocsOk 由 projects 非空决定(rawNodes 空不再误红)', () => {
+    const r = buildHealthReport({ meta: {}, projects: [{ projectId: 'P1' }], rawNodes: [] } as any)
+    expect(r.verdict).not.toBe('red')
+    expect(r.sources[0].provided).toBe(true)
+  })
+
+  it('projects 空则红色告警', () => {
+    const r = buildHealthReport({ meta: {}, projects: [], rawNodes: [{}] } as any)
+    expect(r.verdict).toBe('red')
   })
 
   it('辅源缺失 → 卡未提供 + 高严重度缺失告警(note 降级说明) + 黄', () => {
