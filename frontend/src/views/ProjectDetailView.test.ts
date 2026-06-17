@@ -128,12 +128,24 @@ describe('ProjectDetailView', () => {
 
   it('回款数据 tab:流水汇总 chips+明细表+非 CNY 汇率(R2)', async () => {
     seed()
+    const ds0 = useDataStore()
+    ;(ds0.data as any).paymentRecords['P-1'].records[0] = {
+      ...(ds0.data as any).paymentRecords['P-1'].records[0],
+      billType: '背书', billDueDate: '2026-03-10', billProtocol: '',
+    }
+    ;(ds0.data as any).paymentRecords['P-1'].records[1] = {
+      ...(ds0.data as any).paymentRecords['P-1'].records[1],
+      billType: '', billDueDate: '', billProtocol: 'PROT-9',
+    }
     const w = await mountAt('/project/P-1')
     await w.findAll('.pd-tab').find((b) => b.text() === '回款数据')!.trigger('click')
     expect(w.text()).toContain('累计回款(万)')
     expect(w.text()).toContain('BANK-1')
     expect(w.text()).toContain('马春艳')
     expect(w.text()).toContain('USD(汇率 7.1)')
+    expect(w.text()).toContain('票据')            // 列表头
+    expect(w.text()).toContain('背书·2026-03-10')  // 类型·到期日
+    expect(w.text()).toContain('互抵:PROT-9')      // 仅协议号兜底
   })
 
   it('回款数据 tab:无流水显示未提供空态(R2)', async () => {
