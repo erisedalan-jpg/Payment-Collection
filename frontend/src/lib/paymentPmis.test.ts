@@ -220,3 +220,18 @@ describe('pmisRiskGroups（PMIS 风险三类）', () => {
     expect(g.overspend.map((r) => r.overspendAmount)).toEqual([8000, 3000])
   })
 })
+
+describe('paymentNodeRows 金额与经理字段(3B)', () => {
+  it('节点行带 receivedAmount/unpaidAmount/projectManager', () => {
+    const projects = [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组',
+      paymentPmis: { contract: 2000000 } }] as any
+    const paymentNodes = { P1: [
+      { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.7, expectedPayment: 700000,
+        receivedAmount: 300000, unpaidAmount: 400000, status: '部分回款' },
+    ] } as any
+    const rows = paymentNodeRows(paymentNodes, projects)
+    expect(rows[0].receivedAmount).toBe(300000)
+    expect(rows[0].unpaidAmount).toBe(400000)
+    expect(rows[0].projectManager).toBe('张三')
+  })
+})
