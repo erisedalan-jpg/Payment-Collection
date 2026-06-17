@@ -235,3 +235,12 @@ describe('paymentNodeRows 金额与经理字段(3B)', () => {
     expect(rows[0].projectManager).toBe('张三')
   })
 })
+
+describe('paymentNodeRows actualRatio(3C)', () => {
+  it('节点行带 actualRatio', () => {
+    const projects = [{ projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A', paymentPmis: { contract: 100 } }] as any
+    const paymentNodes = { P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.7,
+      expectedPayment: 100, receivedAmount: 60, unpaidAmount: 40, actualRatio: 0.6, status: '部分回款' }] } as any
+    expect(paymentNodeRows(paymentNodes, projects)[0].actualRatio).toBe(0.6)
+  })
+})
