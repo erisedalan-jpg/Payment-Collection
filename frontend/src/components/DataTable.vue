@@ -8,6 +8,8 @@ export interface DataColumn {
   sortable?: boolean
   /** 单元格格式化；返回展示字符串 */
   formatter?: (value: any, row: Record<string, any>) => string
+  /** 为真时该列不截断、单元格内换行（长文本列用） */
+  wrap?: boolean
 }
 
 const props = withDefaults(
@@ -43,14 +45,17 @@ const count = computed(() => props.rows.length)
         :label="col.label"
         :width="col.width"
         :sortable="!!col.sortable"
-        show-overflow-tooltip
+        :show-overflow-tooltip="!col.wrap"
+        :cell-class-name="col.wrap ? 'dt-wrap-col' : ''"
       >
         <template #header>
           <slot :name="`header-${col.key}`" :col="col">{{ col.label }}</slot>
         </template>
         <template #default="scope">
           <slot :name="`cell-${col.key}`" :row="scope.row" :value="scope.row[col.key]">
-            {{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}
+            <!-- wrap 列双重打 dt-wrap-col 类:cell-class-name 给 <td>(浏览器换行)、内层 span 给 jsdom 测试可靠定位(cell-class-name 在 jsdom 不渲染到 td);勿删 span -->
+            <span v-if="col.wrap" class="dt-wrap-col">{{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}</span>
+            <template v-else>{{ col.formatter ? col.formatter(scope.row[col.key], scope.row) : scope.row[col.key] }}</template>
           </slot>
         </template>
       </el-table-column>
@@ -62,4 +67,5 @@ const count = computed(() => props.rows.length)
 .data-table { width: 100%; }
 .dt-count { font-size: var(--fs-1); color: var(--mut); margin: var(--sp-1) 0; }
 :deep(.dt-clickable-row) { cursor: pointer; }
+:deep(.dt-wrap-col) { white-space: normal; word-break: break-word; }
 </style>
