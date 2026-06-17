@@ -65,14 +65,12 @@ const columns = [
   {
     key: 'remainingAmount',
     label: '待回款金额(元)',
-    formatter: (_v: any, row: Record<string, any>) =>
-      fmtYuan((row.expectedPayment || 0) - (row.actualPayment || 0)),
+    formatter: (v: any) => fmtYuan(v as number),
   },
   {
     key: 'paymentRatio',
     label: '完成率',
-    formatter: (_v: any, row: Record<string, any>) =>
-      pct(row.expectedPayment > 0 ? row.actualPayment / row.expectedPayment : 0),
+    formatter: (v: any) => pct(v as number),
   },
   { key: 'paymentStatus', label: '状态' },
 ]
