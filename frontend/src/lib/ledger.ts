@@ -157,7 +157,9 @@ export interface LedgerSummaryPmis { projectCount: number; totalExp: number; tot
 export function ledgerSummaryPmis(rows: LedgerProjectRow[]): LedgerSummaryPmis {
   const totalExp = rows.reduce((s, r) => s + r.expectedPayment, 0)
   const totalAct = rows.reduce((s, r) => s + r.actualPayment, 0)
-  return { projectCount: rows.length, totalExp, totalAct, totalRem: totalExp - totalAct, rate: totalExp > 0 ? totalAct / totalExp : 0 }
+  // 待回款=Σ节点未收(remainingAmount),与下钻"未收"列同口径;不取 expected-received(收款阶段三列独立填报,未必自洽)
+  const totalRem = rows.reduce((s, r) => s + r.remainingAmount, 0)
+  return { projectCount: rows.length, totalExp, totalAct, totalRem, rate: totalExp > 0 ? totalAct / totalExp : 0 }
 }
 
 const LEDGER_TIERS_PMIS = ['100万以上', '50-100万', '50万以下']
@@ -166,8 +168,8 @@ export function ledgerTierStatsPmis(rows: LedgerProjectRow[]): LedgerTierStatPmi
   return LEDGER_TIERS_PMIS.map((t) => {
     const tp = rows.filter((r) => r.tier === t)
     const exp = tp.reduce((s, r) => s + r.expectedPayment, 0)
-    const act = tp.reduce((s, r) => s + r.actualPayment, 0)
-    return { tier: t, count: tp.length, expWan: exp / 10000, remWan: (exp - act) / 10000 }
+    const rem = tp.reduce((s, r) => s + r.remainingAmount, 0)   // 待回款=Σ未收,同 summary
+    return { tier: t, count: tp.length, expWan: exp / 10000, remWan: rem / 10000 }
   })
 }
 

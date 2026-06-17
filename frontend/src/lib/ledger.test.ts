@@ -130,19 +130,20 @@ describe('filterLedgerRows', () => {
 })
 
 describe('ledgerSummaryPmis/TierStatsPmis/StatusCountsPmis', () => {
+  // remainingAmount 故意 ≠ expected-received(550000≠600000),证实待回款取 Σ未收 而非 expected-received
   const rows = [
-    { tier: '100万以上', expectedPayment: 1000000, actualPayment: 400000, paymentStatus: '部分回款', delayed: true },
-    { tier: '50万以下', expectedPayment: 200000, actualPayment: 0, paymentStatus: '未回款', delayed: false },
+    { tier: '100万以上', expectedPayment: 1000000, actualPayment: 400000, remainingAmount: 550000, paymentStatus: '部分回款', delayed: true },
+    { tier: '50万以下', expectedPayment: 200000, actualPayment: 0, remainingAmount: 200000, paymentStatus: '未回款', delayed: false },
   ] as any
-  it('summary', () => {
+  it('summary 待回款取 ΣremainingAmount', () => {
     const s = ledgerSummaryPmis(rows)
-    expect(s).toMatchObject({ projectCount: 2, totalExp: 1200000, totalAct: 400000, totalRem: 800000 })
+    expect(s).toMatchObject({ projectCount: 2, totalExp: 1200000, totalAct: 400000, totalRem: 750000 })
     expect(s.rate).toBeCloseTo(0.3333)
   })
-  it('tier 三档', () => {
+  it('tier 三档 remWan 取 ΣremainingAmount', () => {
     const t = ledgerTierStatsPmis(rows)
     expect(t.map((x) => x.tier)).toEqual(['100万以上', '50-100万', '50万以下'])
-    expect(t[0]).toMatchObject({ count: 1, expWan: 100, remWan: 60 })
+    expect(t[0]).toMatchObject({ count: 1, expWan: 100, remWan: 55 })
   })
   it('statusCounts 四计数含 delayed', () => {
     expect(ledgerStatusCountsPmis(rows)).toMatchObject({ fullPaid: 0, partial: 1, unpaid: 1, delayed: 1 })
