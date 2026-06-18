@@ -338,6 +338,53 @@ def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
     return out
 
 
+def _pmis_date_to_str(v: Any) -> Optional[str]:
+    """PMIS xlsx 日期单元格(openpyxl datetime/文本)归一为 'YYYY-MM-DD';空→None。"""
+    if v is None or v == "":
+        return None
+    if hasattr(v, "strftime"):
+        return v.strftime("%Y-%m-%d")
+    s = str(v).strip()
+    return s[:10] if s else None
+
+
+def build_closed_projects(pmis_dir: str, org_names: set) -> List[Dict[str, Any]]:
+    """已关闭项目轻量清单:已关闭中心 ∩ 项目经理∈org_names(空则不过滤,降级)。
+    复用 _assemble(已关闭) 取 PMIS 已关闭三表核心字段 + closeInfo(关闭时间/是否正常关闭/
+    关闭说明/计划终验时间);无回款/里程碑/利润/风险 join。"""
+    c_base = _index_by_pid(read_pmis_sheet(os.path.join(pmis_dir, config.PMIS_FILES_CLOSED["base"])))
+    c_center = _index_by_pid(read_pmis_sheet(os.path.join(pmis_dir, config.PMIS_FILES_CLOSED["center"])))
+    c_status = _index_by_pid(read_pmis_sheet(os.path.join(pmis_dir, config.PMIS_FILES_CLOSED["status"])))
+    out: List[Dict[str, Any]] = []
+    for pid, crow in c_center.items():
+        mgr = str(crow.get("项目经理") or "").strip()
+        if org_names and mgr not in org_names:
+            continue
+        pm = _assemble(pid, c_base, c_center, c_status, {}, "已关闭")
+        brow = c_base.get(pid, {})
+        team = pm["team"]
+        out.append({
+            "projectId": pid,
+            "projectName": team["项目名称"] or "",
+            "projectManager": team["项目经理"] or "",
+            "orgL4": team["L4部门"] or "",
+            "orgL3_1": team["L3_1部门"] or "",
+            "合同编号": pm["customer"]["合同编号"] or "",
+            "team": team,
+            "customer": pm["customer"],
+            "status": pm["status"],
+            "progress": pm["progress"],
+            "cost": pm["cost"],
+            "closeInfo": {
+                "关闭时间": _pmis_date_to_str(brow.get("项目关闭时间")),
+                "是否正常关闭": (str(brow.get("是否正常关闭")).strip() or None) if brow.get("是否正常关闭") not in (None, "") else None,
+                "关闭说明": (str(brow.get("关闭说明")).strip() or None) if brow.get("关闭说明") not in (None, "") else None,
+                "计划终验时间": _pmis_date_to_str(crow.get("计划终验时间")),
+            },
+        })
+    return out
+
+
 def load_project_pmis(pmis_dir: str, payment_projects_or_ids, dirty=None,
                       extra_closed_ids=None,
                       ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
