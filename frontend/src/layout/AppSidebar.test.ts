@@ -30,7 +30,8 @@ describe('AppSidebar', () => {
     const wrapper = mount(AppSidebar, { global: { plugins: [router] } })
     const text = wrapper.text()
     expect(text).toContain('项目总览')        // 项目组（P4 新首页）
-    expect(text).toContain('项目清单')        // 项目组（新）
+    expect(text).toContain('在建项目')        // 项目组（在建）
+    expect(text).toContain('已关闭项目')      // 项目组（已关闭）
     expect(text).toContain('项目动态')
     expect(text).toContain('项目分析')        // 项目组（P5 新）
     expect(text).toContain('回款总览')        // 回款组：旧首页收编更名
