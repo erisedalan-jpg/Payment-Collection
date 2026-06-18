@@ -399,3 +399,18 @@ class TestBuildClosedProjects:
         import projects as P
         d = self._make_closed(tmp_path)
         assert len(M.build_closed_projects(d, {"张三"})) == P.count_closed_dept(d, {"张三"})
+
+
+class TestPmisDateToStr:
+    def test_datetime(self):
+        import datetime
+        assert M._pmis_date_to_str(datetime.datetime(2025, 8, 15)) == "2025-08-15"
+        assert M._pmis_date_to_str(datetime.date(2025, 7, 1)) == "2025-07-01"
+
+    def test_string_truncates_to_date(self):
+        assert M._pmis_date_to_str("2025-08-15 00:00:00") == "2025-08-15"
+        assert M._pmis_date_to_str("  2025-08-15  ") == "2025-08-15"
+
+    def test_none_and_empty(self):
+        assert M._pmis_date_to_str(None) is None
+        assert M._pmis_date_to_str("") is None
