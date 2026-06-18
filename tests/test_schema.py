@@ -208,3 +208,38 @@ class TestR1DataSourcesContract:
     def test_r1_sources_default_empty(self):
         m = schema.AnalysisData.model_validate(_minimal_analysis_data())
         assert m.projectMilestones == {} and m.paymentRecords == {} and m.projectProfit == {}
+
+
+def test_closed_projects_schema():
+    import schema
+    base = {"meta": {"lastUpdate": "2026-06-18 10:00", "totalProjects": 1, "totalClosed": 1, "totalPaymentNodes": 0},
+            "projectOverview": {"projects": [], "columns": []},
+            "closedProjects": [{
+                "projectId": "C-1", "projectName": "甲", "projectManager": "张三",
+                "orgL4": "安全A组", "orgL3_1": "三部一组", "合同编号": "HT-1",
+                "team": {"L3_1部门": "三部一组", "AR": "AR张"},
+                "customer": {"最终客户": "客A", "签约单位": "甲单位", "合同总额": 1000000.0, "行业": "金融"},
+                "status": {"项目状态": "已验收", "项目级别": "B", "项目类型": "实施项目", "评级": "A"},
+                "progress": {"完工进展": 1.0, "项目阶段": "项目收尾"},
+                "cost": {"剩余预算": -200.0, "项目超支": True, "交付超支": True, "消耗比": 1.2},
+                "closeInfo": {"关闭时间": "2025-08-15", "是否正常关闭": "是", "关闭说明": "正常结项", "计划终验时间": "2025-07-01"},
+            }]}
+    m = schema.AnalysisData.model_validate(base)
+    cp = m.closedProjects[0]
+    assert cp.projectId == "C-1" and cp.合同编号 == "HT-1"
+    assert cp.team.L3_1部门 == "三部一组"
+    assert cp.cost.项目超支 is True and cp.cost.交付超支 is True
+    assert cp.closeInfo.关闭时间 == "2025-08-15" and cp.closeInfo.计划终验时间 == "2025-07-01"
+    assert cp.status.项目状态 == "已验收"
+    # 声明完整性(防字段被误删)
+    assert "closedProjects" in schema.AnalysisData.model_fields
+    assert {"关闭时间", "计划终验时间", "是否正常关闭", "关闭说明"} <= set(schema.ClosedProjectCloseInfo.model_fields)
+    assert "closeInfo" in schema.ClosedProject.model_fields
+
+
+def test_closed_projects_default_empty():
+    import schema
+    base = {"meta": {"lastUpdate": "x", "totalProjects": 0, "totalPaymentNodes": 0},
+            "projectOverview": {"projects": [], "columns": []}}
+    m = schema.AnalysisData.model_validate(base)
+    assert m.closedProjects == []   # 默认空(不传不报错)
