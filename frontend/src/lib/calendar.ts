@@ -11,6 +11,7 @@ export interface CalFilters { orgL3_1: string; orgL4: string; pm: string }
 export function calFilterOptions(nodes: PayNodeRow[]): { orgL3_1: string[]; orgL4: string[]; pm: string[] } {
   const l3 = new Set<string>(), l4 = new Set<string>(), pm = new Set<string>()
   for (const n of nodes) {
+    if (!n.planDate) continue
     if (n.orgL3_1) l3.add(n.orgL3_1)
     if (n.dept) l4.add(n.dept)
     if (n.projectManager) pm.add(n.projectManager)
