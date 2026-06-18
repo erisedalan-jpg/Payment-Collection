@@ -18,7 +18,7 @@ export function deriveTier(contract: number | null | undefined): string {
 export function deriveProgress(pmis: ProjectPaymentPmis | null | undefined): string {
   const c = pmis?.contract
   if (c == null || c <= 0) return '未知'
-  const r = pmis?.paymentRatio
+  const r = (pmis as Record<string, unknown> | null | undefined)?.['paymentRatio'] as number | null | undefined
   if (r == null || r <= 0) return '未回款'
   if (r >= 0.999) return '已全额回款'
   return '部分回款'
@@ -101,7 +101,7 @@ export function projectPaymentRows(
     const pm = p.paymentPmis ?? null
     const contract = pm?.contract ?? 0
     const actualTotal = pm?.actualTotal ?? 0
-    const paymentRatio = pm?.paymentRatio ?? null
+    const paymentRatio = ((pm as Record<string, unknown> | null | undefined)?.['paymentRatio'] as number | null | undefined) ?? null
     const dept = deriveDept(p)
     const tier = deriveTier(pm?.contract)
     const progress = deriveProgress(pm)

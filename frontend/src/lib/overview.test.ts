@@ -62,7 +62,7 @@ function pn(overrides: Partial<PayNodeRow>): PayNodeRow {
     projectManager: '',
     status: '待回款',
     dept: '',
-    orgL3: '',
+    orgL3_1: '',
     projStage: '',
     tier: '',
     progress: '0',

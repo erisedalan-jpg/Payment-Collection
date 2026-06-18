@@ -40,7 +40,7 @@ const state = reactive({
   filterPM: '',
 })
 const calFilters = computed<CalFilters>(() => ({
-  orgL3: state.filterOrgL3,
+  orgL3_1: state.filterOrgL3,
   orgL4: state.filterOrgL4,
   pm: state.filterPM,
 }))
@@ -136,7 +136,7 @@ function clearFilters() {
         <button class="cal-arrow" @click="nextMonth">›</button>
       </div>
       <el-select v-model="state.filterOrgL3" size="small" placeholder="PM L3-1部门" clearable style="width:150px">
-        <el-option v-for="o in options.orgL3" :key="o" :label="o" :value="o" />
+        <el-option v-for="o in options.orgL3_1" :key="o" :label="o" :value="o" />
       </el-select>
       <el-select v-model="state.filterOrgL4" size="small" placeholder="项目经理L4部门" clearable style="width:160px">
         <el-option v-for="o in options.orgL4" :key="o" :label="o" :value="o" />

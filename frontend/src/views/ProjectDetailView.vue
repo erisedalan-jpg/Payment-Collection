@@ -74,7 +74,7 @@ const deliveryOverBadges = computed(() =>
 const metrics = computed(() => [
   { k: '完工进展', v: fmtRatio(m.value.progress?.完工进展) },
   { k: '里程碑状态', v: m.value.progress?.里程碑进度状态 || '-' },
-  { k: '计划终验', v: fmtDateCell(m.value.progress?.计划终验) },
+  { k: '终验时间', v: fmtDateCell(m.value.progress?.终验时间) },
   { k: '风险', v: m.value.risk?.最高等级 ? `${m.value.risk.最高等级}(${m.value.risk?.未关闭风险数 ?? 0} 未关闭)` : '无' },
   { k: '预算消耗比', v: fmtRatio(m.value.cost?.消耗比) },
   { k: '回款完成率', v: fmtRatio(p.value?.payment?.paymentRatio) },
@@ -104,7 +104,6 @@ const pmisPaySummary = computed(() => {
     { k: '合同总额(万)', v: fmtWan(s.contract) },
     { k: '流水累计(万)', v: fmtWan(s.actualTotal) },
     { k: '回款笔数', v: String(s.paymentCount ?? 0) },
-    { k: '完成率', v: fmtRatio(s.paymentRatio) },
     { k: '计划回款(万)', v: fmtWan(s.expectedTotal) },
     { k: '已回款/阶段', v: `${s.reachedCount ?? 0}/${s.nodeCount ?? 0}` },
   ]
@@ -127,7 +126,9 @@ const progressInfo = computed(() => [
   { k: '完工进展', v: fmtRatio(m.value.progress?.完工进展) },
   { k: '项目阶段', v: m.value.progress?.项目阶段 || '-' },
   { k: '里程碑进度状态', v: m.value.progress?.里程碑进度状态 || '-' },
-  { k: '计划终验', v: fmtDateCell(m.value.progress?.计划终验) },
+  { k: '终验时间', v: fmtDateCell(m.value.progress?.终验时间) },
+  { k: '关键动作', v: m.value.status?.关键动作 || '-' },
+  { k: '交付物', v: m.value.status?.交付物 || '-' },
 ])
 // 进度 tab 的「回款里程碑」表(基于云文档 page.nodes)已于 3A 下线;进度里程碑改由 MilestoneTable(PMIS)承载
 
@@ -206,7 +207,8 @@ const costSummary = computed(() => [
   { k: '剩余预算(万)', v: fmtWan(m.value.cost?.剩余预算) },
   { k: '消耗比', v: fmtRatio(m.value.cost?.消耗比) },
   { k: '成本状态', v: m.value.cost?.成本状态 || '-' },
-  { k: '超支', v: m.value.cost?.超支 === true ? '是' : '否' },
+  { k: '项目超支', v: m.value.cost?.项目超支 === true ? '是' : '否' },
+  { k: '交付超支', v: m.value.cost?.交付超支 === true ? '是' : '否' },
 ])
 const COST_COLS: DataColumn[] = [
   { key: '类别', label: '类别' },
@@ -216,6 +218,18 @@ const COST_COLS: DataColumn[] = [
   { key: '消耗率', label: '消耗率', formatter: (v) => fmtRatio(v) },
 ]
 const costRows = computed(() => (p.value?.deliveryCosts ?? []) as Record<string, any>[])
+
+const teamInfo = computed(() => [
+  { k: '项目经理', v: m.value.team?.项目经理 || '-' },
+  { k: 'L4部门', v: m.value.team?.L4部门 || '-' },
+  { k: 'L3部门', v: m.value.team?.L3部门 || '-' },
+  { k: 'L3-1部门', v: m.value.team?.L3_1部门 || '-' },
+  { k: 'AR', v: m.value.team?.AR || '-' },
+  { k: 'SR', v: m.value.team?.SR || '-' },
+  { k: 'CSR', v: m.value.team?.CSR || '-' },
+  { k: 'CDR', v: m.value.team?.CDR || '-' },
+  { k: 'Sponsor', v: m.value.team?.Sponsor || '-' },
+])
 
 // —— 右栏:本项目动态(P3;spec 4.2 布局 B 右栏,与 /activity 同构) ——
 const myEvents = computed(() =>
@@ -260,6 +274,7 @@ const originInfo = computed(() => [
           <div class="pd-meta">
             <span>编号 <b>{{ p.projectId }}</b></span>
             <span>客户 <b>{{ m.customer?.最终客户 || '-' }}</b></span>
+            <span>签约单位 <b>{{ m.customer?.签约单位 || '-' }}</b></span>
             <span>合同总额(万) <b class="u-num">{{ fmtWan(m.customer?.合同总额) }}</b></span>
             <span>项目经理 <b>{{ p.projectManager || '-' }}</b></span>
             <span>服务组 <b>{{ p.orgL4 || '-' }}</b></span>
@@ -271,6 +286,13 @@ const originInfo = computed(() => [
               <div class="pd-metric-k">{{ it.k }}</div>
             </div>
           </div>
+
+          <section class="pd-team">
+            <div class="pd-section-title">团队</div>
+            <div class="pd-chips">
+              <div v-for="it in teamInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v">{{ it.v }}</span></div>
+            </div>
+          </section>
 
           <section class="pd-tags">
             <span class="pdt-label">项目标签</span>
@@ -292,7 +314,7 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in pmisPaySummary" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
-            <div class="pd-note">完成率=回款流水累计÷合同总额（payment_records.csv；售前项目取原项目合同总额）。回款阶段来源 input/collection_stages.csv。</div>
+            <div class="pd-note">回款阶段来源 input/collection_stages.csv；流水来源 payment_records.csv（售前项目取原项目）。</div>
             <DataTable v-if="pmisNodes.length" :columns="PMIS_NODE_COLS" :rows="pmisNodes as any[]" :show-count="false" />
             <div v-else class="pd-note">该项目暂无回款阶段数据。</div>
             <div class="pd-section-title">跟进记录</div>
