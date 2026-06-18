@@ -8,7 +8,7 @@ import type { PayNodeRow } from './paymentPmis'
 function pn(p: Partial<PayNodeRow>): PayNodeRow {
   return { projectId: 'P1', projectName: '甲', stage: '到货款', planDate: '2026-02-10', actualDate: '',
     payRatio: null, actualRatio: null, expectedPayment: 0, receivedAmount: 0, unpaidAmount: 0,
-    projectManager: '张', status: '待回款', dept: 'A组', orgL3: '三部一组', projStage: '', tier: '100万以上', progress: '未回款', ...p }
+    projectManager: '张', status: '待回款', dept: 'A组', orgL3_1: '三部一组', projStage: '', tier: '100万以上', progress: '未回款', ...p }
 }
 
 describe('calExcludePaid', () => {
@@ -20,18 +20,18 @@ describe('calExcludePaid', () => {
 })
 
 describe('calFilterOptions', () => {
-  it('orgL3/orgL4(dept)/pm 去重升序', () => {
-    const o = calFilterOptions([pn({ orgL3: '组A', dept: 'L4A', projectManager: '张' }), pn({ orgL3: '组B', dept: 'L4B', projectManager: '李' })])
-    expect(o.orgL3).toEqual(['组A', '组B'])
+  it('orgL3_1/orgL4(dept)/pm 去重升序', () => {
+    const o = calFilterOptions([pn({ orgL3_1: '组A', dept: 'L4A', projectManager: '张' }), pn({ orgL3_1: '组B', dept: 'L4B', projectManager: '李' })])
+    expect(o.orgL3_1).toEqual(['组A', '组B'])
     expect(o.orgL4).toEqual(['L4A', 'L4B'])
     expect(o.pm).toEqual(['张', '李'])
   })
 })
 
 describe('applyCalFilters', () => {
-  it('按 orgL3/dept/pm 过滤', () => {
-    const rows = [pn({ projectId: 'P1', orgL3: '组A' }), pn({ projectId: 'P2', orgL3: '组B' })]
-    expect(applyCalFilters(rows, { orgL3: '组A', orgL4: '', pm: '' }).map((n) => n.projectId)).toEqual(['P1'])
+  it('按 orgL3_1/dept/pm 过滤', () => {
+    const rows = [pn({ projectId: 'P1', orgL3_1: '组A' }), pn({ projectId: 'P2', orgL3_1: '组B' })]
+    expect(applyCalFilters(rows, { orgL3_1: '组A', orgL4: '', pm: '' }).map((n) => n.projectId)).toEqual(['P1'])
   })
 })
 
@@ -42,7 +42,7 @@ describe('calDashboardStats', () => {
       pn({ planDate: '2026-02-10', unpaidAmount: 30000, receivedAmount: 10000, status: '部分回款' }),
       pn({ planDate: '2026-02-18', unpaidAmount: 50000, status: '延期' }),
     ]
-    const d = calDashboardStats(rows, { orgL3: '', orgL4: '', pm: '' }, now)
+    const d = calDashboardStats(rows, { orgL3_1: '', orgL4: '', pm: '' }, now)
     expect(d.mRemaining).toBe(80000)
     expect(d.mActual).toBe(10000)
     expect(d.mCount).toBe(2)
@@ -80,7 +80,7 @@ describe('calUpcoming', () => {
       pn({ planDate: '2026-02-25', status: '延期' }),
       pn({ planDate: '2026-02-05', status: '已回款' }),
     ]
-    const u = calUpcoming(rows, { orgL3: '', orgL4: '', pm: '' }, now)
+    const u = calUpcoming(rows, { orgL3_1: '', orgL4: '', pm: '' }, now)
     expect(u.up15.map((n) => n.planDate)).toEqual(['2026-02-10'])
     expect(u.up30.map((n) => n.planDate)).toEqual(['2026-02-25'])
   })
