@@ -5,24 +5,23 @@ export function calExcludePaid(nodes: PayNodeRow[]): PayNodeRow[] {
   return nodes.filter((n) => n.status !== '已回款')
 }
 
-export interface CalFilters { orgL3: string; orgL4: string; pm: string }
+export interface CalFilters { orgL3_1: string; orgL4: string; pm: string }
 
 /** 三筛选下拉选项(有 planDate 的节点,升序去重)。orgL4 取 dept。 */
-export function calFilterOptions(nodes: PayNodeRow[]): { orgL3: string[]; orgL4: string[]; pm: string[] } {
+export function calFilterOptions(nodes: PayNodeRow[]): { orgL3_1: string[]; orgL4: string[]; pm: string[] } {
   const l3 = new Set<string>(), l4 = new Set<string>(), pm = new Set<string>()
   for (const n of nodes) {
-    if (!n.planDate) continue
-    if (n.orgL3) l3.add(n.orgL3)
+    if (n.orgL3_1) l3.add(n.orgL3_1)
     if (n.dept) l4.add(n.dept)
     if (n.projectManager) pm.add(n.projectManager)
   }
-  return { orgL3: [...l3].sort(), orgL4: [...l4].sort(), pm: [...pm].sort() }
+  return { orgL3_1: [...l3].sort(), orgL4: [...l4].sort(), pm: [...pm].sort() }
 }
 
-/** 应用 orgL3/orgL4(dept)/PM 三筛选。 */
+/** 应用 orgL3_1/orgL4(dept)/PM 三筛选。 */
 export function applyCalFilters(nodes: PayNodeRow[], f: CalFilters): PayNodeRow[] {
   let out = nodes
-  if (f.orgL3) out = out.filter((n) => n.orgL3 === f.orgL3)
+  if (f.orgL3_1) out = out.filter((n) => n.orgL3_1 === f.orgL3_1)
   if (f.orgL4) out = out.filter((n) => n.dept === f.orgL4)
   if (f.pm) out = out.filter((n) => n.projectManager === f.pm)
   return out
