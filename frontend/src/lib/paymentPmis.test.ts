@@ -31,22 +31,22 @@ describe('deriveTier（金额档四档边界）', () => {
 
 describe('deriveProgress（进度态边界）', () => {
   it('ratio≥0.999 → 已全额回款（含>1 超额）', () => {
-    expect(deriveProgress(pm({ contract: 100, paymentRatio: 0.999 }))).toBe('已全额回款')
-    expect(deriveProgress(pm({ contract: 100, paymentRatio: 1 }))).toBe('已全额回款')
-    expect(deriveProgress(pm({ contract: 100, paymentRatio: 1.05 }))).toBe('已全额回款')
+    expect(deriveProgress(100, 0.999)).toBe('已全额回款')
+    expect(deriveProgress(100, 1)).toBe('已全额回款')
+    expect(deriveProgress(100, 1.05)).toBe('已全额回款')
   })
   it('0<ratio<0.999 → 部分回款', () => {
-    expect(deriveProgress(pm({ contract: 100, paymentRatio: 0.5 }))).toBe('部分回款')
+    expect(deriveProgress(100, 0.5)).toBe('部分回款')
   })
   it('ratio==0 或 null 且 contract>0 → 未回款', () => {
-    expect(deriveProgress(pm({ contract: 100, paymentRatio: 0 }))).toBe('未回款')
-    expect(deriveProgress(pm({ contract: 100, paymentRatio: null }))).toBe('未回款')
+    expect(deriveProgress(100, 0)).toBe('未回款')
+    expect(deriveProgress(100, null)).toBe('未回款')
   })
-  it('无合同 / 无 pmis → 未知', () => {
-    expect(deriveProgress(pm({ contract: null, paymentRatio: null }))).toBe('未知')
-    expect(deriveProgress(pm({ contract: 0, paymentRatio: 0 }))).toBe('未知')
-    expect(deriveProgress(null)).toBe('未知')
-    expect(deriveProgress(undefined)).toBe('未知')
+  it('无合同 / null/undefined → 未知', () => {
+    expect(deriveProgress(null, null)).toBe('未知')
+    expect(deriveProgress(0, 0)).toBe('未知')
+    expect(deriveProgress(null, undefined)).toBe('未知')
+    expect(deriveProgress(undefined, undefined)).toBe('未知')
   })
 })
 
@@ -110,9 +110,13 @@ describe('filterProjects（视角/纳管，不复用 filterNodes）', () => {
 describe('projectPaymentRows / summaryByDim', () => {
   const ps = [
     proj({ projectId: 'A', projectName: '甲', projectManager: '张三', orgL4: '组1',
-      overspendAmount: 0, paymentPmis: pm({ contract: 2_000_000, actualTotal: 1_000_000, paymentRatio: 0.5, expectedTotal: 1_500_000, nodeCount: 3, reachedCount: 1, delayedCount: 1, fromOrigin: false }) }),
+      overspendAmount: 0,
+      payment: { relatedNodeCount: 3, expectedTotal: 1_500_000, actualTotal: 1_000_000, remainingTotal: 500_000, paymentRatio: 0.5, delayedCount: 1 },
+      paymentPmis: pm({ contract: 2_000_000, actualTotal: 1_000_000, expectedTotal: 1_500_000, nodeCount: 3, reachedCount: 1, delayedCount: 1, fromOrigin: false }) }),
     proj({ projectId: 'B', projectName: '乙', projectManager: '李四', orgL4: '组1',
-      overspendAmount: 5000, paymentPmis: pm({ contract: 1_000_000, actualTotal: 1_000_000, paymentRatio: 1, expectedTotal: 1_000_000, nodeCount: 2, reachedCount: 2, delayedCount: 0, fromOrigin: true }) }),
+      overspendAmount: 5000,
+      payment: { relatedNodeCount: 2, expectedTotal: 1_000_000, actualTotal: 1_000_000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
+      paymentPmis: pm({ contract: 1_000_000, actualTotal: 1_000_000, expectedTotal: 1_000_000, nodeCount: 2, reachedCount: 2, delayedCount: 0, fromOrigin: true }) }),
   ]
   const map: Record<string, ProjectPmis> = { A: { progress: { 项目阶段: '实施' } } as ProjectPmis }
   it('行字段映射齐全（含派生维度与下钻兼容列）', () => {
@@ -147,7 +151,9 @@ describe('projectPaymentRows / summaryByDim', () => {
 
 describe('paymentNodeRows（扁平化 + 维度 join 到所属项目）', () => {
   const projects = [
-    proj({ projectId: 'A', projectName: '甲', orgL4: '组1', paymentPmis: pm({ contract: 2_000_000, paymentRatio: 0.5 }) }),
+    proj({ projectId: 'A', projectName: '甲', orgL4: '组1',
+      payment: { relatedNodeCount: 2, expectedTotal: 2_000_000, actualTotal: 1_000_000, remainingTotal: 1_000_000, paymentRatio: 0.5, delayedCount: 1 },
+      paymentPmis: pm({ contract: 2_000_000 }) }),
   ]
   const pmisMap: Record<string, ProjectPmis> = { A: { progress: { 项目阶段: '实施' } } as ProjectPmis }
   const nodes: Record<string, PaymentNodePmis[]> = {
@@ -188,9 +194,9 @@ describe('nodeSummary（节点三态计数 + 计划回款Σ）', () => {
 describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
   it('已全额/部分/未回款三桶按固定序，未知不入桶', () => {
     const rows = projectPaymentRows([
-      proj({ projectId: 'A', paymentPmis: pm({ contract: 100, paymentRatio: 1, actualTotal: 100 }) }),
-      proj({ projectId: 'B', paymentPmis: pm({ contract: 100, paymentRatio: 0.5, actualTotal: 50 }) }),
-      proj({ projectId: 'C', paymentPmis: pm({ contract: 100, paymentRatio: 0, actualTotal: 0 }) }),
+      proj({ projectId: 'A', payment: { paymentRatio: 1 }, paymentPmis: pm({ contract: 100, actualTotal: 100 }) }),
+      proj({ projectId: 'B', payment: { paymentRatio: 0.5 }, paymentPmis: pm({ contract: 100, actualTotal: 50 }) }),
+      proj({ projectId: 'C', payment: { paymentRatio: 0 }, paymentPmis: pm({ contract: 100, actualTotal: 0 }) }),
       proj({ projectId: 'D', paymentPmis: pm({ contract: 0 }) }),
     ], {})
     const { buckets, unknown } = progressBuckets(rows)
@@ -203,9 +209,15 @@ describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
 
 describe('pmisRiskGroups（PMIS 风险三类）', () => {
   const projects = [
-    proj({ projectId: 'A', projectName: '甲', orgL4: '组1', overspendAmount: 8000, paymentPmis: pm({ contract: 3_000_000, paymentRatio: 0.1, actualTotal: 300_000 }) }),
-    proj({ projectId: 'B', projectName: '乙', orgL4: '组2', overspendAmount: 0, paymentPmis: pm({ contract: 1_000_000, paymentRatio: 0.9, actualTotal: 900_000 }) }),
-    proj({ projectId: 'C', projectName: '丙', orgL4: '组3', overspendAmount: 3000, paymentPmis: pm({ contract: 500_000, paymentRatio: null, actualTotal: 0 }) }),
+    proj({ projectId: 'A', projectName: '甲', orgL4: '组1', overspendAmount: 8000,
+      payment: { paymentRatio: 0.1 },
+      paymentPmis: pm({ contract: 3_000_000, actualTotal: 300_000 }) }),
+    proj({ projectId: 'B', projectName: '乙', orgL4: '组2', overspendAmount: 0,
+      payment: { paymentRatio: 0.9 },
+      paymentPmis: pm({ contract: 1_000_000, actualTotal: 900_000 }) }),
+    proj({ projectId: 'C', projectName: '丙', orgL4: '组3', overspendAmount: 3000,
+      payment: { paymentRatio: null },
+      paymentPmis: pm({ contract: 500_000, actualTotal: 0 }) }),
   ]
   const nodes: Record<string, PaymentNodePmis[]> = {
     A: [{ stage: '终验', planDate: '2026-05-01', status: '延期', expectedPayment: 100 } as PaymentNodePmis],
