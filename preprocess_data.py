@@ -1198,17 +1198,12 @@ def main():
     # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
     print("[INFO] 摄取 PMIS 项目域数据...")
     pmis_dir = os.path.join(BASE_DIR, "input", config.PMIS_DIRNAME)
-    pay_projects = [{"projectId": n.get("projectId", ""), "projectName": n.get("projectName", "")}
-                    for n in all_nodes]
-    # 回款侧脏值:实际回款比例 > 1
-    dirty = []
-    for n in all_nodes:
-        rnum = _get_ratio_num(n.get("actualPaymentRatio"))
-        if rnum is not None and rnum > 1:
-            dirty.append({"type": "回款比例>1", "projectId": n.get("projectId", ""),
-                          "field": "actualPaymentRatio", "value": n.get("actualPaymentRatio")})
+    # 换源:pay_projects 改由 project_overview 取,不再遍历 all_nodes
+    pay_projects = [{"projectId": p.get("projectId", ""), "projectName": p.get("projectName", "")}
+                    for p in project_overview]
+    # dirty 延迟到 payment_nodes 建好后填充(见 9f 循环之后),此处先传空列表
     project_pmis, data_quality = pmis.load_project_pmis(
-        pmis_dir, pay_projects, dirty=dirty, extra_closed_ids=extra_closed)
+        pmis_dir, pay_projects, dirty=[], extra_closed_ids=extra_closed)
     if data_quality["summary"]["pmisProvided"]:
         print(f"  [OK] PMIS 命中在建 {data_quality['summary']['matchedActive']} / "
               f"已关闭 {data_quality['summary']['matchedClosed']} / 未匹配 {data_quality['summary']['unmatched']}")
@@ -1218,7 +1213,7 @@ def main():
     # === 9c. 构建项目主域(PMIS在建 ∩ 交付三部,Phase P1) ===
     print("[INFO] 构建项目主域(交付实施三部)...")
     dept_projects, projects_quality = projects_mod.load_dept_projects(
-        os.path.join(BASE_DIR, "input"), project_pmis, all_nodes, mapping)
+        os.path.join(BASE_DIR, "input"), project_pmis, mapping)
     if projects_quality["orgFile"]["provided"]:
         print(f"  [OK] 主域项目 {projects_quality['deptProjectCount']} 个, "
               f"售前已映射 {projects_quality['presaleMapped']}/{projects_quality['presaleTotal']}, "
@@ -1281,12 +1276,22 @@ def main():
           f"(售前取原项目 {sum(1 for p in dept_projects if p['paymentPmis']['fromOrigin'])}"
           f";收款阶段项目 {len(collection_stages)})")
 
+    # 换源:dirty 改由 payment_nodes 取(actualRatio),回填至 data_quality
+    dirty = []
+    for _pid, _nodes in payment_nodes.items():
+        for n in _nodes:
+            r = n.get("actualRatio")
+            if r is not None and r > 1:
+                dirty.append({"type": "回款比例>1", "projectId": _pid,
+                              "field": "actualRatio", "value": r})
+    data_quality["dirty"] = dirty
+
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {
             "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "totalProjects": dashboard["totalProjectCount"],
-            "totalPaymentNodes": dashboard["totalPaymentNodes"],
+            "totalPaymentNodes": sum(len(v) for v in payment_nodes.values()),
         },
         "dashboard": dashboard,
         "summary": summary,
