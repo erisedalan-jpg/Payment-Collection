@@ -116,7 +116,7 @@ async function doExport() {
 
 <template>
   <div class="projects-view">
-    <h2 class="pv-title">项目清单</h2>
+    <h2 class="pv-title">在建项目</h2>
     <div class="toolbar">
       <el-input v-model="filters.search" size="small" placeholder="搜索 项目名/编号/客户/经理" clearable style="width: 230px" />
       <el-select v-model="filters.manager" size="small" multiple collapse-tags clearable placeholder="项目经理" style="width: 130px">

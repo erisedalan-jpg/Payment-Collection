@@ -184,6 +184,28 @@ class Project(_Base):
     health: ProjectHealth = ProjectHealth()
 
 
+class ClosedProjectCloseInfo(_Base):
+    关闭时间: Optional[str] = None
+    是否正常关闭: Optional[str] = None
+    关闭说明: Optional[str] = None
+    计划终验时间: Optional[str] = None
+
+
+class ClosedProject(_Base):
+    projectId: str
+    projectName: str = ""
+    projectManager: str = ""
+    orgL4: str = ""
+    orgL3_1: str = ""
+    合同编号: str = ""
+    team: PmisTeam = PmisTeam()
+    customer: PmisCustomer = PmisCustomer()
+    status: PmisStatus = PmisStatus()
+    progress: PmisProgress = PmisProgress()
+    cost: PmisCost = PmisCost()
+    closeInfo: ClosedProjectCloseInfo = ClosedProjectCloseInfo()
+
+
 class InputFileStat(_Base):
     provided: bool = False
     rows: int = 0
@@ -304,6 +326,7 @@ class AnalysisData(_Base):
     projectPmis: Dict[str, ProjectPmis] = {}
     dataQuality: Optional[DataQuality] = None
     projects: List[Project] = []
+    closedProjects: List[ClosedProject] = []
     projectsQuality: Optional[ProjectsQuality] = None
     projectMilestones: Dict[str, List[MilestoneItem]] = {}
     paymentRecords: Dict[str, PaymentRecordsEntry] = {}

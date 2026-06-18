@@ -255,7 +255,7 @@ const originInfo = computed(() => [
     <div v-if="!p" class="pd-404">
       <div class="pd-404-title">未找到该项目</div>
       <div class="pd-404-sub">项目编号 {{ route.params.id }} 不在项目主域中（仅含交付实施三部在建项目）。</div>
-      <RouterLink to="/projects" class="pd-404-link">← 返回项目清单</RouterLink>
+      <RouterLink to="/projects" class="pd-404-link">← 返回在建项目</RouterLink>
     </div>
 
     <template v-else>
