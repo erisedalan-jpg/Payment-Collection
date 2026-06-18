@@ -77,14 +77,21 @@ class TestReadPmisSheet:
 
 
 class TestDeriveCost:
-    def test_consume_ratio_and_overrun(self):
-        row = {"项目总预算（元）": "1000", "项目核算（元）": "600", "剩余预算（元）": "400",
+    def test_consume_ratio_overrun_and_delivery(self):
+        row = {"项目总预算（元）": "1000", "项目核算（元）": "600", "剩余预算（元）": "-50",
                "成本状态": "黄色预警"}
-        center = {"是否人工成本超支": "否", "是否直接成本超支": "是"}
+        center = {"是否交付部门人工成本超支": "是"}
         cost = M.derive_cost(row, center)
         assert cost["消耗比"] == pytest.approx(0.6)
-        assert cost["超支"] is True
+        assert cost["项目超支"] is True       # 剩余预算 -50 < 0
+        assert cost["交付超支"] is True        # 中心:是否交付部门人工成本超支==是
         assert cost["成本状态"] == "黄色预警"
+        assert "超支" not in cost              # 旧键已移除
+
+    def test_no_overrun(self):
+        cost = M.derive_cost({"剩余预算（元）": "400"}, {"是否交付部门人工成本超支": "否"})
+        assert cost["项目超支"] is False and cost["交付超支"] is False
+
     def test_zero_budget_ratio_none(self):
         cost = M.derive_cost({"项目总预算（元）": "0", "项目核算（元）": "0"}, {})
         assert cost["消耗比"] is None
@@ -137,14 +144,25 @@ class TestBuildProjectPmis:
     def test_pause_false_and_risk_override(self):
         active = {
             "base": [{"项目编号": "SS-2", "是否暂停": "否", "项目状态": "实施中"}],
+            "center": [{"项目编号": "SS-2"}],
             "status": [{"项目编号": "SS-2", "未关闭风险数量": "3/5"}],
             "risk": [{"项目编号": "SS-2", "风险等级": "低", "风险状态": "已识别"}],
         }
         pm = M.build_project_pmis(active, {}, set())
-        # "否" 必须判为 False(而非 None,也不被 "不是" 之类子串误判)
         assert pm["SS-2"]["status"]["是否暂停"] is False
-        # status 表分式分子(3)覆盖 risk 记录推导值(1)
         assert pm["SS-2"]["risk"]["未关闭风险数"] == 3
+
+    def test_active_universe_is_center_only(self):
+        active = {
+            "base": [{"项目编号": "ONLY-BASE", "项目名称": "x"},
+                     {"项目编号": "IN-CENTER", "项目名称": "c"}],
+            "center": [{"项目编号": "IN-CENTER"}],
+            "status": [{"项目编号": "ONLY-STATUS"}],
+            "risk": [],
+        }
+        pm = M.build_project_pmis(active, {}, set())
+        assert "IN-CENTER" in pm
+        assert "ONLY-BASE" not in pm and "ONLY-STATUS" not in pm
 
 
 class TestComputeDataQuality:
@@ -201,6 +219,9 @@ class TestLoadProjectPmis:
         _make_xlsx(str(d), config.PMIS_FILES_ACTIVE["base"],
                    ["项目编号", "项目名称", "项目状态"],
                    [{"项目编号": "SS-1", "项目名称": "甲", "项目状态": "实施中"}])
+        _make_xlsx(str(d), config.PMIS_FILES_ACTIVE["center"],
+                   ["项目编号"],
+                   [{"项目编号": "SS-1"}])
         _make_xlsx(str(d), config.PMIS_FILES_ACTIVE["status"],
                    ["项目编号", "项目总预算（元）", "项目核算（元）"],
                    [{"项目编号": "SS-1", "项目总预算（元）": "1000", "项目核算（元）": "500"}])
@@ -223,7 +244,37 @@ class TestAssembleTeamAndRisks:
         base_i = {"P1": {"项目经理（FR）": "李四", "项目经理L4部门": "银行服务组", "项目名称": "B名"}}
         center_i = {"P1": {"项目经理": "张三", "项目名称": "C名"}}
         out = M._assemble("P1", base_i, center_i, {}, {}, "在建")
-        assert out["team"] == {"项目名称": "C名", "项目经理": "张三", "L4部门": "银行服务组"}
+        assert out["team"]["项目名称"] == "C名"
+        assert out["team"]["项目经理"] == "张三"
+        assert out["team"]["L4部门"] == "银行服务组"
+        assert out["team"]["AR"] is None        # base 无该列 → None
+
+    def test_team_extended_fields_from_base(self):
+        base_i = {"P1": {"项目经理L3部门": "三部", "项目经理L3-1部门": "三部一组",
+                         "客户经理（AR）": "AR人", "方案经理（SR）": "SR人",
+                         "安全运行经理（CSR）": "CSR人", "定制经理（CDR）": "CDR人",
+                         "Sponsor": "老板"}}
+        t = M._assemble("P1", base_i, {}, {}, {}, "在建")["team"]
+        assert t["L3部门"] == "三部" and t["L3_1部门"] == "三部一组"
+        assert t["AR"] == "AR人" and t["SR"] == "SR人" and t["CSR"] == "CSR人"
+        assert t["CDR"] == "CDR人" and t["Sponsor"] == "老板"
+
+    def test_customer_signing_unit_and_contract_center_priority(self):
+        base_i = {"P1": {"签约单位": "甲方单位", "合同编号": "B-001", "最终客户": "客A",
+                         "行业中类": "金融", "合同总额（元）": "1000"}}
+        center_i = {"P1": {"合同编号": "C-001"}}
+        cust = M._assemble("P1", base_i, center_i, {}, {}, "在建")["customer"]
+        assert cust["签约单位"] == "甲方单位"
+        assert cust["合同编号"] == "C-001"      # center 优先
+        assert "签约形式" not in cust
+        cust2 = M._assemble("P1", base_i, {}, {}, {}, "在建")["customer"]
+        assert cust2["合同编号"] == "B-001"      # center 缺 → 回退 base
+
+    def test_status_key_action_and_deliverable(self):
+        status_i = {"P1": {"关键动作完成情况(必须-考核)": "已完成",
+                           "交付物上传情况(必须-考核)": "3/3"}}
+        st = M._assemble("P1", {}, {}, status_i, {}, "在建")["status"]
+        assert st["关键动作"] == "已完成" and st["交付物"] == "3/3"
 
     def test_team_fallback_to_base(self):
         base_i = {"P1": {"项目经理（FR）": "李四", "项目经理L4部门": "银行服务组", "项目名称": "B名"}}

@@ -95,17 +95,16 @@ _RISK_RANK = {"高": 3, "中": 2, "低": 1}
 
 
 def derive_cost(status_row: Dict[str, Any], center_row: Dict[str, Any]) -> Dict[str, Any]:
-    """计算项目成本维度:消耗比、超支标志、各金额字段。"""
+    """成本维度:消耗比、项目超支(剩余预算<0)、交付超支(中心交付部门人工成本超支)、各金额。"""
     total = parse_pmis_money(status_row.get("项目总预算（元）"))
     used = parse_pmis_money(status_row.get("项目核算（元）"))
     remain = parse_pmis_money(status_row.get("剩余预算（元）"))
     ratio = (used / total) if (total and total > 0 and used is not None) else None
-    overrun_keys = [k for k in center_row if "超支" in k]
-    overrun = None
-    if overrun_keys:
-        overrun = any(str(center_row.get(k) or "").strip() == "是" for k in overrun_keys)
+    over_project = (remain is not None and remain < 0)
+    over_delivery = (str(center_row.get("是否交付部门人工成本超支") or "").strip() == "是")
     return {"总预算": total, "核算": used, "剩余预算": remain, "消耗比": ratio,
-            "超支": overrun, "成本状态": (status_row.get("成本状态") or None)}
+            "项目超支": over_project, "交付超支": over_delivery,
+            "成本状态": (status_row.get("成本状态") or None)}
 
 
 def derive_risk(risk_recs: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -171,7 +170,6 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
             "完工进展": parse_pmis_pct(s.get("项目累计完工进展百分比")),
             "里程碑进度状态": (s.get("里程碑进度状态") or None),
             "项目阶段": (s.get("项目阶段") or c.get("项目阶段") or None),
-            "计划终验": (c.get("计划终验时间") or s.get("合同目标终验时间") or None),
         },
         "risk": risk,
         "status": {
@@ -181,11 +179,13 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
             "项目级别": (b.get("项目级别") or s.get("项目级别") or None),
             "项目类型": (b.get("项目类型") or s.get("项目类型") or None),
             "评分": parse_pmis_money(b.get("项目评分")),
+            "关键动作": (s.get("关键动作完成情况(必须-考核)") or None),
+            "交付物": (s.get("交付物上传情况(必须-考核)") or None),
         },
         "customer": {
             "最终客户": (b.get("最终客户") or None),
-            "合同编号": (b.get("合同编号") or None),
-            "签约形式": (b.get("签约形式分类") or None),
+            "合同编号": (c.get("合同编号") or b.get("合同编号") or None),
+            "签约单位": (b.get("签约单位") or None),
             "行业": (b.get("行业中类") or None),
             "合同总额": parse_pmis_money(b.get("合同总额（元）")),
         },
@@ -193,6 +193,13 @@ def _assemble(pid: str, base_i: Dict, center_i: Dict, status_i: Dict,
             "项目名称": (c.get("项目名称") or b.get("项目名称") or None),
             "项目经理": (c.get("项目经理") or b.get("项目经理（FR）") or None),
             "L4部门": (b.get("项目经理L4部门") or None),
+            "L3部门": (b.get("项目经理L3部门") or None),
+            "L3_1部门": (b.get("项目经理L3-1部门") or None),
+            "AR": (b.get("客户经理（AR）") or None),
+            "SR": (b.get("方案经理（SR）") or None),
+            "CSR": (b.get("安全运行经理（CSR）") or None),
+            "CDR": (b.get("定制经理（CDR）") or None),
+            "Sponsor": (b.get("Sponsor") or None),
         },
         "riskRecords": [_jsonable_row(r) for r in risk_i.get(pid, [])],
     }
@@ -317,7 +324,8 @@ def build_project_pmis(active: Dict[str, List[Dict[str, Any]]],
     a_status = _index_by_pid(active.get("status", []))
     a_risk = _risk_by_pid(active.get("risk", []))
     out: Dict[str, Dict[str, Any]] = {}
-    for pid in a_base.keys() | a_center.keys() | a_status.keys():
+    # 旧: for pid in a_base.keys() | a_center.keys() | a_status.keys():
+    for pid in a_center.keys():
         out[pid] = _assemble(pid, a_base, a_center, a_status, a_risk, "在建")
     c_base = _index_by_pid(closed.get("base", []))
     c_center = _index_by_pid(closed.get("center", []))
