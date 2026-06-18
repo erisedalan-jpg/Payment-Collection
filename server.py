@@ -267,28 +267,6 @@ def _get_next_record_num(today_str):
                 pass
     return max_num + 1
 
-def node_action_date_from_data(data: dict, project_id: str) -> str:
-    """从 analysis_data.json 的数据结构里,取某项目首个非空 nextActionDate。"""
-    try:
-        for n in data.get('rawNodes', []):
-            if str(n.get('projectId', '')) == str(project_id) and n.get('nextActionDate'):
-                return n.get('nextActionDate')
-    except Exception:  # rawNodes 元素格式异常(非 dict 等)时防御性返回空
-        return ''
-    return ''
-
-def _get_node_action_date(project_id):
-    """从 analysis_data.json 读取项目的节点动作完成时间(nextActionDate)。"""
-    data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
-    if not os.path.exists(data_file):
-        return ''
-    try:
-        with open(data_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-    except Exception:
-        return ''
-    return node_action_date_from_data(data, project_id)
-
 def should_spa_fallback(path: str) -> bool:
     """判断 GET 路径是否应回退到 dist/index.html(Vue Router history 模式)。
     /api/、/data/、/yundocs_data/ 子路径不回退(后端接口/数据文件);带文件扩展名的(静态资源)不回退;
@@ -681,13 +659,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         # 自动填充跟进时间
         data['跟进时间'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # 自动填充节点动作完成时间
-        node_action_date = _get_node_action_date(data['项目编号'])
-        data['节点动作完成时间'] = node_action_date or data.get('节点动作完成时间', '')
-        
-        # 下次跟进计划日期默认=节点动作完成时间
-        if not data.get('下次跟进计划日期') and node_action_date:
-            data['下次跟进计划日期'] = node_action_date
+        # 3E-3 移除 nextActionDate 自动填充(collection_stages 无该字段,两字段改前端传入/留空)
 
         # 保存到本地JSON
         records = _load_followup_records()
