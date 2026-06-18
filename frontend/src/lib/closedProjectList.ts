@@ -23,14 +23,6 @@ export interface ClosedRow {
 
 export interface ClosedFilters {
   search: string
-  manager: string[]
-  orgL4: string[]
-  orgL3_1: string[]
-  projectType: string[]
-  projectLevel: string[]
-  rating: string[]
-  stage: string[]
-  projectStatus: string[]
 }
 
 const v = (x: unknown): string => (x == null ? '' : String(x)).trim()
@@ -59,19 +51,8 @@ export function buildClosedRows(closed: ClosedProject[]): ClosedRow[] {
 
 export function filterClosedRows(rows: ClosedRow[], f: ClosedFilters): ClosedRow[] {
   const kw = f.search.trim().toLowerCase()
-  const inSel = (sel: string[], val: string) => sel.length === 0 || sel.includes(val)
-  return rows.filter((r) => {
-    if (kw && ![r.projectName, r.projectId, r.customer, r.projectManager]
-      .some((x) => x.toLowerCase().includes(kw))) return false
-    return inSel(f.manager, r.projectManager) && inSel(f.orgL4, r.orgL4)
-      && inSel(f.orgL3_1, r.orgL3_1) && inSel(f.projectType, r.projectType)
-      && inSel(f.projectLevel, r.projectLevel) && inSel(f.rating, r.rating)
-      && inSel(f.stage, r.stage) && inSel(f.projectStatus, r.projectStatus)
-  })
-}
-
-export function distinctClosedOptions(rows: ClosedRow[], key: keyof ClosedRow): string[] {
-  const s = new Set<string>()
-  for (const r of rows) { const val = String(r[key] ?? '').trim(); if (val) s.add(val) }
-  return [...s].sort()
+  if (!kw) return rows
+  return rows.filter((r) =>
+    [r.projectName, r.projectId, r.customer, r.projectManager].some((x) => x.toLowerCase().includes(kw)),
+  )
 }

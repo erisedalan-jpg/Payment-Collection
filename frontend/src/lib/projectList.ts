@@ -26,19 +26,12 @@ export interface ProjectRow {
   tags?: string[]
 }
 
+// 收窄后只保留特殊项筛选（列枚举筛选已迁至 crossFilter 表头）
 export interface ProjectFilters {
   search: string
-  manager: string[]
-  orgL4: string[]
-  stage: string[]
-  projectStatus: string[]
-  riskLevel: string[]
-  projectLevel: string[]
-  paymentStatus: string[]
-  health: string[]
   presale: string // '' | 'yes' | 'no'
-  paused: string   // '' | 'yes'（URL-only,风险焦点行跳入）
-  overspend: string // '' | 'yes'（URL-only,风险焦点行跳入）
+  paused: string   // '' | 'yes'
+  overspend: string // '' | 'yes'
   tags: string[]
 }
 
@@ -89,18 +82,9 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
 
 export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): ProjectRow[] {
   const q = (f.search || '').trim().toLowerCase()
-  const hit = (sel: string[], v: string) => !sel.length || sel.includes(v)
   return rows.filter((r) => {
-    // s !== '-'：占位值不参与搜索匹配（如 53% 项目客户缺失为 '-'，搜索单字符 '-' 不应命中它们）
+    // s !== '-'：占位值不参与搜索匹配
     if (q && ![r.projectName, r.projectId, r.customer, r.projectManager].some((s) => s !== '-' && s.toLowerCase().includes(q))) return false
-    if (!hit(f.manager, r.projectManager)) return false
-    if (!hit(f.orgL4, r.orgL4)) return false
-    if (!hit(f.stage, r.stage)) return false
-    if (!hit(f.projectStatus, r.projectStatus)) return false
-    if (!hit(f.riskLevel, r.riskLevel)) return false
-    if (!hit(f.projectLevel, r.projectLevel)) return false
-    if (!hit(f.paymentStatus, r.paymentStatus)) return false
-    if (!hit(f.health, r.health)) return false
     if (f.paused === 'yes' && !r.paused) return false
     if (f.overspend === 'yes' && !r.overspend) return false
     if (f.presale === 'yes' && !r.isPresale) return false
@@ -111,10 +95,4 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
     }
     return true
   })
-}
-
-/** 下拉选项：从行集取该列出现过的非空值（保插入序，剔除占位 '-'）。
- * 仅服务数据驱动的开放枚举列；health/paymentStatus 是代码定义的闭集，由视图层硬编码选项。 */
-export function distinctOptions(rows: ProjectRow[], key: 'stage' | 'projectStatus' | 'riskLevel' | 'orgL4' | 'projectManager' | 'projectLevel'): string[] {
-  return [...new Set(rows.map((r) => r[key]).filter((v) => v && v !== '-'))]
 }

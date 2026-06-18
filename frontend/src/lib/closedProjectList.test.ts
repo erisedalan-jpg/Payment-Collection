@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildClosedRows, filterClosedRows, distinctClosedOptions, type ClosedRow } from './closedProjectList'
+import { buildClosedRows, filterClosedRows, type ClosedRow } from './closedProjectList'
 import type { ClosedProject } from '@/types/analysis'
 
 function cp(over: Partial<any> = {}): any {
@@ -44,19 +44,9 @@ describe('filterClosedRows', () => {
          progress: { 项目阶段: '已结项' } }) as ClosedProject,
   ])
   it('搜索匹配 名/编号/客户/经理', () => {
-    expect(filterClosedRows(rows, { search: '李四', manager: [], orgL4: [], orgL3_1: [], projectType: [], projectLevel: [], rating: [], stage: [], projectStatus: [] }).map(r => r.projectId)).toEqual(['C-2'])
-  })
-  it('多选 经理 过滤', () => {
-    expect(filterClosedRows(rows, { search: '', manager: ['张三'], orgL4: [], orgL3_1: [], projectType: [], projectLevel: [], rating: [], stage: [], projectStatus: [] }).map(r => r.projectId)).toEqual(['C-1'])
+    expect(filterClosedRows(rows, { search: '李四' }).map(r => r.projectId)).toEqual(['C-2'])
   })
   it('空筛选返回全部', () => {
-    expect(filterClosedRows(rows, { search: '', manager: [], orgL4: [], orgL3_1: [], projectType: [], projectLevel: [], rating: [], stage: [], projectStatus: [] }).length).toBe(2)
-  })
-})
-
-describe('distinctClosedOptions', () => {
-  it('去重升序', () => {
-    const rows = buildClosedRows([cp() as ClosedProject, cp({ projectId: 'C-2', projectManager: '李四' }) as ClosedProject])
-    expect(distinctClosedOptions(rows, 'projectManager')).toEqual(['张三', '李四'].sort())
+    expect(filterClosedRows(rows, { search: '' }).length).toBe(2)
   })
 })
