@@ -10,6 +10,8 @@ export interface DataColumn {
   formatter?: (value: any, row: Record<string, any>) => string
   /** 为真时该列不截断、单元格内换行（长文本列用） */
   wrap?: boolean
+  /** 固定列：'left' | 'right'（横向滚动时常驻）；默认不固定 */
+  fixed?: 'left' | 'right'
 }
 
 const props = withDefaults(
@@ -44,6 +46,7 @@ const count = computed(() => props.rows.length)
         :prop="col.key"
         :label="col.label"
         :width="col.width"
+        :fixed="col.fixed"
         :sortable="!!col.sortable"
         :show-overflow-tooltip="!col.wrap"
         :cell-class-name="col.wrap ? 'dt-wrap-col' : ''"
