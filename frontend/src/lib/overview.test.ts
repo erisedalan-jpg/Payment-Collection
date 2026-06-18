@@ -15,8 +15,8 @@ const PROJECTS = [
 ] as unknown as Project[]
 
 const PMIS = {
-  'P-1': { status: { 项目状态: '实施中', 是否暂停: false }, cost: { 超支: true } },
-  'P-2': { status: { 项目状态: '项目暂停', 是否暂停: true }, cost: { 超支: false } },
+  'P-1': { status: { 项目状态: '实施中', 是否暂停: false }, cost: { 项目超支: true } },
+  'P-2': { status: { 项目状态: '项目暂停', 是否暂停: true }, cost: { 项目超支: false } },
 } as unknown as Record<string, ProjectPmis>
 
 describe('computeKpis', () => {
@@ -31,6 +31,15 @@ describe('computeKpis', () => {
   })
   it('计划为 0 → 达成率 null', () => {
     expect(computeKpis([PROJECTS[2]], {}).paymentRatio).toBeNull()
+  })
+  it('[守护] cost.项目超支:true 且不含旧键超支 → 计入 overspend', () => {
+    // 确保旧键 cost.超支 回归能被抓到：新键项目超支生效，不依赖旧键
+    const proj = { projectId: 'G-1', projectName: '守护测试', payment: { ...PAY0 }, deliveryCosts: [],
+      health: { progressAbnormal: false, riskAbnormal: false, costAbnormal: false, paymentAbnormal: false, overall: '健康' } } as unknown as Project
+    const pmis = { 'G-1': { status: {}, cost: { 项目超支: true } } } as unknown as Record<string, ProjectPmis>
+    // pmis 中故意不含旧键 '超支'，只含新键 '项目超支'
+    expect(pmis['G-1'].cost as any).not.toHaveProperty('超支')
+    expect(computeKpis([proj], pmis).overspend).toBe(1)
   })
 })
 

@@ -11,7 +11,7 @@ beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 const ModalStub = { template: '<div class="modal-stub"><slot /></div>' }
 
 const PROJECTS = [
-  { projectId: 'P1', projectName: '甲', tier: '100万以上', orgL4: '北京', projectManager: '张三', projectType: '', orgL3: '', projectAmount: 2000000, paymentStatus: '延期', paymentRatio: 0.4, expectedPayment: 1500000, actualPayment: 600000, remainingAmount: 900000, canAdvance: false, nodes: [] },
+  { projectId: 'P1', projectName: '甲', tier: '100万以上', orgL4: '北京', projectManager: '张三', projectType: '', orgL3_1: '', projectAmount: 2000000, paymentStatus: '延期', paymentRatio: 0.4, expectedPayment: 1500000, actualPayment: 600000, remainingAmount: 900000, canAdvance: false, nodes: [] },
 ] as Record<string, any>[]
 
 describe('BoardDrilldownModal', () => {
