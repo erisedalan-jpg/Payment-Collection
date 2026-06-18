@@ -4,9 +4,10 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.7.0**
-- 最近更新：2026-06-18（子项目1 PMIS 数据血缘扩展：projectPmis team+7/签约单位/合同编号center优先/关键动作交付物/项目超支交付超支、终验时间里程碑换源、在建universe仅中心、orgL3→orgL3_1换源PMIS、回款完成率统一节点级(deriveProgress改节点级口径)、meta totalProjects/totalClosed脱WPS）
-- 上一版本：V1.6.9（2026-06-18，3E-3 后端移除 rawNodes 完全 purge，rawNodes 下线程序收官）
+- 当前版本：**V1.7.1**
+- 最近更新：2026-06-18（详情页 /project/{id} 头部 pd-meta 增「合同编号」展示，与项目编号同级、位于项目名称与卡片之间，取自 project.合同编号，消费子项目1 M-2 遗留字段）
+- 上一版本：V1.7.0（2026-06-18，子项目1 PMIS 数据血缘扩展：projectPmis team+7/签约单位/合同编号center优先/关键动作交付物/项目超支交付超支、终验时间里程碑换源、在建universe仅中心、orgL3→orgL3_1换源PMIS、回款完成率统一节点级(deriveProgress改节点级口径)、meta totalProjects/totalClosed脱WPS）
+- 上上版本：V1.6.9（2026-06-18，3E-3 后端移除 rawNodes 完全 purge，rawNodes 下线程序收官）
 - 维护语言：简体中文
 
 ---

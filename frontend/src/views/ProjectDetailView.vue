@@ -273,6 +273,7 @@ const originInfo = computed(() => [
           </div>
           <div class="pd-meta">
             <span>编号 <b>{{ p.projectId }}</b></span>
+            <span>合同编号 <b>{{ p.合同编号 || '-' }}</b></span>
             <span>客户 <b>{{ m.customer?.最终客户 || '-' }}</b></span>
             <span>签约单位 <b>{{ m.customer?.签约单位 || '-' }}</b></span>
             <span>合同总额(万) <b class="u-num">{{ fmtWan(m.customer?.合同总额) }}</b></span>

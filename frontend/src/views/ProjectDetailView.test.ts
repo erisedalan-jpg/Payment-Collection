@@ -35,7 +35,7 @@ function seed() {
       { projectId: 'OLD-9', nodeName: '终验款', planDate: '2024-01-01', expectedPayment: 200000, actualPayment: 200000, nodeStatus: '已全额回款', tier: '50万以下', isPaymentRelated: true },
     ],
     projects: [
-      { projectId: 'P-1', projectName: '终端安全项目', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '',
+      { projectId: 'P-1', projectName: '终端安全项目', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '', 合同编号: 'HT-2026-001',
         payment: { relatedNodeCount: 1, expectedTotal: 500000, actualTotal: 0, remainingTotal: 500000, paymentRatio: 0, delayedCount: 1 },
         deliveryCosts: [{ 类别: '内部人员成本', 预算金额: 122641.51, 实际发生: 0.0, 剩余预算: 122641.51, 消耗率: 0.0 }],
         health: { overall: '风险' } },
@@ -354,5 +354,17 @@ describe('ProjectDetailView', () => {
     // 同时验证其它团队字段值，确保整体渲染正确
     expect(team.text()).toContain('AR张')
     expect(team.text()).toContain('Sponsor陈')
+  })
+
+  it('详情头部 pd-meta 渲染合同编号(与项目编号同级,取自 project.合同编号)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    const meta = w.find('.pd-meta')
+    expect(meta.exists()).toBe(true)
+    // 与项目编号(编号)同处 pd-meta(同级别),位于项目名称与卡片之间
+    expect(meta.text()).toContain('编号')
+    expect(meta.text()).toContain('合同编号')
+    // 值取自 project.合同编号
+    expect(meta.text()).toContain('HT-2026-001')
   })
 })
