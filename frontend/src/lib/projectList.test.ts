@@ -15,11 +15,11 @@ function proj(over: Partial<Project> = {}): Project {
 
 const PMIS: Record<string, ProjectPmis> = {
   'QABJ-SS-1': {
-    progress: { 完工进展: 0.2, 里程碑进度状态: '正常', 项目阶段: '项目执行', 计划终验: '2028-01-31' },
+    progress: { 完工进展: 0.2, 里程碑进度状态: '正常', 项目阶段: '项目执行', 终验时间: '2028-01-31' },
     status: { 项目状态: '实施中', 是否暂停: false, 评级: 'C', 评分: 25.0, 项目级别: 'P3', 项目类型: '交付项目' },
-    cost: { 总预算: 654051.9, 核算: 208745.13, 剩余预算: 445306.77, 消耗比: 0.319, 超支: false, 成本状态: '正常' },
+    cost: { 总预算: 654051.9, 核算: 208745.13, 剩余预算: 445306.77, 消耗比: 0.319, 项目超支: false, 成本状态: '正常' },
     risk: { 未关闭风险数: 2, 风险记录数: 3, 最高等级: '中', 闭环率: 0.33 },
-    customer: { 最终客户: '北京海聚博源', 合同编号: 'QAX1', 签约形式: null, 行业: '企业', 合同总额: 5276000.0 },
+    customer: { 最终客户: '北京海聚博源', 合同编号: 'QAX1', 签约单位: null, 行业: '企业', 合同总额: 5276000.0 },
   } as unknown as ProjectPmis,
 }
 
@@ -140,9 +140,9 @@ describe('标签筛选', () => {
 
 describe('paused/overspend 扩展(P4 风险焦点行)', () => {
   const PM2: Record<string, any> = {
-    'QABJ-SS-1': { status: { 是否暂停: true }, cost: { 超支: true } },
+    'QABJ-SS-1': { status: { 是否暂停: true }, cost: { 项目超支: true } },
   }
-  it('build 取 是否暂停/超支 bool', () => {
+  it('build 取 是否暂停/项目超支 bool', () => {
     const [r] = buildProjectRows([proj()], PM2 as any)
     expect(r.paused).toBe(true)
     expect(r.overspend).toBe(true)
@@ -154,5 +154,14 @@ describe('paused/overspend 扩展(P4 风险焦点行)', () => {
     const rows = buildProjectRows([proj(), proj({ projectId: 'X2', projectName: '乙' })], PM2 as any)
     expect(filterProjectRows(rows, { ...F0, paused: 'yes' })).toHaveLength(1)
     expect(filterProjectRows(rows, { ...F0, overspend: 'yes' })[0].projectId).toBe('QABJ-SS-1')
+  })
+  it('[守护] cost.项目超支:true 且不含旧键超支 → overspend=true', () => {
+    // 只含新键项目超支，没有旧键超支，确保旧键回归时此断言失败
+    const pmGuard: Record<string, any> = {
+      'QABJ-SS-1': { status: {}, cost: { 项目超支: true } },
+    }
+    expect(pmGuard['QABJ-SS-1'].cost).not.toHaveProperty('超支')
+    const [r] = buildProjectRows([proj()], pmGuard as any)
+    expect(r.overspend).toBe(true)
   })
 })

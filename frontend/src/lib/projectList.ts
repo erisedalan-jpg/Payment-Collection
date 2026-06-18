@@ -81,7 +81,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       isPresale: !!p.isPresale,
       hasClosed: !!p.relatedClosedId,
       paused: status.是否暂停 === true,
-      overspend: cost.超支 === true,
+      overspend: cost.项目超支 === true,
       tags: assignments?.[p.projectId] ?? [],
     }
   })

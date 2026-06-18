@@ -24,7 +24,7 @@ export function computeKpis(projects: Project[], pmisMap: Record<string, Project
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     if (m.status?.项目状态 === '实施中') active++
     if (m.status?.是否暂停 === true) paused++
-    if (m.cost?.超支 === true) overspend++
+    if (m.cost?.项目超支 === true) overspend++
     if (p.health?.riskAbnormal) highRisk++
     exp += p.payment?.expectedTotal ?? 0
     act += p.payment?.actualTotal ?? 0

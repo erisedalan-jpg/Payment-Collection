@@ -20,7 +20,7 @@ const PROJECTS = [
 
 const PMIS = {
   'P-1': { progress: { 项目阶段: '项目执行', 完工进展: 0.2 }, status: { 项目状态: '实施中' }, risk: { 最高等级: '高' },
-           cost: { 消耗比: 0.5 }, customer: { 行业: '银行', 签约形式: null, 合同总额: 2000000 } },
+           cost: { 消耗比: 0.5 }, customer: { 行业: '银行', 签约单位: null, 合同总额: 2000000 } },
   'P-2': { progress: { 项目阶段: '项目执行', 完工进展: 0.8 }, status: { 项目状态: '已验收' }, risk: {},
            cost: {}, customer: { 行业: '银行', 合同总额: 1000000 } },
 } as unknown as Record<string, ProjectPmis>
@@ -95,7 +95,7 @@ describe('insightCross / insightPivot', () => {
 
 describe('契约面', () => {
   it('7 维度 6 指标', () => {
-    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '行业', '签约形式', '健康度', '评级', '超支', '暂停'])
+    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '行业', '签约单位', '健康度', '评级', '超支', '暂停'])
     expect(INSIGHT_METRICS.map((m) => m.key)).toEqual(['projectCount', 'contractAmount', 'avgProgress', 'avgCostRatio', 'paymentRatio', 'delayedProjects'])
   })
 })
