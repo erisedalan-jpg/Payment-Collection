@@ -235,6 +235,7 @@ def test_closed_projects_schema():
     assert "closedProjects" in schema.AnalysisData.model_fields
     assert {"关闭时间", "计划终验时间", "是否正常关闭", "关闭说明"} <= set(schema.ClosedProjectCloseInfo.model_fields)
     assert "closeInfo" in schema.ClosedProject.model_fields
+    assert {"team", "customer", "status", "progress", "cost", "projectId", "合同编号"} <= set(schema.ClosedProject.model_fields)
 
 
 def test_closed_projects_default_empty():
