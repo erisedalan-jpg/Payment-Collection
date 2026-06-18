@@ -84,6 +84,7 @@ INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGAC
                       PAYMENT_RECORDS_FILE, PROFIT_DIRECT_FILE, PROFIT_BRIDGE_FILE, BUDGET_FILE]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
+PRESALE_PROJECT_TYPE = "售前服务类"  # 售前判定(取代 name.startswith);与终验时间取列共用
 DELIVERY_COST_CATEGORIES = [
     "交付外包服务成本", "交付部门人工成本", "项目直接成本", "差旅费",
     "业务招待费", "本地交通及通讯费", "其他费用",

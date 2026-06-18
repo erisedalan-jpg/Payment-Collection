@@ -106,3 +106,14 @@ def test_row_to_milestones_has_payratio():
                                 "到货关联回款阶段": "到货款1，70.00%"})
     arrival = next(x for x in rows if x["name"] == "到货")
     assert arrival["payRatio"] == 0.70
+
+
+def test_final_acceptance_date():
+    import milestones as M
+    items = [{"name": "终验", "planDate": "2026-07-01"},
+             {"name": "服务完成", "planDate": "2026-08-01"}]
+    assert M.final_acceptance_date(items, "实施项目") == "2026-07-01"      # 非售前→终验
+    assert M.final_acceptance_date(items, "售前服务类") == "2026-08-01"    # 售前→服务完成
+    assert M.final_acceptance_date([{"name": "初验", "planDate": "2026-06-01"}], "实施项目") is None
+    assert M.final_acceptance_date([{"name": "终验", "planDate": ""}], "实施项目") is None
+    assert M.final_acceptance_date([], "售前服务类") is None
