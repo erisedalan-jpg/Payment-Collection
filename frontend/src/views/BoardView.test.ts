@@ -14,8 +14,12 @@ function seed() {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
     rawNodes: [],
     projects: [
-      { projectId: 'P1', projectName: '甲项目', orgL4: '北京', projectManager: '张三', paymentPmis: { contract: 2000000, actualTotal: 600000, expectedTotal: 1500000, paymentRatio: 0.3, delayedCount: 2, nodeCount: 3, reachedCount: 1, fromOrigin: true } },
-      { projectId: 'P2', projectName: '乙项目', orgL4: '上海', projectManager: '李四', paymentPmis: { contract: 300000, actualTotal: 300000, expectedTotal: 300000, paymentRatio: 1, delayedCount: 0, nodeCount: 1, reachedCount: 1, fromOrigin: true } },
+      { projectId: 'P1', projectName: '甲项目', orgL4: '北京', projectManager: '张三',
+        payment: { relatedNodeCount: 3, expectedTotal: 1500000, actualTotal: 600000, remainingTotal: 900000, paymentRatio: 0.3, delayedCount: 2 },
+        paymentPmis: { contract: 2000000, actualTotal: 600000, expectedTotal: 1500000, delayedCount: 2, nodeCount: 3, reachedCount: 1, fromOrigin: true } },
+      { projectId: 'P2', projectName: '乙项目', orgL4: '上海', projectManager: '李四',
+        payment: { relatedNodeCount: 1, expectedTotal: 300000, actualTotal: 300000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
+        paymentPmis: { contract: 300000, actualTotal: 300000, expectedTotal: 300000, delayedCount: 0, nodeCount: 1, reachedCount: 1, fromOrigin: true } },
     ],
     projectPmis: {
       P1: { progress: { 项目阶段: '实施' }, customer: { 行业: '金融' } },

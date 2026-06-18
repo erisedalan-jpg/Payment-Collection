@@ -196,3 +196,20 @@ class TestRatioHelpers:
         assert P._parse_completion_pct("80%") == pytest.approx(0.8)
         assert P._parse_completion_pct("空值") is None
         assert P._parse_completion_pct("") is None
+
+
+def test_backfill_final_acceptance():
+    import preprocess_data as P
+    project_pmis = {
+        "A": {"status": {"项目类型": "实施项目"}, "progress": {"项目阶段": "执行"}},
+        "B": {"status": {"项目类型": "售前服务类"}, "progress": {}},
+        "C": {"status": {"项目类型": "实施项目"}},  # 无 progress 键
+    }
+    project_milestones = {
+        "A": [{"name": "终验", "planDate": "2026-07-01"}],
+        "B": [{"name": "服务完成", "planDate": "2026-08-01"}],
+    }
+    P.backfill_final_acceptance(project_pmis, project_milestones)
+    assert project_pmis["A"]["progress"]["终验时间"] == "2026-07-01"
+    assert project_pmis["B"]["progress"]["终验时间"] == "2026-08-01"
+    assert project_pmis["C"]["progress"]["终验时间"] is None  # 无里程碑 + 自动建 progress 键

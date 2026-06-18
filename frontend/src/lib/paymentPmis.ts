@@ -14,11 +14,10 @@ export function deriveTier(contract: number | null | undefined): string {
   return '50万以下'
 }
 
-/** 进度态：由 paymentPmis.paymentRatio 派生。无合同→未知；ratio 0/null 且有合同→未回款。 */
-export function deriveProgress(pmis: ProjectPaymentPmis | null | undefined): string {
-  const c = pmis?.contract
-  if (c == null || c <= 0) return '未知'
-  const r = pmis?.paymentRatio
+/** 进度态：由节点级 payment.paymentRatio(Σ已收÷Σ计划)派生。无合同→未知；ratio 0/null 且有合同→未回款。 */
+export function deriveProgress(contract: number | null | undefined, nodeRatio: number | null | undefined): string {
+  if (contract == null || contract <= 0) return '未知'
+  const r = nodeRatio
   if (r == null || r <= 0) return '未回款'
   if (r >= 0.999) return '已全额回款'
   return '部分回款'
@@ -101,10 +100,10 @@ export function projectPaymentRows(
     const pm = p.paymentPmis ?? null
     const contract = pm?.contract ?? 0
     const actualTotal = pm?.actualTotal ?? 0
-    const paymentRatio = pm?.paymentRatio ?? null
+    const paymentRatio = p.payment?.paymentRatio ?? null
     const dept = deriveDept(p)
     const tier = deriveTier(pm?.contract)
-    const progress = deriveProgress(pm)
+    const progress = deriveProgress(contract, paymentRatio)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -175,7 +174,7 @@ export interface PayNodeRow {
   projectManager: string
   status: string
   dept: string
-  orgL3: string
+  orgL3_1: string
   projStage: string
   tier: string
   progress: string
@@ -194,7 +193,7 @@ export function paymentNodeRows(
     if (!p) continue
     const dept = deriveDept(p)
     const tier = deriveTier(p.paymentPmis?.contract)
-    const progress = deriveProgress(p.paymentPmis ?? null)
+    const progress = deriveProgress(p.paymentPmis?.contract ?? null, p.payment?.paymentRatio)
     const projStage = deriveStage(pid, pmisMap)
     for (const n of nodes) {
       rows.push({
@@ -211,7 +210,7 @@ export function paymentNodeRows(
         projectManager: (p.projectManager ?? '').trim() || '未指定',
         status: n.status || '',
         dept,
-        orgL3: (p.orgL3 ?? '').trim(),
+        orgL3_1: (p.orgL3_1 ?? '').trim(),
         projStage,
         tier,
         progress,

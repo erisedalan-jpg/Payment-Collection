@@ -23,7 +23,7 @@ function seed() {
     displayColumns: {},
     followupRecords: {},
     projects: [
-      { projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A组', orgL3: '三部一组', paymentPmis: { contract: 1000000 } },
+      { projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A组', orgL3_1: '三部一组', paymentPmis: { contract: 1000000 } },
     ],
     projectPmis: {},
     paymentNodes: {

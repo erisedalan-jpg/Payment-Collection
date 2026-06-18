@@ -45,11 +45,12 @@ function seed() {
     ],
     projectPmis: {
       'P-1': {
-        progress: { 完工进展: 0.2, 里程碑进度状态: '延期', 项目阶段: '项目执行', 计划终验: '2028-01-31' },
+        progress: { 完工进展: 0.2, 里程碑进度状态: '延期', 项目阶段: '项目执行', 终验时间: '2028-01-31' },
         status: { 项目状态: '实施中', 是否暂停: true, 评级: 'C' },
         cost: { 总预算: 654051.9, 核算: 208745.13, 剩余预算: 445306.77, 消耗比: 0.319, 超支: false, 成本状态: '正常' },
         risk: { 未关闭风险数: 1, 风险记录数: 2, 最高等级: '中', 闭环率: 0.5 },
         customer: { 最终客户: '海聚博源', 合同总额: 5276000.0 },
+        team: { 项目经理: '何平', L4部门: '安全A组', L3部门: '安全事业部', L3_1部门: '三部一组', AR: 'AR张', SR: 'SR李', CSR: 'CSR王', CDR: 'CDR赵', Sponsor: 'Sponsor陈' },
         riskRecords: [
           { 风险编码: 'FX-1', 风险名称: '工期风险', 风险等级: '中', 风险状态: '已识别', 风险大类: '进度', 识别日期: '2025-09-19T00:00:00', 计划应对完成日期: '2025-10-01T00:00:00', 实际应对完成日期: null, 是否超期: '否', 责任人: '何平' },
         ],
@@ -309,7 +310,7 @@ describe('ProjectDetailView', () => {
     seed()
     const ds = useDataStore()
     ;(ds.data as any).projects[0].paymentPmis = {
-      contract: 1000000, actualTotal: 700000, paymentCount: 2, paymentRatio: 0.7,
+      contract: 1000000, actualTotal: 700000, paymentCount: 2,
       expectedTotal: 1000000, nodeCount: 2, reachedCount: 1, delayedCount: 1,
       lastPaymentDate: '2026-06-04', fromOrigin: false,
     }
@@ -339,5 +340,19 @@ describe('ProjectDetailView', () => {
     const w = await mountAt('/project/P-1')
     expect(w.text()).toContain('项目标签')
     expect(w.text()).toContain('BH项目')
+  })
+
+  it('团队块:渲染 L3-1部门 标签(连字符)且值来自 team.L3_1部门(下划线键)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    const team = w.find('.pd-team')
+    expect(team.exists()).toBe(true)
+    // 验证模板标签使用连字符「L3-1部门」
+    expect(team.text()).toContain('L3-1部门')
+    // 验证读取的是下划线键 team.L3_1部门，值为 '三部一组'
+    expect(team.text()).toContain('三部一组')
+    // 同时验证其它团队字段值，确保整体渲染正确
+    expect(team.text()).toContain('AR张')
+    expect(team.text()).toContain('Sponsor陈')
   })
 })

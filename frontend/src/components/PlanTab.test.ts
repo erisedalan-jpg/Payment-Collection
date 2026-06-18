@@ -9,9 +9,9 @@ function seed() {
   const data = useDataStore()
   data.data = {
     projects: [
-      { projectId: 'A', projectName: '甲', orgL4: '组1', paymentPmis: { contract: 100, actualTotal: 100, paymentRatio: 1 } },
-      { projectId: 'B', projectName: '乙', orgL4: '组1', paymentPmis: { contract: 100, actualTotal: 50, paymentRatio: 0.5 } },
-      { projectId: 'C', projectName: '丙', orgL4: '组2', paymentPmis: { contract: 100, actualTotal: 0, paymentRatio: 0 } },
+      { projectId: 'A', projectName: '甲', orgL4: '组1', payment: { paymentRatio: 1 }, paymentPmis: { contract: 100, actualTotal: 100 } },
+      { projectId: 'B', projectName: '乙', orgL4: '组1', payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 100, actualTotal: 50 } },
+      { projectId: 'C', projectName: '丙', orgL4: '组2', payment: { paymentRatio: 0 }, paymentPmis: { contract: 100, actualTotal: 0 } },
     ],
     projectPmis: {}, naguanExclude: {},
   } as any

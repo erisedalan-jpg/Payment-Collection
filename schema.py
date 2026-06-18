@@ -20,6 +20,7 @@ class _Base(BaseModel):
 class Meta(_Base):
     lastUpdate: str
     totalProjects: int
+    totalClosed: int = 0
     totalPaymentNodes: int
 
 
@@ -33,7 +34,8 @@ class PmisCost(_Base):
     核算: Optional[float] = None
     剩余预算: Optional[float] = None
     消耗比: Optional[float] = None
-    超支: Optional[bool] = None
+    项目超支: Optional[bool] = None
+    交付超支: Optional[bool] = None
     成本状态: Optional[str] = None
 
 
@@ -41,7 +43,7 @@ class PmisProgress(_Base):
     完工进展: Optional[float] = None
     里程碑进度状态: Optional[str] = None
     项目阶段: Optional[str] = None
-    计划终验: Optional[str] = None
+    终验时间: Optional[str] = None
 
 
 class PmisRisk(_Base):
@@ -58,12 +60,14 @@ class PmisStatus(_Base):
     项目级别: Optional[str] = None
     项目类型: Optional[str] = None
     评分: Optional[float] = None
+    关键动作: Optional[str] = None
+    交付物: Optional[str] = None
 
 
 class PmisCustomer(_Base):
     最终客户: Optional[str] = None
     合同编号: Optional[str] = None
-    签约形式: Optional[str] = None
+    签约单位: Optional[str] = None
     行业: Optional[str] = None
     合同总额: Optional[float] = None
 
@@ -72,6 +76,13 @@ class PmisTeam(_Base):
     项目名称: Optional[str] = None
     项目经理: Optional[str] = None
     L4部门: Optional[str] = None
+    L3部门: Optional[str] = None
+    L3_1部门: Optional[str] = None
+    AR: Optional[str] = None
+    SR: Optional[str] = None
+    CSR: Optional[str] = None
+    CDR: Optional[str] = None
+    Sponsor: Optional[str] = None
 
 
 class ProjectPmis(_Base):
@@ -149,7 +160,6 @@ class ProjectPaymentPmis(_Base):
     contract: Optional[float] = None
     actualTotal: Optional[float] = None
     paymentCount: int = 0
-    paymentRatio: Optional[float] = None
     expectedTotal: float = 0
     nodeCount: int = 0
     reachedCount: int = 0
@@ -163,7 +173,8 @@ class Project(_Base):
     projectName: str = ""
     projectManager: str = ""
     orgL4: str = ""
-    orgL3: str = ""
+    orgL3_1: str = ""
+    合同编号: str = ""
     isPresale: bool = False
     relatedClosedId: str = ""
     payment: ProjectPayment = ProjectPayment()
