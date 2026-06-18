@@ -179,6 +179,22 @@ def aggregate_payment(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def aggregate_payment_pmis(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """项目回款子域聚合(收款阶段节点级,3E-3);形态同旧 payment 以兼容前端消费方。"""
+    exp = sum(float(n.get("expectedPayment") or 0) for n in nodes)
+    act = sum(float(n.get("receivedAmount") or 0) for n in nodes)
+    rem = sum(float(n.get("unpaidAmount") or 0) for n in nodes)
+    delayed = sum(1 for n in nodes if n.get("status") == "延期")
+    return {
+        "relatedNodeCount": len(nodes),
+        "expectedTotal": round(exp, 2),
+        "actualTotal": round(act, 2),
+        "remainingTotal": round(rem, 2),
+        "paymentRatio": round(act / exp, 4) if exp > 0 else None,
+        "delayedCount": delayed,
+    }
+
+
 def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
     """四维三态健康度(spec 4.6;阈值集中在此,后续可调)。"""
     _ms = str(pm.get("progress", {}).get("里程碑进度状态") or "")
