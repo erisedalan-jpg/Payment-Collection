@@ -8,23 +8,6 @@
 export type Lastupdate = string;
 export type Totalprojects = number;
 export type Totalpaymentnodes = number;
-export type Totalprojectcount = number;
-export type Totalpaymentnodes1 = number;
-export type Totalpaidnodes = number;
-export type Projectcount = number;
-export type Projectid = string;
-export type Projectname = string;
-export type Tier = string;
-export type Ispaymentrelated = boolean;
-export type Nodestatus = string;
-export type Projectamount = number;
-export type Expectedpayment = number;
-export type Actualpayment = number;
-export type Delaydays = number;
-export type Plandate = string;
-export type Planmonth = string;
-export type Followuprecords = unknown[];
-export type Rawnodes = RawNode[];
 export type Projects = {
   [k: string]: unknown;
 }[];
@@ -85,8 +68,8 @@ export type Conflicts = {
 export type Dirty = {
   [k: string]: unknown;
 }[];
-export type Projectid1 = string;
-export type Projectname1 = string;
+export type Projectid = string;
+export type Projectname = string;
 export type Projectmanager = string;
 export type Orgl4 = string;
 export type Orgl3 = string;
@@ -138,7 +121,7 @@ export type Presaleunmapped = {
   [k: string]: unknown;
 }[];
 export type Name = string;
-export type Plandate1 = string;
+export type Plandate = string;
 export type Actualdate = string;
 export type Paystage = string;
 export type Payratio = number | null;
@@ -163,10 +146,10 @@ export type Billprotocol = string;
 export type Records = PaymentRecord[];
 export type Stage = string;
 export type Category = string;
-export type Plandate2 = string;
+export type Plandate1 = string;
 export type Actualdate1 = string;
 export type Payratio1 = number | null;
-export type Expectedpayment1 = number;
+export type Expectedpayment = number;
 export type Receivedamount = number;
 export type Unpaidamount = number;
 export type Actualratio = number | null;
@@ -189,9 +172,9 @@ export type Rows2 = ProfitRow[];
 export type Date1 = string;
 export type Type1 = string;
 export type Domain = string;
-export type Projectid2 = string;
-export type Projectname2 = string;
-export type Summary3 = string;
+export type Projectid1 = string;
+export type Projectname1 = string;
+export type Summary2 = string;
 export type Amount1 = number | null;
 export type Tone = string;
 export type Events = Event[];
@@ -205,14 +188,10 @@ export type Paymentratiochange = number | null;
 
 export interface AnalysisData {
   meta: Meta;
-  dashboard: Dashboard;
-  summary: Summary;
-  rawNodes: Rawnodes;
   projectOverview: ProjectOverview;
   naguanMap?: Naguanmap;
   naguanExclude?: Naguanexclude;
-  displayColumns?: Displaycolumns;
-  followupRecords?: Followuprecords1;
+  followupRecords?: Followuprecords;
   projectPmis?: Projectpmis;
   dataQuality?: DataQuality | null;
   projects?: Projects1;
@@ -232,34 +211,6 @@ export interface Meta {
   totalPaymentNodes: Totalpaymentnodes;
   [k: string]: unknown;
 }
-export interface Dashboard {
-  totalProjectCount: Totalprojectcount;
-  totalPaymentNodes: Totalpaymentnodes1;
-  totalPaidNodes: Totalpaidnodes;
-  [k: string]: unknown;
-}
-export interface Summary {
-  [k: string]: TierSummary;
-}
-export interface TierSummary {
-  projectCount: Projectcount;
-  [k: string]: unknown;
-}
-export interface RawNode {
-  projectId: Projectid;
-  projectName?: Projectname;
-  tier: Tier;
-  isPaymentRelated: Ispaymentrelated;
-  nodeStatus?: Nodestatus;
-  projectAmount?: Projectamount;
-  expectedPayment?: Expectedpayment;
-  actualPayment?: Actualpayment;
-  delayDays?: Delaydays;
-  planDate?: Plandate;
-  planMonth?: Planmonth;
-  followupRecords?: Followuprecords;
-  [k: string]: unknown;
-}
 export interface ProjectOverview {
   projects?: Projects;
   columns?: Columns;
@@ -271,10 +222,7 @@ export interface Naguanmap {
 export interface Naguanexclude {
   [k: string]: boolean;
 }
-export interface Displaycolumns {
-  [k: string]: unknown;
-}
-export interface Followuprecords1 {
+export interface Followuprecords {
   [k: string]: unknown;
 }
 export interface Projectpmis {
@@ -357,8 +305,8 @@ export interface QualitySummary {
   [k: string]: unknown;
 }
 export interface Project {
-  projectId: Projectid1;
-  projectName?: Projectname1;
+  projectId: Projectid;
+  projectName?: Projectname;
   projectManager?: Projectmanager;
   orgL4?: Orgl4;
   orgL3?: Orgl3;
@@ -495,7 +443,7 @@ export interface Projectmilestones {
 }
 export interface MilestoneItem {
   name: Name;
-  planDate?: Plandate1;
+  planDate?: Plandate;
   actualDate?: Actualdate;
   payStage?: Paystage;
   payRatio?: Payratio;
@@ -535,10 +483,10 @@ export interface Paymentnodes {
 export interface PaymentNodePmis {
   stage: Stage;
   category?: Category;
-  planDate?: Plandate2;
+  planDate?: Plandate1;
   actualDate?: Actualdate1;
   payRatio?: Payratio1;
-  expectedPayment?: Expectedpayment1;
+  expectedPayment?: Expectedpayment;
   receivedAmount?: Receivedamount;
   unpaidAmount?: Unpaidamount;
   actualRatio?: Actualratio;
@@ -552,12 +500,12 @@ export interface Projectprofit {
   [k: string]: ProjectProfit;
 }
 export interface ProjectProfit {
-  summary?: Summary1;
+  summary?: Summary;
   rows?: Rows1;
   bridge?: BridgeProfit | null;
   [k: string]: unknown;
 }
-export interface Summary1 {
+export interface Summary {
   [k: string]: number | null;
 }
 export interface ProfitRow {
@@ -574,20 +522,20 @@ export interface ProfitRow {
 }
 export interface BridgeProfit {
   ssId?: Ssid;
-  summary?: Summary2;
+  summary?: Summary1;
   rows?: Rows2;
   [k: string]: unknown;
 }
-export interface Summary2 {
+export interface Summary1 {
   [k: string]: number | null;
 }
 export interface Event {
   date: Date1;
   type: Type1;
   domain: Domain;
-  projectId?: Projectid2;
-  projectName?: Projectname2;
-  summary?: Summary3;
+  projectId?: Projectid1;
+  projectName?: Projectname1;
+  summary?: Summary2;
   prev?: unknown;
   curr?: unknown;
   amount?: Amount1;
