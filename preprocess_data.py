@@ -1251,17 +1251,6 @@ def main():
         else:
             print(f"  [WARN] 未提供 {label} 数据文件")
 
-    # === S1: 回款完成率切流水口径(流水累计÷合同总额,售前回退原项目;文件缺失保留旧口径) ===
-    if pr_stat["provided"]:
-        def _contract(pid):
-            return ((project_pmis.get(pid) or {}).get("customer") or {}).get("合同总额")
-        for p in dept_projects:
-            rec = payment_records.get(p["projectId"]) or {}
-            p["payment"]["paymentRatio"] = projects_mod.payment_ratio_from_records(
-                rec.get("total"), _contract(p["projectId"]),
-                _contract(p.get("relatedClosedId") or ""))
-        print("  [OK] 回款完成率已切换为 流水累计÷合同总额 口径")
-
     # === S2: 整体超支金额回填(同源 profit.overspend_amount;无 profit 数据自动 None,供详情页风险徽章,与事件快照同口径) ===
     for p in dept_projects:
         p["overspendAmount"] = profit_mod.overspend_amount(project_profit.get(p["projectId"]))
@@ -1286,6 +1275,8 @@ def main():
         _summary["fromOrigin"] = _from_origin
         p["paymentPmis"] = _summary
         payment_nodes[_pid] = _nodes
+        p["payment"] = projects_mod.aggregate_payment_pmis(_nodes)
+        p["health"] = projects_mod.compute_health(project_pmis.get(_pid) or {}, p["payment"]["delayedCount"])
     print(f"  [OK] 系统核心口径回款已回填 {len(dept_projects)} 项目"
           f"(售前取原项目 {sum(1 for p in dept_projects if p['paymentPmis']['fromOrigin'])}"
           f";收款阶段项目 {len(collection_stages)})")
