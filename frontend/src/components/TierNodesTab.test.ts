@@ -9,7 +9,7 @@ import DataTable from '@/components/DataTable.vue'
 function seed() {
   const data = useDataStore()
   data.data = {
-    projects: [{ projectId: 'A', projectName: '甲', orgL4: '组1', paymentPmis: { contract: 2_000_000, paymentRatio: 0.5 } }],
+    projects: [{ projectId: 'A', projectName: '甲', orgL4: '组1', payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 2_000_000 } }],
     paymentNodes: { A: [
       { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.7, expectedPayment: 1_400_000, reached: true, status: '已回款' },
       { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 600_000, reached: false, status: '延期' },

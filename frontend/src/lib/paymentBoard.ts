@@ -36,7 +36,7 @@ export function buildPayBoardRows(projects: Project[], pmisMap?: Record<string, 
     const cust = (pmisMap?.[p.projectId]?.customer ?? {}) as Record<string, unknown>
     const contract = pmis?.contract ?? 0
     const dept = deriveDept(p)
-    const progress = deriveProgress(pmis)
+    const progress = deriveProgress(contract, p.payment?.paymentRatio)
     const manager = v(p.projectManager)
     return {
       projectId: p.projectId,
@@ -53,7 +53,7 @@ export function buildPayBoardRows(projects: Project[], pmisMap?: Record<string, 
       actualTotal: pmis?.actualTotal ?? 0,
       expectedTotal: pmis?.expectedTotal ?? 0,
       delayedCount: pmis?.delayedCount ?? 0,
-      paymentRatio: ((pmis as Record<string, unknown> | null | undefined)?.['paymentRatio'] as number | null | undefined) ?? null,
+      paymentRatio: p.payment?.paymentRatio ?? null,
       projectAmount: contract,
       paymentStatus: progress,
     }
