@@ -102,24 +102,6 @@ class TestDeliveryCostsFor:
         assert other["预算金额"] is None  # 缺列降 None
 
 
-class TestAggregatePayment:
-    def test_sums_and_delayed(self):
-        nodes = [
-            {"isPaymentRelated": True, "expectedPayment": 100.0, "actualPayment": 40.0,
-             "nodeStatus": config.STATUS_DELAYED},
-            {"isPaymentRelated": True, "expectedPayment": 50.0, "actualPayment": 50.0,
-             "nodeStatus": config.STATUS_FULL_PAID},
-            {"isPaymentRelated": False, "expectedPayment": 999.0, "actualPayment": 0.0,
-             "nodeStatus": ""},  # 非回款节点不计
-        ]
-        agg = P.aggregate_payment(nodes)
-        assert agg == {"relatedNodeCount": 2, "expectedTotal": 150.0, "actualTotal": 90.0,
-                       "remainingTotal": 60.0, "paymentRatio": 0.6, "delayedCount": 1}
-
-    def test_zero_expected_ratio_none(self):
-        assert P.aggregate_payment([])["paymentRatio"] is None
-
-
 class TestComputeHealth:
     def _pm(self, **over):
         pm = {"progress": {"里程碑进度状态": "正常"},

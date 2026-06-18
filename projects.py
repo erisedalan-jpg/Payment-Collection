@@ -163,22 +163,6 @@ def build_payment_summary(contract, nodes, pay_record):
     }
 
 
-def aggregate_payment(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """项目的回款子域聚合(仅 isPaymentRelated 节点;明细仍在 rawNodes,不复制)。"""
-    rel = [n for n in nodes if n.get("isPaymentRelated")]
-    exp = sum(float(n.get("expectedPayment") or 0) for n in rel)
-    act = sum(float(n.get("actualPayment") or 0) for n in rel)
-    delayed = sum(1 for n in rel if n.get("nodeStatus") == config.STATUS_DELAYED)
-    return {
-        "relatedNodeCount": len(rel),
-        "expectedTotal": round(exp, 2),
-        "actualTotal": round(act, 2),
-        "remainingTotal": round(max(exp - act, 0), 2),
-        "paymentRatio": round(act / exp, 4) if exp > 0 else None,
-        "delayedCount": delayed,
-    }
-
-
 def aggregate_payment_pmis(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """项目回款子域聚合(收款阶段节点级,3E-3);形态同旧 payment 以兼容前端消费方。"""
     exp = sum(float(n.get("expectedPayment") or 0) for n in nodes)
