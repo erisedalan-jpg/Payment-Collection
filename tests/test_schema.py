@@ -73,6 +73,48 @@ class TestPmisSchema:
         assert m.projectPmis["SS-1"].team.L3_1部门 == "三部一组"
         assert m.projectPmis["SS-1"].status.关键动作 == "已完成"
 
+    def test_schema_field_declarations(self):
+        """用 model_fields 做正向+负向断言，防止字段声明被误回退。
+        extra="allow" 会让属性访问绕过声明检查，但 model_fields 只含显式声明字段。"""
+        # -- PmisTeam 全 10 键 --
+        for key in ("项目名称", "项目经理", "L4部门", "L3部门", "L3_1部门",
+                    "AR", "SR", "CSR", "CDR", "Sponsor"):
+            assert key in schema.PmisTeam.model_fields, f"PmisTeam 缺少字段: {key}"
+
+        # -- PmisCost 新字段 --
+        assert "项目超支" in schema.PmisCost.model_fields
+        assert "交付超支" in schema.PmisCost.model_fields
+
+        # -- PmisProgress 新字段 --
+        assert "终验时间" in schema.PmisProgress.model_fields
+
+        # -- PmisStatus 新字段 --
+        assert "关键动作" in schema.PmisStatus.model_fields
+        assert "交付物" in schema.PmisStatus.model_fields
+
+        # -- PmisCustomer 新字段 --
+        assert "签约单位" in schema.PmisCustomer.model_fields
+        assert "合同编号" in schema.PmisCustomer.model_fields
+
+        # -- Project 新字段 --
+        assert "orgL3_1" in schema.Project.model_fields
+        assert "合同编号" in schema.Project.model_fields
+
+        # -- Meta 新字段 --
+        assert "totalClosed" in schema.Meta.model_fields
+
+        # -- 负向：旧键必须已删除 --
+        assert "超支" not in schema.PmisCost.model_fields, \
+            "PmisCost 旧键 '超支' 未删除"
+        assert "计划终验" not in schema.PmisProgress.model_fields, \
+            "PmisProgress 旧键 '计划终验' 未删除"
+        assert "签约形式" not in schema.PmisCustomer.model_fields, \
+            "PmisCustomer 旧键 '签约形式' 未删除"
+        assert "orgL3" not in schema.Project.model_fields, \
+            "Project 旧键 'orgL3' 未删除"
+        assert "paymentRatio" not in schema.ProjectPaymentPmis.model_fields, \
+            "ProjectPaymentPmis 旧键 'paymentRatio' 未删除（本任务删除项）"
+
 
 class TestProjectsContract:
     def test_minimal_project_validates(self):
