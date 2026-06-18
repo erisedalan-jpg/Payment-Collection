@@ -1,4 +1,5 @@
 import json
+import snapshots as S
 import snapshots
 
 
@@ -18,15 +19,17 @@ def _pmis():
 
 
 def _nodes():
-    return [
-        {"projectId": "P-1", "projectName": "甲", "nodeName": "初验款", "isPaymentRelated": True,
-         "nodeStatus": "正常实施中", "planDate": "2026-03-31", "expectedPayment": 500000, "actualPayment": 100000},
-        {"projectId": "P-1", "projectName": "甲", "nodeName": "阶段验收款", "isPaymentRelated": True,
-         "nodeStatus": "延期", "planDate": "2026-01-31", "expectedPayment": 200000, "actualPayment": 0},
-        {"projectId": "P-1", "projectName": "甲", "nodeName": "阶段验收款", "isPaymentRelated": True,
-         "nodeStatus": "正常实施中", "planDate": "2026-09-30", "expectedPayment": 300000, "actualPayment": 0},
-        {"projectId": "P-1", "projectName": "甲", "nodeName": "里程碑", "isPaymentRelated": False},
-    ]
+    # paymentNodes 格式: {pid: [{stage, planDate, receivedAmount, expectedPayment, unpaidAmount, status}]}
+    return {
+        "P-1": [
+            {"stage": "初验款", "planDate": "2026-03-31", "receivedAmount": 100000,
+             "expectedPayment": 500000, "unpaidAmount": 400000, "status": "正常实施中"},
+            {"stage": "阶段验收款", "planDate": "2026-01-31", "receivedAmount": 0,
+             "expectedPayment": 200000, "unpaidAmount": 200000, "status": "延期"},
+            {"stage": "阶段验收款", "planDate": "2026-09-30", "receivedAmount": 0,
+             "expectedPayment": 300000, "unpaidAmount": 300000, "status": "正常实施中"},
+        ]
+    }
 
 
 class TestBuildSnapshot:
@@ -42,8 +45,8 @@ class TestBuildSnapshot:
         snap = snapshots.build_snapshot("2026-06-11", _projects(), _pmis(), _nodes())
         keys = sorted(snap["nodes"].keys())
         assert "P-1|初验款#0" in keys
-        assert "P-1|阶段验收款#0" in keys and "P-1|阶段验收款#1" in keys  # 同名按行序编号
-        assert len(snap["nodes"]) == 3  # isPaymentRelated=False 被排除
+        assert "P-1|阶段验收款#0" in keys and "P-1|阶段验收款#1" in keys  # 同 stage 按行序编号
+        assert len(snap["nodes"]) == 3  # paymentNodes 字典包含 3 个节点
         assert snap["nodes"]["P-1|阶段验收款#0"]["planDate"] == "2026-01-31"  # 行序在前的是 #0
 
     def test_agg(self):
@@ -228,7 +231,7 @@ class TestS1EventRules:
         projects = [{"projectId": "P1", "projectName": "甲",
                      "deliveryCosts": [{"类别": "差旅费", "预算金额": 10.0, "实际发生": 20.0}]}]
         profit = {"P1": {"summary": {"实际成本": 9000.0, "预算成本": 1000.0}, "rows": [], "bridge": None}}
-        snap = snapshots.build_snapshot("2026-06-12", projects, {}, [], profit)
+        snap = snapshots.build_snapshot("2026-06-12", projects, {}, {}, profit)
         e = snap["projects"]["P1"]
         assert e["overspendAmount"] == 8000.0
         assert e["deliveryOver"] is True and e["deliveryOverCats"] == ["差旅费"]
@@ -315,3 +318,15 @@ class TestLoadSnapshotRobustness:
     def test_corrupted_json_returns_none(self, tmp_path):
         (tmp_path / "2026-06-11.json").write_text("{broken", encoding="utf-8")
         assert snapshots.load_snapshot(str(tmp_path), "2026-06-11") is None
+
+
+def test_build_snapshot_node_key_uses_stage():
+    pn = {"P1": [
+        {"stage": "到货款", "planDate": "2026-02-01", "receivedAmount": 600000, "expectedPayment": 1000000, "unpaidAmount": 400000, "status": "部分回款"},
+        {"stage": "验收款", "planDate": "2026-03-01", "receivedAmount": 0, "expectedPayment": 1000000, "unpaidAmount": 1000000, "status": "延期"},
+    ]}
+    snap = S.build_snapshot("2026-06-18", [{"projectId": "P1", "projectName": "甲"}], {}, pn)
+    assert "P1|到货款#0" in snap["nodes"]
+    assert snap["nodes"]["P1|到货款#0"]["actual"] == 600000
+    assert snap["nodes"]["P1|验收款#0"]["status"] == "延期"
+    assert snap["nodes"]["P1|验收款#0"]["expected"] == 1000000

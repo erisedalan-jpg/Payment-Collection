@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Project, ProjectPmis, RawNode } from '@/types/analysis'
+import type { Project, ProjectPmis } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
 import { computeKpis, healthSummary, paymentBand } from './overview'
 

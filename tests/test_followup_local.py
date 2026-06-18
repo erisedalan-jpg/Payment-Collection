@@ -4,7 +4,6 @@ import server
 def test_add_followup_local_only(tmp_path, monkeypatch):
     f = tmp_path / "followup_records.json"
     monkeypatch.setattr(server, "FOLLOWUP_FILE", str(f))
-    monkeypatch.setattr(server, "_get_node_action_date", lambda pid: "")
     recs = server._load_followup_records()
     assert recs == []
     num = server._get_next_record_num("20260615")
