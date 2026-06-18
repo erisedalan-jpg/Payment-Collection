@@ -78,6 +78,8 @@ function qval(v: unknown): string | null {
   if (Array.isArray(v)) { const s = v.find((x) => typeof x === 'string' && x); return (s as string) || null }
   return null
 }
+// 每次进页先清空本表残留筛选，再按 query 重建，确保 KPI 深链不与跨导航残留叠加
+cf.clearAll(TABLE_ID)
 for (const key of FILTERABLE) {
   const val = qval(route.query[key])
   if (val) {
@@ -145,6 +147,7 @@ async function doExport() {
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button class="pv-export-btn" @click="exOpen = true">导出</button>
+      <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
     <div v-if="sp.paused === 'yes' || sp.overspend === 'yes'" class="pv-tags">
