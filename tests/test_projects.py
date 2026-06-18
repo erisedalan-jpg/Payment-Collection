@@ -333,3 +333,21 @@ class TestOrgL3Map:
                        "team": {"项目经理": "张三", "项目名称": "甲", "L4部门": "北京服务组"}}}
         projs = P.build_projects(pmis, {"张三"}, {"北京服务组"}, [], [], [], {"张三": "三部一组"})
         assert projs[0]["orgL3"] == "三部一组"
+
+
+class TestAggregatePaymentPmis:
+    def test_node_level(self):
+        nodes = [
+            {"expectedPayment": 1000000, "receivedAmount": 600000, "unpaidAmount": 400000, "status": "部分回款"},
+            {"expectedPayment": 1000000, "receivedAmount": 0, "unpaidAmount": 1000000, "status": "延期"},
+        ]
+        r = P.aggregate_payment_pmis(nodes)
+        assert r["relatedNodeCount"] == 2
+        assert r["expectedTotal"] == 2000000
+        assert r["actualTotal"] == 600000
+        assert r["remainingTotal"] == 1400000
+        assert r["paymentRatio"] == 0.3
+        assert r["delayedCount"] == 1
+    def test_empty(self):
+        r = P.aggregate_payment_pmis([])
+        assert r["relatedNodeCount"] == 0 and r["paymentRatio"] is None
