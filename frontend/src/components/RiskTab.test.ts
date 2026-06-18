@@ -9,8 +9,12 @@ function seed() {
   const data = useDataStore()
   data.data = {
     projects: [
-      { projectId: 'A', projectName: '甲', orgL4: '组1', overspendAmount: 8000, paymentPmis: { contract: 3_000_000, paymentRatio: 0.1, actualTotal: 300_000 } },
-      { projectId: 'B', projectName: '乙', orgL4: '组2', overspendAmount: 0, paymentPmis: { contract: 1_000_000, paymentRatio: 0.9, actualTotal: 900_000 } },
+      { projectId: 'A', projectName: '甲', orgL4: '组1', overspendAmount: 8000,
+        payment: { paymentRatio: 0.1 },
+        paymentPmis: { contract: 3_000_000, actualTotal: 300_000 } },
+      { projectId: 'B', projectName: '乙', orgL4: '组2', overspendAmount: 0,
+        payment: { paymentRatio: 0.9 },
+        paymentPmis: { contract: 1_000_000, actualTotal: 900_000 } },
     ],
     paymentNodes: { A: [{ stage: '终验', planDate: '2026-05-01', status: '延期', expectedPayment: 100 }] },
     projectPmis: {}, naguanExclude: {},

@@ -10,11 +10,14 @@ const proj = (o: Partial<Project>): Project => ({ projectId: 'P0', ...o } as Pro
 
 const projects: Project[] = [
   proj({ projectId: 'A', projectName: '甲', projectManager: '张三', orgL4: '组1',
-    paymentPmis: pm({ contract: 2_000_000, actualTotal: 1_000_000, paymentRatio: 0.5, expectedTotal: 1_500_000, delayedCount: 1 }) }),
+    payment: { relatedNodeCount: 1, expectedTotal: 1_500_000, actualTotal: 1_000_000, remainingTotal: 500_000, paymentRatio: 0.5, delayedCount: 1 },
+    paymentPmis: pm({ contract: 2_000_000, actualTotal: 1_000_000, expectedTotal: 1_500_000, delayedCount: 1 }) }),
   proj({ projectId: 'B', projectName: '乙', projectManager: '李四', orgL4: '组1',
-    paymentPmis: pm({ contract: 1_000_000, actualTotal: 1_000_000, paymentRatio: 1, expectedTotal: 1_000_000, delayedCount: 0 }) }),
+    payment: { relatedNodeCount: 1, expectedTotal: 1_000_000, actualTotal: 1_000_000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
+    paymentPmis: pm({ contract: 1_000_000, actualTotal: 1_000_000, expectedTotal: 1_000_000, delayedCount: 0 }) }),
   proj({ projectId: 'C', projectName: '丙', projectManager: '李四', orgL4: '组2',
-    paymentPmis: pm({ contract: 0, actualTotal: 0, paymentRatio: null, expectedTotal: 0, delayedCount: 0 }) }),
+    payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+    paymentPmis: pm({ contract: 0, actualTotal: 0, expectedTotal: 0, delayedCount: 0 }) }),
 ]
 const pmisMap: Record<string, ProjectPmis> = {
   A: { progress: { 项目阶段: '实施' }, customer: { 行业: '银行' } } as unknown as ProjectPmis,

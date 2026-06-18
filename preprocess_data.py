@@ -772,6 +772,14 @@ def run_snapshot_pipeline(final_data, output_dir, today=None):
     return list(reversed(all_events[-100:])), period
 
 
+def backfill_final_acceptance(project_pmis, project_milestones):
+    """把里程碑计划终验/服务完成日回填到 project_pmis[pid].progress.终验时间(就地修改)。"""
+    for pid, pm in project_pmis.items():
+        ptype = (pm.get("status") or {}).get("项目类型")
+        (pm.setdefault("progress", {}))["终验时间"] = milestones_mod.final_acceptance_date(
+            project_milestones.get(pid, []), ptype)
+
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -858,6 +866,7 @@ def main():
     keep_ids = {p["projectId"] for p in dept_projects}
     keep_ids |= {p["relatedClosedId"] for p in dept_projects if p.get("relatedClosedId")}
     project_milestones, ms_a, ms_c = milestones_mod.load_milestones(pmis_dir, keep_ids)
+    backfill_final_acceptance(project_pmis, project_milestones)
     payment_records, pr_stat = profit_mod.load_payment_records(
         os.path.join(BASE_DIR, "input"), keep_ids)
     project_profit, pf_stats = profit_mod.load_profit(
@@ -920,7 +929,8 @@ def main():
     final_data = {
         "meta": {
             "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "totalProjects": len(project_overview),
+            "totalProjects": len(dept_projects),
+            "totalClosed": projects_quality.get("closedDeptCount", 0),
             "totalPaymentNodes": sum(len(v) for v in payment_nodes.values()),
         },
         "projectOverview": {

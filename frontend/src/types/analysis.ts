@@ -7,6 +7,7 @@
 
 export type Lastupdate = string;
 export type Totalprojects = number;
+export type Totalclosed = number;
 export type Totalpaymentnodes = number;
 export type Projects = {
   [k: string]: unknown;
@@ -21,29 +22,39 @@ export type NoName1 = number | null;
 export type NoName2 = number | null;
 export type NoName3 = number | null;
 export type NoName4 = boolean | null;
-export type NoName5 = string | null;
-export type NoName6 = number | null;
-export type NoName7 = string | null;
+export type NoName5 = boolean | null;
+export type NoName6 = string | null;
+export type NoName7 = number | null;
 export type NoName8 = string | null;
 export type NoName9 = string | null;
-export type NoName10 = number | null;
+export type NoName10 = string | null;
 export type NoName11 = number | null;
-export type NoName12 = string | null;
-export type NoName13 = number | null;
-export type NoName14 = string | null;
-export type NoName15 = boolean | null;
-export type NoName16 = string | null;
+export type NoName12 = number | null;
+export type NoName13 = string | null;
+export type NoName14 = number | null;
+export type NoName15 = string | null;
+export type NoName16 = boolean | null;
 export type NoName17 = string | null;
 export type NoName18 = string | null;
-export type NoName19 = number | null;
-export type NoName20 = string | null;
+export type NoName19 = string | null;
+export type NoName20 = number | null;
 export type NoName21 = string | null;
 export type NoName22 = string | null;
 export type NoName23 = string | null;
-export type NoName24 = number | null;
+export type NoName24 = string | null;
 export type NoName25 = string | null;
 export type NoName26 = string | null;
+export type NoName27 = number | null;
+export type NoName28 = string | null;
+export type NoName29 = string | null;
 export type L4 = string | null;
+export type L3 = string | null;
+export type L31 = string | null;
+export type Ar = string | null;
+export type Sr = string | null;
+export type Csr = string | null;
+export type Cdr = string | null;
+export type Sponsor = string | null;
 export type Riskrecords = {
   [k: string]: unknown;
 }[];
@@ -72,7 +83,8 @@ export type Projectid = string;
 export type Projectname = string;
 export type Projectmanager = string;
 export type Orgl4 = string;
-export type Orgl3 = string;
+export type Orgl31 = string;
+export type NoName30 = string;
 export type Ispresale = boolean;
 export type Relatedclosedid = string;
 export type Relatednodecount = number;
@@ -81,17 +93,16 @@ export type Actualtotal = number;
 export type Remainingtotal = number;
 export type Paymentratio = number | null;
 export type Delayedcount = number;
-export type NoName27 = string;
-export type NoName28 = number | null;
-export type NoName29 = number | null;
-export type NoName30 = number | null;
-export type NoName31 = number | null;
+export type NoName31 = string;
+export type NoName32 = number | null;
+export type NoName33 = number | null;
+export type NoName34 = number | null;
+export type NoName35 = number | null;
 export type Deliverycosts = DeliveryCostItem[];
 export type Overspendamount = number | null;
 export type Contract = number | null;
 export type Actualtotal1 = number | null;
 export type Paymentcount = number;
-export type Paymentratio1 = number | null;
 export type Expectedtotal1 = number;
 export type Nodecount = number;
 export type Reachedcount = number;
@@ -208,6 +219,7 @@ export interface AnalysisData {
 export interface Meta {
   lastUpdate: Lastupdate;
   totalProjects: Totalprojects;
+  totalClosed?: Totalclosed;
   totalPaymentNodes: Totalpaymentnodes;
   [k: string]: unknown;
 }
@@ -245,45 +257,55 @@ export interface PmisCost {
   核算?: NoName1;
   剩余预算?: NoName2;
   消耗比?: NoName3;
-  超支?: NoName4;
-  成本状态?: NoName5;
+  项目超支?: NoName4;
+  交付超支?: NoName5;
+  成本状态?: NoName6;
   [k: string]: unknown;
 }
 export interface PmisProgress {
-  完工进展?: NoName6;
-  里程碑进度状态?: NoName7;
-  项目阶段?: NoName8;
-  计划终验?: NoName9;
+  完工进展?: NoName7;
+  里程碑进度状态?: NoName8;
+  项目阶段?: NoName9;
+  终验时间?: NoName10;
   [k: string]: unknown;
 }
 export interface PmisRisk {
-  未关闭风险数?: NoName10;
-  风险记录数?: NoName11;
-  最高等级?: NoName12;
-  闭环率?: NoName13;
+  未关闭风险数?: NoName11;
+  风险记录数?: NoName12;
+  最高等级?: NoName13;
+  闭环率?: NoName14;
   [k: string]: unknown;
 }
 export interface PmisStatus {
-  项目状态?: NoName14;
-  是否暂停?: NoName15;
-  评级?: NoName16;
-  项目级别?: NoName17;
-  项目类型?: NoName18;
-  评分?: NoName19;
+  项目状态?: NoName15;
+  是否暂停?: NoName16;
+  评级?: NoName17;
+  项目级别?: NoName18;
+  项目类型?: NoName19;
+  评分?: NoName20;
+  关键动作?: NoName21;
+  交付物?: NoName22;
   [k: string]: unknown;
 }
 export interface PmisCustomer {
-  最终客户?: NoName20;
-  合同编号?: NoName21;
-  签约形式?: NoName22;
-  行业?: NoName23;
-  合同总额?: NoName24;
+  最终客户?: NoName23;
+  合同编号?: NoName24;
+  签约单位?: NoName25;
+  行业?: NoName26;
+  合同总额?: NoName27;
   [k: string]: unknown;
 }
 export interface PmisTeam {
-  项目名称?: NoName25;
-  项目经理?: NoName26;
+  项目名称?: NoName28;
+  项目经理?: NoName29;
   L4部门?: L4;
+  L3部门?: L3;
+  L3_1部门?: L31;
+  AR?: Ar;
+  SR?: Sr;
+  CSR?: Csr;
+  CDR?: Cdr;
+  Sponsor?: Sponsor;
   [k: string]: unknown;
 }
 export interface DataQuality {
@@ -309,7 +331,8 @@ export interface Project {
   projectName?: Projectname;
   projectManager?: Projectmanager;
   orgL4?: Orgl4;
-  orgL3?: Orgl3;
+  orgL3_1?: Orgl31;
+  合同编号?: NoName30;
   isPresale?: Ispresale;
   relatedClosedId?: Relatedclosedid;
   payment?: ProjectPayment;
@@ -329,18 +352,17 @@ export interface ProjectPayment {
   [k: string]: unknown;
 }
 export interface DeliveryCostItem {
-  类别: NoName27;
-  预算金额?: NoName28;
-  实际发生?: NoName29;
-  剩余预算?: NoName30;
-  消耗率?: NoName31;
+  类别: NoName31;
+  预算金额?: NoName32;
+  实际发生?: NoName33;
+  剩余预算?: NoName34;
+  消耗率?: NoName35;
   [k: string]: unknown;
 }
 export interface ProjectPaymentPmis {
   contract?: Contract;
   actualTotal?: Actualtotal1;
   paymentCount?: Paymentcount;
-  paymentRatio?: Paymentratio1;
   expectedTotal?: Expectedtotal1;
   nodeCount?: Nodecount;
   reachedCount?: Reachedcount;
