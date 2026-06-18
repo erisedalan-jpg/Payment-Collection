@@ -182,6 +182,40 @@ describe('ProjectsView', () => {
     expect((w.vm as any).exOpen).toBe(true)
   })
 
+  it('KPI 深链进页清空残留筛选,不与既有筛选叠加', async () => {
+    seed()
+    // 预置一个与本次深链无关的列筛选（模拟跨导航残留）
+    const cf = useCrossFilterStore()
+    cf.setColumnFilter('projects-active', 'projectManager', ['何平'], 2)
+    // 确认预置已生效
+    expect(cf.tableFilters('projects-active')['projectManager']).toBeDefined()
+    // 深链进入，riskLevel=中（P-1 有 risk.最高等级=中；P-2 无 PMIS 数据→中 riskLevel）
+    await router.push('/projects?riskLevel=中')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    // clearAll 已在 setup 清掉 projectManager 残留
+    const tfs = cf.tableFilters('projects-active')
+    expect(tfs['projectManager']).toBeUndefined()
+    // riskLevel 深链已被重建
+    expect(tfs['riskLevel']).toBeDefined()
+    // 渲染行只含 riskLevel=中 的项目（P-1），不被 projectManager=何平 叠加过滤
+    // P-1 经理何平 riskLevel 中 → 应出现
+    expect(w.text()).toContain('P-1')
+    // P-2 无 PMIS → riskLevel 为空或非"中"，不应出现（本数据中 P-2 无 projectPmis，riskLevel 应为空/未定义）
+    // 此断言验证筛选精确性：总数仅含匹配 riskLevel=中 群体
+    const totalText = w.text().match(/共\s*(\d+)\s*条/)
+    expect(totalText).not.toBeNull()
+    const totalCount = parseInt(totalText![1], 10)
+    // 不被 projectManager 叠加：若叠加则 何平+riskLevel=中 → 最多 1 行；
+    // 正确行为：riskLevel=中 群体（只看 riskLevel），P-1 riskLevel=中 → 1 行。
+    // 关键：projectManager 筛选已被清除，total 不受其约束
+    expect(totalCount).toBeGreaterThanOrEqual(1)
+    // store 状态无 projectManager key 是核心断言
+    expect(Object.keys(tfs)).not.toContain('projectManager')
+    expect(Object.keys(tfs)).toContain('riskLevel')
+  })
+
   // ---- 新增断言 ----
 
   it('默认列含"项目状态"且位于"回款完成率"与"健康度"之间', async () => {

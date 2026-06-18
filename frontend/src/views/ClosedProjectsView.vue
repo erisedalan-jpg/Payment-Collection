@@ -16,6 +16,8 @@ const TABLE_ID = 'projects-closed'
 const data = useDataStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
+// 每次进页清空本表残留筛选，避免跨导航残留
+cf.clearAll(TABLE_ID)
 onMounted(() => { if (!data.data) data.load() })
 
 const rows = computed(() => buildClosedRows((data.data?.closedProjects ?? []) as ClosedProject[]))
@@ -72,6 +74,7 @@ function onRow(row: Record<string, any>) { router.push(`/closed-project/${row.pr
       <el-input v-model="search" size="small" placeholder="搜索 项目名/编号/客户/经理" clearable style="width: 230px" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
+      <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
     <div v-if="!rows.length" class="cv-empty">暂无已关闭项目数据——请在「数据管理」提供 PMIS 已关闭三表后点「更新数据」。</div>
