@@ -53,7 +53,7 @@ export function buildPayBoardRows(projects: Project[], pmisMap?: Record<string, 
       actualTotal: pmis?.actualTotal ?? 0,
       expectedTotal: pmis?.expectedTotal ?? 0,
       delayedCount: pmis?.delayedCount ?? 0,
-      paymentRatio: pmis?.paymentRatio ?? null,
+      paymentRatio: ((pmis as Record<string, unknown> | null | undefined)?.['paymentRatio'] as number | null | undefined) ?? null,
       projectAmount: contract,
       paymentStatus: progress,
     }
