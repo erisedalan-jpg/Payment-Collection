@@ -35,7 +35,7 @@
 - **G1 nextActionDate**：**抛弃自动填充**。删 `node_action_date_from_data`/`_get_node_action_date`；跟进新建不再自动默认「节点动作完成时间」「下次跟进计划日期」（用户手填或留空）。
 - **G2 snapshots**：稳定键改 `projectId|stage`、吃 paymentNodes、主域范围；**首次切换前手动清空 `data/snapshots/`，以收款阶段重建基线、不出假事件**（一次性运维步骤，写入提交说明并提醒用户）。
 - **G3 totalPaymentNodes**：换源 = 主域 paymentNodes 节点计数（语义由"云文档全量回款行"变"主域收款阶段数"，已接受）。
-- **G5 projects.payment**：详情页回款完成率 + `health.paymentAbnormal` 换 paymentPmis 收款阶段聚合（值可能微变，口径对齐）；删 `projects[*].payment` 旧字段与 `aggregate_payment`。
+- **G5 projects.payment（2026-06-18 修订：保留+换源，非删）**：调研发现 `projects[*].payment` 有 4 个前端活消费方（概览 KPI/项目清单/透视/详情页），且 paymentPmis.paymentRatio 是流水÷合同、与台账节点级口径不一致。故**保留 `Project.payment` 字段与形态，仅把后端聚合换源为收款阶段节点级**（新 `aggregate_payment_pmis`：Σ已收÷Σ计划、Σ未收、延期=status=='延期'）；4 消费方不动、自动得收款阶段口径、与台账/日历一致；删 S1 的"流水÷合同"覆盖；`health.paymentAbnormal` 用收款阶段 delayed 重算。plan 顺带核对 4 消费方换口径后数值。
 - **dashboard/summary/displayColumns**：连带删（前端零消费）。
 
 ## 范围
@@ -49,7 +49,7 @@
    - `meta.totalPaymentNodes` 换源 = Σ len(paymentNodes[pid])（主域收款阶段节点计数）；`meta.totalProjects` 保持（project_overview 长度）。
    - dirty 检测（actualPaymentRatio>1）换源到 paymentNodes（actualRatio>1）或并入收款阶段已有校验。
    - `pay_projects` 改由 collection_stages 项目集 / project_overview 取；`build_projects` 去 all_nodes 参数（名称回填改用 PMIS/overview 既有 projectName；回款聚合改 paymentPmis）。
-4. `projects.py`：`build_projects` 去 all_nodes 参数；删 `aggregate_payment`（旧 all_nodes 聚合）与 `projects[*].payment` 字段；`health.paymentAbnormal` 判定改用 paymentPmis（收款阶段完成率阈值）。
+4. `projects.py`：`build_projects` 去 all_nodes 参数；新增 `aggregate_payment_pmis`（收款阶段节点级聚合）；**保留 `Project.payment` 字段**，其值改由 preprocess 9f 循环用 `aggregate_payment_pmis(收款阶段节点)` 填；`health.paymentAbnormal` 用收款阶段 delayedCount 重算（compute_health 复用，delayed_count 来源换收款阶段）。
 5. `schema.py`：删 `RawNode` 模型、`Rawnodes` alias、`AnalysisData.rawNodes`/`dashboard`/`summary`/`displayColumns` 字段、`Project.payment`（旧）字段。
 
 ### 做（前端）
