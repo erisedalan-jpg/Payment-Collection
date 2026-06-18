@@ -47,7 +47,7 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'orgL4', label: 'L4组', width: 110 },
   { key: 'stage', label: '阶段', width: 100 },
   { key: 'progress', label: '完工%', width: 90, sortable: true, formatter: (v) => fmtRatio(v) },
-  { key: 'riskLevel', label: '风险', width: 96 },
+  { key: 'riskLevel', label: '风险', width: 96, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
   { key: 'projectLevel', label: '级别', width: 80 },
   { key: 'projectType', label: '项目类型', width: 110 },
   { key: 'costRatio', label: '预算消耗比', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
