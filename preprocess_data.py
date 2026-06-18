@@ -1008,7 +1008,7 @@ def run_snapshot_pipeline(final_data, output_dir, today=None):
     events_path = os.path.join(output_dir, "events.json")
 
     cur = snapshots_mod.build_snapshot(
-        today, final_data["projects"], final_data["projectPmis"], final_data["rawNodes"],
+        today, final_data["projects"], final_data["projectPmis"], final_data["paymentNodes"],
         final_data.get("projectProfit"))
 
     dates = snapshots_mod.list_snapshot_dates(snap_dir)

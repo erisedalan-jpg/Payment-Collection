@@ -1,9 +1,9 @@
 """项目域快照/事件流(Phase P3, spec 3.3)。
 
 快照=每次数据处理后的精简状态(data/snapshots/YYYY-MM-DD.json,同日覆盖,保留 90 天)。
-节点稳定键: "projectId|nodeName#k", k=该(projectId,nodeName)按 rawNodes 原始行序的第 k 次出现
-(真实数据无天然唯一键: projectId+nodeName 25 组重复/84 行,无期次字段;行序跨同步最稳,
-重复组中间插行仅影响该组内匹配,误差半径有限——P3 设计决策 1)。
+节点稳定键: "projectId|stage#k", k=该(projectId,stage)按 paymentNodes 原始行序的第 k 次出现
+(真实数据无天然唯一键:行序跨同步最稳,重复 stage 组中间插行仅影响该组内匹配,
+误差半径有限——P3 设计决策 1;3E-3 起数据源换为 paymentNodes,stage 替代 nodeName)。
 """
 import json
 import os
@@ -30,9 +30,13 @@ def _agg(projects: Dict[str, dict], nodes: Dict[str, dict]) -> Dict[str, Any]:
 
 
 def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[str, dict],
-                   raw_nodes: List[dict],
+                   payment_nodes: Dict[str, List[dict]],
                    project_profit: Optional[Dict[str, dict]] = None) -> Dict[str, Any]:
-    """从 final_data 三块构建精简快照(纯函数)。"""
+    """从 final_data 三块构建精简快照(纯函数)。
+
+    payment_nodes: {pid: [{stage, planDate, receivedAmount, expectedPayment, unpaidAmount, status}]}
+    稳定键格式: "pid|stage#k"，k 为同 (pid, stage) 在列表中的第 k 次出现(0-based)。
+    """
     projs: Dict[str, dict] = {}
     for p in dept_projects:
         pid = p["projectId"]
@@ -58,22 +62,22 @@ def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[
         }
     nodes: Dict[str, dict] = {}
     seen: Dict[tuple, int] = {}
-    for n in raw_nodes:
-        if not n.get("isPaymentRelated"):
-            continue
-        pid = str(n.get("projectId") or "")
-        nm = str(n.get("nodeName") or "")
-        k = seen.get((pid, nm), 0)
-        seen[(pid, nm)] = k + 1
-        nodes[f"{pid}|{nm}#{k}"] = {
-            "pid": pid,
-            "pname": str(n.get("projectName") or ""),
-            "node": nm,
-            "status": n.get("nodeStatus") or "",
-            "planDate": n.get("planDate") or "",
-            "actual": float(n.get("actualPayment") or 0),
-            "expected": float(n.get("expectedPayment") or 0),
-        }
+    for pid, plist in (payment_nodes or {}).items():
+        pid = str(pid)
+        pname = (projs.get(pid) or {}).get("name", "")
+        for n in plist:
+            st = str(n.get("stage") or "")
+            k = seen.get((pid, st), 0)
+            seen[(pid, st)] = k + 1
+            nodes[f"{pid}|{st}#{k}"] = {
+                "pid": pid,
+                "pname": pname,
+                "node": st,
+                "status": n.get("status") or "",
+                "planDate": n.get("planDate") or "",
+                "actual": float(n.get("receivedAmount") or 0),
+                "expected": float(n.get("expectedPayment") or 0),
+            }
     return {"date": date_str, "projects": projs, "nodes": nodes, "agg": _agg(projs, nodes)}
 
 
