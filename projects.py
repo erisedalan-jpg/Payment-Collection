@@ -7,7 +7,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import config
-from pmis import parse_pmis_money, parse_pmis_pct
+from pmis import parse_pmis_money, parse_pmis_pct, read_pmis_sheet
 
 
 def _open_workbook(path: str):
@@ -65,19 +65,6 @@ def read_org_names(path: str) -> Tuple[set, set, int]:
             l4s.add(l4)
     return names, l4s, len(rows)
 
-
-def read_org_l3_map(path: str) -> Dict[str, str]:
-    """组织架构表 → {姓名: 新L3-1组织}。同 read_org_names 选 sheet 与交付实施三部过滤。"""
-    rows = _read_header_sheet(path, "工号")
-    if rows and any(r.get("新L3组织") for r in rows):
-        rows = [r for r in rows if str(r.get("新L3组织") or "").strip() == config.DEPT_L3]
-    out: Dict[str, str] = {}
-    for r in rows:
-        name = str(r.get("姓名") or "").strip()
-        l3 = str(r.get("新L3-1组织") or "").strip()
-        if name and l3:
-            out[name] = l3
-    return out
 
 
 def read_mapping(path: str) -> List[Dict[str, str]]:
@@ -153,7 +140,6 @@ def build_payment_summary(contract, nodes, pay_record):
         "contract": contract,
         "actualTotal": actual_total,
         "paymentCount": (pay_record or {}).get("count", 0),
-        "paymentRatio": round(actual_total / contract, 4) if (actual_total is not None and contract) else None,
         "expectedTotal": round(sum(n["expectedPayment"] for n in nodes), 2),
         "nodeCount": len(nodes),
         "reachedCount": sum(1 for n in nodes if n["reached"]),
@@ -187,7 +173,7 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
     risk_ab = (risk.get("最高等级") == "高") and ((risk.get("未关闭风险数") or 0) > 0)
     cost = pm.get("cost", {})
     ratio = cost.get("消耗比")
-    cost_ab = bool(cost.get("超支")) or (ratio is not None and ratio > 1)
+    cost_ab = bool(cost.get("项目超支")) or (ratio is not None and ratio > 1)
     pay_ab = delayed_count > 0
     n = sum([progress_ab, risk_ab, cost_ab, pay_ab])
     overall = "健康" if n == 0 else ("关注" if n == 1 else "风险")
@@ -196,12 +182,10 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
 
 
 def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
-                   mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
-                   org_l3_map: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+                   mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/成本/健康度。
     payment 字段由 preprocess 9f 循环用 aggregate_payment_pmis 填入。
     matched=False 守卫为防御性分支(现行 _assemble 恒 matched=True),供未来非 PMIS 来源项目使用。"""
-    org_l3_map = org_l3_map or {}
     delivery_by_pid: Dict[str, Dict[str, Any]] = {}
     for r in delivery_rows:
         pid = str(r.get("项目编号") or "").strip()
@@ -231,14 +215,23 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
             "projectName": name,
             "projectManager": manager,
             "orgL4": str(team.get("L4部门") or "").strip(),
-            "orgL3": org_l3_map.get(manager, ""),
-            "isPresale": name.startswith(config.PRESALE_PREFIX),
+            "orgL3_1": str(team.get("L3_1部门") or "").strip(),
+            "合同编号": str((pm.get("customer") or {}).get("合同编号") or "").strip(),
+            "isPresale": ((pm.get("status") or {}).get("项目类型") == config.PRESALE_PROJECT_TYPE),
             "relatedClosedId": (m["closed"] if m else ""),
             "deliveryCosts": delivery_costs_for(drow) if drow else [],
             "health": health,
         })
     out.sort(key=lambda p: p["projectId"])
     return out
+
+
+def count_closed_dept(pmis_dir: str, org_names: set) -> int:
+    """已关闭 ∩ 交付三部 计数:项目中心-已关闭.xlsx 中 项目经理 ∈ org_names 的项目数。无人员清单→0。"""
+    if not org_names:
+        return 0
+    rows = read_pmis_sheet(os.path.join(pmis_dir, config.PMIS_FILES_CLOSED["center"]))
+    return sum(1 for r in rows if str(r.get("项目经理") or "").strip() in org_names)
 
 
 def compute_projects_quality(projects: List[Dict[str, Any]],
@@ -295,9 +288,10 @@ def load_dept_projects(input_dir: str, project_pmis: Dict[str, Dict[str, Any]],
     if mapping is None:
         mapping = []
     names, l4s, org_rows = read_org_names(os.path.join(input_dir, config.ORG_FILE))
-    l3_map = read_org_l3_map(os.path.join(input_dir, config.ORG_FILE))
     delivery = read_delivery(os.path.join(input_dir, config.DELIVERY_FILE))
-    projects = build_projects(project_pmis, names, l4s, mapping, delivery, l3_map)
+    projects = build_projects(project_pmis, names, l4s, mapping, delivery)
     quality = compute_projects_quality(projects, project_pmis, names, l4s, org_rows,
                                        mapping, delivery)
+    quality["closedDeptCount"] = count_closed_dept(
+        os.path.join(input_dir, config.PMIS_DIRNAME), names)
     return projects, quality

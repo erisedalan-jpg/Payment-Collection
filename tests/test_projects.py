@@ -106,7 +106,7 @@ class TestComputeHealth:
     def _pm(self, **over):
         pm = {"progress": {"里程碑进度状态": "正常"},
               "risk": {"最高等级": "低", "未关闭风险数": 0},
-              "cost": {"超支": False, "消耗比": 0.5}}
+              "cost": {"项目超支": False, "消耗比": 0.5}}
         pm.update(over)
         return pm
 
@@ -135,17 +135,19 @@ class TestComputeHealth:
         assert h["riskAbnormal"] and h["paymentAbnormal"] and h["overall"] == "风险"
 
     def test_cost_abnormal_by_ratio_or_overrun(self):
-        assert P.compute_health(self._pm(cost={"超支": True, "消耗比": 0.2}), 0)["costAbnormal"]
-        assert P.compute_health(self._pm(cost={"超支": None, "消耗比": 1.2}), 0)["costAbnormal"]
-        assert not P.compute_health(self._pm(cost={"超支": None, "消耗比": None}), 0)["costAbnormal"]
+        assert P.compute_health(self._pm(cost={"项目超支": True, "消耗比": 0.2}), 0)["costAbnormal"]
+        assert P.compute_health(self._pm(cost={"项目超支": None, "消耗比": 1.2}), 0)["costAbnormal"]
+        assert not P.compute_health(self._pm(cost={"项目超支": None, "消耗比": None}), 0)["costAbnormal"]
 
 
-def _pm_active(name, manager, l4="黑龙江服务组", **over):
+def _pm_active(name, manager, l4="黑龙江服务组", project_type="实施项目", l3_1="三部一组", **over):
     pm = {"matched": True, "source": "在建",
-          "team": {"项目名称": name, "项目经理": manager, "L4部门": l4},
+          "team": {"项目名称": name, "项目经理": manager, "L4部门": l4, "L3_1部门": l3_1},
           "progress": {"里程碑进度状态": "正常"},
           "risk": {"最高等级": None, "未关闭风险数": 0},
-          "cost": {"超支": None, "消耗比": None}}
+          "cost": {"项目超支": None, "消耗比": None},
+          "status": {"项目类型": project_type},
+          "customer": {"合同编号": "HT-" + (name or "x")}}
     pm.update(over)
     return pm
 
@@ -166,16 +168,16 @@ class TestBuildProjects:
         assert len(out) == 1  # 空人员清单=不过滤(spec 3.4 降级)
 
     def test_presale_mapping_and_payment(self):
-        ppm = {"SF-1": _pm_active("售前服务A", "佘海龙")}
+        ppm = {"SF-1": _pm_active("售前服务A", "佘海龙", project_type="售前服务类")}
         mapping = [{"current": "SF-1", "owner": "于江", "closed": "SS-99"}]
         delivery = [{"项目编号": "SF-1", "项目名称": "售前服务A", "差旅费_预算金额": 100}]
         out = P.build_projects(ppm, {"佘海龙"}, {"黑龙江服务组"}, mapping, delivery)
         p = out[0]
         assert p["isPresale"] is True
         assert p["relatedClosedId"] == "SS-99"
-        # payment 字段由后续 9f 任务填入，此处不断言 payment
-        assert "projectId" in p
-        assert "health" in p
+        assert p["orgL3_1"] == "三部一组"
+        assert p["合同编号"] == "HT-售前服务A"
+        assert "orgL3" not in p
         assert next(i for i in p["deliveryCosts"] if i["类别"] == "差旅费")["预算金额"] == 100.0
 
     def test_name_falls_back_to_nodes(self):
@@ -194,7 +196,7 @@ class TestBuildProjects:
 class TestProjectsQuality:
     def test_quality_counts_and_alerts(self):
         ppm = {
-            "SF-1": _pm_active("售前服务A", "佘海龙"),
+            "SF-1": _pm_active("售前服务A", "佘海龙", project_type="售前服务类"),
             "SS-2": _pm_active("漏网项目", "王漏网", l4="黑龙江服务组"),  # L4 命中但经理不在清单 → 告警
         }
         projects = P.build_projects(ppm, {"佘海龙", "杨亮"}, {"黑龙江服务组"},
@@ -282,36 +284,53 @@ class TestBuildPaymentSummary:
         rec = {"total": 700000.0, "count": 2, "lastDate": "2026-06-04"}
         s = PJ.build_payment_summary(1000000.0, nodes, rec)
         assert s["contract"] == 1000000.0 and s["actualTotal"] == 700000.0 and s["paymentCount"] == 2
-        assert s["paymentRatio"] == 0.7 and s["expectedTotal"] == 1000000.0
+        assert "paymentRatio" not in s
+        assert s["expectedTotal"] == 1000000.0
         assert s["nodeCount"] == 2 and s["reachedCount"] == 1 and s["delayedCount"] == 1
         assert s["lastPaymentDate"] == "2026-06-04" and s["fromOrigin"] is False
 
     def test_robust_none(self):
         import projects as PJ
         s = PJ.build_payment_summary(None, [], None)
-        assert s["paymentRatio"] is None and s["actualTotal"] is None
+        assert "paymentRatio" not in s and s["actualTotal"] is None
         assert s["expectedTotal"] == 0 and s["nodeCount"] == 0
         assert s["reachedCount"] == 0 and s["delayedCount"] == 0
 
 
-class TestOrgL3Map:
-    def test_read_org_l3_map(self, tmp_path):
-        path = _make_xlsx(tmp_path, "组织架构.xlsx", [
-            ("Sheet1", [
-                ("工号", "姓名", "员工类别", "新L2组织", "新L3组织", "新L3-1组织", "新L4组织"),
-                ("1", "张三", "正式", "L2", "交付实施三部", "三部一组", "北京服务组"),
-                ("2", "李四", "正式", "L2", "别的部门", "别组", "别L4"),
-            ]),
-        ])
-        m = P.read_org_l3_map(path)
-        assert m.get("张三") == "三部一组"
-        assert "李四" not in m
-
-    def test_build_projects_sets_orgL3(self):
+class TestOrgL31AndContract:
+    def test_build_projects_sets_orgL3_1_and_contract(self):
         pmis = {"P1": {"source": "在建", "matched": True,
-                       "team": {"项目经理": "张三", "项目名称": "甲", "L4部门": "北京服务组"}}}
-        projs = P.build_projects(pmis, {"张三"}, {"北京服务组"}, [], [], {"张三": "三部一组"})
-        assert projs[0]["orgL3"] == "三部一组"
+                       "team": {"项目经理": "张三", "项目名称": "甲", "L4部门": "北京服务组",
+                                "L3_1部门": "三部一组"},
+                       "status": {"项目类型": "实施项目"},
+                       "customer": {"合同编号": "HT-1"}}}
+        projs = P.build_projects(pmis, {"张三"}, {"北京服务组"}, [], [])
+        assert projs[0]["orgL3_1"] == "三部一组"
+        assert projs[0]["合同编号"] == "HT-1"
+        assert projs[0]["isPresale"] is False
+
+    def test_isPresale_by_project_type(self):
+        pmis = {"P1": {"source": "在建", "matched": True,
+                       "team": {"项目经理": "张三", "项目名称": "未命名", "L4部门": "北京服务组",
+                                "L3_1部门": "组"},
+                       "status": {"项目类型": "售前服务类"}, "customer": {}}}
+        projs = P.build_projects(pmis, {"张三"}, set(), [], [])
+        assert projs[0]["isPresale"] is True
+
+
+class TestCountClosedDept:
+    def test_counts_manager_in_org(self, tmp_path):
+        import openpyxl, os as _os
+        d = tmp_path / "pmis"; d.mkdir()
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.cell(row=1, column=1, value="标题")
+        ws.cell(row=2, column=1, value="项目编号"); ws.cell(row=2, column=2, value="项目经理")
+        ws.cell(row=3, column=1, value="C-1"); ws.cell(row=3, column=2, value="张三")
+        ws.cell(row=4, column=1, value="C-2"); ws.cell(row=4, column=2, value="外部人")
+        wb.save(str(d / config.PMIS_FILES_CLOSED["center"]))
+        assert P.count_closed_dept(str(d), {"张三"}) == 1
+        assert P.count_closed_dept(str(d), set()) == 0
+        assert P.count_closed_dept(str(tmp_path / "none"), {"张三"}) == 0
 
 
 class TestAggregatePaymentPmis:
