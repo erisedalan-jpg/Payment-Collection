@@ -16,10 +16,11 @@ export const TIER_TABS: TierTab[] = [
   { label: '风险项目', tab: 'risk' },
 ]
 
-// 项目主域（P2 起逐期补全：P3 项目动态 /activity、P4 项目总览 /、P5 项目分析 /insight）
+// 项目主域（P2 起逐期补全：P3 项目动态 /activity、P4 项目总览 /、P5 项目分析 /insight、子项目2 已关闭项目）
 export const PROJECT_LINKS: NavLink[] = [
   { label: '项目总览', to: '/' },
-  { label: '项目清单', to: '/projects' },
+  { label: '在建项目', to: '/projects' },
+  { label: '已关闭项目', to: '/projects/closed' },
   { label: '项目动态', to: '/activity' },
   { label: '项目分析', to: '/insight' },
 ]

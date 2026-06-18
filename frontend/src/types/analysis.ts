@@ -115,6 +115,17 @@ export type Costabnormal = boolean;
 export type Paymentabnormal = boolean;
 export type Overall = string;
 export type Projects1 = Project[];
+export type Projectid1 = string;
+export type Projectname1 = string;
+export type Projectmanager1 = string;
+export type Orgl41 = string;
+export type Orgl311 = string;
+export type NoName36 = string;
+export type NoName37 = string | null;
+export type NoName38 = string | null;
+export type NoName39 = string | null;
+export type NoName40 = string | null;
+export type Closedprojects = ClosedProject[];
 export type Deptprojectcount = number;
 export type Provided = boolean;
 export type Rows = number;
@@ -183,8 +194,8 @@ export type Rows2 = ProfitRow[];
 export type Date1 = string;
 export type Type1 = string;
 export type Domain = string;
-export type Projectid1 = string;
-export type Projectname1 = string;
+export type Projectid2 = string;
+export type Projectname2 = string;
 export type Summary2 = string;
 export type Amount1 = number | null;
 export type Tone = string;
@@ -206,6 +217,7 @@ export interface AnalysisData {
   projectPmis?: Projectpmis;
   dataQuality?: DataQuality | null;
   projects?: Projects1;
+  closedProjects?: Closedprojects;
   projectsQuality?: ProjectsQuality | null;
   projectMilestones?: Projectmilestones;
   paymentRecords?: Paymentrecords;
@@ -377,6 +389,77 @@ export interface ProjectHealth {
   costAbnormal?: Costabnormal;
   paymentAbnormal?: Paymentabnormal;
   overall?: Overall;
+  [k: string]: unknown;
+}
+export interface ClosedProject {
+  projectId: Projectid1;
+  projectName?: Projectname1;
+  projectManager?: Projectmanager1;
+  orgL4?: Orgl41;
+  orgL3_1?: Orgl311;
+  合同编号?: NoName36;
+  team?: PmisTeam1;
+  customer?: PmisCustomer1;
+  status?: PmisStatus1;
+  progress?: PmisProgress1;
+  cost?: PmisCost1;
+  closeInfo?: ClosedProjectCloseInfo;
+  [k: string]: unknown;
+}
+export interface PmisTeam1 {
+  项目名称?: NoName28;
+  项目经理?: NoName29;
+  L4部门?: L4;
+  L3部门?: L3;
+  L3_1部门?: L31;
+  AR?: Ar;
+  SR?: Sr;
+  CSR?: Csr;
+  CDR?: Cdr;
+  Sponsor?: Sponsor;
+  [k: string]: unknown;
+}
+export interface PmisCustomer1 {
+  最终客户?: NoName23;
+  合同编号?: NoName24;
+  签约单位?: NoName25;
+  行业?: NoName26;
+  合同总额?: NoName27;
+  [k: string]: unknown;
+}
+export interface PmisStatus1 {
+  项目状态?: NoName15;
+  是否暂停?: NoName16;
+  评级?: NoName17;
+  项目级别?: NoName18;
+  项目类型?: NoName19;
+  评分?: NoName20;
+  关键动作?: NoName21;
+  交付物?: NoName22;
+  [k: string]: unknown;
+}
+export interface PmisProgress1 {
+  完工进展?: NoName7;
+  里程碑进度状态?: NoName8;
+  项目阶段?: NoName9;
+  终验时间?: NoName10;
+  [k: string]: unknown;
+}
+export interface PmisCost1 {
+  总预算?: NoName;
+  核算?: NoName1;
+  剩余预算?: NoName2;
+  消耗比?: NoName3;
+  项目超支?: NoName4;
+  交付超支?: NoName5;
+  成本状态?: NoName6;
+  [k: string]: unknown;
+}
+export interface ClosedProjectCloseInfo {
+  关闭时间?: NoName37;
+  是否正常关闭?: NoName38;
+  关闭说明?: NoName39;
+  计划终验时间?: NoName40;
   [k: string]: unknown;
 }
 export interface ProjectsQuality {
@@ -555,8 +638,8 @@ export interface Event {
   date: Date1;
   type: Type1;
   domain: Domain;
-  projectId?: Projectid1;
-  projectName?: Projectname1;
+  projectId?: Projectid2;
+  projectName?: Projectname2;
   summary?: Summary2;
   prev?: unknown;
   curr?: unknown;
