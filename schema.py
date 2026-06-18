@@ -23,31 +23,6 @@ class Meta(_Base):
     totalPaymentNodes: int
 
 
-class RawNode(_Base):
-    projectId: str
-    projectName: str = ""
-    tier: str
-    isPaymentRelated: bool
-    nodeStatus: str = ""
-    projectAmount: float = 0
-    expectedPayment: float = 0
-    actualPayment: float = 0
-    delayDays: int = 0
-    planDate: str = ""
-    planMonth: str = ""
-    followupRecords: List[Any] = []
-
-
-class Dashboard(_Base):
-    totalProjectCount: int
-    totalPaymentNodes: int
-    totalPaidNodes: int
-
-
-class TierSummary(_Base):
-    projectCount: int
-
-
 class ProjectOverview(_Base):
     projects: List[Dict[str, Any]] = []
     columns: List[Dict[str, Any]] = []
@@ -311,13 +286,9 @@ class PeriodCompare(_Base):
 
 class AnalysisData(_Base):
     meta: Meta
-    dashboard: Dashboard
-    summary: Dict[str, TierSummary]
-    rawNodes: List[RawNode]
     projectOverview: ProjectOverview
     naguanMap: Dict[str, bool] = {}
     naguanExclude: Dict[str, bool] = {}
-    displayColumns: Dict[str, Any] = {}
     followupRecords: Dict[str, Any] = {}
     projectPmis: Dict[str, ProjectPmis] = {}
     dataQuality: Optional[DataQuality] = None

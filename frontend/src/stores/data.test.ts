@@ -4,8 +4,6 @@ import { useDataStore } from './data'
 
 const SAMPLE = {
   meta: { lastUpdate: '2026-06-03 10:00', totalProjects: 2, totalPaymentNodes: 3 },
-  dashboard: { totalProjectCount: 2, totalPaymentNodes: 3, totalPaidNodes: 1 },
-  summary: {}, rawNodes: [{ projectId: 'P1' }, { projectId: 'P2' }],
   projectOverview: { projects: [], columns: [] },
   naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
 }
@@ -21,7 +19,6 @@ describe('data store', () => {
     expect(store.loading).toBe(false)
     expect(store.error).toBeNull()
     expect(store.data?.meta.totalProjects).toBe(2)
-    expect(store.data?.rawNodes.length).toBe(2)
   })
 
   it('records error on fetch failure', async () => {
@@ -46,9 +43,6 @@ describe('useDataStore.clearBusinessData', () => {
     const s = useDataStore()
     s.data = {
       meta: { lastUpdate: 'x', totalProjects: 1, totalPaymentNodes: 1 },
-      dashboard: { a: 1 },
-      summary: { b: 2 },
-      rawNodes: [{ projectId: 'P1' }],
       projectOverview: { projects: [{ projectId: 'P1' }], columns: [{ key: 'projectId' }] },
       naguanMap: {},
       naguanExclude: {},
@@ -56,7 +50,6 @@ describe('useDataStore.clearBusinessData', () => {
       followupRecords: {},
     } as any
     s.clearBusinessData()
-    expect(s.data!.rawNodes).toEqual([])
     expect((s.data!.projectOverview as any).projects).toEqual([])
     expect(s.data!.displayColumns).toBeTruthy()
     expect((s.data!.projectOverview as any).columns).toHaveLength(1)
@@ -70,10 +63,9 @@ describe('useDataStore.clearBusinessData', () => {
 describe('useDataStore.reload', () => {
   it('强制重拉并更新 data', async () => {
     const s = useDataStore()
-    const fresh = { meta: { lastUpdate: 'new' }, rawNodes: [{ projectId: 'X' }] }
+    const fresh = { meta: { lastUpdate: 'new' }, projectOverview: { projects: [] } }
     const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({ ok: true, json: async () => fresh } as any)
     await s.reload()
-    expect(s.data!.rawNodes).toEqual([{ projectId: 'X' }])
     expect((s.data as any).meta.lastUpdate).toBe('new')
     spy.mockRestore()
   })

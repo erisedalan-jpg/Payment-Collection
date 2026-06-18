@@ -9,9 +9,9 @@ def _final_data(actual=0.0):
     return {
         "projects": [{"projectId": "P-1", "projectName": "甲"}],
         "projectPmis": {"P-1": {"progress": {"项目阶段": "项目执行"}, "status": {}, "risk": {}, "cost": {}}},
-        "rawNodes": [{"projectId": "P-1", "projectName": "甲", "nodeName": "初验款",
-                      "isPaymentRelated": True, "nodeStatus": "正常实施中",
-                      "planDate": "2026-03-31", "expectedPayment": 500000, "actualPayment": actual}],
+        "paymentNodes": {"P-1": [{"stage": "初验款", "planDate": "2026-03-31",
+                                   "receivedAmount": actual, "expectedPayment": 500000,
+                                   "unpaidAmount": 500000 - actual, "status": "正常实施中"}]},
     }
 
 

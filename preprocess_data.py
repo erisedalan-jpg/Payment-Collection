@@ -547,265 +547,6 @@ def process_followup_records():
     print(f"[OK] 跟进记录解析完成: {len(records_by_project)}个项目, 共{sum(len(v) for v in records_by_project.values())}条记录")
     return records_by_project
 
-
-def compute_dashboard(all_nodes):
-    """计算看板首页汇总数据"""
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    # a. 项目总数量：按tier分别去重项目编号
-    tier_project_ids = defaultdict(set)
-    for n in all_nodes:
-        tier_project_ids[n["tier"]].add(n["projectId"])
-    total_project_count = sum(len(ids) for ids in tier_project_ids.values())
-    
-    # b. 项目回款阶段总数量：关联回款=是的行数
-    related_nodes = [n for n in all_nodes if n["isPaymentRelated"]]
-    total_payment_nodes = len(related_nodes)
-    
-    # c. 已回款项目总数量：关联回款=是且实际回款比例=100%
-    paid_nodes = [n for n in related_nodes if n["nodeStatus"] in (config.STATUS_FULL_PAID, config.STATUS_ADVANCE_PAID)]
-    total_paid_nodes = len(paid_nodes)
-    
-    # d. 可提前回款项目总数量：关联回款=是 + canAdvance=是 + 实际回款比例未达100%
-    can_advance_nodes = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_CAN_ADVANCE]
-    total_can_advance = len(can_advance_nodes)
-
-    # e. 回款延期项目总数量
-    delayed_nodes = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_DELAYED]
-    total_delayed = len(delayed_nodes)
-    
-    # f. 月度回款计划（关联回款=是且实际回款≠100%，按月统计）
-    monthly_nodes = [n for n in related_nodes 
-                     if _get_ratio_num(n["actualPaymentRatio"]) is None or _get_ratio_num(n["actualPaymentRatio"]) < 1.0]
-    monthly_plan = {}
-    for n in monthly_nodes:
-        m = n.get("planMonth", "")
-        if not m:
-            continue
-        if m not in monthly_plan:
-            monthly_plan[m] = {"count": 0, "amount": 0, "nodes": []}
-        monthly_plan[m]["count"] += 1
-        monthly_plan[m]["amount"] += n["expectedPayment"] - n["actualPayment"]
-        monthly_plan[m]["nodes"].append({
-            "projectId": n["projectId"],
-            "projectName": n["projectName"],
-            "nodeName": n["nodeName"],
-            "planDate": n["planDate"],
-            "projectAmount": n["projectAmount"],
-            "planPaymentRatio": n["planPaymentRatio"],
-            "actualPaymentRatio": n["actualPaymentRatio"],
-            "expectedPayment": n["expectedPayment"],
-            "tier": n["tier"],
-        })
-    
-    # g. 服务组回款达成排名
-    org_stats = defaultdict(lambda: {"expectedTotal": 0, "actualTotal": 0, "count": 0})
-    for n in related_nodes:
-        org = n["orgL4"] or "未分配"
-        org_stats[org]["expectedTotal"] += n["expectedPayment"]
-        org_stats[org]["actualTotal"] += n["actualPayment"]
-        org_stats[org]["count"] += 1
-    
-    org_ranking = []
-    for org, stats in org_stats.items():
-        rate = stats["actualTotal"] / stats["expectedTotal"] if stats["expectedTotal"] > 0 else 0
-        org_ranking.append({
-            "org": org,
-            "expectedTotal": round(stats["expectedTotal"], 2),
-            "expectedTotalWan": round(stats["expectedTotal"] / 10000, 2),
-            "actualTotal": round(stats["actualTotal"], 2),
-            "actualTotalWan": round(stats["actualTotal"] / 10000, 2),
-            "achievementRate": round(rate, 4),
-            "count": stats["count"],
-        })
-    org_ranking.sort(key=lambda x: x["actualTotal"], reverse=True)
-    
-    # h. 延期回款TOP5（按延期天数倒序）
-    delayed_top = []
-    seen = set()
-    for n in sorted(delayed_nodes, key=lambda x: x.get("delayDays", 0), reverse=True):
-        key = n["projectId"]
-        if key not in seen:
-            seen.add(key)
-            delayed_top.append({
-                "projectId": n["projectId"],
-                "projectName": n["projectName"],
-                "orgL4": n["orgL4"],
-                "projectManager": n["projectManager"],
-                "tier": n["tier"],
-                "delayDays": n.get("delayDays", 0),
-            })
-    delayed_top = delayed_top[:10]
-    
-    # 计划回款总金额 = sum(节点计划回款金额)，已回款总金额 = sum(节点实际回款金额)
-    total_expected_payment = sum(n["expectedPayment"] for n in related_nodes)
-    total_actual_payment = sum(n["actualPayment"] for n in related_nodes)
-    total_pending_payment = total_expected_payment - total_actual_payment
-    # 总完成率 = sum(节点实际回款金额)/sum(节点计划回款金额)
-    total_completion_rate = total_actual_payment / total_expected_payment if total_expected_payment > 0 else 0
-    
-    return {
-        "totalProjectCount": total_project_count,
-        "totalPaymentNodes": total_payment_nodes,
-        "totalPaidNodes": total_paid_nodes,
-        "totalCanAdvance": total_can_advance,
-        "totalDelayed": total_delayed,
-        "totalReachedCondition": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_REACHED]),
-        "totalOnTime": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_ON_TIME]),
-        "totalAdvanceEarly": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_ADVANCE_PAID]),
-        "totalFullPaid": len([n for n in related_nodes if n["nodeStatus"] == config.STATUS_FULL_PAID]),
-        # 金额指标（元为单位计算，万为单位展示）
-        "totalExpectedPayment": round(total_expected_payment, 2),
-        "totalExpectedPaymentWan": round(total_expected_payment / 10000, 2),
-        "totalActualPayment": round(total_actual_payment, 2),
-        "totalActualPaymentWan": round(total_actual_payment / 10000, 2),
-        "totalPendingPayment": round(total_pending_payment, 2),
-        "totalPendingPaymentWan": round(total_pending_payment / 10000, 2),
-        "totalCompletionRate": round(total_completion_rate, 4),
-        "monthlyPlan": {k: {"count": v["count"], 
-                            "amountWan": round(v["amount"]/10000, 2),
-                            "nodes": v["nodes"]} 
-                        for k, v in sorted(monthly_plan.items())},
-        "orgRanking": org_ranking,
-        "delayedTop5": delayed_top,
-        "tierProjectCounts": {tier: len(ids) for tier, ids in tier_project_ids.items()},
-    }
-
-def compute_tier_summary(all_nodes, tier_name):
-    """计算单个层级的汇总统计"""
-    tier_nodes = [n for n in all_nodes if n["tier"] == tier_name]
-    related_nodes = [n for n in tier_nodes if n["isPaymentRelated"]]
-    
-    # 项目去重（全量，含是否关联回款=否）
-    project_ids = set(n["projectId"] for n in tier_nodes)
-    project_count = len(project_ids)
-    # 项目去重（仅关联回款=是）
-    related_project_ids = set(n["projectId"] for n in related_nodes)
-    related_project_count = len(related_project_ids)
-    
-    # 精确计算：按项目ID去重取项目金额
-    project_amounts = {}
-    for n in tier_nodes:
-        pid = n["projectId"]
-        if pid not in project_amounts:
-            project_amounts[pid] = n["projectAmount"]
-    total_amount = sum(project_amounts.values())
-    
-    # 金额指标：计划回款/已回款/待回款（元为单位计算）
-    tier_expected_payment = sum(n["expectedPayment"] for n in related_nodes)
-    tier_actual_payment = sum(n["actualPayment"] for n in related_nodes)
-    tier_pending_payment = tier_expected_payment - tier_actual_payment
-    tier_completion_rate = tier_actual_payment / tier_expected_payment if tier_expected_payment > 0 else 0
-    # 兼容旧字段
-    remaining = tier_pending_payment
-    
-    # 6种节点状态统计（使用nodeStatus字段直接匹配）
-    can_advance_nodes = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_CAN_ADVANCE]
-    reached_condition = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_REACHED]
-    advance_early = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_ADVANCE_PAID]
-    full_paid = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_FULL_PAID]
-    on_time = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_ON_TIME]
-    delayed = [n for n in related_nodes if n["nodeStatus"] == config.STATUS_DELAYED]
-    
-    # 月度计划
-    monthly = {}
-    for n in related_nodes:
-        if _get_ratio_num(n["actualPaymentRatio"]) is not None and _get_ratio_num(n["actualPaymentRatio"]) >= 1.0:
-            continue
-        m = n.get("planMonth", "")
-        if not m:
-            continue
-        if m not in monthly:
-            monthly[m] = {"count": 0, "amount": 0}
-        monthly[m]["count"] += 1
-        monthly[m]["amount"] += n["expectedPayment"] - n["actualPayment"]
-    
-    # 服务组统计
-    org_stats = defaultdict(lambda: {"expectedTotal": 0, "actualTotal": 0, "count": 0, "delayedCount": 0})
-    for n in related_nodes:
-        org = n["orgL4"] or "未分配"
-        org_stats[org]["expectedTotal"] += n["expectedPayment"]
-        org_stats[org]["actualTotal"] += n["actualPayment"]
-        org_stats[org]["count"] += 1
-        if n["nodeStatus"] == config.STATUS_DELAYED:
-            org_stats[org]["delayedCount"] += 1
-    
-    org_summary = {}
-    for org, stats in org_stats.items():
-        rate = stats["actualTotal"] / stats["expectedTotal"] if stats["expectedTotal"] > 0 else 0
-        org_summary[org] = {
-            "count": stats["count"],
-            "expectedTotal": round(stats["expectedTotal"], 2),
-            "expectedTotalWan": round(stats["expectedTotal"] / 10000, 2),
-            "actualTotal": round(stats["actualTotal"], 2),
-            "actualTotalWan": round(stats["actualTotal"] / 10000, 2),
-            "achievementRate": round(rate, 4),
-            "delayedCount": stats["delayedCount"],
-        }
-    
-    # 数据完整性检查（三表统一）：关联回款=是且当前项目完成%为空且是否已达成里程碑为空
-    def _is_empty_val(v):
-        """判断字段值是否为空（空字符串、'空值'均视为空）"""
-        if not v or not str(v).strip():
-            return True
-        return str(v).strip() == "空值"
-
-    incomplete = [n for n in related_nodes
-                 if _is_empty_val(n["projectCompletion"]) and _is_empty_val(n["isMilestoneAchieved"])]
-    
-    # 去重
-    seen_incomplete = set()
-    incomplete_list = []
-    for n in incomplete:
-        if n["projectId"] not in seen_incomplete:
-            seen_incomplete.add(n["projectId"])
-            incomplete_list.append({
-                "projectId": n["projectId"],
-                "projectName": n["projectName"],
-                "orgL4": n["orgL4"],
-                "projectManager": n["projectManager"],
-            })
-    
-    return {
-        "projectCount": project_count,
-        "totalAmount": round(total_amount, 2),
-        "totalAmountWan": round(total_amount / 10000, 2),
-        # 新增：计划回款/已回款/待回款金额（元计算，万展示）
-        "expectedPayment": round(tier_expected_payment, 2),
-        "expectedPaymentWan": round(tier_expected_payment / 10000, 2),
-        "actualPayment": round(tier_actual_payment, 2),
-        "actualPaymentWan": round(tier_actual_payment / 10000, 2),
-        "pendingPayment": round(tier_pending_payment, 2),
-        "pendingPaymentWan": round(tier_pending_payment / 10000, 2),
-        "completionRate": round(tier_completion_rate, 4),
-        # 兼容旧字段
-        "remainingAmount": round(remaining, 2),
-        "remainingAmountWan": round(remaining / 10000, 2),
-        # 兼容旧字段：app.js 使用 actualAmountWan/expectedAmountWan
-        "actualAmountWan": round(tier_actual_payment / 10000, 2),
-        "expectedAmountWan": round(tier_expected_payment / 10000, 2),
-        "relatedNodeCount": len(related_nodes),
-        "relatedProjectCount": related_project_count,
-        # 6种节点状态统计
-        "canAdvanceCount": len(can_advance_nodes),
-        "reachedConditionCount": len(reached_condition),
-        "advanceEarlyCount": len(advance_early),
-        "fullPaidCount": len(full_paid),
-        "onTimeCount": len(on_time),
-        "delayedCount": len(delayed),
-        # 各状态金额统计
-        "canAdvanceAmount": round(sum(n["expectedPayment"] for n in can_advance_nodes) / 10000, 2),
-        "reachedConditionAmount": round(sum(n["expectedPayment"] for n in reached_condition) / 10000, 2),
-        "advanceEarlyAmount": round(sum(n["expectedPayment"] for n in advance_early) / 10000, 2),
-        "fullPaidAmount": round(sum(n["actualPayment"] for n in full_paid) / 10000, 2),
-        "onTimeAmount": round(sum(n["expectedPayment"] for n in on_time) / 10000, 2),
-        "delayedAmount": round(sum(n["expectedPayment"] for n in delayed) / 10000, 2),
-        "monthlyPlan": {k: {"count": v["count"], "amountWan": round(v["amount"]/10000, 2)} 
-                       for k, v in sorted(monthly.items())},
-        "orgStats": org_summary,
-        "incompleteData": incomplete_list,
-    }
-
 # ============================================================
 # 主流程
 # ============================================================
@@ -1008,7 +749,7 @@ def run_snapshot_pipeline(final_data, output_dir, today=None):
     events_path = os.path.join(output_dir, "events.json")
 
     cur = snapshots_mod.build_snapshot(
-        today, final_data["projects"], final_data["projectPmis"], final_data["rawNodes"],
+        today, final_data["projects"], final_data["projectPmis"], final_data["paymentNodes"],
         final_data.get("projectProfit"))
 
     dates = snapshots_mod.list_snapshot_dates(snap_dir)
@@ -1036,28 +777,12 @@ def main():
 
     print("[INFO] 开始数据预处理V3（合并回款节点清单 + 项目验收日期Sheet）...")
 
-    all_nodes = []
     naguan_map = {}
     project_overview = []
     classification = []
     service_groups = []
     classification_total = 0
     classification_total_amount = 0
-
-    # === 1. 处理合并后的回款节点清单 ===
-    print("[INFO] 处理 项目回款节点（里程碑）清单...")
-    sheet = load_sheet(config.SHEET_PAYMENT_NODES)
-    if sheet:
-        # 先用 below100 逻辑处理所有行（字段映射一致），统一标记为待修正 tier
-        nodes = process_below100_nodes(sheet, "__temp__")
-        # 根据实际项目金额重新分配 tier
-        for node in nodes:
-            node["tier"] = assign_tier(node.get("projectAmount", 0))
-        # amountTier 保留 Excel"项目金额分层"列的原始值，不再用金额覆盖
-        all_nodes.extend(nodes)
-        print(f"  [OK] {len(nodes)} 个节点 (100万以上: {sum(1 for n in nodes if n['tier']=='100万以上')}, 50-100万: {sum(1 for n in nodes if n['tier']=='50-100万')}, 50万以下: {sum(1 for n in nodes if n['tier']=='50万以下')})")
-    else:
-        print("  [WARN] 未找到Sheet: 项目回款节点（里程碑）清单")
 
     # === 2. 处理项目验收日期Sheet ===
     print("[INFO] 处理 项目验收日期、回款条件信息收集...")
@@ -1069,17 +794,6 @@ def main():
     else:
         print("  [WARN] 未找到Sheet: 项目验收日期、回款条件信息收集")
 
-    # === 3. 纳管映射关联到回款节点 ===
-    # 统一以验收日期表的纳管值为标准，按项目编号关联
-    for node in all_nodes:
-        pid = node.get("projectId", "")
-        ov_naguan = ""
-        for p in project_overview:
-            if p.get("projectId") == pid:
-                ov_naguan = p.get("纳管", "").strip()
-                break
-        node["纳管"] = ov_naguan  # 直接用验收日期表的值（空/是/否）
-
     # === 4. 计算分类分布 (Content 1) ===
     print("[INFO] 计算项目分类分布...")
     classification, classification_total, classification_total_amount = compute_classification(project_overview)
@@ -1089,85 +803,6 @@ def main():
     print("[INFO] 计算服务组重点关注项目...")
     service_groups, svc_total = compute_service_groups(project_overview, naguan_map)
     print(f"  [OK] {len(service_groups)} 个服务组, 重点关注 {svc_total} 个")
-
-    # === 6. 计算看板首页汇总 ===
-    print("[INFO] 计算看板首页汇总...")
-    dashboard = compute_dashboard(all_nodes)
-    # 统一项目总数：使用验收日期表的项目数 633，与分类分布一致
-    if project_overview:
-        dashboard["totalProjectCount"] = len(project_overview)
-    # 附加 Content 1 和 Content 2 数据
-    dashboard["classification"] = classification
-    dashboard["classificationTotal"] = classification_total
-    dashboard["classificationTotalAmountWan"] = classification_total_amount
-    dashboard["serviceGroups"] = service_groups
-
-    # === 7. 计算各层级汇总 ===
-    print("[INFO] 计算各层级汇总...")
-    summary = {}
-    for tier in config.TIER_LABELS:
-        summary[tier] = compute_tier_summary(all_nodes, tier)
-
-    # === 8. 构建展示列配置（动态，跟随云文档列名） ===
-    # 内部key → 云文档中文列名映射（从 process_below100_nodes 的 row.get() 调用提取）
-    NODE_FIELD_MAP = {
-        "projectId": "项目编号", "projectName": "项目名称",
-        "orgL3": "项目经理L3-1部门", "orgL4": "项目经理L4部门", "projectManager": "项目经理",
-        "projectType": "项目类型", "projectAmount": "项目金额", "amountTier": "项目金额分层",
-        "nodeName": "里程碑节点", "planDate": "该节点计划完成时间",
-        "planQuarter": "计划时间切片", "actualDate": "实际完成时间",
-        "completionStatus": "里程碑节点完成情况",
-        "isPaymentRelated": "是否关联回款", "planPaymentRatio": "关联回款比例",
-        "actualPaymentRatio": "实际回款比例", "projectCompletion": "当前项目完成%",
-        "isMilestoneAchieved": "是否已达成里程碑", "expectedMilestoneDate": "预计里程碑完成时间",
-        "canAdvance": "是否增加资源是否可以提前完成里程碑计划",
-        "advanceDetail": "如T列为\"是\"写明需求资源，如\"否\"写明原因",
-        "blocker": "卡点", "blockerOwner": "卡点责任方",
-        "nextAction": "下一步动作", "nextActionDate": "下一步动作完成时间", "remarks": "备注",
-        "delayDays": "延期天数", "planMonth": "计划月份", "纳管": "纳管",
-        "remarks2": "备注2", "signUnit": "签约单位",
-    }
-    # 从云文档 Sheet 获取实际列顺序
-    node_sheet = load_sheet(config.SHEET_PAYMENT_NODES)
-    node_sheet_headers = []
-    if node_sheet:
-        raw_headers, _ = parse_header_and_data(node_sheet)
-        node_sheet_headers = [h.replace('\r\n',' ').replace('\r',' ').replace('\n',' ').strip().replace('“','"').replace('”','"').replace('‘',"'").replace('’',"'") for h in raw_headers] if raw_headers else []
-    # 构建显示列：先按云文档列顺序放，再放计算字段
-    internal_to_chinese = {}
-    for internal_key, chinese_name in NODE_FIELD_MAP.items():
-        internal_to_chinese[internal_key] = chinese_name
-    # 反向映射：云文档列名 → internal_key
-    chinese_to_internal = {v: k for k, v in NODE_FIELD_MAP.items()}
-    hidden_cols = {"source", "tier", "nodeStatus", "expectedPayment", "actualPayment", "planMonth"}
-    display_columns = {}
-    for tier in config.TIER_LABELS:
-        tier_nodes = [n for n in all_nodes if n["tier"] == tier]
-        tier_cols = set()
-        for n in tier_nodes:
-            tier_cols.update(n.keys())
-        cols = []
-        seen = set()
-        # 先按云文档列顺序添加
-        for h in node_sheet_headers:
-            ikey = chinese_to_internal.get(h)
-            if ikey and ikey in tier_cols and ikey not in hidden_cols and ikey not in seen:
-                cols.append({"key": ikey, "label": h, "visible": True})
-                seen.add(ikey)
-        # 再添加云文档中没有的计算字段（如 delayDays, planMonth, 纳管）
-        extra_order = ["delayDays", "planMonth", "纳管", "remarks2", "signUnit"]
-        for ikey in extra_order:
-            if ikey in tier_cols and ikey not in hidden_cols and ikey not in seen:
-                label = NODE_FIELD_MAP.get(ikey, ikey)
-                cols.append({"key": ikey, "label": label, "visible": True})
-                seen.add(ikey)
-        # 最后添加任何遗漏的字段
-        for c in sorted(tier_cols):
-            if c not in hidden_cols and c not in seen:
-                label = internal_to_chinese.get(c, c)
-                cols.append({"key": c, "label": label, "visible": True})
-                seen.add(c)
-        display_columns[tier] = cols
 
     # 项目总览展示列：动态生成，按云文档Sheet列顺序，全部默认可见
     # 截图类列名（包含这些关键词的列自动标记为图片类型）
@@ -1182,11 +817,6 @@ def main():
     print("[INFO] 处理跟进记录...")
     followup_records = process_followup_records()
     
-    # 将跟进记录关联到回款节点
-    for node in all_nodes:
-        pid = node.get("projectId", "")
-        node["followupRecords"] = followup_records.get(pid, [])
-
     # === 9a. 读项目映射(售前↔已关闭原项目),供 PMIS 已关闭收录与项目主域使用 ===
     mapping = projects_mod.read_mapping(os.path.join(BASE_DIR, "input", config.MAPPING_FILE))
     extra_closed = {m["closed"] for m in mapping}
@@ -1198,17 +828,12 @@ def main():
     # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
     print("[INFO] 摄取 PMIS 项目域数据...")
     pmis_dir = os.path.join(BASE_DIR, "input", config.PMIS_DIRNAME)
-    pay_projects = [{"projectId": n.get("projectId", ""), "projectName": n.get("projectName", "")}
-                    for n in all_nodes]
-    # 回款侧脏值:实际回款比例 > 1
-    dirty = []
-    for n in all_nodes:
-        rnum = _get_ratio_num(n.get("actualPaymentRatio"))
-        if rnum is not None and rnum > 1:
-            dirty.append({"type": "回款比例>1", "projectId": n.get("projectId", ""),
-                          "field": "actualPaymentRatio", "value": n.get("actualPaymentRatio")})
+    # 换源:pay_projects 改由 project_overview 取,不再遍历 all_nodes
+    pay_projects = [{"projectId": p.get("projectId", ""), "projectName": p.get("projectName", "")}
+                    for p in project_overview]
+    # dirty 延迟到 payment_nodes 建好后填充(见 9f 循环之后),此处先传空列表
     project_pmis, data_quality = pmis.load_project_pmis(
-        pmis_dir, pay_projects, dirty=dirty, extra_closed_ids=extra_closed)
+        pmis_dir, pay_projects, dirty=[], extra_closed_ids=extra_closed)
     if data_quality["summary"]["pmisProvided"]:
         print(f"  [OK] PMIS 命中在建 {data_quality['summary']['matchedActive']} / "
               f"已关闭 {data_quality['summary']['matchedClosed']} / 未匹配 {data_quality['summary']['unmatched']}")
@@ -1218,7 +843,7 @@ def main():
     # === 9c. 构建项目主域(PMIS在建 ∩ 交付三部,Phase P1) ===
     print("[INFO] 构建项目主域(交付实施三部)...")
     dept_projects, projects_quality = projects_mod.load_dept_projects(
-        os.path.join(BASE_DIR, "input"), project_pmis, all_nodes, mapping)
+        os.path.join(BASE_DIR, "input"), project_pmis, mapping)
     if projects_quality["orgFile"]["provided"]:
         print(f"  [OK] 主域项目 {projects_quality['deptProjectCount']} 个, "
               f"售前已映射 {projects_quality['presaleMapped']}/{projects_quality['presaleTotal']}, "
@@ -1251,17 +876,6 @@ def main():
         else:
             print(f"  [WARN] 未提供 {label} 数据文件")
 
-    # === S1: 回款完成率切流水口径(流水累计÷合同总额,售前回退原项目;文件缺失保留旧口径) ===
-    if pr_stat["provided"]:
-        def _contract(pid):
-            return ((project_pmis.get(pid) or {}).get("customer") or {}).get("合同总额")
-        for p in dept_projects:
-            rec = payment_records.get(p["projectId"]) or {}
-            p["payment"]["paymentRatio"] = projects_mod.payment_ratio_from_records(
-                rec.get("total"), _contract(p["projectId"]),
-                _contract(p.get("relatedClosedId") or ""))
-        print("  [OK] 回款完成率已切换为 流水累计÷合同总额 口径")
-
     # === S2: 整体超支金额回填(同源 profit.overspend_amount;无 profit 数据自动 None,供详情页风险徽章,与事件快照同口径) ===
     for p in dept_projects:
         p["overspendAmount"] = profit_mod.overspend_amount(project_profit.get(p["projectId"]))
@@ -1286,27 +900,35 @@ def main():
         _summary["fromOrigin"] = _from_origin
         p["paymentPmis"] = _summary
         payment_nodes[_pid] = _nodes
+        p["payment"] = projects_mod.aggregate_payment_pmis(_nodes)
+        p["health"] = projects_mod.compute_health(project_pmis.get(_pid) or {}, p["payment"]["delayedCount"])
     print(f"  [OK] 系统核心口径回款已回填 {len(dept_projects)} 项目"
           f"(售前取原项目 {sum(1 for p in dept_projects if p['paymentPmis']['fromOrigin'])}"
           f";收款阶段项目 {len(collection_stages)})")
+
+    # 换源:dirty 改由 payment_nodes 取(actualRatio),回填至 data_quality
+    dirty = []
+    for _pid, _nodes in payment_nodes.items():
+        for n in _nodes:
+            r = n.get("actualRatio")
+            if r is not None and r > 1:
+                dirty.append({"type": "回款比例>1", "projectId": _pid,
+                              "field": "actualRatio", "value": r})
+    data_quality["dirty"] = dirty
 
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {
             "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "totalProjects": dashboard["totalProjectCount"],
-            "totalPaymentNodes": dashboard["totalPaymentNodes"],
+            "totalProjects": len(project_overview),
+            "totalPaymentNodes": sum(len(v) for v in payment_nodes.values()),
         },
-        "dashboard": dashboard,
-        "summary": summary,
-        "rawNodes": all_nodes,
         "projectOverview": {
             "projects": project_overview,
             "columns": overview_cols,
         },
         "naguanMap": {k: v for k, v in naguan_map.items()},
         "naguanExclude": {k: v for k, v in naguan_exclude.items()},
-        "displayColumns": display_columns,
         "followupRecords": followup_records,
         "projectPmis": project_pmis,
         "dataQuality": data_quality,
@@ -1340,12 +962,10 @@ def main():
     print("[OK] 数据已通过 schema 校验")
 
     print(f"\n[INFO] 数据预处理V3完成!")
-    print(f"  项目总数(去重): {dashboard['totalProjectCount']}")
-    print(f"  回款阶段总数: {dashboard['totalPaymentNodes']}")
-    print(f"  已回款总数: {dashboard['totalPaidNodes']}")
+    print(f"  项目总数(验收日期表): {len(project_overview)}")
+    print(f"  回款阶段总数(收款阶段节点): {sum(len(v) for v in payment_nodes.values())}")
     print(f"  分类总数: {classification_total}")
     print(f"  重点关注: {svc_total}")
-    print(f"  原始节点数: {len(all_nodes)}")
     print(f"  输出文件: {output_file}")
 
 if __name__ == "__main__":
