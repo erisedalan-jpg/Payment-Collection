@@ -330,3 +330,72 @@ class TestBuildProjectPmisExtraClosed:
         out = M.build_project_pmis({"base": [], "center": [], "status": [], "risk": []},
                                    closed, set())
         assert "SS-1" not in out
+
+
+class TestBuildClosedProjects:
+    def _make_closed(self, tmp_path):
+        import openpyxl, datetime
+        d = tmp_path / "pmis"; d.mkdir()
+
+        def _wb(fn, headers, rows):
+            wb = openpyxl.Workbook(); ws = wb.active
+            ws.cell(row=1, column=1, value="标题")  # 第1行为合并标题,表头在第2行
+            for j, h in enumerate(headers, start=1):
+                ws.cell(row=2, column=j, value=h)
+            for i, rec in enumerate(rows, start=3):
+                for j, h in enumerate(headers, start=1):
+                    ws.cell(row=i, column=j, value=rec.get(h))
+            wb.save(str(d / fn))
+
+        _wb(M.config.PMIS_FILES_CLOSED["center"],
+            ["项目编号", "项目名称", "项目经理", "是否交付部门人工成本超支", "成本状态", "计划终验时间", "合同编号"],
+            [{"项目编号": "C-1", "项目名称": "中心甲", "项目经理": "张三",
+              "是否交付部门人工成本超支": "是", "成本状态": "正常",
+              "计划终验时间": datetime.datetime(2025, 7, 1), "合同编号": "HT-C1"},
+             {"项目编号": "C-2", "项目经理": "外部人"}])
+        _wb(M.config.PMIS_FILES_CLOSED["base"],
+            ["项目编号", "项目名称", "项目经理（FR）", "项目经理L4部门", "项目经理L3-1部门",
+             "签约单位", "最终客户", "行业中类", "合同总额（元）", "合同编号",
+             "项目状态", "项目关闭时间", "是否正常关闭", "关闭说明"],
+            [{"项目编号": "C-1", "项目名称": "基础甲", "项目经理L4部门": "安全A组",
+              "项目经理L3-1部门": "三部一组", "签约单位": "甲单位", "最终客户": "客A",
+              "行业中类": "金融", "合同总额（元）": "1000000", "合同编号": "HT-B1",
+              "项目状态": "已验收", "项目关闭时间": datetime.datetime(2025, 8, 15),
+              "是否正常关闭": "是", "关闭说明": "正常结项"}])
+        _wb(M.config.PMIS_FILES_CLOSED["status"],
+            ["项目编号", "项目总预算（元）", "项目核算（元）", "剩余预算（元）",
+             "项目阶段", "项目类型", "项目级别", "项目累计完工进展百分比"],
+            [{"项目编号": "C-1", "项目总预算（元）": "1000", "项目核算（元）": "1200",
+              "剩余预算（元）": "-200", "项目阶段": "项目收尾", "项目类型": "实施项目",
+              "项目级别": "B", "项目累计完工进展百分比": "100"}])
+        return str(d)
+
+    def test_universe_and_fields(self, tmp_path):
+        d = self._make_closed(tmp_path)
+        out = M.build_closed_projects(d, {"张三"})
+        assert [p["projectId"] for p in out] == ["C-1"]      # 仅经理∈org_names(C-2 外部人剔除)
+        p = out[0]
+        assert p["projectName"] == "中心甲"                   # center 优先
+        assert p["projectManager"] == "张三"
+        assert p["orgL4"] == "安全A组" and p["orgL3_1"] == "三部一组"
+        assert p["合同编号"] == "HT-C1"                        # center 优先→base
+        assert p["customer"]["签约单位"] == "甲单位"
+        assert p["customer"]["合同总额"] == 1000000.0
+        assert p["status"]["项目状态"] == "已验收" and p["status"]["项目级别"] == "B"
+        assert p["progress"]["项目阶段"] == "项目收尾"
+        assert p["cost"]["剩余预算"] == -200.0 and p["cost"]["项目超支"] is True
+        assert p["cost"]["交付超支"] is True                   # center 是否交付部门人工成本超支==是
+        assert p["closeInfo"]["关闭时间"] == "2025-08-15"      # datetime→YYYY-MM-DD
+        assert p["closeInfo"]["计划终验时间"] == "2025-07-01"
+        assert p["closeInfo"]["是否正常关闭"] == "是"
+        assert p["team"]["L3_1部门"] == "三部一组"             # 下划线键
+
+    def test_empty_org_no_filter_and_missing_dir(self, tmp_path):
+        d = self._make_closed(tmp_path)
+        assert {p["projectId"] for p in M.build_closed_projects(d, set())} == {"C-1", "C-2"}  # 空清单不过滤
+        assert M.build_closed_projects(str(tmp_path / "none"), {"张三"}) == []                 # 缺目录→[]
+
+    def test_count_consistency(self, tmp_path):
+        import projects as P
+        d = self._make_closed(tmp_path)
+        assert len(M.build_closed_projects(d, {"张三"})) == P.count_closed_dept(d, {"张三"})
