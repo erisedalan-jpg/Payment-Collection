@@ -82,3 +82,19 @@ describe('DataTable wrap 列', () => {
     expect(wrapCell.text()).toContain('剩余货款4个月帐期')
   })
 })
+
+describe('DataTable fixed 列', () => {
+  it('col.fixed 透传到 el-table-column', async () => {
+    const cols: DataColumn[] = [
+      { key: 'a', label: 'A' },
+      { key: 'op', label: '操作', fixed: 'right' },
+    ]
+    const w = mount(DataTable, {
+      props: { columns: cols, rows: [{ a: 1 }] },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    // el-table-column fixed=right 会在表格根渲染 fixed 容器类
+    expect(w.html()).toContain('fixed')
+  })
+})
