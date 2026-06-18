@@ -852,6 +852,10 @@ def main():
     print("[INFO] 构建项目主域(交付实施三部)...")
     dept_projects, projects_quality = projects_mod.load_dept_projects(
         os.path.join(BASE_DIR, "input"), project_pmis, mapping)
+    org_names, _org_l4s, _org_rows = projects_mod.read_org_names(
+        os.path.join(BASE_DIR, "input", config.ORG_FILE))
+    closed_projects = pmis.build_closed_projects(pmis_dir, org_names)
+    print(f"  [OK] 已关闭项目清单 {len(closed_projects)} 个(交付三部)")
     if projects_quality["orgFile"]["provided"]:
         print(f"  [OK] 主域项目 {projects_quality['deptProjectCount']} 个, "
               f"售前已映射 {projects_quality['presaleMapped']}/{projects_quality['presaleTotal']}, "
@@ -930,7 +934,7 @@ def main():
         "meta": {
             "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "totalProjects": len(dept_projects),
-            "totalClosed": projects_quality.get("closedDeptCount", 0),
+            "totalClosed": len(closed_projects),
             "totalPaymentNodes": sum(len(v) for v in payment_nodes.values()),
         },
         "projectOverview": {
@@ -943,6 +947,7 @@ def main():
         "projectPmis": project_pmis,
         "dataQuality": data_quality,
         "projects": dept_projects,
+        "closedProjects": closed_projects,
         "projectsQuality": projects_quality,
         "projectMilestones": project_milestones,
         "paymentRecords": payment_records,
