@@ -95,6 +95,7 @@ class TestDeriveCost:
     def test_zero_budget_ratio_none(self):
         cost = M.derive_cost({"项目总预算（元）": "0", "项目核算（元）": "0"}, {})
         assert cost["消耗比"] is None
+        assert cost["交付超支"] is False
 
 
 class TestDeriveRisk:
@@ -149,7 +150,9 @@ class TestBuildProjectPmis:
             "risk": [{"项目编号": "SS-2", "风险等级": "低", "风险状态": "已识别"}],
         }
         pm = M.build_project_pmis(active, {}, set())
+        # "否" 必须判为 False(而非 None,也不被 "不是" 之类子串误判)
         assert pm["SS-2"]["status"]["是否暂停"] is False
+        # status 表分式分子(3)覆盖 risk 记录推导值(1)
         assert pm["SS-2"]["risk"]["未关闭风险数"] == 3
 
     def test_active_universe_is_center_only(self):
@@ -258,6 +261,7 @@ class TestAssembleTeamAndRisks:
         assert t["L3部门"] == "三部" and t["L3_1部门"] == "三部一组"
         assert t["AR"] == "AR人" and t["SR"] == "SR人" and t["CSR"] == "CSR人"
         assert t["CDR"] == "CDR人" and t["Sponsor"] == "老板"
+        assert set(t.keys()) == {"项目名称", "项目经理", "L4部门", "L3部门", "L3_1部门", "AR", "SR", "CSR", "CDR", "Sponsor"}
 
     def test_customer_signing_unit_and_contract_center_priority(self):
         base_i = {"P1": {"签约单位": "甲方单位", "合同编号": "B-001", "最终客户": "客A",
