@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Project, ProjectPmis } from '@/types/analysis'
-import { buildProjectRows, filterProjectRows, distinctOptions, paymentStatusOf, type ProjectFilters } from './projectList'
+import { buildProjectRows, filterProjectRows, paymentStatusOf, type ProjectFilters } from './projectList'
 
 const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
@@ -74,7 +74,8 @@ describe('buildProjectRows', () => {
   })
 })
 
-const F0: ProjectFilters = { search: '', manager: [], orgL4: [], stage: [], projectStatus: [], riskLevel: [], projectLevel: [], paymentStatus: [], health: [], presale: '', paused: '', overspend: '', tags: [] }
+// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags）
+const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', tags: [] }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -87,42 +88,13 @@ describe('filterProjectRows', () => {
     expect(filterProjectRows(rows, { ...F0, search: '海聚' })).toHaveLength(1)
     expect(filterProjectRows(rows, { ...F0, search: '不存在' })).toHaveLength(0)
   })
-  it('按健康度与售前过滤', () => {
-    expect(filterProjectRows(rows, { ...F0, health: ['关注'] })).toHaveLength(1)
+  it('presale 过滤', () => {
     expect(filterProjectRows(rows, { ...F0, presale: 'yes' })[0].projectId).toBe('QAX-2')
     expect(filterProjectRows(rows, { ...F0, presale: 'no' })[0].projectId).toBe('QABJ-SS-1')
   })
-  it('多选命中:stage 两类 / manager 单选', () => {
-    const multi = buildProjectRows(
-      [proj(), proj({ projectId: 'X3', projectName: '丙', projectManager: '王五' })],
-      { ...PMIS, X3: { progress: { 项目阶段: '项目收尾' } } as unknown as ProjectPmis },
-    )
-    expect(filterProjectRows(multi, { ...F0, stage: ['项目执行', '项目收尾'] })).toHaveLength(2)
-    expect(filterProjectRows(multi, { ...F0, manager: ['何平'] })).toHaveLength(1)
-  })
   it("搜索 '-' 不命中占位字段(客户缺失为 '-')", () => {
-    // X9 行四个搜索字段中只有 customer 占位 '-' 含连字符 → 不应命中
     const only = buildProjectRows([proj({ projectId: 'X9', projectName: '纯中文名' })], {})
     expect(filterProjectRows(only, { ...F0, search: '-' })).toHaveLength(0)
-  })
-})
-
-describe('orgL4 列与筛选(P5.5 用户反馈)', () => {
-  it('build 取 orgL4,filter 按服务组过滤', () => {
-    const rows = buildProjectRows(
-      [proj(), proj({ projectId: 'X2', projectName: '乙', orgL4: 'B组' } as any)],
-      {},
-    )
-    expect(rows[0].orgL4).toBe('小微部')
-    expect(filterProjectRows(rows, { ...F0, orgL4: ['B组'] })).toHaveLength(1)
-    expect(distinctOptions(rows, 'orgL4').sort()).toEqual(['B组', '小微部'])
-  })
-})
-
-describe('distinctOptions', () => {
-  it('去重且剔除空与占位 -', () => {
-    const rows = buildProjectRows([proj(), proj({ projectId: 'NO-PMIS' })], PMIS)
-    expect(distinctOptions(rows, 'stage')).toEqual(['项目执行'])
   })
 })
 
@@ -156,7 +128,6 @@ describe('paused/overspend 扩展(P4 风险焦点行)', () => {
     expect(filterProjectRows(rows, { ...F0, overspend: 'yes' })[0].projectId).toBe('QABJ-SS-1')
   })
   it('[守护] cost.项目超支:true 且不含旧键超支 → overspend=true', () => {
-    // 只含新键项目超支，没有旧键超支，确保旧键回归时此断言失败
     const pmGuard: Record<string, any> = {
       'QABJ-SS-1': { status: {}, cost: { 项目超支: true } },
     }
