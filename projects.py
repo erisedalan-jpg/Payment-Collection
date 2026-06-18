@@ -305,11 +305,9 @@ def compute_projects_quality(projects: List[Dict[str, Any]],
 
 
 def load_dept_projects(input_dir: str, project_pmis: Dict[str, Dict[str, Any]],
-                       all_nodes: List[Dict[str, Any]] = None,
                        mapping: List[Dict[str, str]] = None,
                        ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """读组织架构+delivery → build_projects + 质量。mapping 由调用方先读(9a 也要用)。
-    all_nodes 参数保留默认值以兼容 preprocess 按位置传参(3E-3 过渡期;下个任务删除)。"""
+    """读组织架构+delivery → build_projects + 质量。mapping 由调用方先读(9a 也要用)。"""
     if mapping is None:
         mapping = []
     names, l4s, org_rows = read_org_names(os.path.join(input_dir, config.ORG_FILE))
