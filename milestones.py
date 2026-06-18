@@ -141,3 +141,12 @@ def load_milestones(pmis_dir: str, keep_ids: Set[str]
     merged = dict(closed)
     merged.update(active)
     return merged, stat_a, stat_c
+
+
+def final_acceptance_date(items: List[Dict[str, Any]], project_type: Any) -> Optional[str]:
+    """按项目类型取里程碑计划日:售前服务类→服务完成.planDate,否则→终验.planDate。缺/空→None。"""
+    target = "服务完成" if str(project_type or "").strip() == config.PRESALE_PROJECT_TYPE else "终验"
+    for it in items or []:
+        if it.get("name") == target:
+            return it.get("planDate") or None
+    return None
