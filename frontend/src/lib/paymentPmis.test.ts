@@ -275,7 +275,11 @@ describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
     const { buckets, unknown } = progressBuckets(rows)
     expect(buckets.map((b) => b.key)).toEqual(['已全额回款', '部分回款', '未回款'])
     expect(buckets.map((b) => b.projectCount)).toEqual([1, 1, 1])
-    expect(buckets[1].rate).toBeCloseTo(0.5, 6)
+    // rate = 已回/计划(expectedSum)，B: 50/100 = 0.5
+    expect(buckets[1].rate).toBeCloseTo(50 / 100, 6)
+    expect(buckets[1].expectedSum).toBe(100)
+    // C: actualSum=0, expectedSum=100 → rate=0
+    expect(buckets[2].rate).toBeCloseTo(0 / 100, 6)
     expect(unknown).toBe(1)
   })
 })

@@ -44,8 +44,14 @@ const drillProjects = ref<PayProjectRow[]>([])
 function openTier(tier: string) {
   drillTitle.value = tier
   const filteredPids = new Set(filter.filteredProjects.map((p) => p.projectId))
-  drillProjects.value = projectPaymentRows(data.data?.projects ?? [], data.data?.projectPmis)
-    .filter((r) => r.tier === tier && filteredPids.has(r.projectId))
+  drillProjects.value = projectPaymentRows(
+    data.data?.projects ?? [],
+    data.data?.projectPmis,
+    data.data?.paymentNodes,
+    data.data?.paymentRecords,
+    filter.dateStart,
+    filter.dateEnd,
+  ).filter((r) => r.tier === tier && filteredPids.has(r.projectId))
   drillOpen.value = true
 }
 defineExpose({ drillOpen })
