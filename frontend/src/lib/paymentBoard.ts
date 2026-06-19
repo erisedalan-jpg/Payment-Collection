@@ -18,6 +18,8 @@ export interface PayBoardRow {
   projectManager: string
   dept: string
   stage: string
+  // 遗留维度字段：manager/tier/progress 已从 PAY_BOARD_DIMENSIONS 移除，不可作为分组维度键传入
+  // groupPayBoard；保留此处是为了兼容 BoardDrilldownModal 等既有消费方，请勿新增依赖此三字段的分组逻辑。
   manager: string
   industry: string
   tier: string
@@ -30,6 +32,7 @@ export interface PayBoardRow {
   remainingTotal: number
   delayedCount: number
   paymentRatio: number | null
+  // 遗留字段：projectAmount 与 paymentStatus 同为旧维度退场后保留的冗余字段，仅供既有消费方读取。
   projectAmount: number
   paymentStatus: string
 }
