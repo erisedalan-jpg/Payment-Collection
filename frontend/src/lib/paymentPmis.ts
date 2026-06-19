@@ -264,6 +264,7 @@ export interface ProgressBucket {
   projectCount: number
   contractSum: number
   actualSum: number
+  expectedSum: number
   rate: number | null
 }
 export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucket[]; unknown: number } {
@@ -277,7 +278,8 @@ export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucke
     const grp = map[key] || []
     const contractSum = grp.reduce((s, r) => s + r.contract, 0)
     const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
-    return { key, projectCount: grp.length, contractSum, actualSum, rate: contractSum > 0 ? actualSum / contractSum : null }
+    const expectedSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
+    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: expectedSum > 0 ? actualSum / expectedSum : null }
   })
   return { buckets, unknown }
 }

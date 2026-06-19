@@ -18,6 +18,7 @@ describe('TierStrip', () => {
       paymentNodes: { P1: [
         { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.6, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
       ] },
+      paymentRecords: { P1: { records: [{ amount: 600000, date: '2026-02-01' }] } },
     } as any
     const w = mount(TierStrip, { global: { stubs: { BoardDrilldownModal: true } } })
     expect(w.findAll('.ts-row').length).toBe(3)
@@ -36,6 +37,7 @@ describe('TierStrip', () => {
       paymentNodes: { P1: [
         { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.6, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
       ] },
+      paymentRecords: { P1: { records: [{ amount: 600000, date: '2026-02-01' }] } },
     } as any
     const w = mount(TierStrip, { global: { stubs: { BoardDrilldownModal: true } } })
     await w.findAll('.ts-row')[0].trigger('click')

@@ -24,6 +24,10 @@ const rows = computed(() =>
       excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
     }),
     data.data?.projectPmis ?? {},
+    data.data?.paymentNodes,
+    filter.payRecordsAll,
+    filter.dateStart,
+    filter.dateEnd,
   ),
 )
 const buckets = computed(() => progressBuckets(rows.value))
