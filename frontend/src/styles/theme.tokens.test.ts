@@ -20,23 +20,23 @@ const dark = block('html.dark {')
 describe('theme.css 令牌契约 · :root(浅色)', () => {
   it('结构色(蓝色系基调)', () => {
     expect(root).toContain('--fs-base: 18px')
-    expect(root).toContain('--bg: #eef3f7')
-    expect(root).toContain('--card: #ffffff')
-    expect(root).toContain('--txt: #1e2a33')
-    expect(root).toContain('--accent: #325969')
-    expect(root).toContain('--accent2: #6c8fa9')
-    expect(root).toContain('--highlight: #c8adc4')
+    expect(root).toContain('--bg: #f6f6f0')
+    expect(root).toContain('--card: #fbfbfd')
+    expect(root).toContain('--txt: #121212')
+    expect(root).toContain('--accent: #0d3a69')
+    expect(root).toContain('--accent2: #002fa7')
+    expect(root).toContain('--highlight: #f9d46c')
   })
   it('状态语义色(固定)', () => {
-    expect(root).toContain('--ok: #4e9a7c')
-    expect(root).toContain('--warn: #e0a23b')
-    expect(root).toContain('--danger: #d24d5c')
-    expect(root).toContain('--c-urgent: #e07a4f')
+    expect(root).toContain('--ok: #6ecc54')
+    expect(root).toContain('--warn: #f9d46c')
+    expect(root).toContain('--danger: #c8161d')
+    expect(root).toContain('--c-urgent: #eb5c20')
   })
   it('图表分类色 8 支', () => {
-    expect(root).toContain('--chart-1: #6c8fa9')
-    expect(root).toContain('--chart-5: #d24d5c')
-    expect(root).toContain('--chart-8: #a7c190')
+    expect(root).toContain('--chart-1: #0d3a69')
+    expect(root).toContain('--chart-5: #c8161d')
+    expect(root).toContain('--chart-8: #492d22')
   })
   it('六级字号 rem', () => {
     expect(root).toContain('--fs-1: 0.75rem')
@@ -67,12 +67,12 @@ describe('theme.css 令牌契约 · :root(浅色)', () => {
     for (const t of ['--card2:', '--line2:', '--sub:', '--mut:', '--cyan:',
                      '--c-paid: var(--ok)', '--c-pending: var(--warn)',
                      '--c-remaining: var(--danger)', '--c-delayed: var(--danger)',
-                     '--c-plan:', '--on-accent: #ffffff', '--fs-5:']) {
+                     '--c-plan:', '--on-accent: #fbfbfd', '--fs-5:']) {
       expect(root).toContain(t)
     }
   })
   it('V2:--mut 加深 + 字体/行高/字距令牌', () => {
-    expect(root).toContain('--mut: #62707d;')
+    expect(root).toContain('--mut: #6b6b6b;')
     expect(root).toContain('--font-sans: -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;')
     expect(root).toContain('--lh-tight: 1.15;')
     expect(root).toContain('--lh-dense: 1.4;')
@@ -86,11 +86,11 @@ describe('theme.css 令牌契约 · :root(浅色)', () => {
     expect(root).toContain('--danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);')
     expect(root).toContain('--urgent-bg: color-mix(in srgb, var(--c-urgent) 12%, transparent);')
     expect(root).toContain('--advance-bg: color-mix(in srgb, var(--c-advance) 12%, transparent);')
-    expect(root).toContain('--ok-text: #37745b;')
-    expect(root).toContain('--warn-text: #8a6210;')
-    expect(root).toContain('--danger-text: #b93848;')
-    expect(root).toContain('--urgent-text: #a84b1d;')
-    expect(root).toContain('--advance-text: #066f89;')
+    expect(root).toContain('--ok-text: #2f6b27;')
+    expect(root).toContain('--warn-text: #492d22;')
+    expect(root).toContain('--danger-text: #470125;')
+    expect(root).toContain('--urgent-text: #8a3a18;')
+    expect(root).toContain('--advance-text: #056d6e;')
   })
   it('V2:交互状态层与 z-index 阶梯', () => {
     expect(root).toContain('--hover-tint: color-mix(in srgb, var(--accent) 6%, transparent);')
@@ -104,15 +104,15 @@ describe('theme.css 令牌契约 · :root(浅色)', () => {
 
 describe('theme.css 令牌契约 · html.dark(深色覆盖)', () => {
   it('结构色提亮', () => {
-    expect(dark).toContain('--bg: #0e1a22')
-    expect(dark).toContain('--card: #16262f')
-    expect(dark).toContain('--txt: #e4edf2')
-    expect(dark).toContain('--accent: #6c8fa9')
-    expect(dark).toContain('--accent2: #8fb0c4')
+    expect(dark).toContain('--bg: #0d1117')
+    expect(dark).toContain('--card: #121212')
+    expect(dark).toContain('--txt: #fbfbfd')
+    expect(dark).toContain('--accent: #7891ac')
+    expect(dark).toContain('--accent2: #7e95d2')
   })
   it('状态色 + 阴影(深色)', () => {
-    expect(dark).toContain('--danger: #e0697a')
-    expect(dark).toContain('--ok: #5ba88a')
+    expect(dark).toContain('--danger: #d34947')
+    expect(dark).toContain('--ok: #6ecc54')
     expect(dark).toContain('--shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3)')
   })
   it('V2:暗色三态(淡底 16%;ok/danger 文字提亮,其余用本色)', () => {
@@ -121,9 +121,9 @@ describe('theme.css 令牌契约 · html.dark(深色覆盖)', () => {
     expect(dark).toContain('--danger-bg: color-mix(in srgb, var(--danger) 16%, transparent);')
     expect(dark).toContain('--urgent-bg: color-mix(in srgb, var(--c-urgent) 16%, transparent);')
     expect(dark).toContain('--advance-bg: color-mix(in srgb, var(--c-advance) 16%, transparent);')
-    expect(dark).toContain('--ok-text: #7dbfa3;')
+    expect(dark).toContain('--ok-text: #8fd97a;')
     expect(dark).toContain('--warn-text: var(--warn);')
-    expect(dark).toContain('--danger-text: #ea8b99;')
+    expect(dark).toContain('--danger-text: #e8918f;')
     expect(dark).toContain('--urgent-text: var(--c-urgent);')
     expect(dark).toContain('--advance-text: var(--c-advance);')
   })
