@@ -175,7 +175,7 @@ function buildPaySeries(rows: PayNodeRow[], keyOf: (planMonth: string) => string
     TIER_KEYS.forEach((t) => { if (byTier[t][k] === undefined) byTier[t][k] = 0 })
   }
   const categories = Object.keys(catSet).sort()
-  return { categories, series: TIER_KEYS.map((t) => ({ tier: t, data: categories.map((c) => byTier[t][c] || 0) })) }
+  return { categories, series: TIER_KEYS.map((t) => ({ tier: t, data: categories.map((c) => Math.round(byTier[t][c] || 0)) })) }
 }
 
 export function payQuarterlyTrend(rows: PayNodeRow[], start: string, end: string): PeriodSeries {
