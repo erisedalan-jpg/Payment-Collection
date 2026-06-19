@@ -32,7 +32,7 @@ const rows = computed(() => {
 })
 
 const COLUMNS: DataColumn[] = [
-  { key: 'value', label: 'L4组', width: 130 },
+  { key: 'value', label: 'L4组', width: 130, sortable: true },
   { key: 'projectCount', label: '项目数', width: 84, sortable: true },
   { key: 'contractSum', label: '合同额(万)', width: 110, sortable: true, formatter: (v) => fmtWan(v as number) },
   { key: 'actualSum', label: '已回款(万)', width: 110, sortable: true, formatter: (v) => fmtWan(v as number) },

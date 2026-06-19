@@ -103,23 +103,63 @@ describe('PaymentL4Table', () => {
     expect(text).toContain('组B')
   })
 
-  it('sortable 列在列定义中标记正确（10 列可排序）', () => {
+  it('sortable 列在列定义中标记正确（11 列全可排序）', async () => {
     seed()
     useFilterStore().setPreset('all')
-    // 直接检验组件内 COLUMNS 结构：通过挂载并检查列数
-    const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
-    // DataTable 将 sortable 透传给 el-table-column，此处断言组件正常渲染（间接验证列配置无误）
-    expect(w.exists()).toBe(true)
-  })
-
-  it('区间联动：setPreset(year) 后数据正常渲染', async () => {
-    seed()
-    const filter = useFilterStore()
-    filter.setPreset('year')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
-    // 在年度区间内，数据应能渲染（不崩溃，有行或空态）
-    expect(w.exists()).toBe(true)
+    // el-table-column 携带 sortable 时会在表头渲染 .caret-wrapper 元素；
+    // 若把 COLUMNS 中任意列的 sortable 删除，此处断言即变红。
+    const carets = w.findAll('.caret-wrapper')
+    // 11 列全部标记 sortable → 11 个排序角标
+    expect(carets.length).toBe(11)
+  })
+
+  it('区间联动：setPreset(all) 与 setPreset(year) 下数据行不同', async () => {
+    // seed() 中所有节点/流水日期均在 2026，无法体现区间变化。
+    // 追加 P3（orgL4='组A'），其节点和流水仅在 2025，在 year(2026) 区间内应被过滤掉。
+    seed()
+    const dataStore = useDataStore()
+    // seed() 保证 data 及其子字段已填充；用 any 绕过可选字段的 TS 收窄
+    const d = dataStore.data as any
+    d.projects.push({
+      projectId: 'P3',
+      projectName: '项目丙',
+      projectManager: '王五',
+      orgL4: '组A',
+      paymentPmis: {
+        contract: 500_000,
+        actualTotal: 500_000,
+        paymentRatio: 1,
+        expectedTotal: 500_000,
+        nodeCount: 1,
+        reachedCount: 1,
+        delayedCount: 0,
+        fromOrigin: false,
+      },
+    })
+    d.paymentNodes['P3'] = [
+      { stage: '预付款', planDate: '2025-06-01', actualDate: '2025-06-10', payRatio: 1, actualRatio: 1, expectedPayment: 500_000, receivedAmount: 500_000, unpaidAmount: 0, status: '已回款' },
+    ]
+    d.paymentRecords['P3'] = { records: [{ date: '2025-06-10', amount: 500_000 }] }
+
+    const filter = useFilterStore()
+
+    // all 区间：P3 的节点被统计进 组A
+    filter.setPreset('all')
+    const wAll = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    // 取 组A 行的文本（包含 actualSum 与 nodeSum 汇总数字）
+    const textAll = wAll.text()
+
+    // year(2026) 区间：P3 仅有 2025 节点/流水，应被排除 → 组A 行数值更小
+    filter.setPreset('year')
+    const wYear = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const textYear = wYear.text()
+
+    // 两个区间渲染出的表格文本必须不同（P3 的 2025 数据在 year 下消失）
+    expect(textAll).not.toBe(textYear)
   })
 
   it('空数据显示空态提示', async () => {
