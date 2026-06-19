@@ -39,28 +39,64 @@ describe('filterPayNodes', () => {
 
 describe('payDashSummary', () => {
   const rows = [
-    node({ projectId: 'P1', expectedPayment: 1000, receivedAmount: 600, unpaidAmount: 400, status: '部分回款' }),
-    node({ projectId: 'P2', expectedPayment: 500, receivedAmount: 0, unpaidAmount: 500, status: '延期' }),
+    node({ projectId: 'P1', expectedPayment: 1000, receivedAmount: 600, unpaidAmount: 400, status: '部分回款', planDate: '2026-02-01' }),
+    node({ projectId: 'P2', expectedPayment: 500, receivedAmount: 0, unpaidAmount: 500, status: '延期', planDate: '2026-08-01' }),
   ]
   const projects = [{ projectId: 'P1', orgL4: 'A组', projectManager: '张三' }, { projectId: 'P2', orgL4: 'B组', projectManager: '李四' }] as any
   const opts = { viewMode: 'global' as const, viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} }
-  it('金额/完成率/延期项目/项目数', () => {
-    const s = payDashSummary(rows, projects, opts)
+  // paymentRecords: P1 有流水 700, P2 有流水 200
+  const paymentRecords = {
+    P1: { records: [{ date: '2026-02-10', amount: 700 }] },
+    P2: { records: [{ date: '2026-08-05', amount: 200 }] },
+  } as any
+  // paymentNodes: 与 rows planDate 对应
+  const paymentNodes = {
+    P1: [{ planDate: '2026-02-01', expectedPayment: 1000, unpaidAmount: 400, reached: false, status: '部分回款' }],
+    P2: [{ planDate: '2026-08-01', expectedPayment: 500, unpaidAmount: 500, reached: false, status: '延期' }],
+  } as any
+
+  it('全部口径: 已回款=Σ全流水(inScope), 完成率=totalActual/totalExpected, 延期项目/relatedNodeCount', () => {
+    const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '', '')
     expect(s.relatedNodeCount).toBe(2)
-    expect(s.totalProjects).toBe(2)
-    expect(s.totalActual).toBe(600)
-    expect(s.totalExpected).toBe(1500)
-    expect(s.totalRemaining).toBe(900)
-    expect(s.rate).toBeCloseTo(0.4)
+    expect(s.totalActual).toBe(900)           // P1:700 + P2:200
+    expect(s.totalExpected).toBe(1500)        // 来自 rows
+    expect(s.totalRemaining).toBe(900)        // 来自 rows
+    expect(s.rate).toBeCloseTo(900 / 1500)    // 流水/计划
     expect(s.delayedProjects).toBe(1)
+    // 全部下两个项目均有活动
+    expect(s.totalProjects).toBe(2)
   })
+
+  it('区间口径: start/end 过滤, 已回款只计区间内流水, 项目数=有活动项目', () => {
+    // 区间 2026-01-01~2026-06-30: P1 流水(2026-02-10)在内, P2 流水(2026-08-05)不在
+    const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '2026-01-01', '2026-06-30')
+    expect(s.totalActual).toBe(700)           // 只有 P1 的流水
+    expect(s.totalProjects).toBe(1)           // 只有 P1 有活动(节点 planDate 2026-02-01 在区间内)
+  })
+
+  it('全部口径不变式: start=end="" 时 totalActual=Σ全流水(inScope)', () => {
+    const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '', '')
+    expect(s.totalActual).toBe(900)
+    expect(s.rate).toBeCloseTo(s.totalActual / s.totalExpected)
+  })
+
+  it('无 paymentRecords 时 totalActual=0', () => {
+    const s = payDashSummary(rows, projects, opts, undefined, undefined, '', '')
+    expect(s.totalActual).toBe(0)
+    expect(s.rate).toBe(0)
+  })
+
   it('totalProjects 排除 orgL4 空项目', () => {
-    const projects = [
+    const p2 = [
       { projectId: 'A', projectName: 'a', orgL4: '组1' } as any,
       { projectId: 'X', projectName: 'x', orgL4: '' } as any,
     ]
-    const opts = { viewMode: 'global', viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} } as any
-    expect(payDashSummary([], projects, opts).totalProjects).toBe(1)
+    const opts2 = { viewMode: 'global', viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} } as any
+    // 全部口径, 无活动(paymentRecords/paymentNodes 均空), 只有 A(orgL4非空) 在 inScope
+    // start=end='' 下 hasActivityInRange 对空 nodes/records 返回 false => totalProjects=0
+    expect(payDashSummary([], p2, opts2, {}, {}, '', '').totalProjects).toBe(0)
+    // inScope 仍有 1 个项目(A), 只是无活动
+    expect(payDashSummary([], p2, opts2).relatedNodeCount).toBe(0)
   })
 })
 
