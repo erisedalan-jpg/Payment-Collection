@@ -93,21 +93,27 @@ export interface OrgRank {
   achievementRate: number
 }
 
-/** 服务组(dept)达成排名。sortBy: 'actualTotal' | 'achievementRate'。降序全量(组件自行 slice)。 */
-export function payOrgRanking(rows: PayNodeRow[], sortBy: 'actualTotal' | 'achievementRate'): OrgRank[] {
+/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款=Σ流水(到账日∈R)；达成率=已回/计划。sortBy 降序全量(组件自行 slice)。 */
+export function payOrgRanking(
+  projects: Project[],
+  paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
+  paymentRecords: Record<string, PaymentRecordsEntry> | undefined,
+  start: string,
+  end: string,
+  sortBy: 'actualTotal' | 'achievementRate',
+): OrgRank[] {
   const m: Record<string, OrgRank> = {}
-  for (const r of rows) {
-    const org = r.dept || '未指定'
+  for (const p of projects) {
+    const org = (p.orgL4 ?? '').trim() || '未指定'
     if (!m[org]) m[org] = { org, expectedTotal: 0, actualTotal: 0, actualTotalWan: 0, achievementRate: 0 }
-    m[org].expectedTotal += r.expectedPayment
-    m[org].actualTotal += r.receivedAmount
+    for (const n of paymentNodes?.[p.projectId] ?? []) {
+      if (inRange(n.planDate || '', start, end)) m[org].expectedTotal += Number(n.expectedPayment ?? 0)
+    }
+    m[org].actualTotal += actualInRange(paymentRecords?.[p.projectId]?.records, start, end)
   }
-  const list = Object.values(m).map((o) => ({
-    ...o,
-    achievementRate: o.expectedTotal > 0 ? o.actualTotal / o.expectedTotal : 0,
-    actualTotalWan: o.actualTotal / 10000,
-  }))
-  return list.sort((a, b) => b[sortBy] - a[sortBy])
+  return Object.values(m)
+    .map((o) => ({ ...o, achievementRate: o.expectedTotal > 0 ? o.actualTotal / o.expectedTotal : 0, actualTotalWan: o.actualTotal / 10000 }))
+    .sort((a, b) => b[sortBy] - a[sortBy])
 }
 
 export interface PeriodSeries {

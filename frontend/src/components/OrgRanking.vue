@@ -2,12 +2,15 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFilterStore } from '@/stores/filter'
+import { useDataStore } from '@/stores/data'
 import { payOrgRanking } from '@/lib/payDashboard'
+import { filterProjects } from '@/lib/paymentPmis'
 import { goBoard } from '@/lib/navContext'
 import { fmtWan, pct } from '@/lib/format'
 import SegToggle from './SegToggle.vue'
 
 const filter = useFilterStore()
+const data = useDataStore()
 const router = useRouter()
 const sortBy = ref('actualTotal')
 const SORT_OPTS = [
@@ -15,9 +18,23 @@ const SORT_OPTS = [
   { value: 'achievementRate', label: '达成率' },
 ]
 
-const ranked = computed(() =>
-  payOrgRanking(filter.filteredPayNodes, sortBy.value as 'actualTotal' | 'achievementRate').slice(0, 8),
-)
+const ranked = computed(() => {
+  const projects = filterProjects(data.data?.projects ?? [], {
+    viewMode: filter.viewMode,
+    viewL4: filter.viewL4,
+    viewPM: filter.viewPM,
+    excludeActive: filter.excludeOn,
+    excludedIds: filter.excludedIds,
+  })
+  return payOrgRanking(
+    projects,
+    data.data?.paymentNodes,
+    filter.payRecordsAll,
+    filter.dateStart,
+    filter.dateEnd,
+    sortBy.value as 'actualTotal' | 'achievementRate',
+  ).slice(0, 8)
+})
 const maxActual = computed(() => Math.max(1, ...ranked.value.map((o) => o.actualTotal)))
 
 function rateColor(r: number): string {
