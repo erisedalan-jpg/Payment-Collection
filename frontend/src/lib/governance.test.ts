@@ -6,7 +6,7 @@ function makeData(over: Record<string, any> = {}): AnalysisData {
   return {
     meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
     dashboard: {}, summary: {}, projectOverview: {},
-    projects: [{ projectId: 'P-1' }],
+    projects: [{ projectId: 'P-1', orgL4: '交付一组' }],
     rawNodes: [{ projectId: 'P-1', tier: '100万以上', isPaymentRelated: true }],
     dataQuality: {
       summary: { pmisProvided: true, joinRate: 0.95, matchedActive: 8, matchedClosed: 2, unmatched: 0, lastPmisUpdate: '2026-06-11' },
@@ -131,10 +131,22 @@ describe('buildHealthReport', () => {
     expect(r.sources.find((s) => s.key === 'pmis')!.subs[0]).toContain('主题 1/2 可用')
   })
 
-  it('导出文件名只挂在指定四类目', () => {
+  it('导出文件名只挂在指定五类目', () => {
     const r = buildHealthReport(makeData())
     expect(r.alerts.filter((a) => a.exportName).map((a) => a.key).sort())
-      .toEqual(['backfill', 'managerNotInOrg', 'presaleUnmapped', 'unmatched'])
+      .toEqual(['backfill', 'l4Missing', 'managerNotInOrg', 'presaleUnmapped', 'unmatched'])
+  })
+
+  it('orgL4 空项目进 l4Missing 告警组', () => {
+    const data = { projects: [
+      { projectId: 'WSGF-SS-202604169018', projectName: '甲', orgL4: '' },
+      { projectId: 'P2', projectName: '乙', orgL4: '交付一组' },
+    ] } as any
+    const r = buildHealthReport(data)
+    const g = r.alerts.find((a) => a.key === 'l4Missing')
+    expect(g).toBeTruthy()
+    expect(g!.count).toBe(1)
+    expect((g!.rows[0] as any).projectId).toBe('WSGF-SS-202604169018')
   })
 
   it('R1 新源四卡:就绪计 9 卡', () => {

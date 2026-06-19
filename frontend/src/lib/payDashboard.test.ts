@@ -51,6 +51,14 @@ describe('payDashSummary', () => {
     expect(s.rate).toBeCloseTo(0.4)
     expect(s.delayedProjects).toBe(1)
   })
+  it('totalProjects 排除 orgL4 空项目', () => {
+    const projects = [
+      { projectId: 'A', projectName: 'a', orgL4: '组1' } as any,
+      { projectId: 'X', projectName: 'x', orgL4: '' } as any,
+    ]
+    const opts = { viewMode: 'global', viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} } as any
+    expect(payDashSummary([], projects, opts).totalProjects).toBe(1)
+  })
 })
 
 describe('payTierStats', () => {
