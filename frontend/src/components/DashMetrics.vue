@@ -19,11 +19,11 @@ const metrics = computed(() => {
   const s = summary.value
   return [
     { k: '项目数', v: String(s.totalProjects), cls: '' },
-    { k: '回款节点', v: String(s.relatedNodeCount), cls: '' },
+    { k: '回款节点数', v: String(s.relatedNodeCount), cls: '' },
     { k: '已回款(万)', v: fmtWan(s.totalActual), cls: 'paid' },
     { k: '待回款(万)', v: fmtWan(s.totalRemaining), cls: 'remain' },
     { k: '完成率', v: pct(s.rate), cls: s.rate >= 0.8 ? 'paid' : s.rate >= 0.5 ? 'pending' : 'danger' },
-    { k: '延期', v: String(s.delayedProjects), cls: 'danger' },
+    { k: '延期项目数', v: String(s.delayedProjects), cls: 'danger' },
   ]
 })
 </script>

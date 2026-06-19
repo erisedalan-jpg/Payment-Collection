@@ -103,7 +103,7 @@ export const INSIGHT_METRICS: InsightMetricDef[] = [
   { key: 'avgProgress', label: '平均完工', kind: 'rate' },
   { key: 'avgCostRatio', label: '平均消耗比', kind: 'rate' },
   { key: 'paymentRatio', label: '回款完成率', kind: 'rate' },
-  { key: 'delayedProjects', label: '延期项目', kind: 'count' },
+  { key: 'delayedProjects', label: '延期项目数', kind: 'count' },
 ]
 
 export const INSIGHT_METRIC_BY_KEY: Record<string, InsightMetricDef> = Object.fromEntries(
