@@ -11,7 +11,7 @@ vi.mock('vue-router', () => ({
   RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
 }))
 
-const TAB_STUBS = { BoardView: true, ProjectsOverviewTab: true, TierNodesTab: true, PlanTab: true, RiskTab: true }
+const TAB_STUBS = { BoardView: true, PayProjectsView: true, PayNodesView: true, PayPlanView: true, PayRiskView: true }
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); routeTab = 'board' })
 
@@ -48,21 +48,21 @@ describe('PayAnalysisView', () => {
     expect(w.text()).toContain('部门')
     expect(w.text()).toContain('金额档')
     expect(w.text()).toContain('进度态')
-    expect(w.findComponent({ name: 'ProjectsOverviewTab' }).exists()).toBe(true)
+    expect(w.findComponent({ name: 'PayProjectsView' }).exists()).toBe(true)
   })
 
   it('nodes tab 分发 TierNodesTab 且维度选择器显示', () => {
     seed()
     routeTab = 'nodes'
     const w = mount(PayAnalysisView, { global: { stubs: TAB_STUBS } })
-    expect(w.findComponent({ name: 'TierNodesTab' }).exists()).toBe(true)
+    expect(w.findComponent({ name: 'PayNodesView' }).exists()).toBe(true)
     expect(w.text()).toContain('维度')
   })
 
   it('plan / risk tab 分发到对应组件', () => {
     seed(); routeTab = 'plan'
-    expect(mount(PayAnalysisView, { global: { stubs: TAB_STUBS } }).findComponent({ name: 'PlanTab' }).exists()).toBe(true)
+    expect(mount(PayAnalysisView, { global: { stubs: TAB_STUBS } }).findComponent({ name: 'PayPlanView' }).exists()).toBe(true)
     seed(); routeTab = 'risk'
-    expect(mount(PayAnalysisView, { global: { stubs: TAB_STUBS } }).findComponent({ name: 'RiskTab' }).exists()).toBe(true)
+    expect(mount(PayAnalysisView, { global: { stubs: TAB_STUBS } }).findComponent({ name: 'PayRiskView' }).exists()).toBe(true)
   })
 })
