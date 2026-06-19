@@ -133,5 +133,6 @@ describe('BoardView', () => {
     const w = mount(BoardView, opts)
     const rows = w.findComponent(DataTable).props('rows') as Array<Record<string, any>>
     expect(rows.some((r) => r.key === '北京')).toBe(true) // dept 分组
+    expect((w.vm as any).dimKey).toBe('dept') // orgL4 别名解析为 dept
   })
 })

@@ -101,7 +101,7 @@ const chartOption = computed(() => {
       { name: '已回款', type: 'bar', stack: 'a', data: paid, itemStyle: { color: sc.ok }, label: { show: true, position: 'inside' } },
       { name: '待回款', type: 'bar', stack: 'a', data: pending, itemStyle: { color: sc.warn }, label: { show: true, position: 'inside' } },
       // 透明总计 series: 0 高、不入 legend，顶部显示 已回+待回 总计（ECharts 堆叠柱无内建总计）
-      { name: '总计', type: 'bar', stack: 'a', data: total.map(() => 0), itemStyle: { color: 'transparent' },
+      { name: '总计', type: 'bar', stack: 'a', data: new Array(t.length).fill(0), itemStyle: { color: 'transparent' },
         tooltip: { show: false }, label: { show: true, position: 'top', formatter: (p: { dataIndex: number }) => String(total[p.dataIndex]) } },
     ],
   }
@@ -165,7 +165,7 @@ function onPivotCellClick({ rowKey, colKey }: { rowKey: string; colKey: string }
   const g = pivot.value?.index[rowKey]?.[colKey]
   if (g) openDrill(g)
 }
-defineExpose({ drillOpen })
+defineExpose({ drillOpen, dimKey })
 </script>
 
 <template>
