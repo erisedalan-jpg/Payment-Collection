@@ -1,5 +1,7 @@
-import type { Project, ProjectPmis } from '@/types/analysis'
+import type { Project, ProjectPmis, PaymentRecordsEntry } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
+import { isAnomalous } from './anomaly'
+import { inRange, actualInRange } from './paymentRange'
 
 // 项目总览(/)的纯计算层(spec 4.1)。两套口径:KPI 用主域 projects[] 聚合;
 // 回款重点带与 /payment 同口径(全部门 isPaymentRelated 节点)——微块点击钻的就是 /payment。
@@ -13,6 +15,7 @@ export interface OverviewKpis {
   paymentRatio: number | null
 }
 
+/** 回款达成率:分子=流水 Σ actualTotal(排除异常)，分母=计划 Σ expectedTotal(排除异常)。 */
 export function computeKpis(projects: Project[], pmisMap: Record<string, ProjectPmis>): OverviewKpis {
   let active = 0
   let paused = 0
@@ -26,8 +29,11 @@ export function computeKpis(projects: Project[], pmisMap: Record<string, Project
     if (m.status?.是否暂停 === true) paused++
     if (m.cost?.项目超支 === true) overspend++
     if (p.health?.riskAbnormal) highRisk++
-    exp += p.payment?.expectedTotal ?? 0
-    act += p.payment?.actualTotal ?? 0
+    // 回款达成率排除异常项目
+    if (!isAnomalous(p)) {
+      exp += p.payment?.expectedTotal ?? 0
+      act += p.payment?.actualTotal ?? 0
+    }
   }
   return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: exp > 0 ? act / exp : null }
 }
@@ -75,27 +81,57 @@ function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** 回款重点带——now 注入便于测试;收款阶段节点级口径(计划=expectedPayment/已收=receivedAmount/未收=unpaidAmount/状态5态)。 */
-export function paymentBand(rows: PayNodeRow[], now: Date): PaymentBand {
+/** 回款重点带——now 注入便于测试;收款阶段节点级口径。
+ * paymentRecords/start/end 可选:传入时 yearActual=Σ流水∈[start,end]；全部(start=end='')时含空日期记录。
+ * 计划侧(yearExpected/monthPending/delayedTop)按 inRange(planDate,start,end) 过滤；全部时含空计划日节点。*/
+export function paymentBand(
+  rows: PayNodeRow[],
+  now: Date,
+  paymentRecords?: Record<string, PaymentRecordsEntry>,
+  start = '',
+  end = '',
+): PaymentBand {
   const year = String(now.getFullYear())
   const month = isoDate(now).slice(0, 7)
   const today = isoDate(now)
   const until = isoDate(new Date(now.getTime() + 7 * 86400000))
 
-  let yearExpected = 0
+  // 计划侧区间判断：若有日期区间则用 inRange；否则退化到年度前缀匹配
+  const hasRange = !!(start || end)
+  const planInScope = (planDate: string): boolean =>
+    hasRange ? inRange(planDate, start, end) : planDate.startsWith(year)
+
+  // yearActual：若传入 paymentRecords 则按流水∈区间求和，否则退化节点 receivedAmount 之和
   let yearActual = 0
+  if (paymentRecords) {
+    // 按项目 id 去重求和（rows 含多节点，流水应按项目级聚合）
+    const seen = new Set<string>()
+    for (const n of rows) {
+      if (!seen.has(n.projectId)) {
+        seen.add(n.projectId)
+        yearActual += actualInRange(paymentRecords[n.projectId]?.records, start, end)
+      }
+    }
+  } else {
+    for (const n of rows) {
+      if (planInScope(String(n.planDate ?? ''))) {
+        yearActual += n.receivedAmount
+      }
+    }
+  }
+
+  let yearExpected = 0
   let monthPending = 0
   let dueSoon7 = 0
   const delayed: DelayedTopItem[] = []
   for (const n of rows) {
     const plan = String(n.planDate ?? '')
-    if (plan.startsWith(year)) {
+    if (planInScope(plan)) {
       yearExpected += n.expectedPayment
-      yearActual += n.receivedAmount
     }
     if (plan.slice(0, 7) === month) monthPending += n.unpaidAmount
     if (plan >= today && plan <= until && n.status !== '已回款') dueSoon7++
-    if (n.status === '延期') {
+    if (n.status === '延期' && planInScope(plan)) {
       delayed.push({ projectId: n.projectId, projectName: n.projectName, stage: n.stage, remaining: n.unpaidAmount })
     }
   }
