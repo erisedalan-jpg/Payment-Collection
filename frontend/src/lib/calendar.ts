@@ -1,4 +1,6 @@
 import type { PayNodeRow } from './paymentPmis'
+import type { Paymentrecords } from '@/types/analysis'
+import { actualInRange } from './paymentRange'
 
 /** 排除已回款节点(日历只关心未结清的)。 */
 export function calExcludePaid(nodes: PayNodeRow[]): PayNodeRow[] {
@@ -29,11 +31,16 @@ export function applyCalFilters(nodes: PayNodeRow[], f: CalFilters): PayNodeRow[
 }
 
 export interface CalDashboard { mRemaining: number; mActual: number; upcoming7: number; mCount: number; delayed: number }
-/** 当月(now 月)待回款=Σ未收/已回款=Σ已收/笔数；延期=count(延期)；upcoming7=planDate 距今 0..7 天且未结清。 */
-export function calDashboardStats(nodes: PayNodeRow[], f: CalFilters, now: Date): CalDashboard {
+/** 当月(now 月)待回款=Σ未收/已回款=流水到账Σ/笔数；延期=count(延期)；upcoming7=planDate 距今 0..7 天且未结清。 */
+export function calDashboardStats(nodes: PayNodeRow[], f: CalFilters, now: Date, paymentRecords?: Paymentrecords): CalDashboard {
   const ns = applyCalFilters(nodes.filter((n) => n.planDate), f)
   const nowY = now.getFullYear(), nowM = now.getMonth()
-  let mRem = 0, mAct = 0, mCnt = 0, up = 0, del = 0
+  const MM = String(nowM + 1).padStart(2, '0')
+  const monthStart = `${nowY}-${MM}-01`
+  const lastDay = new Date(nowY, nowM + 1, 0).getDate()
+  const monthEnd = `${nowY}-${MM}-${String(lastDay).padStart(2, '0')}`
+  let mRem = 0, mCnt = 0, up = 0, del = 0
+  const seenPids = new Set<string>()
   for (const n of ns) {
     const pd = n.planDate
     if (!pd || pd.length < 10) continue
@@ -41,7 +48,11 @@ export function calDashboardStats(nodes: PayNodeRow[], f: CalFilters, now: Date)
     const diff = Math.ceil((new Date(pd.substring(0, 10)).getTime() - now.getTime()) / 86400000)
     if (diff >= 0 && diff <= 7 && n.status !== '已回款') up++
     if (n.status === '延期') del++
-    if (py === nowY && pmo === nowM) { mCnt++; mRem += n.unpaidAmount; mAct += n.receivedAmount }
+    if (py === nowY && pmo === nowM) { mCnt++; mRem += n.unpaidAmount; seenPids.add(n.projectId) }
+  }
+  let mAct = 0
+  for (const pid of seenPids) {
+    mAct += actualInRange(paymentRecords?.[pid]?.records, monthStart, monthEnd)
   }
   return { mRemaining: mRem, mActual: mAct, upcoming7: up, mCount: mCnt, delayed: del }
 }

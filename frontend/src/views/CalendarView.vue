@@ -54,7 +54,7 @@ const filtered = computed(() =>
   baseNodes.value.filter((n) => inRange(n.planDate || '', filter.dateStart, filter.dateEnd)))
 
 const options = computed(() => calFilterOptions(filtered.value))
-const dashboard = computed(() => calDashboardStats(filtered.value, calFilters.value, new Date()))
+const dashboard = computed(() => calDashboardStats(filtered.value, calFilters.value, new Date(), data.data?.paymentRecords))
 const gridNodes = computed(() => applyCalFilters(calExcludePaid(filtered.value), calFilters.value))
 const gridDateData = computed(() => calDateData(gridNodes.value))
 const yearHeat = computed(() => calYearHeat(gridNodes.value, state.year))
