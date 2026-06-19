@@ -165,7 +165,7 @@ async function doExport() {
             </el-tooltip><ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>
         </template>
         <template #cell-projectName="{ row }">
-          {{ row.projectName }}<span v-if="row.hasClosed" class="pv-origin">原项目*</span>
+          {{ row.projectName }}<span v-if="row.hasClosed" class="pv-origin">原项目*</span><span v-if="row.isAnomalous" class="pv-anomaly" title="服务组 L4 缺失，回款看板不统计">数据异常</span>
         </template>
         <template #cell-health="{ row }">
           <HealthBadge :overall="row.health" />
@@ -208,6 +208,7 @@ async function doExport() {
 .pv-scroll { overflow-x: auto; }
 .pv-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .pv-origin { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); }
+.pv-anomaly { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--warn-bg); color: var(--warn-text); }
 .pv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .pv-tags { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .pv-tag { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 2px var(--sp-3); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); font-weight: 600; }

@@ -260,4 +260,23 @@ describe('ProjectsView', () => {
     await flushPromises()
     expect(w.find('.pv-scroll').exists()).toBe(true)
   })
+
+  it('orgL4 空项目渲染「数据异常」标记，正常项目不渲染', async () => {
+    const ds = useDataStore()
+    ds.data = {
+      meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
+      naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+      projects: [
+        { projectId: 'NORMAL', projectName: '正常项目', projectManager: '甲', orgL4: 'A组', isPresale: false, relatedClosedId: '',
+          payment: { relatedNodeCount: 1, expectedTotal: 100, actualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 }, health: { overall: '健康' } },
+        { projectId: 'WSGF-SS-202604169018', projectName: '异常项目', projectManager: '乙', orgL4: '', isPresale: false, relatedClosedId: '',
+          payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }, health: { overall: '关注' } },
+      ],
+      projectPmis: {},
+    } as any
+    const w = mountView()
+    await flushPromises()
+    expect(w.text()).toContain('数据异常')
+    expect(w.findAll('.pv-anomaly').length).toBe(1)
+  })
 })
