@@ -10,30 +10,30 @@
   --font-sans: -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
 
   /* 调色板 · 结构色（浅色，蓝色系基调） */
-  --bg: #eef3f7;
-  --card: #ffffff;
-  --card2: #f6f9fb;
-  --line: #dde6ee;
-  --line2: #cddae2;
-  --txt: #1e2a33;
-  --sub: #4a5b68;
-  --mut: #62707d;
-  --accent: #325969;
-  --accent2: #6c8fa9;
-  --highlight: #c8adc4;
-  --cyan: #0891b2;
-  --on-accent: #ffffff;
+  --bg: #f6f6f0;
+  --card: #fbfbfd;
+  --card2: #f1f1ef;
+  --line: #e4e4e2;
+  --line2: #d4d4d2;
+  --txt: #121212;
+  --sub: #474747;
+  --mut: #6b6b6b;
+  --accent: #0d3a69;
+  --accent2: #002fa7;
+  --highlight: #f9d46c;
+  --cyan: #018b8d;
+  --on-accent: #fbfbfd;
 
   /* 状态语义色（固定，不随基调变） */
-  --ok: #4e9a7c;
-  --warn: #e0a23b;
-  --danger: #d24d5c;
+  --ok: #6ecc54;
+  --warn: #f9d46c;
+  --danger: #c8161d;
   --c-paid: var(--ok);
   --c-pending: var(--warn);
   --c-remaining: var(--danger);
   --c-delayed: var(--danger);
-  --c-plan: #6c8fa9;        /* 计划回款 */
-  --c-urgent: #e07a4f;
+  --c-plan: #002fa7;        /* 计划回款 */
+  --c-urgent: #eb5c20;
   --c-advance: var(--cyan); /* 可提前(原 --cyan 收编,旧名保留兼容) */
 
   /* 状态三态(V2):填充=上方本色;淡底 12% 自适应底色;文字深字达 4.5:1 */
@@ -42,21 +42,21 @@
   --danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
   --urgent-bg: color-mix(in srgb, var(--c-urgent) 12%, transparent);
   --advance-bg: color-mix(in srgb, var(--c-advance) 12%, transparent);
-  --ok-text: #37745b;
-  --warn-text: #8a6210;
-  --danger-text: #b93848;
-  --urgent-text: #a84b1d;
-  --advance-text: #066f89;
+  --ok-text: #2f6b27;
+  --warn-text: #492d22;
+  --danger-text: #470125;
+  --urgent-text: #8a3a18;
+  --advance-text: #056d6e;
 
   /* 图表分类色（8 支，源自 5 套基调） */
-  --chart-1: #6c8fa9;
-  --chart-2: #b484b0;
-  --chart-3: #417a64;
-  --chart-4: #886441;
-  --chart-5: #d24d5c;
-  --chart-6: #c8adc4;
-  --chart-7: #fec187;
-  --chart-8: #a7c190;
+  --chart-1: #0d3a69;
+  --chart-2: #eb5c20;
+  --chart-3: #018b8d;
+  --chart-4: #f9d46c;
+  --chart-5: #c8161d;
+  --chart-6: #71e2d1;
+  --chart-7: #6ecc54;
+  --chart-8: #492d22;
 
   /* 字号 rem 令牌（随 --fs-base 缩放；px 标注 @16基准，当前默认中=18 整体 ×1.125） */
   --fs-1: 0.75rem;   /* 12 角标/标签/列头 */
@@ -126,25 +126,25 @@
 
 html.dark {
   /* 结构色（深色） */
-  --bg: #0e1a22;
-  --card: #16262f;
-  --card2: #11212a;
-  --line: #253a47;
-  --line2: #2f4756;
-  --txt: #e4edf2;
-  --sub: #a7bac7;
-  --mut: #8295a3;
-  --accent: #6c8fa9;
-  --accent2: #8fb0c4;
-  --highlight: #c8adc4;
-  --cyan: #22d3ee;
+  --bg: #0d1117;
+  --card: #121212;
+  --card2: #1b1b20;
+  --line: #272b31;
+  --line2: #343a44;
+  --txt: #fbfbfd;
+  --sub: #bcbec1;
+  --mut: #8b8e93;
+  --accent: #7891ac;
+  --accent2: #7e95d2;
+  --highlight: #f9d46c;
+  --cyan: #71e2d1;
 
   /* 状态语义色（深色提亮） */
-  --ok: #5ba88a;
-  --warn: #e6b056;
-  --danger: #e0697a;
-  --c-plan: #7fa5be;
-  --c-urgent: #ec8a60;
+  --ok: #6ecc54;
+  --warn: #f9d46c;
+  --danger: #d34947;
+  --c-plan: #7e95d2;
+  --c-urgent: #eb5c20;
 
   /* 状态三态(暗色,V2):淡底提至 16%;warn/urgent/advance 文字用状态本色,ok/danger 用提亮专值(16% 淡底上实测 ≥4.5:1) */
   --ok-bg: color-mix(in srgb, var(--ok) 16%, transparent);
@@ -152,21 +152,21 @@ html.dark {
   --danger-bg: color-mix(in srgb, var(--danger) 16%, transparent);
   --urgent-bg: color-mix(in srgb, var(--c-urgent) 16%, transparent);
   --advance-bg: color-mix(in srgb, var(--c-advance) 16%, transparent);
-  --ok-text: #7dbfa3;
+  --ok-text: #8fd97a;
   --warn-text: var(--warn);
-  --danger-text: #ea8b99;
+  --danger-text: #e8918f;
   --urgent-text: var(--c-urgent);
   --advance-text: var(--c-advance);
 
   /* 图表分类色（深色） */
-  --chart-1: #7fa5be;
-  --chart-2: #c29ac0;
-  --chart-3: #5ba88a;
-  --chart-4: #b08a63;
-  --chart-5: #e0697a;
-  --chart-6: #d2bccf;
-  --chart-7: #fec187;
-  --chart-8: #b7cea3;
+  --chart-1: #3e6fa8;
+  --chart-2: #eb5c20;
+  --chart-3: #1fa6a8;
+  --chart-4: #f9d46c;
+  --chart-5: #d34947;
+  --chart-6: #71e2d1;
+  --chart-7: #6ecc54;
+  --chart-8: #8a5a45;
 
   /* 阴影（深色加重） */
   --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);

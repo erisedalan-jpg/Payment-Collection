@@ -9,7 +9,7 @@ const props = defineProps<{
   height?: string
 }>()
 
-const COLORS = ['#EF4444', '#F59E0B', '#10B981']
+const COLORS = ['#c8161d', '#f9d46c', '#6ecc54']
 
 const option = computed(() => ({
   tooltip: { trigger: 'axis' },

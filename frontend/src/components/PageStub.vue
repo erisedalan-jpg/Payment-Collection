@@ -13,5 +13,5 @@ const route = useRoute()
 
 <style scoped>
 .page-stub { padding: var(--sp-5); }
-.hint { color: #94a3b8; font-size: var(--fs-2); }
+.hint { color: var(--mut); font-size: var(--fs-2); }
 </style>
