@@ -39,7 +39,8 @@ export function ledgerRows(
     const expectedPayment = nodes.reduce((s, n) => s + n.expectedPayment, 0)
     const actualPayment = actualInRange(paymentRecords?.[pid]?.records as any, start, end)
     const remainingAmount = nodes.reduce((s, n) => s + n.unpaidAmount, 0)
-    const r = expectedPayment > 0 ? actualPayment / expectedPayment : 0
+    const contract = p.paymentPmis?.contract ?? 0
+    const r = contract > 0 ? actualPayment / contract : 0
     out.push({
       projectId: pid,
       projectName: p.projectName || pid,
@@ -78,7 +79,8 @@ export function ledgerSummaryPmis(rows: LedgerProjectRow[]): LedgerSummaryPmis {
   const totalAct = rows.reduce((s, r) => s + r.actualPayment, 0)
   // 待回款=Σ节点未收(remainingAmount),与下钻"未收"列同口径;不取 expected-received(收款阶段三列独立填报,未必自洽)
   const totalRem = rows.reduce((s, r) => s + r.remainingAmount, 0)
-  return { projectCount: rows.length, totalExp, totalAct, totalRem, rate: totalExp > 0 ? totalAct / totalExp : 0 }
+  const totalCon = rows.reduce((s, r) => s + (r.projectAmount || 0), 0)
+  return { projectCount: rows.length, totalExp, totalAct, totalRem, rate: totalCon > 0 ? totalAct / totalCon : 0 }
 }
 
 const LEDGER_TIERS_PMIS = ['100万以上', '50-100万', '50万以下']

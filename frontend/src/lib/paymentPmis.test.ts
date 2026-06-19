@@ -149,7 +149,8 @@ describe('projectPaymentRows / summaryByDim', () => {
       expectedTotal: 1_500_000, nodeCount: 3, reachedCount: 1, delayedCount: 1,
       fromOrigin: false, projectAmount: 2_000_000, orgL4: '组1',
     })
-    expect(a.paymentRatio).toBeCloseTo(1_000_000 / 1_500_000, 4)
+    // 分母改为合同 contract=2_000_000：1_000_000/2_000_000=0.5
+    expect(a.paymentRatio).toBeCloseTo(1_000_000 / 2_000_000, 4)
     expect(a.progress).toBe('部分回款')
     expect(a.paymentStatus).toBe('部分回款')
     const b = rows.find((r) => r.projectId === 'B')!
@@ -164,32 +165,36 @@ describe('projectPaymentRows / summaryByDim', () => {
     expect(rows[0]).toMatchObject({ contract: 0, actualTotal: 0, paymentRatio: null, tier: '未知', progress: '未知' })
   })
 
-  it('summaryByDim rate=已回/计划(Σactual/Σexpected)，加 remainingSum，按合同Σ降序', () => {
+  it('summaryByDim rate=已回/合同(Σactual/Σcontract)，加 remainingSum，按合同Σ降序', () => {
     const rows = projectPaymentRows(ps, map, payNodes, payRec)
     const s = summaryByDim(rows, 'dept')
     expect(s).toHaveLength(1)
-    // actualSum=2_000_000, expSum=1_500_000+1_000_000=2_500_000, rate=2_000_000/2_500_000
+    // actualSum=2_000_000, contractSum=2_000_000+1_000_000=3_000_000, rate=2_000_000/3_000_000
     expect(s[0]).toMatchObject({ value: '组1', projectCount: 2, contractSum: 3_000_000, actualSum: 2_000_000, delayedNodeSum: 1 })
-    expect(s[0].rate).toBeCloseTo(2_000_000 / 2_500_000, 6)
+    expect(s[0].rate).toBeCloseTo(2_000_000 / 3_000_000, 6)
     // remainingSum: A=unpaid之和=500_000+150_000+200_000=850_000, B=0
     expect(s[0].remainingSum).toBeCloseTo(850_000, 0)
   })
 
-  it('summaryByDim 分母(expSum) 0 → rate null', () => {
-    // 无 nodes → expectedTotal=0 → rate null
+  it('summaryByDim 分母(contractSum) 0 → rate null；contract>0 时 rate=actual/contract（即使 expected=0）', () => {
+    // 无 nodes → expectedTotal=0, actualSum=0; contract=500_000>0 → rate=0/500_000=0（不再 null）
     const rows = projectPaymentRows([proj({ projectId: 'Z', orgL4: '组9', paymentPmis: pm({ contract: 500_000 }) })], {})
-    expect(summaryByDim(rows, 'dept')[0].rate).toBeNull()
+    expect(summaryByDim(rows, 'dept')[0].rate).toBeCloseTo(0)
+    // contract=0 → contractSum=0 → rate null
+    const rows0 = projectPaymentRows([proj({ projectId: 'Y', orgL4: '组10', paymentPmis: pm({ contract: 0 }) })], {})
+    expect(summaryByDim(rows0, 'dept')[0].rate).toBeNull()
   })
 
   it('区间过滤：只含区间内节点和流水', () => {
     // 只取 2026-01 区间：A 的 nodesA[0](planDate 2026-01-01 ∈ [2026-01,2026-01])，B 的 nodesB[0]
     const rows = projectPaymentRows(ps, map, payNodes, payRec, '2026-01-01', '2026-01-31')
     const a = rows.find((r) => r.projectId === 'A')!
-    // A 2026-01区间内：nodes[0] expected=1_000_000; 流水100万
+    // A 2026-01区间内：nodes[0] expected=1_000_000; 流水100万; contract=2_000_000
     expect(a.nodeCount).toBe(1)
     expect(a.expectedTotal).toBe(1_000_000)
     expect(a.actualTotal).toBe(1_000_000)
-    expect(a.paymentRatio).toBeCloseTo(1, 4)
+    // 分母改为合同 contract=2_000_000：1_000_000/2_000_000=0.5
+    expect(a.paymentRatio).toBeCloseTo(1_000_000 / 2_000_000, 4)
     const b = rows.find((r) => r.projectId === 'B')!
     // B 2026-01区间内：nodes[0] expected=500_000; 流水100万到账2026-02-05 不在区间 → actualTotal=0
     expect(b.nodeCount).toBe(1)
@@ -197,7 +202,7 @@ describe('projectPaymentRows / summaryByDim', () => {
     expect(b.actualTotal).toBe(0)
   })
 
-  it('全部不变式：全部模式 actualTotal=Σ流水，summaryByDim.rate=Σactual/Σexpected', () => {
+  it('全部不变式：全部模式 actualTotal=Σ流水，summaryByDim.rate=Σactual/Σcontract', () => {
     const rows = projectPaymentRows(ps, map, payNodes, payRec, '', '')
     // actualTotal 等于流水之和
     const a = rows.find((r) => r.projectId === 'A')!
@@ -205,9 +210,9 @@ describe('projectPaymentRows / summaryByDim', () => {
     expect(a.actualTotal).toBe(1_000_000)
     expect(b.actualTotal).toBe(1_000_000)
     const s = summaryByDim(rows, 'dept')
-    const expSum = a.expectedTotal + b.expectedTotal
+    const conSum = a.contract + b.contract  // 2_000_000 + 1_000_000 = 3_000_000
     const actSum = a.actualTotal + b.actualTotal
-    expect(s[0].rate).toBeCloseTo(actSum / expSum, 6)
+    expect(s[0].rate).toBeCloseTo(actSum / conSum, 6)
   })
 
   it('projectPaymentRows 行含 delayedAmount=Σ延期节点未收(全部模式)', () => {
@@ -316,11 +321,10 @@ describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
     const { buckets, unknown } = progressBuckets(rows)
     expect(buckets.map((b) => b.key)).toEqual(['已全额回款', '部分回款', '未回款'])
     expect(buckets.map((b) => b.projectCount)).toEqual([1, 1, 1])
-    // rate = 已回/计划(expectedSum)，B: actual=40, expectedSum=80 → rate=40/80=0.5
-    // 若回退为 /合同(contractSum=100) 则 40/100=0.4，断言会红
-    expect(buckets[1].rate).toBeCloseTo(40 / 80, 6)
+    // rate = 已回/合同(contractSum)，B: actual=40, contractSum=100 → rate=40/100=0.4
+    expect(buckets[1].rate).toBeCloseTo(40 / 100, 6)
     expect(buckets[1].expectedSum).toBe(80)
-    // C: actualSum=0, expectedSum=100 → rate=0
+    // C: actualSum=0, contractSum=100 → rate=0
     expect(buckets[2].rate).toBeCloseTo(0 / 100, 6)
     expect(unknown).toBe(1)
   })

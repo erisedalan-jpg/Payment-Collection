@@ -44,7 +44,8 @@ describe('paymentPmisInRange', () => {
     expect(r.delayedCount).toBe(1)
     expect(r.actualTotal).toBe(400)      // 仅2/10(2025/11排除)
     expect(r.contract).toBe(2000)
-    expect(r.paymentRatio).toBeCloseTo(400 / 1500, 4)
+    // 分母改为合同总额 contract=2000，不再是计划 expectedTotal=1500
+    expect(r.paymentRatio).toBeCloseTo(400 / 2000, 4)
   })
   it('全部≡全量(不变式):expected=Σ全节点,actual=Σ全流水', () => {
     const r = paymentPmisInRange(2000, nodes, recs, '', '')

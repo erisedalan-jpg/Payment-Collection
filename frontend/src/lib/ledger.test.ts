@@ -33,7 +33,8 @@ describe('ledgerRows', () => {
     expect(r.actualPayment).toBe(600000)
     // remainingAmount 仍取 Σ节点.unpaidAmount
     expect(r.remainingAmount).toBe(900000)
-    expect(r.paymentRatio).toBeCloseTo(0.4)
+    // 分母改为合同总额 contract=2000000：600000/2000000=0.3
+    expect(r.paymentRatio).toBeCloseTo(0.3)
     expect(r.paymentStatus).toBe('部分回款')
     expect(r.delayed).toBe(true)
     expect(r.orgL4).toBe('A组')
@@ -70,8 +71,9 @@ describe('ledgerRows', () => {
   })
 
   it('全额→已全额回款 / 零→未回款', () => {
-    const fullRec = { P1: { records: [{ amount: 100, date: '2026-01-01' }] } } as any
-    expect(ledgerRows([pn({ expectedPayment: 100, receivedAmount: 100, status: '已回款' })], projects, fullRec)[0].paymentStatus).toBe('已全额回款')
+    // 合同 contract=2000000；流水需 ≥contract 才触发已全额回款（ratio≥0.999）
+    const fullRec = { P1: { records: [{ amount: 2000000, date: '2026-01-01' }] } } as any
+    expect(ledgerRows([pn({ expectedPayment: 2000000, receivedAmount: 2000000, status: '已回款' })], projects, fullRec)[0].paymentStatus).toBe('已全额回款')
     expect(ledgerRows([pn({ expectedPayment: 100, receivedAmount: 0, status: '待回款' })], projects)[0].paymentStatus).toBe('未回款')
   })
   it('不在 projects 的项目跳过', () => {
@@ -95,14 +97,16 @@ describe('filterLedgerRows', () => {
 
 describe('ledgerSummaryPmis/TierStatsPmis/StatusCountsPmis', () => {
   // remainingAmount 故意 ≠ expected-received(550000≠600000),证实待回款取 Σ未收 而非 expected-received
+  // projectAmount = paymentPmis.contract（合同总额），作为 ledgerSummaryPmis rate 分母
   const rows = [
-    { tier: '100万以上', expectedPayment: 1000000, actualPayment: 400000, remainingAmount: 550000, paymentStatus: '部分回款', delayed: true },
-    { tier: '50万以下', expectedPayment: 200000, actualPayment: 0, remainingAmount: 200000, paymentStatus: '未回款', delayed: false },
+    { tier: '100万以上', expectedPayment: 1000000, actualPayment: 400000, remainingAmount: 550000, paymentStatus: '部分回款', delayed: true, projectAmount: 1500000 },
+    { tier: '50万以下', expectedPayment: 200000, actualPayment: 0, remainingAmount: 200000, paymentStatus: '未回款', delayed: false, projectAmount: 300000 },
   ] as any
-  it('summary 待回款取 ΣremainingAmount', () => {
+  it('summary 待回款取 ΣremainingAmount；rate=Σactual/ΣprojectAmount（合同）', () => {
     const s = ledgerSummaryPmis(rows)
     expect(s).toMatchObject({ projectCount: 2, totalExp: 1200000, totalAct: 400000, totalRem: 750000 })
-    expect(s.rate).toBeCloseTo(0.3333)
+    // 分母改为 ΣprojectAmount=1500000+300000=1800000：400000/1800000≈0.2222
+    expect(s.rate).toBeCloseTo(400000 / 1800000)
   })
   it('tier 三档 remWan 取 ΣremainingAmount', () => {
     const t = ledgerTierStatsPmis(rows)

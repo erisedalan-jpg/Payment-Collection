@@ -356,6 +356,26 @@ describe('ProjectDetailView', () => {
     expect(team.text()).toContain('Sponsor陈')
   })
 
+  it('售前详情回款数据 tab:本项目无流水时回退原项目(relatedClosedId)流水(T3)', async () => {
+    seed()
+    const ds = useDataStore()
+    // 给原项目 OLD-9 挂流水，P-2(售前) 本身无流水
+    ;(ds.data as any).paymentRecords['OLD-9'] = {
+      total: 8800,
+      count: 1,
+      lastDate: '2024-01-15',
+      records: [
+        { type: '实际回款', serial: 'BANK-OLD-1', payer: '某局', amount: 8800, date: '2024-01-15', claimer: '王五', orderNo: 'N-OLD-1', currency: 'CNY', rate: 1, note: '' },
+      ],
+    }
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '回款数据')!.trigger('click')
+    // 售前项目本身无流水，应回退读 relatedClosedId=OLD-9 的流水
+    expect(w.text()).not.toContain('未提供回款流水数据')
+    expect(w.text()).toContain('BANK-OLD-1')
+    expect(w.text()).toContain('8,800')
+  })
+
   it('详情头部 pd-meta 渲染合同编号(与项目编号同级,取自 project.合同编号)', async () => {
     seed()
     const w = await mountAt('/project/P-1')

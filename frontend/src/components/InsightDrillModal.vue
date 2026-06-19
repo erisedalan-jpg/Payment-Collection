@@ -16,7 +16,7 @@ const COLS: DataColumn[] = [
   { key: 'stage', label: '阶段', width: 90 },
   { key: 'health', label: '健康度', width: 80 },
   { key: 'contractAmount', label: '合同总额(万)', width: 110, formatter: (v) => fmtWan(v as number) },
-  { key: 'paymentRatio', label: '回款完成率', width: 100, formatter: (_v, r) => fmtRatio(r.expectedTotal > 0 ? r.actualTotal / r.expectedTotal : null) },
+  { key: 'paymentRatio', label: '回款完成率', width: 100, formatter: (_v, r) => fmtRatio(r.contractAmount > 0 ? r.actualTotal / r.contractAmount : null) },
 ]
 
 function onRow(row: Record<string, any>) {

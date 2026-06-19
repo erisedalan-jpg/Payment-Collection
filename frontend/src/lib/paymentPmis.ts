@@ -16,7 +16,7 @@ export function deriveTier(contract: number | null | undefined): string {
   return '50万以下'
 }
 
-/** 进度态：由节点级 payment.paymentRatio(Σ已收÷Σ计划)派生。无合同→未知；ratio 0/null 且有合同→未回款。 */
+/** 进度态：由节点级 payment.paymentRatio(流水÷合同)派生。无合同→未知；ratio 0/null 且有合同→未回款。 */
 export function deriveProgress(contract: number | null | undefined, nodeRatio: number | null | undefined): string {
   if (contract == null || contract <= 0) return '未知'
   const r = nodeRatio
@@ -146,7 +146,7 @@ export function projectPaymentRows(
   })
 }
 
-// ── 单维汇总（加权完成率 Σ÷Σ，rate=已回/计划）──
+// ── 单维汇总（加权完成率 Σ÷Σ，rate=已回/合同）──
 export interface DimSummary {
   value: string
   projectCount: number
@@ -170,13 +170,12 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
     .map(([value, grp]) => {
       const contractSum = grp.reduce((s, r) => s + r.contract, 0)
       const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
-      const expSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
       return {
         value,
         projectCount: grp.length,
         contractSum,
         actualSum,
-        rate: expSum > 0 ? actualSum / expSum : null,   // 已回/计划
+        rate: contractSum > 0 ? actualSum / contractSum : null,   // 已回/合同
         delayedNodeSum: grp.reduce((s, r) => s + r.delayedCount, 0),
         remainingSum: grp.reduce((s, r) => s + r.remainingTotal, 0),
         nodeSum: grp.reduce((s, r) => s + r.nodeCount, 0),
@@ -289,7 +288,7 @@ export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucke
     const contractSum = grp.reduce((s, r) => s + r.contract, 0)
     const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
     const expectedSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
-    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: expectedSum > 0 ? actualSum / expectedSum : null }
+    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: contractSum > 0 ? actualSum / contractSum : null }
   })
   return { buckets, unknown }
 }

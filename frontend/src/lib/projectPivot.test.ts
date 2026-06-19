@@ -71,7 +71,7 @@ describe('groupInsight', () => {
     expect(he.contractAmount).toBe(3000000)
     expect(he.avgProgress).toBeCloseTo(0.5)      // (0.2+0.8)/2
     expect(he.avgCostRatio).toBeCloseTo(0.5)     // 仅 P-1 有值
-    expect(he.paymentRatio).toBeCloseTo(0.8)     // 1600/2000
+    expect(he.paymentRatio).toBeCloseTo(1600 / 3_000_000)  // act=1600, contractAmount=2000000+1000000
     expect(he.delayedProjects).toBe(1)
     const li = gs.find((g) => g.key === '李四')!
     expect(li.avgProgress).toBeNull()            // 全空 → null
@@ -100,7 +100,8 @@ describe('insightCross / insightPivot', () => {
     const c = m.cols.indexOf('李四')
     expect(Number.isNaN(m.cells[r][c])).toBe(true)   // P-3 Σexpected=0 → null → NaN
     const c2 = m.cols.indexOf('何平')
-    expect(m.cells[r][c2]).toBeCloseTo(1)            // P-2 1000/1000,真实值不受影响
+    // P-2: act=1000, contractAmount=1000000 → ratio=1000/1000000=0.001（分母改合同）
+    expect(m.cells[r][c2]).toBeCloseTo(1000 / 1_000_000)
   })
 
   it('透视:colDims 空退化单列合计', () => {
