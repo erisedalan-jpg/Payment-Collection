@@ -1,4 +1,5 @@
 import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis } from '@/types/analysis'
+import { isAnomalous } from './anomaly'
 
 // ── 阈值常量（集中定义，spec §2）──
 export const TIER_HIGH = 1_000_000
@@ -62,6 +63,7 @@ export interface FilterOpts {
 }
 export function filterProjects(projects: Project[], opts: FilterOpts): Project[] {
   return projects.filter((p) => {
+    if (isAnomalous(p)) return false
     if (opts.excludeActive && opts.excludedIds && opts.excludedIds[p.projectId]) return false
     if (opts.viewMode === 'l4' && opts.viewL4) return (p.orgL4 ?? '') === opts.viewL4
     if (opts.viewMode === 'pm' && opts.viewPM) return (p.projectManager ?? '') === opts.viewPM
@@ -191,6 +193,7 @@ export function paymentNodeRows(
   for (const [pid, nodes] of Object.entries(paymentNodes)) {
     const p = byId.get(pid)
     if (!p) continue
+    if (isAnomalous(p)) continue
     const dept = deriveDept(p)
     const tier = deriveTier(p.paymentPmis?.contract)
     const progress = deriveProgress(p.paymentPmis?.contract ?? null, p.payment?.paymentRatio)
