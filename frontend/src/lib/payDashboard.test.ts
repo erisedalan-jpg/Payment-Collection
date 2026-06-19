@@ -119,18 +119,71 @@ describe('payTierStats', () => {
 import { payOrgRanking, payMonthlyTrend, payQuarterlyTrend } from './payDashboard'
 
 describe('payOrgRanking', () => {
-  const rows = [
-    node({ dept: 'A组', expectedPayment: 1000, receivedAmount: 800 }),
-    node({ dept: 'B组', expectedPayment: 1000, receivedAmount: 100 }),
-  ]
-  it('OrgRank 形态 + 按 actualTotal 降序', () => {
-    const r = payOrgRanking(rows, 'actualTotal')
+  // 两个 L4 服务组，各有一个项目
+  const projects = [
+    { projectId: 'P1', orgL4: 'A组', projectManager: '张三' },
+    { projectId: 'P2', orgL4: 'B组', projectManager: '李四' },
+  ] as any
+
+  // P1: 计划节点 2026-02-01 期望=1000；P2: 计划节点 2026-08-01 期望=2000
+  const paymentNodes = {
+    P1: [{ planDate: '2026-02-01', expectedPayment: 1000 }],
+    P2: [{ planDate: '2026-08-01', expectedPayment: 2000 }],
+  } as any
+
+  // P1: 流水 2026-02-10 金额=800；P2: 流水 2026-08-05 金额=500
+  const paymentRecords = {
+    P1: { records: [{ date: '2026-02-10', amount: 800 }] },
+    P2: { records: [{ date: '2026-08-05', amount: 500 }] },
+  } as any
+
+  it('全部口径(start=end=""): 计划=Σ全节点, 已回款=Σ全流水, 达成率=已回/计划, 按 actualTotal 降序', () => {
+    const r = payOrgRanking(projects, paymentNodes, paymentRecords, '', '', 'actualTotal')
     expect(r[0].org).toBe('A组')
+    expect(r[0].expectedTotal).toBe(1000)
     expect(r[0].actualTotal).toBe(800)
     expect(r[0].achievementRate).toBeCloseTo(0.8)
+    expect(r[1].org).toBe('B组')
+    expect(r[1].actualTotal).toBe(500)
   })
-  it('按 achievementRate 降序', () => {
-    expect(payOrgRanking(rows, 'achievementRate')[0].org).toBe('A组')
+
+  it('按 achievementRate 降序: A组(0.8) > B组(0.25)', () => {
+    const r = payOrgRanking(projects, paymentNodes, paymentRecords, '', '', 'achievementRate')
+    expect(r[0].org).toBe('A组')
+    expect(r[0].achievementRate).toBeCloseTo(0.8)
+    expect(r[1].achievementRate).toBeCloseTo(0.25)
+  })
+
+  it('区间 2026-01-01~2026-06-30: 只计 P1 节点(计划日 2026-02-01)和 P1 流水(到账日 2026-02-10)', () => {
+    const r = payOrgRanking(projects, paymentNodes, paymentRecords, '2026-01-01', '2026-06-30', 'actualTotal')
+    const a = r.find((o) => o.org === 'A组')!
+    const b = r.find((o) => o.org === 'B组')!
+    expect(a.expectedTotal).toBe(1000)   // 节点计划日在区间内
+    expect(a.actualTotal).toBe(800)      // 流水到账日在区间内
+    expect(b.expectedTotal).toBe(0)      // 节点计划日 2026-08-01 不在区间
+    expect(b.actualTotal).toBe(0)        // 流水到账日 2026-08-05 不在区间
+  })
+
+  it('全部不变式: start=end="" 时计划=Σ全节点、已回=Σ全流水', () => {
+    const r = payOrgRanking(projects, paymentNodes, paymentRecords, '', '', 'actualTotal')
+    const totalExpected = r.reduce((s, o) => s + o.expectedTotal, 0)
+    const totalActual = r.reduce((s, o) => s + o.actualTotal, 0)
+    expect(totalExpected).toBe(3000)   // 1000 + 2000
+    expect(totalActual).toBe(1300)     // 800 + 500
+  })
+
+  it('actualTotalWan = actualTotal / 10000', () => {
+    const r = payOrgRanking(projects, paymentNodes, paymentRecords, '', '', 'actualTotal')
+    for (const o of r) expect(o.actualTotalWan).toBeCloseTo(o.actualTotal / 10000)
+  })
+
+  it('无 paymentRecords/paymentNodes 时 actualTotal=0, expectedTotal=0', () => {
+    const r = payOrgRanking(projects, undefined, undefined, '', '', 'actualTotal')
+    for (const o of r) {
+      expect(o.actualTotal).toBe(0)
+      expect(o.expectedTotal).toBe(0)
+      expect(o.achievementRate).toBe(0)
+    }
   })
 })
 
