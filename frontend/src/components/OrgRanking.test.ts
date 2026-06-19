@@ -29,7 +29,45 @@ function seed() {
   } as any
 }
 
+function seedMany(n: number) {
+  const ds = useDataStore()
+  const projects: any[] = []
+  const paymentNodes: Record<string, any[]> = {}
+  for (let i = 0; i < n; i++) {
+    const id = `P${i + 1}`
+    const org = `服务组${String(i + 1).padStart(2, '0')}`
+    projects.push({
+      projectId: id, projectName: `项目${i + 1}`, projectManager: '张三',
+      orgL4: org, paymentPmis: { contract: 2000000 },
+    })
+    paymentNodes[id] = [{
+      stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.5,
+      expectedPayment: 1000000, receivedAmount: (n - i) * 10000, unpaidAmount: 500000, status: '部分回款',
+    }]
+  }
+  ds.data = {
+    meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
+    rawNodes: [], projects, projectPmis: {}, paymentNodes,
+    projectOverview: { projects: [], columns: [] },
+    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+  } as any
+}
+
 describe('OrgRanking', () => {
+  it('注入 10 个不同 orgL4 项目：渲染全部 10 行，不截断到 8', () => {
+    seedMany(10)
+    const w = mount(OrgRanking)
+    const items = w.findAll('.rank-item')
+    expect(items.length).toBe(10)
+  })
+
+  it('注入 12 个不同 orgL4 项目：渲染全部 12 行，不截断到 8', () => {
+    seedMany(12)
+    const w = mount(OrgRanking)
+    const items = w.findAll('.rank-item')
+    expect(items.length).toBe(12)
+  })
+
   it('渲染服务组排名（A组已回款 800000 > B组 100000，A 在前）', () => {
     seed()
     const w = mount(OrgRanking)

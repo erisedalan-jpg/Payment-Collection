@@ -28,6 +28,7 @@ export interface RangePmis {
   nodeCount: number
   reachedCount: number
   delayedCount: number
+  delayedAmount: number
   paymentRatio: number | null
 }
 
@@ -40,6 +41,7 @@ export function paymentPmisInRange(
   const expectedTotal = round2(ns.reduce((s, n) => s + Number(n.expectedPayment ?? 0), 0))
   const remainingTotal = round2(ns.reduce((s, n) => s + Number(n.unpaidAmount ?? 0), 0))
   const actualTotal = round2(actualInRange(records, start, end))
+  const delayedAmount = round2(ns.filter((n) => n.status === '延期').reduce((s, n) => s + Number(n.unpaidAmount ?? 0), 0))
   return {
     contract,
     expectedTotal,
@@ -48,6 +50,7 @@ export function paymentPmisInRange(
     nodeCount: ns.length,
     reachedCount: ns.filter((n) => n.reached).length,
     delayedCount: ns.filter((n) => n.status === '延期').length,
+    delayedAmount,
     paymentRatio: expectedTotal > 0 ? round4(actualTotal / expectedTotal) : null,
   }
 }

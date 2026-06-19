@@ -264,4 +264,29 @@ describe('payMonthlyTrend/payQuarterlyTrend', () => {
   it('指定区间补满季度键（2026-01-01~2026-12-31 补 4 季度）', () => {
     expect(payQuarterlyTrend(rows, '2026-01-01', '2026-12-31').categories.length).toBe(4)
   })
+  it('趋势桶值为整数万（含小数 unpaid 四舍五入）', () => {
+    // 123456 元 → 12.3456 万 → Math.round = 12
+    // 135000 元 → 13.5 万 → Math.round = 14（四舍五入）
+    const decimalRows = [
+      node({ tier: '100万以上', planDate: '2026-03-01', unpaidAmount: 123456, status: '待回款' }),
+      node({ tier: '100万以上', planDate: '2026-03-15', unpaidAmount: 135000, status: '延期' }),
+    ]
+    const s = payMonthlyTrend(decimalRows, '', '')
+    const t = s.series.find((x) => x.tier === '100万以上')!
+    const i = s.categories.indexOf('2026-03')
+    // 同桶合并后: (123456 + 135000) / 10000 = 25.8456 → Math.round = 26
+    expect(Number.isInteger(t.data[i])).toBe(true)
+    expect(t.data[i]).toBe(26)
+  })
+  it('趋势桶值整数万（季度分桶）', () => {
+    const decimalRows = [
+      node({ tier: '50-100万', planDate: '2026-04-01', unpaidAmount: 99999, status: '待回款' }),
+    ]
+    const s = payQuarterlyTrend(decimalRows, '', '')
+    const t = s.series.find((x) => x.tier === '50-100万')!
+    const i = s.categories.indexOf('2026-Q2')
+    // 99999 / 10000 = 9.9999 → Math.round = 10
+    expect(Number.isInteger(t.data[i])).toBe(true)
+    expect(t.data[i]).toBe(10)
+  })
 })

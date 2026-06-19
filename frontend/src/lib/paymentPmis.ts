@@ -90,6 +90,7 @@ export interface PayProjectRow {
   nodeCount: number
   reachedCount: number
   delayedCount: number
+  delayedAmount: number
   fromOrigin: boolean
   overspendAmount: number
   projectAmount: number
@@ -136,6 +137,7 @@ export function projectPaymentRows(
       nodeCount: rp.nodeCount,
       reachedCount: rp.reachedCount,
       delayedCount: rp.delayedCount,
+      delayedAmount: rp.delayedAmount,
       fromOrigin: pm?.fromOrigin ?? false,
       overspendAmount: p.overspendAmount ?? 0,
       projectAmount: contract,
@@ -153,6 +155,10 @@ export interface DimSummary {
   rate: number | null
   delayedNodeSum: number
   remainingSum: number
+  nodeSum: number
+  reachedSum: number
+  delayedProjectCount: number
+  delayedAmountSum: number
 }
 export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[] {
   const buckets: Record<string, PayProjectRow[]> = {}
@@ -173,6 +179,10 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
         rate: expSum > 0 ? actualSum / expSum : null,   // 已回/计划
         delayedNodeSum: grp.reduce((s, r) => s + r.delayedCount, 0),
         remainingSum: grp.reduce((s, r) => s + r.remainingTotal, 0),
+        nodeSum: grp.reduce((s, r) => s + r.nodeCount, 0),
+        reachedSum: grp.reduce((s, r) => s + r.reachedCount, 0),
+        delayedProjectCount: grp.filter((r) => r.delayedCount > 0).length,
+        delayedAmountSum: grp.reduce((s, r) => s + r.delayedAmount, 0),
       }
     })
     .sort((a, b) => b.contractSum - a.contractSum)

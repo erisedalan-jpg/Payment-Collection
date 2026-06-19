@@ -39,4 +39,46 @@ describe('PendingBarChart', () => {
     expect(option.series[1].itemStyle.color).toBe('#f9d46c')
     expect(option.series[2].itemStyle.color).toBe('#6ecc54')
   })
+
+  it('横滑容器 .pbc-scroll 存在', () => {
+    const wrapper = mount(PendingBarChart, {
+      props: {
+        categories: ['2026-Q1', '2026-Q2'],
+        series: [
+          { tier: '100万以上', data: [10, 20] },
+          { tier: '50-100万', data: [5, 15] },
+          { tier: '50万以下', data: [0, 0] },
+        ],
+      },
+    })
+    expect(wrapper.find('.pbc-scroll').exists()).toBe(true)
+  })
+
+  it('pbc-inner min-width 随 categories 数增大', () => {
+    // 2 个 categories: min-width 含 2*48=96px
+    const w2 = mount(PendingBarChart, {
+      props: {
+        categories: ['2026-Q1', '2026-Q2'],
+        series: [{ tier: '100万以上', data: [10, 20] }, { tier: '50-100万', data: [5, 15] }, { tier: '50万以下', data: [0, 0] }],
+      },
+    })
+    // 10 个 categories: min-width 含 10*48=480px
+    const w10 = mount(PendingBarChart, {
+      props: {
+        categories: ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'],
+        series: [{ tier: '100万以上', data: [1,1,1,1,1,1,1,1,1,1] }, { tier: '50-100万', data: [0,0,0,0,0,0,0,0,0,0] }, { tier: '50万以下', data: [0,0,0,0,0,0,0,0,0,0] }],
+      },
+    })
+    const inner2 = w2.find('.pbc-inner')
+    const inner10 = w10.find('.pbc-inner')
+    expect(inner2.exists()).toBe(true)
+    expect(inner10.exists()).toBe(true)
+    // 解析 minWidth style，10 个桶的值应大于 2 个桶的值
+    const minWidth2 = inner2.attributes('style') ?? ''
+    const minWidth10 = inner10.attributes('style') ?? ''
+    // 2 个桶: max(100%, 2*48px) = max(100%, 96px)
+    expect(minWidth2).toContain('96px')
+    // 10 个桶: max(100%, 10*48px) = max(100%, 480px)
+    expect(minWidth10).toContain('480px')
+  })
 })
