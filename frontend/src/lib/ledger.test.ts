@@ -12,15 +12,26 @@ function pn(p: Partial<PayNodeRow>): PayNodeRow {
 
 describe('ledgerRows', () => {
   const projects = [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } }] as any
-  it('按项目聚合金额 + 派生 progress/延期 + join 维度', () => {
+
+  // paymentRecords 流水口径: P1 有两笔, 合计 600000
+  const paymentRecords = {
+    P1: { records: [
+      { amount: 400000, date: '2026-02-01' },
+      { amount: 200000, date: '2026-03-15' },
+    ]},
+  } as any
+
+  it('按项目聚合金额(流水口径) + 派生 progress/延期 + join 维度', () => {
     const rows = ledgerRows([
       pn({ expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' }),
       pn({ expectedPayment: 500000, receivedAmount: 0, unpaidAmount: 500000, status: '延期' }),
-    ], projects)
+    ], projects, paymentRecords)
     expect(rows).toHaveLength(1)
     const r = rows[0]
     expect(r.expectedPayment).toBe(1500000)
+    // actualPayment 取流水 Σ = 600000
     expect(r.actualPayment).toBe(600000)
+    // remainingAmount 仍取 Σ节点.unpaidAmount
     expect(r.remainingAmount).toBe(900000)
     expect(r.paymentRatio).toBeCloseTo(0.4)
     expect(r.paymentStatus).toBe('部分回款')
@@ -30,8 +41,37 @@ describe('ledgerRows', () => {
     expect(r.projectAmount).toBe(2000000)
     expect(r.nodes).toHaveLength(2)
   })
+
+  it('区间过滤流水: start/end 限定后只取区间内流水', () => {
+    // 只取 2026-02 的流水: 400000
+    const rows = ledgerRows([
+      pn({ expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000 }),
+    ], projects, paymentRecords, '2026-02-01', '2026-02-28')
+    expect(rows[0].actualPayment).toBe(400000)
+  })
+
+  it('无 paymentRecords 时 actualPayment=0 (全量兼容, 默认后两参=空=全部)', () => {
+    // 不传 paymentRecords, actualPayment=0
+    const rows = ledgerRows([pn({ expectedPayment: 500000, receivedAmount: 300000, unpaidAmount: 200000 })], projects)
+    expect(rows[0].actualPayment).toBe(0)
+    expect(rows[0].paymentStatus).toBe('未回款')
+  })
+
+  it('全部不变式: 全量(无区间限定) actualPayment=Σ流水, expected/remaining=Σ节点', () => {
+    const rows = ledgerRows([
+      pn({ expectedPayment: 1000000, receivedAmount: 999, unpaidAmount: 400000 }),
+      pn({ expectedPayment: 500000, receivedAmount: 999, unpaidAmount: 500000 }),
+    ], projects, paymentRecords, '', '')
+    const r = rows[0]
+    // 流水 Σ = 400000+200000=600000, 与 receivedAmount 无关
+    expect(r.actualPayment).toBe(600000)
+    expect(r.expectedPayment).toBe(1500000)
+    expect(r.remainingAmount).toBe(900000)
+  })
+
   it('全额→已全额回款 / 零→未回款', () => {
-    expect(ledgerRows([pn({ expectedPayment: 100, receivedAmount: 100, status: '已回款' })], projects)[0].paymentStatus).toBe('已全额回款')
+    const fullRec = { P1: { records: [{ amount: 100, date: '2026-01-01' }] } } as any
+    expect(ledgerRows([pn({ expectedPayment: 100, receivedAmount: 100, status: '已回款' })], projects, fullRec)[0].paymentStatus).toBe('已全额回款')
     expect(ledgerRows([pn({ expectedPayment: 100, receivedAmount: 0, status: '待回款' })], projects)[0].paymentStatus).toBe('未回款')
   })
   it('不在 projects 的项目跳过', () => {

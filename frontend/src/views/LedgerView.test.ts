@@ -25,6 +25,10 @@ function seed() {
       P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.5, expectedPayment: 1000000, receivedAmount: 0, unpaidAmount: 1000000, actualRatio: 0, status: '延期' }],
       P2: [{ stage: '预付款', planDate: '2026-02-01', actualDate: '2026-02-02', payRatio: 1, expectedPayment: 200000, receivedAmount: 200000, unpaidAmount: 0, actualRatio: 1, status: '已回款' }],
     },
+    // 流水口径: P2 全额回款 200000, P1 无流水
+    paymentRecords: {
+      P2: { records: [{ amount: 200000, date: '2026-02-02' }] },
+    },
   } as any
 }
 
