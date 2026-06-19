@@ -256,14 +256,16 @@ describe('nodeSummary（节点三态计数 + 计划回款Σ）', () => {
 describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
   it('已全额/部分/未回款三桶按固定序，未知不入桶', () => {
     // 提供 nodes/records 使 paymentPmisInRange 算出正确 ratio
+    // B: expectedPayment=80 ≠ contract=100，确保 rate=actual/expectedSum(40/80=0.5) 与
+    //    回退口径 rate=actual/contractSum(40/100=0.4) 数值不同，有判别力
     const bkNodes: Record<string, PaymentNodePmis[]> = {
       A: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 100, unpaidAmount: 0, reached: true, status: '已回款' } as PaymentNodePmis],
-      B: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 100, unpaidAmount: 50, reached: false, status: '部分回款' } as PaymentNodePmis],
+      B: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 80, unpaidAmount: 40, reached: false, status: '部分回款' } as PaymentNodePmis],
       C: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 100, unpaidAmount: 100, reached: false, status: '待回款' } as PaymentNodePmis],
     }
     const bkRec: Record<string, PaymentRecordsEntry> = {
       A: { records: [{ amount: 100, date: '2026-01-05' } as any] },
-      B: { records: [{ amount: 50, date: '2026-01-05' } as any] },
+      B: { records: [{ amount: 40, date: '2026-01-05' } as any] },
       C: { records: [] },
     }
     const rows = projectPaymentRows([
@@ -275,9 +277,10 @@ describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
     const { buckets, unknown } = progressBuckets(rows)
     expect(buckets.map((b) => b.key)).toEqual(['已全额回款', '部分回款', '未回款'])
     expect(buckets.map((b) => b.projectCount)).toEqual([1, 1, 1])
-    // rate = 已回/计划(expectedSum)，B: 50/100 = 0.5
-    expect(buckets[1].rate).toBeCloseTo(50 / 100, 6)
-    expect(buckets[1].expectedSum).toBe(100)
+    // rate = 已回/计划(expectedSum)，B: actual=40, expectedSum=80 → rate=40/80=0.5
+    // 若回退为 /合同(contractSum=100) 则 40/100=0.4，断言会红
+    expect(buckets[1].rate).toBeCloseTo(40 / 80, 6)
+    expect(buckets[1].expectedSum).toBe(80)
     // C: actualSum=0, expectedSum=100 → rate=0
     expect(buckets[2].rate).toBeCloseTo(0 / 100, 6)
     expect(unknown).toBe(1)
