@@ -72,7 +72,7 @@ const RANK_COLS = computed<DataColumn[]>(() => [
   { key: 'avgProgress', label: '平均完工', width: 90, formatter: (v) => (v == null ? '-' : pct(v)) },
   { key: 'avgCostRatio', label: '平均消耗比', width: 100, formatter: (v) => (v == null ? '-' : pct(v)) },
   { key: 'paymentRatio', label: '回款完成率', width: 100, formatter: (v) => (v == null ? '-' : pct(v)) },
-  { key: 'delayedProjects', label: '延期项目', width: 90, sortable: true },
+  { key: 'delayedProjects', label: '延期项目数', width: 90, sortable: true },
 ])
 
 // ---- 交叉 ----
