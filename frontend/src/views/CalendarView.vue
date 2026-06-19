@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { paymentNodeRows } from '@/lib/paymentPmis'
+import { inRange } from '@/lib/paymentRange'
 import {
   calFilterOptions,
   calDashboardStats,
@@ -49,21 +50,23 @@ const allNodes = computed(() =>
   paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis))
 const baseNodes = computed(() =>
   filter.excludeOn ? allNodes.value.filter((n) => !filter.excludedIds[n.projectId]) : allNodes.value)
+const filtered = computed(() =>
+  baseNodes.value.filter((n) => inRange(n.planDate || '', filter.dateStart, filter.dateEnd)))
 
-const options = computed(() => calFilterOptions(baseNodes.value))
-const dashboard = computed(() => calDashboardStats(baseNodes.value, calFilters.value, new Date()))
-const gridNodes = computed(() => applyCalFilters(calExcludePaid(baseNodes.value), calFilters.value))
+const options = computed(() => calFilterOptions(filtered.value))
+const dashboard = computed(() => calDashboardStats(filtered.value, calFilters.value, new Date(), data.data?.paymentRecords))
+const gridNodes = computed(() => applyCalFilters(calExcludePaid(filtered.value), calFilters.value))
 const gridDateData = computed(() => calDateData(gridNodes.value))
 const yearHeat = computed(() => calYearHeat(gridNodes.value, state.year))
 const listNodes = computed(() =>
-  calListNodes(baseNodes.value, calFilters.value, {
+  calListNodes(filtered.value, calFilters.value, {
     year: state.year,
     month: state.month,
     selectedDate: state.selectedDate,
   }),
 )
 const listGroups = computed(() => calListGroups(listNodes.value))
-const upcoming = computed(() => calUpcoming(baseNodes.value, calFilters.value, new Date()))
+const upcoming = computed(() => calUpcoming(filtered.value, calFilters.value, new Date()))
 
 const listTitle = computed(() => (state.selectedDate ? `${state.selectedDate} 回款节点` : '当月/次月回款节点'))
 
@@ -73,7 +76,7 @@ const VIEW_OPTS = [
   { value: 'agenda', label: '议程列表' },
 ]
 const agendaNodes = computed(() =>
-  calListNodes(baseNodes.value, calFilters.value, {
+  calListNodes(filtered.value, calFilters.value, {
     year: state.year,
     month: state.month,
     selectedDate: '',

@@ -6,6 +6,7 @@ import { useProjectDetailStore } from '@/stores/projectDetail'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
 import { projectPaymentRows, paymentNodeRows, pmisRiskGroups, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
+import { inRange } from '@/lib/paymentRange'
 
 defineProps<{ dim: string }>()
 const data = useDataStore()
@@ -17,8 +18,17 @@ const ctx = computed(() => {
     viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
     excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
   })
-  const rows = projectPaymentRows(ps, data.data?.projectPmis ?? {})
-  const nodeRows = paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
+  const rows = projectPaymentRows(
+    ps,
+    data.data?.projectPmis ?? {},
+    data.data?.paymentNodes,
+    filter.payRecordsAll,
+    filter.dateStart,
+    filter.dateEnd,
+  )
+  const allNodeRows = paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
+  // 延期节点只取计划日∈区间的（全部区间时 inRange 恒真）
+  const nodeRows = allNodeRows.filter((n) => inRange(n.planDate, filter.dateStart, filter.dateEnd))
   return pmisRiskGroups(rows, nodeRows)
 })
 

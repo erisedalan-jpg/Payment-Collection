@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis } from '@/types/analysis'
+import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis, PaymentRecordsEntry } from '@/types/analysis'
 import {
   TIER_HIGH, TIER_MID, deriveTier, deriveProgress, deriveDept, deriveStage,
   rateColorPmis, PAY_FACET_DIMS, filterProjects, projectPaymentRows, summaryByDim,
@@ -113,44 +113,101 @@ describe('filterProjects（视角/纳管，不复用 filterNodes）', () => {
 })
 
 describe('projectPaymentRows / summaryByDim', () => {
+  // nodes/records 构造：让全部模式下 paymentPmisInRange 返回与旧 paymentPmis 一致的数值
+  const nodesA: PaymentNodePmis[] = [
+    { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.5, expectedPayment: 1_000_000, unpaidAmount: 500_000, reached: true, status: '已回款' } as PaymentNodePmis,
+    { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 300_000, unpaidAmount: 0, reached: false, status: '延期' } as PaymentNodePmis,
+    { stage: '质保', planDate: '2026-06-01', actualDate: '', payRatio: 0.2, expectedPayment: 200_000, unpaidAmount: 200_000, reached: false, status: '待回款' } as PaymentNodePmis,
+  ]
+  const nodesB: PaymentNodePmis[] = [
+    { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-02', payRatio: 0.5, expectedPayment: 500_000, unpaidAmount: 0, reached: true, status: '已回款' } as PaymentNodePmis,
+    { stage: '终验', planDate: '2026-02-01', actualDate: '2026-02-05', payRatio: 0.5, expectedPayment: 500_000, unpaidAmount: 0, reached: true, status: '已回款' } as PaymentNodePmis,
+  ]
+  const payNodes: Record<string, PaymentNodePmis[]> = { A: nodesA, B: nodesB }
+  // 流水：A 回了 100 万，B 回了 100 万
+  const recA: PaymentRecordsEntry = { records: [{ amount: 1_000_000, date: '2026-01-05' } as any] }
+  const recB: PaymentRecordsEntry = { records: [{ amount: 1_000_000, date: '2026-02-05' } as any] }
+  const payRec: Record<string, PaymentRecordsEntry> = { A: recA, B: recB }
+
   const ps = [
     proj({ projectId: 'A', projectName: '甲', projectManager: '张三', orgL4: '组1',
       overspendAmount: 0,
-      payment: { relatedNodeCount: 3, expectedTotal: 1_500_000, actualTotal: 1_000_000, remainingTotal: 500_000, paymentRatio: 0.5, delayedCount: 1 },
-      paymentPmis: pm({ contract: 2_000_000, actualTotal: 1_000_000, expectedTotal: 1_500_000, nodeCount: 3, reachedCount: 1, delayedCount: 1, fromOrigin: false }) }),
+      paymentPmis: pm({ contract: 2_000_000, fromOrigin: false }) }),
     proj({ projectId: 'B', projectName: '乙', projectManager: '李四', orgL4: '组1',
       overspendAmount: 5000,
-      payment: { relatedNodeCount: 2, expectedTotal: 1_000_000, actualTotal: 1_000_000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
-      paymentPmis: pm({ contract: 1_000_000, actualTotal: 1_000_000, expectedTotal: 1_000_000, nodeCount: 2, reachedCount: 2, delayedCount: 0, fromOrigin: true }) }),
+      paymentPmis: pm({ contract: 1_000_000, fromOrigin: true }) }),
   ]
   const map: Record<string, ProjectPmis> = { A: { progress: { 项目阶段: '实施' } } as ProjectPmis }
-  it('行字段映射齐全（含派生维度与下钻兼容列）', () => {
-    const rows = projectPaymentRows(ps, map)
+
+  it('行字段映射齐全（含派生维度与下钻兼容列）——全部模式，区间重算', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec)
     const a = rows.find((r) => r.projectId === 'A')!
+    // A: nodes 全部(start/end空)→全3节点 expectedTotal=1_500_000, actualTotal=流水100万, ratio=1000000/1500000
     expect(a).toMatchObject({
       projectName: '甲', projectManager: '张三', dept: '组1', stage: '实施',
-      tier: '100万以上', progress: '部分回款', contract: 2_000_000, actualTotal: 1_000_000,
-      paymentRatio: 0.5, expectedTotal: 1_500_000, nodeCount: 3, reachedCount: 1, delayedCount: 1,
-      fromOrigin: false, projectAmount: 2_000_000, paymentStatus: '部分回款', orgL4: '组1',
+      tier: '100万以上', contract: 2_000_000, actualTotal: 1_000_000,
+      expectedTotal: 1_500_000, nodeCount: 3, reachedCount: 1, delayedCount: 1,
+      fromOrigin: false, projectAmount: 2_000_000, orgL4: '组1',
     })
+    expect(a.paymentRatio).toBeCloseTo(1_000_000 / 1_500_000, 4)
+    expect(a.progress).toBe('部分回款')
+    expect(a.paymentStatus).toBe('部分回款')
     const b = rows.find((r) => r.projectId === 'B')!
     expect(b.stage).toBe('未指定')
+    // B: nodes 2节点 expected=1_000_000, actual=流水100万, ratio=1
+    expect(b.paymentRatio).toBeCloseTo(1, 4)
     expect(b.progress).toBe('已全额回款')
   })
+
   it('contract/actualTotal/paymentRatio 缺失按 0/null', () => {
     const rows = projectPaymentRows([proj({ projectId: 'X', paymentPmis: null })], {})
     expect(rows[0]).toMatchObject({ contract: 0, actualTotal: 0, paymentRatio: null, tier: '未知', progress: '未知' })
   })
-  it('summaryByDim 按 dept 加权完成率（Σ÷Σ，非单项目率平均），按合同Σ降序', () => {
-    const rows = projectPaymentRows(ps, map)
+
+  it('summaryByDim rate=已回/计划(Σactual/Σexpected)，加 remainingSum，按合同Σ降序', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec)
     const s = summaryByDim(rows, 'dept')
     expect(s).toHaveLength(1)
+    // actualSum=2_000_000, expSum=1_500_000+1_000_000=2_500_000, rate=2_000_000/2_500_000
     expect(s[0]).toMatchObject({ value: '组1', projectCount: 2, contractSum: 3_000_000, actualSum: 2_000_000, delayedNodeSum: 1 })
-    expect(s[0].rate).toBeCloseTo(2_000_000 / 3_000_000, 6)
+    expect(s[0].rate).toBeCloseTo(2_000_000 / 2_500_000, 6)
+    // remainingSum: A=unpaid之和=500_000+0+200_000=700_000, B=0
+    expect(s[0].remainingSum).toBeCloseTo(700_000, 0)
   })
-  it('summaryByDim 分母 0 → rate null', () => {
-    const rows = projectPaymentRows([proj({ projectId: 'Z', orgL4: '组9', paymentPmis: pm({ contract: 0 }) })], {})
+
+  it('summaryByDim 分母(expSum) 0 → rate null', () => {
+    // 无 nodes → expectedTotal=0 → rate null
+    const rows = projectPaymentRows([proj({ projectId: 'Z', orgL4: '组9', paymentPmis: pm({ contract: 500_000 }) })], {})
     expect(summaryByDim(rows, 'dept')[0].rate).toBeNull()
+  })
+
+  it('区间过滤：只含区间内节点和流水', () => {
+    // 只取 2026-01 区间：A 的 nodesA[0](planDate 2026-01-01 ∈ [2026-01,2026-01])，B 的 nodesB[0]
+    const rows = projectPaymentRows(ps, map, payNodes, payRec, '2026-01-01', '2026-01-31')
+    const a = rows.find((r) => r.projectId === 'A')!
+    // A 2026-01区间内：nodes[0] expected=1_000_000; 流水100万
+    expect(a.nodeCount).toBe(1)
+    expect(a.expectedTotal).toBe(1_000_000)
+    expect(a.actualTotal).toBe(1_000_000)
+    expect(a.paymentRatio).toBeCloseTo(1, 4)
+    const b = rows.find((r) => r.projectId === 'B')!
+    // B 2026-01区间内：nodes[0] expected=500_000; 流水100万到账2026-02-05 不在区间 → actualTotal=0
+    expect(b.nodeCount).toBe(1)
+    expect(b.expectedTotal).toBe(500_000)
+    expect(b.actualTotal).toBe(0)
+  })
+
+  it('全部不变式：全部模式 actualTotal=Σ流水，summaryByDim.rate=Σactual/Σexpected', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec, '', '')
+    // actualTotal 等于流水之和
+    const a = rows.find((r) => r.projectId === 'A')!
+    const b = rows.find((r) => r.projectId === 'B')!
+    expect(a.actualTotal).toBe(1_000_000)
+    expect(b.actualTotal).toBe(1_000_000)
+    const s = summaryByDim(rows, 'dept')
+    const expSum = a.expectedTotal + b.expectedTotal
+    const actSum = a.actualTotal + b.actualTotal
+    expect(s[0].rate).toBeCloseTo(actSum / expSum, 6)
   })
 })
 
@@ -198,16 +255,34 @@ describe('nodeSummary（节点三态计数 + 计划回款Σ）', () => {
 
 describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
   it('已全额/部分/未回款三桶按固定序，未知不入桶', () => {
+    // 提供 nodes/records 使 paymentPmisInRange 算出正确 ratio
+    // B: expectedPayment=80 ≠ contract=100，确保 rate=actual/expectedSum(40/80=0.5) 与
+    //    回退口径 rate=actual/contractSum(40/100=0.4) 数值不同，有判别力
+    const bkNodes: Record<string, PaymentNodePmis[]> = {
+      A: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 100, unpaidAmount: 0, reached: true, status: '已回款' } as PaymentNodePmis],
+      B: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 80, unpaidAmount: 40, reached: false, status: '部分回款' } as PaymentNodePmis],
+      C: [{ stage: '到货', planDate: '2026-01-01', expectedPayment: 100, unpaidAmount: 100, reached: false, status: '待回款' } as PaymentNodePmis],
+    }
+    const bkRec: Record<string, PaymentRecordsEntry> = {
+      A: { records: [{ amount: 100, date: '2026-01-05' } as any] },
+      B: { records: [{ amount: 40, date: '2026-01-05' } as any] },
+      C: { records: [] },
+    }
     const rows = projectPaymentRows([
-      proj({ projectId: 'A', payment: { paymentRatio: 1 }, paymentPmis: pm({ contract: 100, actualTotal: 100 }) }),
-      proj({ projectId: 'B', payment: { paymentRatio: 0.5 }, paymentPmis: pm({ contract: 100, actualTotal: 50 }) }),
-      proj({ projectId: 'C', payment: { paymentRatio: 0 }, paymentPmis: pm({ contract: 100, actualTotal: 0 }) }),
-      proj({ projectId: 'D', paymentPmis: pm({ contract: 0 }) }),
-    ], {})
+      proj({ projectId: 'A', orgL4: '组1', paymentPmis: pm({ contract: 100 }) }),
+      proj({ projectId: 'B', orgL4: '组1', paymentPmis: pm({ contract: 100 }) }),
+      proj({ projectId: 'C', orgL4: '组1', paymentPmis: pm({ contract: 100 }) }),
+      proj({ projectId: 'D', orgL4: '组1', paymentPmis: pm({ contract: 0 }) }),
+    ], {}, bkNodes, bkRec)
     const { buckets, unknown } = progressBuckets(rows)
     expect(buckets.map((b) => b.key)).toEqual(['已全额回款', '部分回款', '未回款'])
     expect(buckets.map((b) => b.projectCount)).toEqual([1, 1, 1])
-    expect(buckets[1].rate).toBeCloseTo(0.5, 6)
+    // rate = 已回/计划(expectedSum)，B: actual=40, expectedSum=80 → rate=40/80=0.5
+    // 若回退为 /合同(contractSum=100) 则 40/100=0.4，断言会红
+    expect(buckets[1].rate).toBeCloseTo(40 / 80, 6)
+    expect(buckets[1].expectedSum).toBe(80)
+    // C: actualSum=0, expectedSum=100 → rate=0
+    expect(buckets[2].rate).toBeCloseTo(0 / 100, 6)
     expect(unknown).toBe(1)
   })
 })
@@ -215,23 +290,30 @@ describe('progressBuckets（3 互斥桶，未知单列计数）', () => {
 describe('pmisRiskGroups（PMIS 风险三类）', () => {
   const projects = [
     proj({ projectId: 'A', projectName: '甲', orgL4: '组1', overspendAmount: 8000,
-      payment: { paymentRatio: 0.1 },
-      paymentPmis: pm({ contract: 3_000_000, actualTotal: 300_000 }) }),
+      paymentPmis: pm({ contract: 3_000_000 }) }),
     proj({ projectId: 'B', projectName: '乙', orgL4: '组2', overspendAmount: 0,
-      payment: { paymentRatio: 0.9 },
-      paymentPmis: pm({ contract: 1_000_000, actualTotal: 900_000 }) }),
+      paymentPmis: pm({ contract: 1_000_000 }) }),
     proj({ projectId: 'C', projectName: '丙', orgL4: '组3', overspendAmount: 3000,
-      payment: { paymentRatio: null },
-      paymentPmis: pm({ contract: 500_000, actualTotal: 0 }) }),
+      paymentPmis: pm({ contract: 500_000 }) }),
   ]
-  const nodes: Record<string, PaymentNodePmis[]> = {
-    A: [{ stage: '终验', planDate: '2026-05-01', status: '延期', expectedPayment: 100 } as PaymentNodePmis],
-    B: [{ stage: '到货', planDate: '2026-02-01', status: '延期', expectedPayment: 50 } as PaymentNodePmis],
+  // paymentNodes 同时给 paymentNodeRows 和 projectPaymentRows 用
+  const riskNodes: Record<string, PaymentNodePmis[]> = {
+    // A: 1个延期节点，expected=3_000_000，B: 1个延期节点，expected=1_000_000
+    A: [{ stage: '终验', planDate: '2026-05-01', status: '延期', expectedPayment: 3_000_000, unpaidAmount: 2_700_000, reached: false } as PaymentNodePmis],
+    B: [{ stage: '到货', planDate: '2026-02-01', status: '延期', expectedPayment: 1_000_000, unpaidAmount: 100_000, reached: true } as PaymentNodePmis],
+    C: [{ stage: '验收', planDate: '2026-03-01', status: '待回款', expectedPayment: 500_000, unpaidAmount: 500_000, reached: false } as PaymentNodePmis],
+  }
+  // 流水：A 300_000/3_000_000=0.1<0.3 → lowPayment; B 900_000/1_000_000=0.9≥0.3 → 不入; C 0→0<0.3 → lowPayment
+  const riskRec: Record<string, PaymentRecordsEntry> = {
+    A: { records: [{ amount: 300_000, date: '2026-01-01' } as any] },
+    B: { records: [{ amount: 900_000, date: '2026-02-01' } as any] },
+    C: { records: [] },
   }
   it('延期节点按 planDate 升序；低回款<0.3 且 contract>0 按 contract 降序 Top10；超支>0 按金额降序', () => {
-    const rows = projectPaymentRows(projects, {})
-    const g = pmisRiskGroups(rows, paymentNodeRows(nodes, projects, {}))
+    const rows = projectPaymentRows(projects, {}, riskNodes, riskRec)
+    const g = pmisRiskGroups(rows, paymentNodeRows(riskNodes, projects, {}))
     expect(g.delayedNodes.map((n) => n.projectId)).toEqual(['B', 'A'])
+    // A: ratio=300_000/3_000_000=0.1<0.3 ✓; B: 0.9≥0.3; C: 0<0.3 ✓ → [A,C] by contract desc
     expect(g.lowPayment.map((r) => r.projectId)).toEqual(['A', 'C'])
     expect(g.overspend.map((r) => r.projectId)).toEqual(['A', 'C'])
     expect(g.overspend.map((r) => r.overspendAmount)).toEqual([8000, 3000])

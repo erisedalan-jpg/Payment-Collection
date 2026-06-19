@@ -1,5 +1,6 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import type { CrossMatrix, PivotResult, PivotRow, PivotCol } from './pivot'
+import { isAnomalous } from './anomaly'
 
 // 项目域透视(/insight,spec 4.5):与 lib/pivot(回款节点域)并行,复用其泛型结构类型;
 // 回款域 groupByDims/PivotGroup 不动,P6 归并期再议统一。
@@ -31,6 +32,8 @@ const v = (raw: unknown, fallback = '未指定') => {
   return s === '' ? fallback : s
 }
 
+/** 行保留全部项目；异常项目(isAnomalous)的回款列(expectedTotal/actualTotal/delayed)置 0/false，
+ *  使其不污染回款指标聚合，但行本身与非回款列(成本/进度等)正常保留。 */
 export function buildInsightRows(projects: Project[], pmisMap: Record<string, ProjectPmis>): InsightRow[] {
   return projects.map((p) => {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
@@ -39,6 +42,7 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
     const risk = m.risk ?? {}
     const cost = m.cost ?? {}
     const cust = m.customer ?? {}
+    const anomalous = isAnomalous(p)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -56,9 +60,10 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       contractAmount: Number(cust.合同总额 ?? 0),
       progress: typeof prog.完工进展 === 'number' ? prog.完工进展 : null,
       costRatio: typeof cost.消耗比 === 'number' ? cost.消耗比 : null,
-      expectedTotal: Number(p.payment?.expectedTotal ?? 0),
-      actualTotal: Number(p.payment?.actualTotal ?? 0),
-      delayed: (p.payment?.delayedCount ?? 0) > 0,
+      // 异常项目回款列置 0/false，不参与回款指标聚合
+      expectedTotal: anomalous ? 0 : Number(p.payment?.expectedTotal ?? 0),
+      actualTotal: anomalous ? 0 : Number(p.payment?.actualTotal ?? 0),
+      delayed: anomalous ? false : (p.payment?.delayedCount ?? 0) > 0,
     }
   })
 }

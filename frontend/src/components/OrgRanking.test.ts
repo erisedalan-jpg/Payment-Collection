@@ -3,11 +3,12 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import OrgRanking from './OrgRanking.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
 const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
 
 function seed() {
   const ds = useDataStore()

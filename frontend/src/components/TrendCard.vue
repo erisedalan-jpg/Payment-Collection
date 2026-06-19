@@ -14,8 +14,8 @@ const PERIOD_OPTS = [
 
 const series = computed(() =>
   period.value === 'month'
-    ? payMonthlyTrend(filter.filteredPayNodes, filter.filterYear)
-    : payQuarterlyTrend(filter.filteredPayNodes, filter.filterYear),
+    ? payMonthlyTrend(filter.filteredPayNodes, filter.dateStart, filter.dateEnd)
+    : payQuarterlyTrend(filter.filteredPayNodes, filter.dateStart, filter.dateEnd),
 )
 </script>
 

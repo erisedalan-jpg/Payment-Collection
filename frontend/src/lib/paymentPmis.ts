@@ -1,5 +1,6 @@
-import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis } from '@/types/analysis'
+import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis, PaymentRecordsEntry } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
+import { paymentPmisInRange } from './paymentRange'
 
 // ── 阈值常量（集中定义，spec §2）──
 export const TIER_HIGH = 1_000_000
@@ -85,6 +86,7 @@ export interface PayProjectRow {
   actualTotal: number
   paymentRatio: number | null
   expectedTotal: number
+  remainingTotal: number
   nodeCount: number
   reachedCount: number
   delayedCount: number
@@ -97,15 +99,26 @@ export interface PayProjectRow {
 export function projectPaymentRows(
   projects: Project[],
   pmisMap?: Record<string, ProjectPmis>,
+  paymentNodes?: Record<string, PaymentNodePmis[]>,
+  paymentRecords?: Record<string, PaymentRecordsEntry>,
+  start = '',
+  end = '',
 ): PayProjectRow[] {
   return projects.map((p) => {
     const pm = p.paymentPmis ?? null
     const contract = pm?.contract ?? 0
-    const actualTotal = pm?.actualTotal ?? 0
-    const paymentRatio = p.payment?.paymentRatio ?? null
     const dept = deriveDept(p)
     const tier = deriveTier(pm?.contract)
-    const progress = deriveProgress(contract, paymentRatio)
+
+    const rp = paymentPmisInRange(
+      contract,
+      paymentNodes?.[p.projectId],
+      paymentRecords?.[p.projectId]?.records,
+      start,
+      end,
+    )
+
+    const progress = deriveProgress(rp.contract, rp.paymentRatio)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -115,13 +128,14 @@ export function projectPaymentRows(
       stage: deriveStage(p.projectId, pmisMap),
       tier,
       progress,
-      contract,
-      actualTotal,
-      paymentRatio,
-      expectedTotal: pm?.expectedTotal ?? 0,
-      nodeCount: pm?.nodeCount ?? 0,
-      reachedCount: pm?.reachedCount ?? 0,
-      delayedCount: pm?.delayedCount ?? 0,
+      contract: rp.contract,
+      actualTotal: rp.actualTotal,
+      paymentRatio: rp.paymentRatio,
+      expectedTotal: rp.expectedTotal,
+      remainingTotal: rp.remainingTotal,
+      nodeCount: rp.nodeCount,
+      reachedCount: rp.reachedCount,
+      delayedCount: rp.delayedCount,
       fromOrigin: pm?.fromOrigin ?? false,
       overspendAmount: p.overspendAmount ?? 0,
       projectAmount: contract,
@@ -130,7 +144,7 @@ export function projectPaymentRows(
   })
 }
 
-// ── 单维汇总（加权完成率 Σ÷Σ）──
+// ── 单维汇总（加权完成率 Σ÷Σ，rate=已回/计划）──
 export interface DimSummary {
   value: string
   projectCount: number
@@ -138,6 +152,7 @@ export interface DimSummary {
   actualSum: number
   rate: number | null
   delayedNodeSum: number
+  remainingSum: number
 }
 export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[] {
   const buckets: Record<string, PayProjectRow[]> = {}
@@ -149,13 +164,15 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
     .map(([value, grp]) => {
       const contractSum = grp.reduce((s, r) => s + r.contract, 0)
       const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
+      const expSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
       return {
         value,
         projectCount: grp.length,
         contractSum,
         actualSum,
-        rate: contractSum > 0 ? actualSum / contractSum : null,
+        rate: expSum > 0 ? actualSum / expSum : null,   // 已回/计划
         delayedNodeSum: grp.reduce((s, r) => s + r.delayedCount, 0),
+        remainingSum: grp.reduce((s, r) => s + r.remainingTotal, 0),
       }
     })
     .sort((a, b) => b.contractSum - a.contractSum)
@@ -247,6 +264,7 @@ export interface ProgressBucket {
   projectCount: number
   contractSum: number
   actualSum: number
+  expectedSum: number
   rate: number | null
 }
 export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucket[]; unknown: number } {
@@ -260,7 +278,8 @@ export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucke
     const grp = map[key] || []
     const contractSum = grp.reduce((s, r) => s + r.contract, 0)
     const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
-    return { key, projectCount: grp.length, contractSum, actualSum, rate: contractSum > 0 ? actualSum / contractSum : null }
+    const expectedSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
+    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: expectedSum > 0 ? actualSum / expectedSum : null }
   })
   return { buckets, unknown }
 }

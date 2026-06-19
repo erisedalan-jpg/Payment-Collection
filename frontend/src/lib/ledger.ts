@@ -1,5 +1,6 @@
-import type { Project } from '@/types/analysis'
+import type { Project, Paymentrecords } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
+import { actualInRange } from './paymentRange'
 
 export interface LedgerProjectRow {
   projectId: string
@@ -17,8 +18,17 @@ export interface LedgerProjectRow {
   nodes: PayNodeRow[]
 }
 
-/** 按 projectId 聚合收款阶段节点 → 项目级台账行(仅纳入在 projects 中的项目)。金额节点级,状态 progress 三态。 */
-export function ledgerRows(nodeRows: PayNodeRow[], projects: Project[]): LedgerProjectRow[] {
+/** 按 projectId 聚合收款阶段节点 → 项目级台账行(仅纳入在 projects 中的项目)。
+ * actualPayment 取流水区间和（actualInRange），expectedPayment/remainingAmount 仍 Σ节点。
+ * paymentRecords/start/end 可选，缺省=全量兼容旧调用。
+ */
+export function ledgerRows(
+  nodeRows: PayNodeRow[],
+  projects: Project[],
+  paymentRecords?: Paymentrecords,
+  start = '',
+  end = '',
+): LedgerProjectRow[] {
   const byId = new Map(projects.map((p) => [p.projectId, p]))
   const grp: Record<string, PayNodeRow[]> = {}
   for (const n of nodeRows) (grp[n.projectId] ||= []).push(n)
@@ -27,7 +37,7 @@ export function ledgerRows(nodeRows: PayNodeRow[], projects: Project[]): LedgerP
     const p = byId.get(pid)
     if (!p) continue
     const expectedPayment = nodes.reduce((s, n) => s + n.expectedPayment, 0)
-    const actualPayment = nodes.reduce((s, n) => s + n.receivedAmount, 0)
+    const actualPayment = actualInRange(paymentRecords?.[pid]?.records as any, start, end)
     const remainingAmount = nodes.reduce((s, n) => s + n.unpaidAmount, 0)
     const r = expectedPayment > 0 ? actualPayment / expectedPayment : 0
     out.push({

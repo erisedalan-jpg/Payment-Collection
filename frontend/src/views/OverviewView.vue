@@ -5,21 +5,28 @@ import { useDataStore } from '@/stores/data'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
 import { computeKpis, healthSummary, paymentBand } from '@/lib/overview'
 import { paymentNodeRows } from '@/lib/paymentPmis'
+import { useFilterStore } from '@/stores/filter'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import HealthBadge from '@/components/HealthBadge.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
 
 const data = useDataStore()
+const filter = useFilterStore()
 const router = useRouter()
 onMounted(() => { if (!data.data) data.load() })
 
 const projects = computed(() => (data.data?.projects ?? []) as Project[])
 const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 
-const kpis = computed(() => computeKpis(projects.value, pmisMap.value))
+const kpis = computed(() => computeKpis(projects.value, pmisMap.value, data.data?.paymentRecords))
 const health = computed(() => healthSummary(projects.value))
 const band = computed(() => paymentBand(
-  paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis), new Date()))
+  paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
+  new Date(),
+  filter.payRecordsAll,
+  filter.dateStart,
+  filter.dateEnd,
+))
 const recentEvents = computed(() => ((data.data?.events ?? []) as Event[]).slice(0, 10))
 
 // KPI 卡带跳转(用户实测反馈 2026-06-11,推翻原"不可点击"决策):前五张带筛选进清单,达成率进回款总览

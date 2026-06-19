@@ -7,14 +7,15 @@ import {
 
 const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
+// orgL4 非空 = 正常项目；orgL4 为空/undefined = 异常项目(回款列置 0/false，行本身保留)
 const PROJECTS = [
-  { projectId: 'P-1', projectName: '甲', projectManager: '何平',
+  { projectId: 'P-1', projectName: '甲', projectManager: '何平', orgL4: '交付一组',
     payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, delayedCount: 1 },
     deliveryCosts: [], health: { overall: '风险' } },
-  { projectId: 'P-2', projectName: '乙', projectManager: '何平',
+  { projectId: 'P-2', projectName: '乙', projectManager: '何平', orgL4: '交付二组',
     payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 1000 },
     deliveryCosts: [], health: { overall: '健康' } },
-  { projectId: 'P-3', projectName: '丙', projectManager: '李四',
+  { projectId: 'P-3', projectName: '丙', projectManager: '李四', orgL4: '交付一组',
     payment: { ...PAY0 }, deliveryCosts: [], health: { overall: '健康' } },
 ] as unknown as Project[]
 
@@ -40,6 +41,24 @@ describe('buildInsightRows', () => {
     expect(r3.riskLevel).toBe('无')
     expect(r3.health).toBe('健康')
     expect(r3.progress).toBeNull()
+  })
+  it('异常项目(orgL4 空)保留在行里但回款列置 0/false', () => {
+    // 构造含异常项目的列表
+    const anomProject = { projectId: 'P-X', projectName: '异常甲', projectManager: '测试员',
+      // orgL4 undefined = isAnomalous → true
+      payment: { ...PAY0, expectedTotal: 5000, actualTotal: 3000, delayedCount: 2 },
+      deliveryCosts: [], health: { overall: '健康' } } as unknown as Project
+    const rows = buildInsightRows([anomProject], {})
+    // 行本身保留(不被过滤)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].projectId).toBe('P-X')
+    // 回款列置 0/false
+    expect(rows[0].expectedTotal).toBe(0)
+    expect(rows[0].actualTotal).toBe(0)
+    expect(rows[0].delayed).toBe(false)
+    // 非回款列正常
+    expect(rows[0].projectName).toBe('异常甲')
+    expect(rows[0].health).toBe('健康')
   })
 })
 

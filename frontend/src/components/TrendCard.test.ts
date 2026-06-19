@@ -4,8 +4,9 @@ import { setActivePinia, createPinia } from 'pinia'
 import TrendCard from './TrendCard.vue'
 import PendingBarChart from './PendingBarChart.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
 
 function seed() {
   const ds = useDataStore()
