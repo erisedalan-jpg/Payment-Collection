@@ -76,7 +76,7 @@ pip install playwright && playwright install chromium
 > 令牌落地于 `frontend/src/styles/theme.css`(CSS 唯一落地)与 `frontend/src/charts/echartsTheme.ts`(canvas 同源桥接，契约测试强制一致)；页面只准引用令牌，**不准手写散值**。
 > 完整取值表见 `docs/superpowers/specs/2026-06-10-design-foundation-design.md`。
 
-- **配色**：蓝色系做基调(`--accent` 浅 `#325969`/暗 `#6C8FA9`)，light/dark 两套。**结构色与状态色分离**：状态语义色固定(已回款 `--ok #4E9A7C` / 待回款 `--warn #E0A23B` / 风险延期 `--danger #D24D5C` / 可提前 `--c-advance`)，不随基调变。图表分类用 `--chart-1..8`，表达回款状态的图表系列必须用状态色。
+- **配色**：以钦定品牌色板为唯一来源(蓝色系做基调,`--accent` 浅 `#0D3A69`/暗 `#7891AC`)，light/dark 两套；结构灰阶由 4 个黑白中性色(柔纸白/米白/炭黑/深海石)明度·透明度派生,全站不引入第 16 个色号。**结构色与状态色分离**：状态语义色固定(已回款 `--ok #6ECC54` / 待回款 `--warn #F9D46C` / 风险延期 `--danger #C8161D` / 可提前 `--c-advance` 浅 青绿`#018B8D`/暗 蓝绿`#71E2D1`)，不随基调变。图表分类用 `--chart-1..8`，表达回款状态的图表系列必须用状态色。
 - **状态三态**：带文字的状态标识一律「淡底+深字」(`--ok-bg`+`--ok-text` 等，warn/danger/urgent/advance 同构)；实底 100% 状态色只用于无文字色块；禁止实底+小号白字。
 - **8pt grid**：间距只取 `--sp-1..7`(4/8/12/16/24/32/48)，4px 仅内联半步。
 - **排版严格层级**：六级 `--fs-1..6`(12/14/16/19/25/34 @16基准)，每级字号·字重·色锁定，不混用。

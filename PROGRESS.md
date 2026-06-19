@@ -4,10 +4,10 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.9.0**
-- 最近更新：2026-06-18（/projects 在建 与 /projects/closed 已关闭两清单：列枚举筛选移入表头(复用 ColumnFilter)、新增选列菜单 ColumnPicker(显隐+上下排序+localStorage 持久化,useColumnPrefs)、在建增项目状态列(回款完成率与健康度间)+回款状态列、服务组(L4)→L4组、DataTable 加 fixed 列、横向滚动）
-- 上一版本：V1.8.0（2026-06-18，子项目2 在建/已关闭项目清单：已关闭全量摄取交付三部 closedProjects(轻量 PMIS 已关闭三表 + closeInfo)、meta.totalClosed=len、前端 /projects 在建 + /projects/closed 已关闭两路由 + /closed-project/:id 精简详情、导航在建项目/已关闭项目）
-- 上上版本：V1.7.1（2026-06-18，详情页 /project/{id} 头部 pd-meta 增「合同编号」展示，与项目编号同级、位于项目名称与卡片之间，取自 project.合同编号，消费子项目1 M-2 遗留字段；合并 62687ba）
+- 当前版本：**V1.10.0**
+- 最近更新：2026-06-19（整体配色改版：全站令牌切换为钦定品牌色板(11 彩+4 黑白)，结构灰阶派生、散值归一、契约测试同步）
+- 上一版本：V1.9.0（2026-06-18，/projects 在建 与 /projects/closed 已关闭两清单：列枚举筛选移入表头(复用 ColumnFilter)、新增选列菜单 ColumnPicker(显隐+上下排序+localStorage 持久化,useColumnPrefs)、在建增项目状态列(回款完成率与健康度间)+回款状态列、服务组(L4)→L4组、DataTable 加 fixed 列、横向滚动）
+- 上上版本：V1.8.0（2026-06-18，子项目2 在建/已关闭项目清单：已关闭全量摄取交付三部 closedProjects(轻量 PMIS 已关闭三表 + closeInfo)、meta.totalClosed=len、前端 /projects 在建 + /projects/closed 已关闭两路由 + /closed-project/:id 精简详情、导航在建项目/已关闭项目）
 - 维护语言：简体中文
 
 ---
@@ -16,6 +16,7 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.10.0 整体配色改版：全站令牌切换为钦定品牌色板(11 彩+4 黑白)，结构灰阶派生、散值归一、契约测试同步。合并 SHA: <finishing 回填>
 - V1.0.0 = 产品更名「项目管理平台」基线（此前 V5.x 旧前端与 V7.x Phase P/R 序列退役，历史见 git）。
 
 ---
