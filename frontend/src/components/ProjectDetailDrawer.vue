@@ -32,7 +32,7 @@ const visible = computed({
 
 const detail = computed(() =>
   pd.openId
-    ? buildProjectDetail(data.data?.paymentNodes, (data.data?.projects ?? []) as Project[], data.data?.projectPmis, pd.openId)
+    ? buildProjectDetail(data.data?.paymentNodes, (data.data?.projects ?? []) as Project[], data.data?.projectPmis, pd.openId, data.data?.paymentRecords)
     : { project: null, nodes: [] },
 )
 

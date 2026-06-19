@@ -35,6 +35,9 @@ const allRows = computed(() =>
   ledgerRows(
     paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
     data.data?.projects ?? [],
+    data.data?.paymentRecords,
+    filter.dateStart,
+    filter.dateEnd,
   ),
 )
 const baseProjs = computed(() =>
