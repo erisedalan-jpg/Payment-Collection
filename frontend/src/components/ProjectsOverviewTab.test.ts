@@ -4,11 +4,13 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import ProjectsOverviewTab from './ProjectsOverviewTab.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
 function seed() {
   const data = useDataStore()
+  useFilterStore().setPreset('all')
   data.data = {
     meta: { lastUpdate: 'x', totalProjects: 1, totalPaymentNodes: 3 },
     dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
@@ -27,20 +29,34 @@ function seed() {
 }
 
 describe('ProjectsOverviewTab', () => {
-  it('渲染项目行与维度汇总，行可点击', async () => {
+  it('渲染项目明细行，部门汇总不再出现', async () => {
     seed()
     const w = mount(ProjectsOverviewTab, {
       props: { dim: 'dept' },
       global: { plugins: [ElementPlus] },
     })
     await flushPromises()
+    // 明细表仍渲染
     expect(w.text()).toContain('甲')
-    expect(w.text()).toContain('部门汇总')
-    expect(w.text()).toContain('组1')
+    // 部门汇总 section 已移除
+    expect(w.text()).not.toContain('部门汇总')
+    expect(w.find('section.dim-summary').exists()).toBe(false)
+  })
+
+  it('明细表含预期列头', async () => {
+    seed()
+    const w = mount(ProjectsOverviewTab, {
+      props: { dim: 'dept' },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    expect(w.text()).toContain('项目编号')
+    expect(w.text()).toContain('完成率')
   })
 
   it('空数据不崩', async () => {
     const data = useDataStore()
+    useFilterStore().setPreset('all')
     data.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
       dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
@@ -52,5 +68,6 @@ describe('ProjectsOverviewTab', () => {
     })
     await flushPromises()
     expect(w.exists()).toBe(true)
+    expect(w.text()).not.toContain('部门汇总')
   })
 })
