@@ -209,6 +209,39 @@ describe('projectPaymentRows / summaryByDim', () => {
     const actSum = a.actualTotal + b.actualTotal
     expect(s[0].rate).toBeCloseTo(actSum / expSum, 6)
   })
+
+  it('projectPaymentRows 行含 delayedAmount=Σ延期节点未收(全部模式)', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec)
+    // A: nodesA 中 终验(延期,unpaidAmount=0) → delayedAmount=0
+    const a = rows.find((r) => r.projectId === 'A')!
+    expect(a.delayedAmount).toBe(0)
+    // B: nodesB 中无延期节点 → delayedAmount=0
+    const b = rows.find((r) => r.projectId === 'B')!
+    expect(b.delayedAmount).toBe(0)
+  })
+
+  it('summaryByDim 新增 nodeSum/reachedSum/delayedProjectCount/delayedAmountSum', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec)
+    const s = summaryByDim(rows, 'dept')[0]
+    // A: nodeCount=3, reachedCount=1, delayedCount=1; B: nodeCount=2, reachedCount=2, delayedCount=0
+    expect(s.nodeSum).toBe(5)
+    expect(s.reachedSum).toBe(3)
+    // delayedProjectCount: 有延期节点(delayedCount>0)的项目数 → A有1，B没有 → 1
+    expect(s.delayedProjectCount).toBe(1)
+    expect(s.delayedAmountSum).toBe(0)
+  })
+
+  it('全部不变式:summaryByDim 新字段=全量口径', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec, '', '')
+    const s = summaryByDim(rows, 'dept')[0]
+    expect(typeof s.nodeSum).toBe('number')
+    expect(typeof s.reachedSum).toBe('number')
+    expect(typeof s.delayedProjectCount).toBe('number')
+    expect(typeof s.delayedAmountSum).toBe('number')
+    // 全部模式下与逐行求和一致
+    const totalNodeSum = rows.reduce((acc, r) => acc + r.nodeCount, 0)
+    expect(s.nodeSum).toBe(totalNodeSum)
+  })
 })
 
 describe('paymentNodeRows（扁平化 + 维度 join 到所属项目）', () => {
