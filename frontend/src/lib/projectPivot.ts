@@ -32,15 +32,17 @@ const v = (raw: unknown, fallback = '未指定') => {
   return s === '' ? fallback : s
 }
 
-/** 回款相关列(paymentRatio/delayed)排除 isAnomalous 项目；非回款列不受影响。 */
+/** 行保留全部项目；异常项目(isAnomalous)的回款列(expectedTotal/actualTotal/delayed)置 0/false，
+ *  使其不污染回款指标聚合，但行本身与非回款列(成本/进度等)正常保留。 */
 export function buildInsightRows(projects: Project[], pmisMap: Record<string, ProjectPmis>): InsightRow[] {
-  return projects.filter((p) => !isAnomalous(p)).map((p) => {
+  return projects.map((p) => {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     const prog = m.progress ?? {}
     const st = m.status ?? {}
     const risk = m.risk ?? {}
     const cost = m.cost ?? {}
     const cust = m.customer ?? {}
+    const anomalous = isAnomalous(p)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -58,9 +60,10 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       contractAmount: Number(cust.合同总额 ?? 0),
       progress: typeof prog.完工进展 === 'number' ? prog.完工进展 : null,
       costRatio: typeof cost.消耗比 === 'number' ? cost.消耗比 : null,
-      expectedTotal: Number(p.payment?.expectedTotal ?? 0),
-      actualTotal: Number(p.payment?.actualTotal ?? 0),
-      delayed: (p.payment?.delayedCount ?? 0) > 0,
+      // 异常项目回款列置 0/false，不参与回款指标聚合
+      expectedTotal: anomalous ? 0 : Number(p.payment?.expectedTotal ?? 0),
+      actualTotal: anomalous ? 0 : Number(p.payment?.actualTotal ?? 0),
+      delayed: anomalous ? false : (p.payment?.delayedCount ?? 0) > 0,
     }
   })
 }

@@ -28,8 +28,18 @@ describe('computeKpis', () => {
     expect(k.paused).toBe(1)
     expect(k.highRisk).toBe(1)
     expect(k.overspend).toBe(1)
-    // 回款达成率排除异常项目(P-3 orgL4 空): 600/(1000+1000) = 0.3
+    // 无 paymentRecords 时退化节点 actualTotal: 600/(1000+1000) = 0.3
     expect(k.paymentRatio).toBeCloseTo(0.3)
+  })
+  it('传入 paymentRecords 时分子改用全量流水(全时 start=end=\'\')', () => {
+    // P-1 流水 800, P-2 流水 500; P-3 异常排除; 分母仍 expectedTotal=2000
+    const records: Record<string, PaymentRecordsEntry> = {
+      'P-1': { records: [{ amount: 800, date: '2026-03-01' } as any] },
+      'P-2': { records: [{ amount: 300, date: '2025-12-01' } as any], },
+    }
+    const k = computeKpis(PROJECTS, PMIS, records as any)
+    // 流水: P-1=800, P-2=300(含往年全量); 分母 expectedTotal: P-1=1000, P-2=1000
+    expect(k.paymentRatio).toBeCloseTo(1100 / 2000)
   })
   it('计划为 0 → 达成率 null', () => {
     // P-3 orgL4 为空 = 异常, 排除后 exp=0 → null
@@ -103,7 +113,7 @@ describe('paymentBand', () => {
     expect(b.delayedTop[0]).toMatchObject({ projectId: 'P9', stage: '验收款', remaining: 50000 })
   })
 
-  it('传入 paymentRecords 时 yearActual 改用流水(全部口径，start/end 均空)', () => {
+  it('传入 paymentRecords 时 yearActual 按本年口径(start/end 均空=全部时只含本年流水)', () => {
     const now = new Date('2026-02-15T00:00:00')
     const rows = [
       pn({ projectId: 'P1', planDate: '2026-02-10', expectedPayment: 100000, receivedAmount: 40000, unpaidAmount: 60000, status: '部分回款' }),
@@ -111,11 +121,12 @@ describe('paymentBand', () => {
     ]
     const paymentRecords: Record<string, PaymentRecordsEntry> = {
       P1: { records: [{ amount: 70000, date: '2026-02-01' } as any] },
-      P9: { records: [{ amount: 20000, date: '2025-12-10' } as any] },
+      P9: { records: [{ amount: 20000, date: '2025-12-10' } as any] },  // 2025年，不在本年
     }
-    // 全部口径(start=end=''):流水含空日期和所有日期，yearActual = 70000+20000
+    // 无区间(start=end='')时 yearActual 按本年前缀过滤，与 yearExpected 年度口径对齐
+    // P1 流水 2026-02-01 → 本年 ✓; P9 流水 2025-12-10 → 非本年 ✗
     const b = paymentBand(rows, now, paymentRecords, '', '')
-    expect(b.yearActual).toBe(90000)  // 两项目流水之和
+    expect(b.yearActual).toBe(70000)  // 仅 P1 本年流水
     expect(b.yearExpected).toBe(150000)  // 无区间，年度前缀匹配
   })
 

@@ -1,4 +1,4 @@
-import type { Project, ProjectPmis, PaymentRecordsEntry } from '@/types/analysis'
+import type { Project, ProjectPmis, PaymentRecordsEntry, Paymentrecords } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
 import { isAnomalous } from './anomaly'
 import { inRange, actualInRange } from './paymentRange'
@@ -15,8 +15,13 @@ export interface OverviewKpis {
   paymentRatio: number | null
 }
 
-/** 回款达成率:分子=流水 Σ actualTotal(排除异常)，分母=计划 Σ expectedTotal(排除异常)。 */
-export function computeKpis(projects: Project[], pmisMap: Record<string, ProjectPmis>): OverviewKpis {
+/** 回款达成率:分子=Σ流水(排除异常)，分母=Σ计划 expectedTotal(排除异常)。
+ *  paymentRecords 传入时分子用全量流水(start=end=''=全时)；未传时退化节点 actualTotal。 */
+export function computeKpis(
+  projects: Project[],
+  pmisMap: Record<string, ProjectPmis>,
+  paymentRecords?: Paymentrecords,
+): OverviewKpis {
   let active = 0
   let paused = 0
   let overspend = 0
@@ -32,7 +37,10 @@ export function computeKpis(projects: Project[], pmisMap: Record<string, Project
     // 回款达成率排除异常项目
     if (!isAnomalous(p)) {
       exp += p.payment?.expectedTotal ?? 0
-      act += p.payment?.actualTotal ?? 0
+      // 分子=Σ流水(全时)；无流水表时退化节点汇总
+      act += paymentRecords
+        ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
+        : (p.payment?.actualTotal ?? 0)
     }
   }
   return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: exp > 0 ? act / exp : null }
@@ -101,7 +109,8 @@ export function paymentBand(
   const planInScope = (planDate: string): boolean =>
     hasRange ? inRange(planDate, start, end) : planDate.startsWith(year)
 
-  // yearActual：若传入 paymentRecords 则按流水∈区间求和，否则退化节点 receivedAmount 之和
+  // yearActual：若传入 paymentRecords 则按流水求和，否则退化节点 receivedAmount 之和
+  // hasRange 时：流水∈[start,end]；无区间时：流水 date.startsWith(year)，与计划侧年度口径对齐
   let yearActual = 0
   if (paymentRecords) {
     // 按项目 id 去重求和（rows 含多节点，流水应按项目级聚合）
@@ -109,7 +118,16 @@ export function paymentBand(
     for (const n of rows) {
       if (!seen.has(n.projectId)) {
         seen.add(n.projectId)
-        yearActual += actualInRange(paymentRecords[n.projectId]?.records, start, end)
+        const records = paymentRecords[n.projectId]?.records
+        if (hasRange) {
+          yearActual += actualInRange(records, start, end)
+        } else {
+          // 无区间时只累加本年流水，与 yearExpected 年度前缀口径对齐
+          yearActual += (records ?? []).reduce(
+            (s, r) => s + (String(r.date ?? '').startsWith(year) ? Number(r.amount ?? 0) : 0),
+            0,
+          )
+        }
       }
     }
   } else {
