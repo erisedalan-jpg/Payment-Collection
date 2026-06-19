@@ -11,12 +11,12 @@ use([CanvasRenderer, BarChart, LineChart, PieChart, GridComponent, TooltipCompon
 export const FONT_SANS = '-apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif'
 
 // --chart-1..8(浅/暗)
-export const CHART_LIGHT = ['#6c8fa9', '#b484b0', '#417a64', '#886441', '#d24d5c', '#c8adc4', '#fec187', '#a7c190']
-export const CHART_DARK = ['#7fa5be', '#c29ac0', '#5ba88a', '#b08a63', '#e0697a', '#d2bccf', '#fec187', '#b7cea3']
+export const CHART_LIGHT = ['#0d3a69', '#eb5c20', '#018b8d', '#f9d46c', '#c8161d', '#71e2d1', '#6ecc54', '#492d22']
+export const CHART_DARK = ['#3e6fa8', '#eb5c20', '#1fa6a8', '#f9d46c', '#d34947', '#71e2d1', '#6ecc54', '#8a5a45']
 
 // 结构色映射:txt=标题/tooltip 文字,sub=轴标签/图例,line=分隔线/tooltip 边,line2=轴线,card=tooltip 底
-export const STRUCT_LIGHT = { txt: '#1e2a33', sub: '#4a5b68', line: '#dde6ee', line2: '#cddae2', card: '#ffffff' }
-export const STRUCT_DARK = { txt: '#e4edf2', sub: '#a7bac7', line: '#253a47', line2: '#2f4756', card: '#16262f' }
+export const STRUCT_LIGHT = { txt: '#121212', sub: '#474747', line: '#e4e4e2', line2: '#d4d4d2', card: '#fbfbfd' }
+export const STRUCT_DARK = { txt: '#fbfbfd', sub: '#bcbec1', line: '#272b31', line2: '#343a44', card: '#121212' }
 
 function buildTheme(palette: string[], s: typeof STRUCT_LIGHT) {
   return {
@@ -50,5 +50,5 @@ export const ENT_THEME_DARK = 'ent-dark'
 registerTheme(ENT_THEME_DARK, buildTheme(CHART_DARK, STRUCT_DARK))
 
 // 状态色镜像(canvas 不能读 CSS 变量,与 CHART_* 同理;契约测试与 theme.css 同步)
-export const STATUS_LIGHT = { ok: '#4e9a7c', warn: '#e0a23b', danger: '#d24d5c' }
-export const STATUS_DARK = { ok: '#5ba88a', warn: '#e6b056', danger: '#e0697a' }
+export const STATUS_LIGHT = { ok: '#6ecc54', warn: '#f9d46c', danger: '#c8161d' }
+export const STATUS_DARK = { ok: '#6ecc54', warn: '#f9d46c', danger: '#d34947' }
