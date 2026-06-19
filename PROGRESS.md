@@ -16,7 +16,7 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
-- V1.12.0 SP3 /payment 页面重做（2026-06-19）：回款数据表按 L4 分组展示(11 列可排序、全宽铺满)；OrgRanking 展全部 L4 行不截断；待回款趋势图整数万刻度+容器横向滚动；去除 TierStrip 档位条；部门汇总迁出看板独立展示。合并 SHA: <finishing 回填>
+- V1.12.0 SP3 /payment 页面重做（2026-06-19）：回款数据表按 L4 分组展示(11 列可排序、全宽铺满)；OrgRanking 展全部 L4 行不截断；待回款趋势图整数万刻度+容器横向滚动；去除 TierStrip 档位条；部门汇总迁出看板独立展示。合并 SHA: cb13883
 - V1.11.0 SP2 日期范围筛选+口径统一（2026-06-19）：filter store 默认本年度(dateStart/dateEnd ref)；FilterBar 区间/预设；回款看板六卡/board/部门汇总/趋势/日历/台账随区间联动；SP1-followup 复核（computeKpis 已套 `!isAnomalous`、buildInsightRows 对异常项目回款字段置 0，口径安全，关闭）。合并 SHA: 190c385
 - V1.10.2 纯展示标签改名：DashMetrics 延期→延期项目数、回款节点→回款节点数；BoardView 排序选项 延期数→延期节点数；LedgerView 统计卡 延期→延期项目数；InsightView RANK_COLS + projectPivot INSIGHT_METRICS 延期项目→延期项目数。合并 SHA: a7eae67
 - V1.10.1 SP1 数据治理：识别 orgL4 空异常项目，回款看板(/payment + /panalysis 五页)硬排除、治理页新增告警、项目清单挂「数据异常」标记。合并 SHA: 38fe4bf
