@@ -110,6 +110,17 @@ describe('标签筛选', () => {
   })
 })
 
+describe('isAnomalous 标记', () => {
+  it('orgL4 空行标 isAnomalous=true', () => {
+    const rows = buildProjectRows([
+      { projectId: 'A', projectName: 'a', orgL4: '组1' } as any,
+      { projectId: 'X', projectName: 'x', orgL4: '' } as any,
+    ], {})
+    expect(rows.find((r) => r.projectId === 'A')!.isAnomalous).toBe(false)
+    expect(rows.find((r) => r.projectId === 'X')!.isAnomalous).toBe(true)
+  })
+})
+
 describe('paused/overspend 扩展(P4 风险焦点行)', () => {
   const PM2: Record<string, any> = {
     'QABJ-SS-1': { status: { 是否暂停: true }, cost: { 项目超支: true } },
