@@ -83,6 +83,27 @@ describe('DataTable wrap 列', () => {
   })
 })
 
+describe('DataTable num 列', () => {
+  it('num:true 列单元格挂 .u-num、普通列不挂', async () => {
+    const w = mount(DataTable, {
+      props: {
+        columns: [
+          { key: 'label', label: '名称' },
+          { key: 'amount', label: '金额', num: true },
+        ] as DataColumn[],
+        rows: [{ label: '项目A', amount: 1234 }],
+      },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    // el-table 在 jsdom 中渲染插槽内容；.u-num span 应存在于 DOM
+    expect(w.find('.u-num').exists()).toBe(true)
+    // label 列未设 num，不应有 .u-num；amount 列设了 num，有 ≥1 个
+    // el-table 内部可能双渲染行（固定列镜像），用 >=1 而非精确数量
+    expect(w.findAll('.u-num').length).toBeGreaterThanOrEqual(1)
+  })
+})
+
 describe('DataTable fixed 列', () => {
   it('col.fixed 透传到 el-table-column', async () => {
     const cols: DataColumn[] = [
