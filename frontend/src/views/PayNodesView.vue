@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
+import SegToggle from '@/components/SegToggle.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { paymentNodeRows, nodeSummary, filterProjects, PAY_FACET_DIMS } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
 
-const props = defineProps<{ dim: string }>()
+const dim = ref<'dept' | 'stage' | 'tier' | 'progress'>('dept')
+const DIM_OPTS = PAY_FACET_DIMS.map((d) => ({ value: d.key, label: d.label }))
 const data = useDataStore()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()
@@ -29,8 +31,8 @@ const sum = computed(() => nodeSummary(rows.value))
 
 // 按选中维度分组（spec §3：节点 tab 可按维度分组；维度已 join 到节点所属项目）
 // 维度 key 'stage' 取项目阶段字段 projStage（区别于节点阶段名 stage）
-const dimField = computed(() => (props.dim === 'stage' ? 'projStage' : props.dim))
-const dimLabel = computed(() => PAY_FACET_DIMS.find((d) => d.key === props.dim)?.label ?? '维度')
+const dimField = computed(() => (dim.value === 'stage' ? 'projStage' : dim.value))
+const dimLabel = computed(() => PAY_FACET_DIMS.find((d) => d.key === dim.value)?.label ?? '维度')
 const byDim = computed(() => {
   const m: Record<string, { count: number; reached: number; delayed: number; pending: number; exp: number }> = {}
   for (const r of rows.value) {
@@ -62,6 +64,10 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
 
 <template>
   <div class="nodes-tab">
+    <div class="pv-ctl">
+      <span class="pv-label">维度</span>
+      <SegToggle v-model="dim" :options="DIM_OPTS" />
+    </div>
     <section class="nsum u-num">
       <div class="ns"><span class="ns-l">节点总数</span><span class="ns-v">{{ sum.total }}</span></div>
       <div class="ns"><span class="ns-l">已回款</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></div>
@@ -96,6 +102,8 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
 </template>
 
 <style scoped>
+.pv-ctl { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--gap-card); }
+.pv-label { font-size: var(--fs-1); color: var(--mut); }
 .nsum { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--gap-card); margin-bottom: var(--gap-section); }
 .dim-summary { margin-bottom: var(--gap-section); }
 .ds-head { font-size: var(--fs-2); color: var(--sub); margin-bottom: var(--sp-2); }

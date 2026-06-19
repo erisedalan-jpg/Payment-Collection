@@ -25,10 +25,14 @@ export const PROJECT_LINKS: NavLink[] = [
   { label: '项目分析', to: '/insight' },
 ]
 
-// 回款重点子域（spec 2：分组低一级呈现；P6 归并多维看板+业务分析为「回款分析」单入口 /panalysis）
+// 回款重点子域（SP4 拆分：/panalysis 单入口拆为 /payment/* 五页独立路由）
 export const PAYMENT_LINKS: NavLink[] = [
   { label: '回款总览', to: '/payment' },
-  { label: '回款分析', to: '/panalysis/board' },
+  { label: '多维看板', to: '/payment/board' },
+  { label: '回款项目', to: '/payment/projects' },
+  { label: '回款节点', to: '/payment/nodes' },
+  { label: '回款进度', to: '/payment/plan' },
+  { label: '风险项目', to: '/payment/risk' },
   { label: '回款日历', to: '/calendar' },
   { label: '回款台账', to: '/ledger' },
 ]
