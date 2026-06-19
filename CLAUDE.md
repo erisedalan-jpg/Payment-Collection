@@ -6,11 +6,9 @@
 
 ## 1. 这是什么
 
-> ⚠️ 重写进行中：前端正由原生 JS 迁移到 `frontend/` 下的 Vue3+Vite+TS（见"前端"节与 PROGRESS.md Phase B）。下方第 1-2 节对旧前端（app.js/analysis_data.js）的描述将在 Phase C 旧版删除后更新；后端数据现已输出 `data/analysis_data.json`（非 .js）。
+一个**单机/内网离线**运行的项目管理与回款（收款）跟踪看板。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**（旧原生 JS 前端 app.js/index.html/analysis_data.js 已退役删除；后端输出 `data/analysis_data.json`）。数据源以 **PMIS 导出**（`input/pmis/` 9 表 + `input/*.csv`：收款阶段/回款流水/预算）为核心，`组织架构.xlsx` 决定项目花名册，`A.xlsx` 售前↔原项目映射；WPS 云文档仅残留少量历史依赖。可用 PyInstaller 打包成单 exe 分发。
 
-一个**单机/内网离线**运行的项目回款（收款）跟踪看板工具。后端是纯 Python 标准库的本地 HTTP 服务，前端是原生 HTML/CSS/JS（无构建工具），数据源是 WPS 云文档。可用 PyInstaller 打包成单 exe 分发。
-
-- 当前版本：**V1.0.0**（2026-06-12 重置；单一来源 `frontend/src/version.ts`，改版本只改此处）
+- 当前版本：见 `frontend/src/version.ts`（撰写时 **V1.15.0**；单一来源，改版本只改此处，本文件不逐版同步）；版本史/各期结论见 `PROGRESS.md`
 - 产品名称：**项目管理平台**（2026-06-12 起；桌面快捷方式/.vbs/.bat/exe 文件名仍为旧名「项目回款跟踪与管控平台」，随下次打包专项更名）
 - 访问地址：`http://localhost:8080`
 - 交流语言：**简体中文**
@@ -18,27 +16,33 @@
 ## 2. 架构地图（按数据流）
 
 ```
-WPS云文档 ──fetch_yundocs_full.py(Playwright抓取)──> yundocs_data/*.json,*.csv
-                                                          │
-                                          preprocess_data.py(清洗+计算指标)
-                                                          │
-                                                          v
-                                              data/analysis_data.js   (前端唯一数据源, ~2.2MB)
-                                                          │  <script> 注入全局 ANALYSIS_DATA
-                                                          v
-   index.html ──> app.js(全部前端逻辑, ~7900行) + lib/echarts + lib/xlsx
-                                                          ▲
-                              server.py(本地HTTP: 静态服务 + /api/*) ┘
+PMIS 9 表(input/pmis/*.xlsx) ┐
+组织架构.xlsx / A.xlsx(售前映射) │
+收款阶段 collection_stages.csv  ├─ preprocess_data.py(各域解析+计算+快照diff)
+回款流水 payment_records.csv    │     模块: pmis/projects/collection_stages/
+预算 profit_loss_*/budget/delivery│           milestones/profit/snapshots
+WPS 残留(项目验收 sheet,可选)   ┘                    │
+                                                     v
+                                   data/analysis_data.json  (前端唯一数据源, 经 schema 校验)
+                                                     │  fetch('/data/analysis_data.json')
+                                                     v
+   frontend/ Vue3+Vite+TS (router / views / components / lib(纯计算口径) / stores / charts) + ECharts + xlsx
+                                                     ▲
+        server.py(本地HTTP: 静态 + /data + /api/*) ┘
 ```
 
-| 文件 | 职责 |
+| 文件/目录 | 职责 |
 |---|---|
-| `server.py` | 本地 HTTP 服务：静态文件 + `/api/sync`(SSE) / `/api/import` / `/api/clear-data` / `/api/followup/*` / `/api/stop` |
-| `fetch_yundocs_full.py` | 用 Playwright 打开 WPS 云文档，抓取各 Sheet → `yundocs_data/` |
-| `preprocess_data.py` | **核心算法**：解析金额/日期/比例，计算看板/分层/分类指标 → `data/analysis_data.js` |
-| `write_followup.py` | 把本地跟进记录回写到 WPS 云文档 |
-| `app.js` | 前端全部逻辑（看板、日历、台账、跟进、图表、数据管理…），函数挂 `window`，靠内联 `onclick` 调用 |
-| `data/followup_records.json` | 本地跟进记录持久化 |
+| `server.py` | 本地 HTTP：静态 + `/data` + `/api/sync`(SSE) / `/api/import` / `/api/reprocess`(更新数据,SSE) / `/api/clear-data` / `/api/followup/*` / `/api/tags` / `/api/manual/*` / `/api/pmis/*`(下载) / 历史回滚 / `/api/stop` |
+| `preprocess_data.py` | **核心管线**：摄取各源→项目主域/回款/健康/治理指标→`data/analysis_data.json`（经 schema 校验）；末段 9f 系统核心口径回款回填 |
+| `pmis.py` / `projects.py` / `collection_stages.py` / `milestones.py` / `profit.py` | 各数据域解析：PMIS 项目域 / 主域 join / 收款阶段节点 / 里程碑 / 预算流水 |
+| `schema.py` | pydantic 数据契约 + 导出 JSON Schema 供前端 `npm run gen:types` |
+| `snapshots.py` | 快照 diff → 事件流/周期对比（项目动态） |
+| `data_history.py` / `manual_history.py` / `manual_import.py` / `pmis_download.py` | 数据历史快照回滚 / 人工导入 / PMIS 在线下载 |
+| `fetch_yundocs_full.py` | Playwright 抓 WPS（残留，多为历史依赖；rawNodes 旧口径已全局下线） |
+| `frontend/` | Vue3 前端：`router/`(路由) `views/`(页面) `components/` `lib/`(纯计算口径) `stores/`(Pinia) `charts/` `styles/theme.css`(设计令牌单一落地) |
+| `data/followup_records.json` / `data/project_tags.json` | 本地跟进记录 / 项目标签持久化 |
+| `input/` / `yundocs_data/` | 数据源输入（PMIS+CSV）/ WPS 抓取落地 |
 | `停止服务.py/.bat/.command`、`*_启动.bat/.command` | 启停脚本（Windows / macOS） |
 
 ## 3. 运行 / 调试
@@ -69,6 +73,14 @@ pip install playwright && playwright install chromium
 - 云同步操作必须有**明确进度反馈**，不能让用户对成功与否无感知。
 - **版本策略（2026-06-12 起，用户钦定）**：三位版本 `VX.Y.Z`——X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。单一来源 `frontend/src/version.ts`，改版本只改此处。
 - 前端样式改动倾向于补充 CSS 完善表现，而非引入框架。
+
+### 回款口径约定（2026-06-19 起，V1.15.0；改任一处先全仓核对）
+- **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外（已记技术债）**：`/insight` 项目分析的"回款完成率"仍用 节点已收/PMIS合同总额，与主口径不同源。
+- **回款数据核心源 = `input/collection_stages.csv`**（PMIS 收款阶段台账导出，已入"数据更新"流程）。售前项目收款阶段节点**按本项目号优先取、缺再回退原项目号**（`_collection_nodes_for`）；台账把售前节点挂在本项目号下。
+- **异常项目（`orgL4` 空）排除出回款统计**（`lib/anomaly.isAnomalous`）：回款看板硬排除、治理页告警、项目清单标「数据异常」。
+- **回款节点只为在建主域（`dept_projects`=PMIS 在建∩组织架构交付三部）及售前原项目构建**；已关闭/域外项目的收款阶段不进在建回款看板（设计边界，非缺陷）。
+- **回款子域路由**：`/payment`(总览) + `/payment/{board,projects,nodes,plan,risk}`（V1.13.0 由旧 `/panalysis` 拆分；旧路径仍 redirect 兼容）。
+- **日期区间口径（V1.11.0）**：FilterBar 起止日期，计划侧按节点 planDate∈区间、已回款按流水到账日∈区间；"全部"区间≡全时口径（回归安全网）。
 
 ## 设计底层规范（展示形式）
 
@@ -112,7 +124,7 @@ python -m pytest -q
 
 - `preprocess_data.py` 的纯函数（金额/日期/比例解析）有 pytest 覆盖，见 `tests/`。
 - 改了 `preprocess_data.py` 的计算逻辑，**先补/改测试再改实现**。
-- 改了前端，至少手动启动一次确认看板能加载、无 JS 报错（页面右下角会红条显示 `window.onerror`）。
+- 改了前端，至少手动启动一次（`python server.py` + `cd frontend && npm run dev`）确认相关页面能加载、无 console 报错；改口径/数据层时用真实数据冒烟核对关键指标（如回款达成率落在合理区间）。
 
 ## 7. 范围与完成定义（harness: Scope）
 
@@ -122,7 +134,8 @@ python -m pytest -q
 
 ## 8. 已知重大技术债（详见 PROGRESS.md backlog）
 
-- `server.py` 用单线程 `HTTPServer`，同步 SSE 期间会阻塞全站（含"停止同步"）。
+- `server.py` 用单线程 `HTTPServer`，同步/更新 SSE 期间会阻塞全站（含"停止"）。
 - 服务绑定 `("", 8080)` = 所有网卡，无认证。
-- `app.js` 7900 行单文件 + 140 处 innerHTML 拼接；`analysis_data.js` 以 `<script>` 全量加载。
-- `index.html` 离线工具却外链 Google Fonts。
+- `data/analysis_data.json` 全量 fetch（~2MB），前端一次性加载；vite 构建产物单 chunk >500KB（未做代码分割）。
+- `/insight` 项目分析"回款完成率"口径（节点已收/PMIS合同）与主域口径（流水/合同）不同源，待归并统一。
+- `collection_stages.csv` 导出端覆盖风险：导出脚本若漏在建项目则其回款节点静默缺失（无校验告警）——建议加"在建项目收款阶段覆盖率"治理告警。
