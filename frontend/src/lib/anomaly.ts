@@ -6,7 +6,7 @@ export function isAnomalous(p: Pick<Project, 'orgL4'>): boolean {
   return !((p.orgL4 ?? '').trim())
 }
 
-export interface AnomalyRow { projectId: string; projectName: string; reason: string }
+export interface AnomalyRow extends Record<string, unknown> { projectId: string; projectName: string; reason: string }
 
 /** 治理页告警明细行。 */
 export function anomalyRows(projects: Pick<Project, 'projectId' | 'projectName' | 'orgL4'>[]): AnomalyRow[] {

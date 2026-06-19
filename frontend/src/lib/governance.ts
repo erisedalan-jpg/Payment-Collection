@@ -1,4 +1,5 @@
 import type { AnalysisData } from '@/types/analysis'
+import { anomalyRows } from './anomaly'
 
 // 数据治理「健康检查」视图模型(P8 spec §2):纯函数聚合 meta+dataQuality+projectsQuality,零后端依赖。
 export type Verdict = 'red' | 'yellow' | 'green'
@@ -149,6 +150,11 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
   alerts.push({ key: 'dirty', label: '脏值', severity: 'low', count: dirty.length,
     columns: [{ key: 'type', label: '类型' }, { key: 'projectId', label: '项目编号' }, { key: 'field', label: '字段' }, { key: 'value', label: '值' }],
     rows: dirty })
+
+  const anomalies = anomalyRows(data.projects ?? [])
+  alerts.push({ key: 'l4Missing', label: '回款排除：服务组 L4 缺失', severity: 'mid', count: anomalies.length,
+    columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' }, { key: 'reason', label: '原因' }],
+    rows: anomalies, exportName: '回款排除-L4缺失.xlsx' })
 
   alerts.sort((a, b) =>
     (a.count === 0 ? 1 : 0) - (b.count === 0 ? 1 : 0) || SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.count - a.count)
