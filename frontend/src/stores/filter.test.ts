@@ -27,10 +27,11 @@ function withData() {
 }
 
 describe('filter store', () => {
-  it('defaults: dateStart/dateEnd empty(全部), view=global', () => {
+  it('defaults: dateStart/dateEnd 本年度, view=global', () => {
     const f = useFilterStore()
-    expect(f.dateStart).toBe('')
-    expect(f.dateEnd).toBe('')
+    const y = new Date().getFullYear()
+    expect(f.dateStart).toBe(`${y}-01-01`)
+    expect(f.dateEnd).toBe(`${y}-12-31`)
     expect(f.viewMode).toBe('global')
   })
 
