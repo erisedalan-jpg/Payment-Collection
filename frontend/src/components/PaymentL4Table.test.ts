@@ -162,6 +162,16 @@ describe('PaymentL4Table', () => {
     expect(textAll).not.toBe(textYear)
   })
 
+  it('数字列单元格含 .u-num（tabular-nums 约束）', async () => {
+    seed()
+    useFilterStore().setPreset('all')
+    const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    // 10 个数字列每行应有 .u-num；2 行数据 → 至少 10 个 .u-num 元素
+    const numCells = w.findAll('.u-num')
+    expect(numCells.length).toBeGreaterThanOrEqual(10)
+  })
+
   it('空数据显示空态提示', async () => {
     const data = useDataStore()
     data.data = {

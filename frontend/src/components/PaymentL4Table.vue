@@ -33,16 +33,16 @@ const rows = computed(() => {
 
 const COLUMNS: DataColumn[] = [
   { key: 'value', label: 'L4组', width: 130, sortable: true },
-  { key: 'projectCount', label: '项目数', width: 84, sortable: true },
-  { key: 'contractSum', label: '合同额(万)', width: 110, sortable: true, formatter: (v) => fmtWan(v as number) },
-  { key: 'actualSum', label: '已回款(万)', width: 110, sortable: true, formatter: (v) => fmtWan(v as number) },
-  { key: 'rate', label: '回款额完成率', width: 110, sortable: true, formatter: (v) => fmtRatio(v as number | null) },
-  { key: 'delayedProjectCount', label: '延期项目数', width: 96, sortable: true },
-  { key: 'delayedNodeSum', label: '延期节点', width: 90, sortable: true },
-  { key: 'delayedAmountSum', label: '延期金额(万)', width: 110, sortable: true, formatter: (v) => fmtWan(v as number) },
-  { key: 'nodeSum', label: '回款节点数', width: 100, sortable: true },
-  { key: 'reachedSum', label: '完成节点数', width: 100, sortable: true },
-  { key: 'reachedRatio', label: '完成节点比例', width: 110, sortable: true, formatter: (v) => fmtRatio(v as number | null) },
+  { key: 'projectCount', label: '项目数', width: 84, sortable: true, num: true },
+  { key: 'contractSum', label: '合同额(万)', width: 110, sortable: true, num: true, formatter: (v) => fmtWan(v as number) },
+  { key: 'actualSum', label: '已回款(万)', width: 110, sortable: true, num: true, formatter: (v) => fmtWan(v as number) },
+  { key: 'rate', label: '回款额完成率', width: 110, sortable: true, num: true, formatter: (v) => fmtRatio(v as number | null) },
+  { key: 'delayedProjectCount', label: '延期项目数', width: 96, sortable: true, num: true },
+  { key: 'delayedNodeSum', label: '延期节点', width: 90, sortable: true, num: true },
+  { key: 'delayedAmountSum', label: '延期金额(万)', width: 110, sortable: true, num: true, formatter: (v) => fmtWan(v as number) },
+  { key: 'nodeSum', label: '回款节点数', width: 100, sortable: true, num: true },
+  { key: 'reachedSum', label: '完成节点数', width: 100, sortable: true, num: true },
+  { key: 'reachedRatio', label: '完成节点比例', width: 110, sortable: true, num: true, formatter: (v) => fmtRatio(v as number | null) },
 ]
 </script>
 
