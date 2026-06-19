@@ -22,6 +22,8 @@ export interface PayBoardRow {
   industry: string
   tier: string
   progress: string
+  projectLevel: string
+  tags: string[]
   contract: number
   actualTotal: number
   expectedTotal: number
@@ -39,10 +41,12 @@ export function buildPayBoardRows(
   paymentRecords?: Paymentrecords,
   start = '',
   end = '',
+  tagAssignments?: Record<string, string[]>,
 ): PayBoardRow[] {
   return projects.map((p) => {
     const pmis = p.paymentPmis ?? null
     const cust = (pmisMap?.[p.projectId]?.customer ?? {}) as Record<string, unknown>
+    const stat = (pmisMap?.[p.projectId]?.status ?? {}) as Record<string, unknown>
     const dept = deriveDept(p)
     const manager = v(p.projectManager)
     const rp = paymentPmisInRange(
@@ -64,6 +68,8 @@ export function buildPayBoardRows(
       industry: v(cust['行业']),
       tier: deriveTier(rp.contract),
       progress,
+      projectLevel: v(stat['项目级别']),
+      tags: tagAssignments?.[p.projectId] ?? [],
       contract: rp.contract,
       actualTotal: rp.actualTotal,
       expectedTotal: rp.expectedTotal,
@@ -77,23 +83,23 @@ export function buildPayBoardRows(
 }
 
 export interface PayBoardDimDef {
-  key: 'dept' | 'stage' | 'manager' | 'industry' | 'tier' | 'progress'
+  key: 'dept' | 'projectLevel' | 'industry' | 'stage' | 'tag'
   label: string
+  multi?: boolean   // tag 为 true：分组时按标签炸开
 }
 export const PAY_BOARD_DIMENSIONS: PayBoardDimDef[] = [
-  { key: 'dept', label: '部门' },
-  { key: 'stage', label: '阶段' },
-  { key: 'manager', label: '项目经理' },
+  { key: 'dept', label: 'L4部门' },
+  { key: 'projectLevel', label: '项目级别' },
   { key: 'industry', label: '行业' },
-  { key: 'tier', label: '金额档' },
-  { key: 'progress', label: '进度态' },
+  { key: 'stage', label: '项目阶段' },
+  { key: 'tag', label: '标签', multi: true },
 ]
 export const PAY_BOARD_DIM_BY_KEY: Record<string, PayBoardDimDef> = Object.fromEntries(
   PAY_BOARD_DIMENSIONS.map((d) => [d.key, d]),
 )
 
 export type PayBoardMetricKey =
-  | 'projectCount' | 'contractSum' | 'actualSum' | 'expectedSum' | 'pendingSum' | 'rate' | 'delayedNodeSum'
+  | 'projectCount' | 'contractSum' | 'expectedSum' | 'rate' | 'delayedNodeSum'
 export interface PayBoardMetricDef {
   key: PayBoardMetricKey
   label: string
@@ -102,11 +108,9 @@ export interface PayBoardMetricDef {
 export const PAY_BOARD_METRICS: PayBoardMetricDef[] = [
   { key: 'projectCount', label: '项目数', kind: 'count' },
   { key: 'contractSum', label: '合同总额', kind: 'money' },
-  { key: 'actualSum', label: '已回款', kind: 'money' },
   { key: 'expectedSum', label: '计划回款', kind: 'money' },
-  { key: 'pendingSum', label: '待回款', kind: 'money' },
   { key: 'rate', label: '完成率', kind: 'rate' },
-  { key: 'delayedNodeSum', label: '延期节点数', kind: 'count' },
+  { key: 'delayedNodeSum', label: '延期节点', kind: 'count' },
 ]
 export const PAY_BOARD_METRIC_BY_KEY: Record<string, PayBoardMetricDef> = Object.fromEntries(
   PAY_BOARD_METRICS.map((m) => [m.key, m]),
@@ -143,17 +147,36 @@ function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoa
   }
 }
 
-/** 按 1..N 维分桶(桶 key=各维取值以 " / " 连接),算 7 指标(加权完成率 Σ÷Σ);默认按项目数降序 */
+/** 取某行在某维的取值列表：multi 维(tag)可多值(空→['无标签'])，其余维恒单值 */
+function dimValuesOf(row: PayBoardRow, def: PayBoardDimDef): string[] {
+  if (def.multi) {
+    const arr = row.tags
+    return arr && arr.length ? arr : ['无标签']
+  }
+  const raw = (row as unknown as Record<string, unknown>)[def.key]
+  return [raw == null || String(raw).trim() === '' ? '未指定' : String(raw)]
+}
+
+/** 按 1..N 维分桶(桶 key=各维取值 ' / ' 连接),算指标(加权完成率 Σ÷Σ);默认按项目数降序。
+ *  含 multi 维(tag)时按各维取值笛卡尔积炸开,一行可计入多桶(标准多标签 faceting,组间重复计数);
+ *  非 multi 维全程每行每维恰一值,笛卡尔积退化为现状(零回归)。 */
 export function groupPayBoard(rows: PayBoardRow[], dimKeys: string[]): PayBoardGroup[] {
   const defs = dimKeys.map((k) => PAY_BOARD_DIM_BY_KEY[k]).filter(Boolean)
   if (!defs.length) return []
-  const buckets: Record<string, PayBoardRow[]> = {}
+  const buckets: Record<string, { values: string[]; rows: PayBoardRow[] }> = {}
   for (const r of rows) {
-    const key = defs.map((d) => r[d.key]).join(' / ')
-    ;(buckets[key] ||= []).push(r)
+    let combos: string[][] = [[]]
+    for (const d of defs) {
+      const vals = dimValuesOf(r, d)
+      combos = combos.flatMap((c) => vals.map((val) => [...c, val]))
+    }
+    for (const combo of combos) {
+      const key = combo.join(' / ')
+      ;(buckets[key] ||= { values: combo, rows: [] }).rows.push(r)
+    }
   }
   return Object.entries(buckets)
-    .map(([key, grows]) => buildGroup(key, defs.map((d) => grows[0][d.key]), grows))
+    .map(([key, b]) => buildGroup(key, b.values, b.rows))
     .sort((a, b) => b.projectCount - a.projectCount)
 }
 

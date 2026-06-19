@@ -46,8 +46,6 @@ describe('BoardView', () => {
     const w = mount(BoardView, opts)
     // 维度标签（DimPicker/SegToggle）
     expect(w.text()).toContain('部门')
-    expect(w.text()).toContain('金额档')
-    expect(w.text()).toContain('进度态')
     // 单维排名表指标列标签
     expect(w.text()).toContain('合同总额(万)')
     expect(w.text()).toContain('已回款(万)')
@@ -65,8 +63,8 @@ describe('BoardView', () => {
     seed()
     const w = mount(BoardView, opts)
     await w.get('[data-test="seg-cross"]').trigger('click')
-    const tierBtns = w.findAll('[data-test="seg-tier"]')
-    await tierBtns[tierBtns.length - 1].trigger('click')
+    const stageBtns = w.findAll('[data-test="seg-stage"]')
+    await stageBtns[stageBtns.length - 1].trigger('click')
     expect(w.find('.bm').exists()).toBe(true)
   })
 
