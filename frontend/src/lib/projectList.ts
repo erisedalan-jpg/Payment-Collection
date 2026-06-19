@@ -1,4 +1,5 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
+import { isAnomalous } from './anomaly'
 
 // 项目清单行：projects[](P1 主域) join projectPmis[id] 的扁平展示模型
 export interface ProjectRow {
@@ -24,6 +25,7 @@ export interface ProjectRow {
   paused: boolean
   overspend: boolean
   tags?: string[]
+  isAnomalous: boolean
 }
 
 // 收窄后只保留特殊项筛选（列枚举筛选已迁至 crossFilter 表头）
@@ -76,6 +78,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       paused: status.是否暂停 === true,
       overspend: cost.项目超支 === true,
       tags: assignments?.[p.projectId] ?? [],
+      isAnomalous: isAnomalous(p),
     }
   })
 }
