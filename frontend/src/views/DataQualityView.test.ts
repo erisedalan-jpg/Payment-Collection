@@ -15,7 +15,7 @@ function seed(over: Record<string, any> = {}) {
     meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
     dashboard: {}, summary: {}, projectOverview: {},
     // yundocsOk 换 projects.length>0(3E-2):非空主域 → 云文档主数据已就绪
-    projects: [{ projectId: 'P-1' }],
+    projects: [{ projectId: 'P-1', orgL4: 'A组' }],
     rawNodes: [{ projectId: 'P-1', tier: 't', isPaymentRelated: true }],
     dataQuality: {
       summary: { pmisProvided: true, joinRate: 0.95, matchedActive: 8, matchedClosed: 2, unmatched: 1, lastPmisUpdate: '2026-06-11' },
