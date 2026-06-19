@@ -7,7 +7,7 @@ import type { CalListGroup } from '@/lib/calendar'
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
 const GROUPS: CalListGroup[] = [
-  { key: '延期', color: '#EF4444', nodes: [{ projectId: 'P1', projectName: '甲', nodeStatus: '延期' }] as any, subRemaining: 100000 },
+  { key: '延期', color: 'var(--danger)', nodes: [{ projectId: 'P1', projectName: '甲', nodeStatus: '延期' }] as any, subRemaining: 100000 },
 ]
 
 describe('CalDayDetail', () => {

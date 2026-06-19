@@ -23,7 +23,7 @@ describe('PendingBarChart', () => {
     expect(option.xAxis.data).toEqual(['2026-Q1', '2026-Q2'])
     expect(option.series[0].data).toEqual([100, 0])
   })
-  it('assigns tier colors in order (red/orange/green)', () => {
+  it('assigns tier colors in order (danger/warn/ok)', () => {
     const wrapper = mount(PendingBarChart, {
       props: {
         categories: ['Q1'],
@@ -35,8 +35,8 @@ describe('PendingBarChart', () => {
       },
     })
     const option = wrapper.findComponent(ChartBox).props('option') as any
-    expect(option.series[0].itemStyle.color).toBe('#EF4444')
-    expect(option.series[1].itemStyle.color).toBe('#F59E0B')
-    expect(option.series[2].itemStyle.color).toBe('#10B981')
+    expect(option.series[0].itemStyle.color).toBe('#c8161d')
+    expect(option.series[1].itemStyle.color).toBe('#f9d46c')
+    expect(option.series[2].itemStyle.color).toBe('#6ecc54')
   })
 })

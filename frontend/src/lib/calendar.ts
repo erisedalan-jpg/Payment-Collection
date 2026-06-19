@@ -116,10 +116,10 @@ export function calListNodes(naguanNodes: PayNodeRow[], f: CalFilters, view: { y
 
 export interface CalListGroup { key: string; color: string; nodes: PayNodeRow[]; subRemaining: number }
 const LIST_STATUS_ORDER = [
-  { key: '延期', color: '#EF4444' },
-  { key: '待回款', color: '#94A3B8' },
-  { key: '部分回款', color: '#3B82F6' },
-  { key: '质保期', color: '#F59E0B' },
+  { key: '延期', color: 'var(--danger)' },
+  { key: '待回款', color: 'var(--mut)' },
+  { key: '部分回款', color: 'var(--c-plan)' },
+  { key: '质保期', color: 'var(--warn)' },
 ]
 /** 按 4 态分组(顺序固定,空组略,subRemaining=Σ未收)。 */
 export function calListGroups(nodes: PayNodeRow[]): CalListGroup[] {
