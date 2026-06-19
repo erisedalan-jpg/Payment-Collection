@@ -16,7 +16,7 @@ export function deriveTier(contract: number | null | undefined): string {
   return '50万以下'
 }
 
-/** 进度态：由节点级 payment.paymentRatio(Σ已收÷Σ计划)派生。无合同→未知；ratio 0/null 且有合同→未回款。 */
+/** 进度态：由节点级 payment.paymentRatio(流水÷合同)派生。无合同→未知；ratio 0/null 且有合同→未回款。 */
 export function deriveProgress(contract: number | null | undefined, nodeRatio: number | null | undefined): string {
   if (contract == null || contract <= 0) return '未知'
   const r = nodeRatio
