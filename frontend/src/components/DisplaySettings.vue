@@ -34,6 +34,6 @@ const FONTS: { key: FontScale; label: string }[] = [
 .seg-btn { border: none; background: var(--card); color: var(--sub); cursor: pointer;
   font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); }
 .seg-btn + .seg-btn { border-left: 1px solid var(--line); }
-.seg-btn.on { background: var(--accent); color: #fff; font-weight: 700; }
+.seg-btn.on { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .seg-btn:hover:not(.on) { color: var(--txt); }
 </style>

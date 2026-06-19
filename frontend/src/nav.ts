@@ -4,9 +4,9 @@ export interface TierTab { label: string; tab: string }
 export interface TierOpt { label: string; slug: string; color: string }
 
 export const TIERS: TierOpt[] = [
-  { label: '100万以上', slug: 'above1m', color: 'var(--red, #ef4444)' },
-  { label: '50-100万', slug: '50to100', color: 'var(--orange, #f59e0b)' },
-  { label: '50万以下', slug: 'below50', color: 'var(--green, #10b981)' },
+  { label: '100万以上', slug: 'above1m', color: 'var(--danger)' },
+  { label: '50-100万', slug: '50to100', color: 'var(--warn)' },
+  { label: '50万以下', slug: 'below50', color: 'var(--ok)' },
 ]
 
 export const TIER_TABS: TierTab[] = [
