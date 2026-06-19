@@ -6,10 +6,13 @@ import { computeKpis, healthSummary, paymentBand } from './overview'
 const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
 // orgL4 非空 = 正常项目（P-3 无 orgL4 = 异常项目，回款达成率应排除）
+// paymentPmis.contract 为合同总额，作为达成率分母（P-1=2000, P-2=1500; P-3 异常排除）
 const PROJECTS = [
   { projectId: 'P-1', projectName: '甲', orgL4: '交付一组', payment: { ...PAY0, expectedTotal: 1000, actualTotal: 600 }, deliveryCosts: [],
+    paymentPmis: { contract: 2000 },
     health: { progressAbnormal: true, riskAbnormal: true, costAbnormal: false, paymentAbnormal: false, overall: '风险' } },
   { projectId: 'P-2', projectName: '乙', orgL4: '交付二组', payment: { ...PAY0, expectedTotal: 1000, actualTotal: 0 }, deliveryCosts: [],
+    paymentPmis: { contract: 1500 },
     health: { progressAbnormal: false, riskAbnormal: false, costAbnormal: true, paymentAbnormal: false, overall: '关注' } },
   { projectId: 'P-3', projectName: '丙', payment: { ...PAY0 }, deliveryCosts: [],
     health: { overall: '健康' } },
@@ -28,8 +31,8 @@ describe('computeKpis', () => {
     expect(k.paused).toBe(1)
     expect(k.highRisk).toBe(1)
     expect(k.overspend).toBe(1)
-    // 无 paymentRecords 时退化节点 actualTotal: 600/(1000+1000) = 0.3
-    expect(k.paymentRatio).toBeCloseTo(0.3)
+    // 无 paymentRecords 时退化节点 actualTotal: P-1=600; 分母改为 Σcontract=2000+1500=3500
+    expect(k.paymentRatio).toBeCloseTo(600 / 3500)
   })
   it('传入 paymentRecords 时分子改用全量流水(全时 start=end=\'\')', () => {
     // P-1 流水 800, P-2 流水 500; P-3 异常排除; 分母仍 expectedTotal=2000
@@ -38,8 +41,8 @@ describe('computeKpis', () => {
       'P-2': { records: [{ amount: 300, date: '2025-12-01' } as any], },
     }
     const k = computeKpis(PROJECTS, PMIS, records as any)
-    // 流水: P-1=800, P-2=300(含往年全量); 分母 expectedTotal: P-1=1000, P-2=1000
-    expect(k.paymentRatio).toBeCloseTo(1100 / 2000)
+    // 流水: P-1=800, P-2=300(含往年全量); 分母改为 Σcontract=2000+1500=3500
+    expect(k.paymentRatio).toBeCloseTo(1100 / 3500)
   })
   it('计划为 0 → 达成率 null', () => {
     // P-3 orgL4 为空 = 异常, 排除后 exp=0 → null

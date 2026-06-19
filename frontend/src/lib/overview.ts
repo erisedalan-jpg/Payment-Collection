@@ -15,7 +15,7 @@ export interface OverviewKpis {
   paymentRatio: number | null
 }
 
-/** 回款达成率:分子=Σ流水(排除异常)，分母=Σ计划 expectedTotal(排除异常)。
+/** 回款达成率:分子=Σ流水(排除异常)，分母=Σ合同 paymentPmis.contract(排除异常)。
  *  paymentRecords 传入时分子用全量流水(start=end=''=全时)；未传时退化节点 actualTotal。 */
 export function computeKpis(
   projects: Project[],
@@ -26,7 +26,7 @@ export function computeKpis(
   let paused = 0
   let overspend = 0
   let highRisk = 0
-  let exp = 0
+  let con = 0
   let act = 0
   for (const p of projects) {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
@@ -34,16 +34,16 @@ export function computeKpis(
     if (m.status?.是否暂停 === true) paused++
     if (m.cost?.项目超支 === true) overspend++
     if (p.health?.riskAbnormal) highRisk++
-    // 回款达成率排除异常项目
+    // 回款达成率排除异常项目；分母改为 Σ合同(paymentPmis.contract)
     if (!isAnomalous(p)) {
-      exp += p.payment?.expectedTotal ?? 0
+      con += p.paymentPmis?.contract ?? 0
       // 分子=Σ流水(全时)；无流水表时退化节点汇总
       act += paymentRecords
         ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
         : (p.payment?.actualTotal ?? 0)
     }
   }
-  return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: exp > 0 ? act / exp : null }
+  return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: con > 0 ? act / con : null }
 }
 
 export interface HealthSummary {

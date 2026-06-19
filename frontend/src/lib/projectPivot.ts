@@ -141,17 +141,17 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
     ;(buckets[key] ||= []).push(r)
   }
   const groups = Object.entries(buckets).map(([key, grows]) => {
-    const exp = grows.reduce((s, r) => s + r.expectedTotal, 0)
     const act = grows.reduce((s, r) => s + r.actualTotal, 0)
+    const contractAmount = grows.reduce((s, r) => s + r.contractAmount, 0)
     return {
       key,
       values: defs.map((d) => grows[0][d.key]),
       rows: grows,
       projectCount: grows.length,
-      contractAmount: grows.reduce((s, r) => s + r.contractAmount, 0),
+      contractAmount,
       avgProgress: avg(grows.map((r) => r.progress).filter((x): x is number => x != null)),
       avgCostRatio: avg(grows.map((r) => r.costRatio).filter((x): x is number => x != null)),
-      paymentRatio: exp > 0 ? act / exp : null,
+      paymentRatio: contractAmount > 0 ? act / contractAmount : null,
       delayedProjects: grows.filter((r) => r.delayed).length,
     }
   })
