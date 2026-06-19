@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 import RiskTab from './RiskTab.vue'
 
 function seed() {
@@ -22,7 +23,7 @@ function seed() {
 }
 
 describe('RiskTab(PMIS 风险三类)', () => {
-  beforeEach(() => { setActivePinia(createPinia()) })
+  beforeEach(() => { setActivePinia(createPinia()); useFilterStore().setPreset('all') })
   it('渲染三组标题与命中项', () => {
     seed()
     const w = mount(RiskTab, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })

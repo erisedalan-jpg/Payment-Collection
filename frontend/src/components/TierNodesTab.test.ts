@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 import TierNodesTab from './TierNodesTab.vue'
 import DataTable from '@/components/DataTable.vue'
 
@@ -20,7 +21,7 @@ function seed() {
 }
 
 describe('TierNodesTab', () => {
-  beforeEach(() => { setActivePinia(createPinia()) })
+  beforeEach(() => { setActivePinia(createPinia()); useFilterStore().setPreset('all') })
 
   it('渲染节点行 + 汇总条(总数/已回款/延期/待回款) + 状态徽章', () => {
     seed()

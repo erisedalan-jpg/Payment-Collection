@@ -3,8 +3,9 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import DashMetrics from './DashMetrics.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
 
 describe('DashMetrics', () => {
   it('渲染六个指标含延期数(流水口径)', () => {

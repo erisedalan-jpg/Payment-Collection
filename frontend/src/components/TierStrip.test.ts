@@ -3,8 +3,9 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import TierStrip from './TierStrip.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
 
 describe('TierStrip', () => {
   it('每档渲染一条进度行并显示完成率(收款阶段口径)', () => {
