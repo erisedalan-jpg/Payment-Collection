@@ -4,10 +4,12 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import LedgerView from './LedgerView.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
+  useFilterStore().setPreset('all')
 })
 
 function seed() {
