@@ -22,6 +22,10 @@ const rows = computed(() =>
       excludedIds: filter.excludedIds,
     }),
     (data.data?.projectPmis ?? {}) as Record<string, any>,
+    data.data?.paymentNodes,
+    data.data?.paymentRecords,
+    filter.dateStart,
+    filter.dateEnd,
   ),
 )
 
