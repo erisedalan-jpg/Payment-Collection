@@ -780,6 +780,15 @@ def backfill_final_acceptance(project_pmis, project_milestones):
             project_milestones.get(pid, []), ptype)
 
 
+def _overview_or_empty(overview_sheet):
+    """空/缺失「项目验收日期」sheet 时返回完整 4 元组默认,避免 naguan_exclude 等局部变量未绑定。
+    清空数据后 yundocs_data 为空 → overview_sheet 为 None,此处兜底保证主数据(PMIS 源)仍能产出,
+    不会因 UnboundLocalError 崩在写盘前导致 analysis_data.json 整份丢失。"""
+    if overview_sheet:
+        return process_project_overview(overview_sheet)
+    return [], {}, {}, []
+
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -795,9 +804,9 @@ def main():
     # === 2. 处理项目验收日期Sheet ===
     print("[INFO] 处理 项目验收日期、回款条件信息收集...")
     overview_sheet = load_sheet(config.SHEET_PROJECT_OVERVIEW)
-    overview_sheet_headers = []
+    # 空 sheet(如清空数据后 yundocs_data 为空)也返回完整 4 元组默认,避免 naguan_exclude 未绑定
+    project_overview, naguan_map, naguan_exclude, overview_sheet_headers = _overview_or_empty(overview_sheet)
     if overview_sheet:
-        project_overview, naguan_map, naguan_exclude, overview_sheet_headers = process_project_overview(overview_sheet)
         print(f"  [OK] {len(project_overview)} 个项目, {len(overview_sheet_headers)} 列, 纳管 {sum(1 for v in naguan_map.values() if v)} 个")
     else:
         print("  [WARN] 未找到Sheet: 项目验收日期、回款条件信息收集")
