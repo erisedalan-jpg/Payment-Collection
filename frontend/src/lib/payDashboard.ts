@@ -1,6 +1,6 @@
 import type { Project, PaymentRecordsEntry, PaymentNodePmis } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
-import { filterProjects, type FilterOpts as ProjFilterOpts } from './paymentPmis'
+import { filterProjects, deriveTier, type FilterOpts as ProjFilterOpts } from './paymentPmis'
 import { inRange, actualInRange, hasActivityInRange } from './paymentRange'
 
 export interface PayNodeFilterOpts {
@@ -68,20 +68,32 @@ export interface PayTierStat {
   paidCount: number
 }
 
-/** 单档聚合(字段名贴合 TierStrip 既有用法 expectedAmountWan/actualAmountWan/projectCount/delayedCount)。 */
-export function payTierStats(tier: string, rows: PayNodeRow[]): PayTierStat {
-  const grp = rows.filter((r) => r.tier === tier)
-  const expected = grp.reduce((s, r) => s + r.expectedPayment, 0)
-  const actual = grp.reduce((s, r) => s + r.receivedAmount, 0)
-  const remaining = grp.reduce((s, r) => s + r.unpaidAmount, 0)
+/** 单档聚合：档位由项目合同(deriveTier)定，计划/待回款/延期/节点数=该档位项目节点(计划日∈R)，已回款=Σ该档位项目流水(到账日∈R)。 */
+export function payTierStats(
+  tier: string,
+  projects: Project[],
+  paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
+  paymentRecords: Record<string, PaymentRecordsEntry> | undefined,
+  start: string,
+  end: string,
+): PayTierStat {
+  const grp = projects.filter((p) => deriveTier(p.paymentPmis?.contract) === tier)
+  let expected = 0, remaining = 0, nodeCnt = 0, delayed = 0, paid = 0, actual = 0
+  for (const p of grp) {
+    for (const n of paymentNodes?.[p.projectId] ?? []) if (inRange(n.planDate || '', start, end)) {
+      expected += Number(n.expectedPayment ?? 0); remaining += Number(n.unpaidAmount ?? 0); nodeCnt++
+      if (n.status === '延期') delayed++; if (n.status === '已回款') paid++
+    }
+    actual += actualInRange(paymentRecords?.[p.projectId]?.records, start, end)
+  }
   return {
-    projectCount: new Set(grp.map((r) => r.projectId)).size,
-    relatedNodeCount: grp.length,
+    projectCount: grp.length,
+    relatedNodeCount: nodeCnt,
     expectedAmountWan: expected / 10000,
     actualAmountWan: actual / 10000,
     remainingAmountWan: remaining / 10000,
-    delayedCount: grp.filter((r) => r.status === '延期').length,
-    paidCount: grp.filter((r) => r.status === '已回款').length,
+    delayedCount: delayed,
+    paidCount: paid,
   }
 }
 

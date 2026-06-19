@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { filterPayNodes, payDashSummary, payTierStats } from './payDashboard'
 import type { PayNodeRow } from './paymentPmis'
+import type { Project, PaymentNodePmis, PaymentRecordsEntry } from '@/types/analysis'
 
 function node(p: Partial<PayNodeRow>): PayNodeRow {
   return {
@@ -101,18 +102,72 @@ describe('payDashSummary', () => {
 })
 
 describe('payTierStats', () => {
-  const rows = [
-    node({ projectId: 'P1', tier: '100万以上', expectedPayment: 1000, receivedAmount: 600, unpaidAmount: 400, status: '已回款' }),
-    node({ projectId: 'P1', tier: '100万以上', expectedPayment: 500, receivedAmount: 0, unpaidAmount: 500, status: '延期' }),
-    node({ projectId: 'P2', tier: '50万以下', expectedPayment: 100, receivedAmount: 0, unpaidAmount: 100, status: '待回款' }),
+  // P1: contract=2000000 => 100万以上; P2: contract=600000 => 50-100万; P3: contract=300000 => 50万以下
+  const projects: Project[] = [
+    { projectId: 'P1', projectName: 'A', paymentPmis: { contract: 2000000 } } as any,
+    { projectId: 'P2', projectName: 'B', paymentPmis: { contract: 600000 } } as any,
+    { projectId: 'P3', projectName: 'C', paymentPmis: { contract: 300000 } } as any,
   ]
-  it('单档聚合 Wan + 5态计数', () => {
-    const s = payTierStats('100万以上', rows)
-    expect(s.projectCount).toBe(1)
-    expect(s.expectedAmountWan).toBeCloseTo(0.15)
-    expect(s.actualAmountWan).toBeCloseTo(0.06)
+  // paymentNodes: P1 有两节点(planDate 2026-02-01 在区间内、2026-08-01 不在); P2 节点 2026-02-10 在区间内; P3 节点 2026-02-15 在区间内
+  const paymentNodes: Record<string, PaymentNodePmis[]> = {
+    P1: [
+      { planDate: '2026-02-01', expectedPayment: 1000000, unpaidAmount: 400000, status: '延期' } as any,
+      { planDate: '2026-08-01', expectedPayment: 500000, unpaidAmount: 500000, status: '待回款' } as any,
+    ],
+    P2: [
+      { planDate: '2026-02-10', expectedPayment: 200000, unpaidAmount: 100000, status: '已回款' } as any,
+    ],
+    P3: [
+      { planDate: '2026-02-15', expectedPayment: 80000, unpaidAmount: 80000, status: '待回款' } as any,
+    ],
+  }
+  // paymentRecords: P1 流水 2026-02-15 共 700000; P2 流水 2026-08-20 共 150000(区间外)
+  const paymentRecords: Record<string, PaymentRecordsEntry> = {
+    P1: { records: [{ date: '2026-02-15', amount: 700000 }] } as any,
+    P2: { records: [{ date: '2026-08-20', amount: 150000 }] } as any,
+  }
+  const start = '2026-01-01'
+  const end = '2026-06-30'
+
+  it('按 contract 档位分组，计划/节点数/延期 走节点(planDate∈R)', () => {
+    const s = payTierStats('100万以上', projects, paymentNodes, paymentRecords, start, end)
+    expect(s.projectCount).toBe(1)                         // 只有 P1
+    expect(s.relatedNodeCount).toBe(1)                     // P1 只有 2026-02-01 在区间
+    expect(s.expectedAmountWan).toBeCloseTo(100)           // 1000000/10000
+    expect(s.remainingAmountWan).toBeCloseTo(40)           // 400000/10000
     expect(s.delayedCount).toBe(1)
-    expect(s.paidCount).toBe(1)
+    expect(s.paidCount).toBe(0)
+  })
+
+  it('已回款=Σ流水(actualInRange), 区间外流水不计', () => {
+    const s1 = payTierStats('100万以上', projects, paymentNodes, paymentRecords, start, end)
+    expect(s1.actualAmountWan).toBeCloseTo(70)             // P1 流水 700000/10000
+
+    const s2 = payTierStats('50-100万', projects, paymentNodes, paymentRecords, start, end)
+    expect(s2.actualAmountWan).toBeCloseTo(0)              // P2 流水 2026-08-20 不在区间
+    expect(s2.relatedNodeCount).toBe(1)                    // P2 节点 2026-02-10 在区间
+    expect(s2.paidCount).toBe(1)                           // 节点 status=已回款
+  })
+
+  it('全部不变式: start=end="" 时 relatedNodeCount=全节点数, actualAmountWan=全流水', () => {
+    const s = payTierStats('100万以上', projects, paymentNodes, paymentRecords, '', '')
+    expect(s.relatedNodeCount).toBe(2)                     // P1 全部 2 节点
+    expect(s.actualAmountWan).toBeCloseTo(70)              // P1 全部流水
+  })
+
+  it('无 paymentNodes/paymentRecords 时全零', () => {
+    const s = payTierStats('100万以上', projects, undefined, undefined, start, end)
+    expect(s.projectCount).toBe(1)
+    expect(s.relatedNodeCount).toBe(0)
+    expect(s.expectedAmountWan).toBe(0)
+    expect(s.actualAmountWan).toBe(0)
+  })
+
+  it('空 projects => 全零', () => {
+    const s = payTierStats('100万以上', [], paymentNodes, paymentRecords, start, end)
+    expect(s.projectCount).toBe(0)
+    expect(s.relatedNodeCount).toBe(0)
+    expect(s.actualAmountWan).toBe(0)
   })
 })
 
