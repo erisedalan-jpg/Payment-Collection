@@ -27,17 +27,37 @@ function withData() {
 }
 
 describe('filter store', () => {
-  it('defaults: year=all, view=global', () => {
+  it('defaults: dateStart/dateEnd empty(全部), view=global', () => {
     const f = useFilterStore()
-    expect(f.filterYear).toBe('all')
+    expect(f.dateStart).toBe('')
+    expect(f.dateEnd).toBe('')
     expect(f.viewMode).toBe('global')
   })
 
-  it('yearOptions include all + current year', () => {
+  it('setDateRange 写值；setDateRange 空清空', () => {
     const f = useFilterStore()
-    const keys = f.yearOptions.map((o) => o.key)
-    expect(keys).toContain('all')
-    expect(keys).toContain(String(new Date().getFullYear()))
+    f.setDateRange('2026-01-01', '2026-12-31')
+    expect(f.dateStart).toBe('2026-01-01')
+    expect(f.dateEnd).toBe('2026-12-31')
+    f.setDateRange('', '')
+    expect(f.dateStart).toBe('')
+    expect(f.dateEnd).toBe('')
+  })
+
+  it('setPreset("all") 清空区间', () => {
+    const f = useFilterStore()
+    f.setDateRange('2026-01-01', '2026-12-31')
+    f.setPreset('all')
+    expect(f.dateStart).toBe('')
+    expect(f.dateEnd).toBe('')
+  })
+
+  it('setPreset("year") 写本年度起止非空', () => {
+    const f = useFilterStore()
+    f.setPreset('year')
+    const y = new Date().getFullYear()
+    expect(f.dateStart).toBe(`${y}-01-01`)
+    expect(f.dateEnd).toBe(`${y}-12-31`)
   })
 
   it('l4Options / pmOptions derive distinct values from data', () => {
@@ -88,7 +108,7 @@ describe('filter excludedIds（按标签全局排除）', () => {
 })
 
 describe('filteredPayNodes(3B)', () => {
-  it('随 viewMode/filterYear 过滤收款阶段节点', () => {
+  it('随 viewMode/dateRange 过滤收款阶段节点', () => {
     const ds = useDataStore()
     ds.data = {
       meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] },
@@ -104,11 +124,14 @@ describe('filteredPayNodes(3B)', () => {
       },
     } as any
     const f = useFilterStore()
+    // 默认全部：两个节点都在
     expect(f.filteredPayNodes.length).toBe(2)
+    // 视角 l4 过滤
     f.setViewL4('A组')
     expect(f.filteredPayNodes.map((r) => r.projectId)).toEqual(['P1'])
+    // 日期范围过滤：2026-Q1 对应 2026-01-01~2026-03-31，只 P1(2026-02) 在内
     f.setViewGlobal()
-    f.setYear('2026-Q1')
+    f.setDateRange('2026-01-01', '2026-03-31')
     expect(f.filteredPayNodes.map((r) => r.projectId)).toEqual(['P1'])
   })
 })
