@@ -216,6 +216,22 @@ class TestOverviewOrEmpty:
         assert dict(naguan_exclude.items()) == {}
 
 
+class TestCollectionNodesFor:
+    STAGES = {'P-SELF': [{'expectedPayment': 100}], 'P-ORIG': [{'expectedPayment': 200}]}
+
+    def test_self_first(self):
+        assert P._collection_nodes_for('P-SELF', 'P-ORIG', self.STAGES) == [{'expectedPayment': 100}]
+
+    def test_fallback_to_origin_when_self_missing(self):
+        assert P._collection_nodes_for('P-NONE', 'P-ORIG', self.STAGES) == [{'expectedPayment': 200}]
+
+    def test_empty_when_both_missing(self):
+        assert P._collection_nodes_for('P-NONE', 'P-NIL', self.STAGES) == []
+
+    def test_empty_when_no_rid(self):
+        assert P._collection_nodes_for('P-NONE', '', self.STAGES) == []
+
+
 def test_backfill_final_acceptance():
     import preprocess_data as P
     project_pmis = {

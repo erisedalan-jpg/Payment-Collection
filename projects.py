@@ -160,7 +160,7 @@ def aggregate_payment_pmis(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
         "expectedTotal": round(exp, 2),
         "actualTotal": round(act, 2),
         "remainingTotal": round(rem, 2),
-        "paymentRatio": round(act / exp, 4) if exp > 0 else None,
+        "paymentRatio": None,
         "delayedCount": delayed,
     }
 

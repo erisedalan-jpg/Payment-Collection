@@ -789,6 +789,11 @@ def _overview_or_empty(overview_sheet):
     return [], {}, {}, []
 
 
+def _collection_nodes_for(pid, rid, collection_stages):
+    """售前收款阶段台账把节点挂在本项目号下,故本项目号优先、缺再回退原项目号。"""
+    return collection_stages.get(pid) or (collection_stages.get(rid) if rid else None) or []
+
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -917,12 +922,14 @@ def main():
             _eff, _from_origin = _rid, True
         # 节点按 eff 取(售前=原项目);流水本项目优先,缺再回退原项目
         _rec = payment_records.get(_pid) or (payment_records.get(_rid) if _rid else None)
-        _nodes = collection_stages.get(_eff) or []
+        _nodes = _collection_nodes_for(_pid, _rid, collection_stages)
         _summary = projects_mod.build_payment_summary(_pmis_contract(_eff), _nodes, _rec)
         _summary["fromOrigin"] = _from_origin
         p["paymentPmis"] = _summary
         payment_nodes[_pid] = _nodes
         p["payment"] = projects_mod.aggregate_payment_pmis(_nodes)
+        p["payment"]["paymentRatio"] = projects_mod.payment_ratio_from_records(
+            p["paymentPmis"]["actualTotal"], p["paymentPmis"]["contract"], None)
         p["health"] = projects_mod.compute_health(project_pmis.get(_pid) or {}, p["payment"]["delayedCount"])
     print(f"  [OK] 系统核心口径回款已回填 {len(dept_projects)} 项目"
           f"(售前取原项目 {sum(1 for p in dept_projects if p['paymentPmis']['fromOrigin'])}"

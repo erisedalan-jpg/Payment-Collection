@@ -344,8 +344,14 @@ class TestAggregatePaymentPmis:
         assert r["expectedTotal"] == 2000000
         assert r["actualTotal"] == 600000
         assert r["remainingTotal"] == 1400000
-        assert r["paymentRatio"] == 0.3
+        assert r["paymentRatio"] is None
         assert r["delayedCount"] == 1
     def test_empty(self):
         r = P.aggregate_payment_pmis([])
         assert r["relatedNodeCount"] == 0 and r["paymentRatio"] is None
+
+
+def test_aggregate_payment_pmis_ratio_is_none():
+    import projects
+    nodes = [{'expectedPayment': 100, 'receivedAmount': 50, 'unpaidAmount': 50, 'status': '部分回款', 'reached': False}]
+    assert projects.aggregate_payment_pmis(nodes)['paymentRatio'] is None
