@@ -33,7 +33,7 @@ const ranked = computed(() => {
     filter.dateStart,
     filter.dateEnd,
     sortBy.value as 'actualTotal' | 'achievementRate',
-  ).slice(0, 8)
+  )
 })
 const maxActual = computed(() => Math.max(1, ...ranked.value.map((o) => o.actualTotal)))
 
@@ -48,28 +48,32 @@ function rateColor(r: number): string {
       <h3 class="or-title">服务组达成排名</h3>
       <SegToggle v-model="sortBy" :options="SORT_OPTS" />
     </div>
-    <div
-      v-for="(o, i) in ranked"
-      :key="o.org"
-      v-activate
-      class="rank-item"
-      @click="goBoard(router, 'orgL4')"
-    >
-      <span class="rank-no">{{ i + 1 }}</span>
-      <span class="rank-name" :title="o.org">{{ o.org }}</span>
-      <span class="rank-bar-wrap">
-        <span class="rank-bar" :style="{ width: ((o.actualTotal / maxActual) * 100).toFixed(1) + '%', background: rateColor(o.achievementRate) }" />
-      </span>
-      <span class="rank-amount">{{ fmtWan(o.actualTotal) }} 万</span>
-      <span class="rank-rate" :style="{ color: rateColor(o.achievementRate) }">{{ pct(o.achievementRate) }}</span>
+    <div class="org-list">
+      <div
+        v-for="(o, i) in ranked"
+        :key="o.org"
+        v-activate
+        class="rank-item"
+        @click="goBoard(router, 'orgL4')"
+      >
+        <span class="rank-no">{{ i + 1 }}</span>
+        <span class="rank-name" :title="o.org">{{ o.org }}</span>
+        <span class="rank-bar-wrap">
+          <span class="rank-bar" :style="{ width: ((o.actualTotal / maxActual) * 100).toFixed(1) + '%', background: rateColor(o.achievementRate) }" />
+        </span>
+        <span class="rank-amount">{{ fmtWan(o.actualTotal) }} 万</span>
+        <span class="rank-rate" :style="{ color: rateColor(o.achievementRate) }">{{ pct(o.achievementRate) }}</span>
+      </div>
+      <div v-if="!ranked.length" class="or-empty">暂无数据</div>
     </div>
-    <div v-if="!ranked.length" class="or-empty">暂无数据</div>
   </div>
 </template>
 
 <style scoped>
 .org-ranking { }
 .or-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+/* 列表区：展示全部 L4，超出时纵向滚动；360px ≈ 8 行 × 32px 行高 + 8px 内边距，令牌无对应行高值，故用具体 px */
+.org-list { max-height: 360px; overflow-y: auto; }
 .or-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0; }
 .rank-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: var(--fs-2); cursor: pointer; border-radius: 6px; }
 .rank-item:hover { background: var(--card2); }
