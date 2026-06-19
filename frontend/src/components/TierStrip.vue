@@ -13,7 +13,14 @@ const filter = useFilterStore()
 
 const rows = computed(() =>
   TIERS.map((t) => {
-    const s = payTierStats(t.label, filter.filteredPayNodes)
+    const s = payTierStats(
+      t.label,
+      filter.filteredProjects,
+      data.data?.paymentNodes,
+      data.data?.paymentRecords,
+      filter.dateStart,
+      filter.dateEnd,
+    )
     const expectedWan = s.expectedAmountWan
     const actualWan = s.actualAmountWan
     return {
@@ -36,9 +43,9 @@ const drillTitle = ref('')
 const drillProjects = ref<PayProjectRow[]>([])
 function openTier(tier: string) {
   drillTitle.value = tier
-  const pids = new Set(filter.filteredPayNodes.filter((r) => r.tier === tier).map((r) => r.projectId))
+  const filteredPids = new Set(filter.filteredProjects.map((p) => p.projectId))
   drillProjects.value = projectPaymentRows(data.data?.projects ?? [], data.data?.projectPmis)
-    .filter((r) => pids.has(r.projectId))
+    .filter((r) => r.tier === tier && filteredPids.has(r.projectId))
   drillOpen.value = true
 }
 defineExpose({ drillOpen })
