@@ -5,10 +5,10 @@ import { useDataStore } from '@/stores/data'
 import { PAY_FACET_DIMS } from '@/lib/paymentPmis'
 import SegToggle from '@/components/SegToggle.vue'
 import BoardView from '@/views/BoardView.vue'
-import ProjectsOverviewTab from '@/components/ProjectsOverviewTab.vue'
-import TierNodesTab from '@/components/TierNodesTab.vue'
-import PlanTab from '@/components/PlanTab.vue'
-import RiskTab from '@/components/RiskTab.vue'
+import PayProjectsView from '@/views/PayProjectsView.vue'
+import PayNodesView from '@/views/PayNodesView.vue'
+import PayPlanView from '@/views/PayPlanView.vue'
+import PayRiskView from '@/views/PayRiskView.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -47,10 +47,10 @@ const DIM_OPTS = PAY_FACET_DIMS.map((d) => ({ value: d.key, label: d.label }))
     </div>
 
     <BoardView v-if="tab === 'board'" />
-    <ProjectsOverviewTab v-else-if="tab === 'projects'" :dim="dim" />
-    <TierNodesTab v-else-if="tab === 'nodes'" :dim="dim" />
-    <PlanTab v-else-if="tab === 'plan'" :dim="dim" />
-    <RiskTab v-else-if="tab === 'risk'" :dim="dim" />
+    <PayProjectsView v-else-if="tab === 'projects'" :dim="dim" />
+    <PayNodesView v-else-if="tab === 'nodes'" :dim="dim" />
+    <PayPlanView v-else-if="tab === 'plan'" :dim="dim" />
+    <PayRiskView v-else-if="tab === 'risk'" :dim="dim" />
     <div v-else class="av-stub">「{{ tab }}」建设中</div>
   </div>
 </template>

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
-import ProjectsOverviewTab from './ProjectsOverviewTab.vue'
+import PayProjectsView from './PayProjectsView.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
@@ -28,10 +28,10 @@ function seed() {
   } as any
 }
 
-describe('ProjectsOverviewTab', () => {
+describe('PayProjectsView', () => {
   it('渲染项目明细行，部门汇总不再出现', async () => {
     seed()
-    const w = mount(ProjectsOverviewTab, {
+    const w = mount(PayProjectsView, {
       props: { dim: 'dept' },
       global: { plugins: [ElementPlus] },
     })
@@ -45,7 +45,7 @@ describe('ProjectsOverviewTab', () => {
 
   it('明细表含预期列头', async () => {
     seed()
-    const w = mount(ProjectsOverviewTab, {
+    const w = mount(PayProjectsView, {
       props: { dim: 'dept' },
       global: { plugins: [ElementPlus] },
     })
@@ -62,7 +62,7 @@ describe('ProjectsOverviewTab', () => {
       dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
       naguanExclude: {}, projects: [], projectPmis: {},
     } as any
-    const w = mount(ProjectsOverviewTab, {
+    const w = mount(PayProjectsView, {
       props: { dim: 'tier' },
       global: { plugins: [ElementPlus] },
     })

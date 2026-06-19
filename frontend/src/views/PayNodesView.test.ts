@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import TierNodesTab from './TierNodesTab.vue'
+import PayNodesView from './PayNodesView.vue'
 import DataTable from '@/components/DataTable.vue'
 
 function seed() {
@@ -20,12 +20,12 @@ function seed() {
   } as any
 }
 
-describe('TierNodesTab', () => {
+describe('PayNodesView', () => {
   beforeEach(() => { setActivePinia(createPinia()); useFilterStore().setPreset('all') })
 
   it('渲染节点行 + 汇总条(总数/已回款/延期/待回款) + 状态徽章', () => {
     seed()
-    const w = mount(TierNodesTab, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
+    const w = mount(PayNodesView, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
     // 汇总条文字
     expect(w.text()).toContain('节点总数')
     expect(w.text()).toContain('已回款')
@@ -42,7 +42,7 @@ describe('TierNodesTab', () => {
 
   it('按选中维度分组(dim 联动)：dim=dept 出部门分组与组值', () => {
     seed()
-    const w = mount(TierNodesTab, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
+    const w = mount(PayNodesView, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
     // 原生分组表在 JSDOM 可渲染：维度 join 到节点所属项目 orgL4
     expect(w.text()).toContain('部门分组')
     expect(w.text()).toContain('组1')
@@ -51,6 +51,6 @@ describe('TierNodesTab', () => {
   it('空数据不崩', () => {
     const data = useDataStore()
     data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
-    expect(mount(TierNodesTab, { props: { dim: 'tier' }, global: { plugins: [ElementPlus] } }).exists()).toBe(true)
+    expect(mount(PayNodesView, { props: { dim: 'tier' }, global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 })
