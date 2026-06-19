@@ -105,6 +105,11 @@ describe('filterProjects（视角/纳管，不复用 filterNodes）', () => {
   it('排除关闭时不剔除', () => {
     expect(filterProjects(ps, { ...base, excludeActive: false, excludedIds: { B: true } }).length).toBe(3)
   })
+  it('orgL4 空项目恒排除（独立于 excludeActive）', () => {
+    const withEmpty = [...ps, { projectId: 'X', projectName: '空', orgL4: '' } as any]
+    expect(filterProjects(withEmpty, base).map((p) => p.projectId)).not.toContain('X')
+    expect(filterProjects(withEmpty, { ...base, excludeActive: false }).map((p) => p.projectId)).not.toContain('X')
+  })
 })
 
 describe('projectPaymentRows / summaryByDim', () => {
@@ -176,7 +181,7 @@ describe('paymentNodeRows（扁平化 + 维度 join 到所属项目）', () => {
 
 describe('nodeSummary（节点三态计数 + 计划回款Σ）', () => {
   it('按 status 计数，expectedTotal 求和', () => {
-    const projects = [proj({ projectId: 'A', paymentPmis: pm({ contract: 100 }) })]
+    const projects = [proj({ projectId: 'A', orgL4: '测试组', paymentPmis: pm({ contract: 100 }) })]
     const nodes: Record<string, PaymentNodePmis[]> = {
       A: [
         { stage: '到货', status: '已回款', expectedPayment: 70 } as PaymentNodePmis,
@@ -262,5 +267,13 @@ describe('paymentNodeRows orgL3_1(3D)', () => {
     const projects = [{ projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: 'A', orgL3_1: '三部一组', paymentPmis: { contract: 100 } }] as any
     const paymentNodes = { P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.7, actualRatio: 0, expectedPayment: 100, receivedAmount: 0, unpaidAmount: 100, status: '待回款' }] } as any
     expect(paymentNodeRows(paymentNodes, projects)[0].orgL3_1).toBe('三部一组')
+  })
+})
+
+describe('paymentNodeRows 硬排除（orgL4 空）', () => {
+  it('paymentNodeRows 跳过 orgL4 空项目', () => {
+    const projects = [{ projectId: 'X', projectName: '空', orgL4: '' } as any]
+    const nodes = { X: [{ stage: '阶段1', planDate: '2026-01-01', expectedPayment: 100, receivedAmount: 0, unpaidAmount: 100, status: '待回款' } as any] }
+    expect(paymentNodeRows(nodes, projects).length).toBe(0)
   })
 })
