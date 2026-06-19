@@ -146,7 +146,7 @@ export function projectPaymentRows(
   })
 }
 
-// ── 单维汇总（加权完成率 Σ÷Σ，rate=已回/计划）──
+// ── 单维汇总（加权完成率 Σ÷Σ，rate=已回/合同）──
 export interface DimSummary {
   value: string
   projectCount: number

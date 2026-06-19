@@ -35,7 +35,7 @@ describe('computeKpis', () => {
     expect(k.paymentRatio).toBeCloseTo(600 / 3500)
   })
   it('传入 paymentRecords 时分子改用全量流水(全时 start=end=\'\')', () => {
-    // P-1 流水 800, P-2 流水 500; P-3 异常排除; 分母仍 expectedTotal=2000
+    // P-1 流水 800, P-2 流水 300; P-3 异常排除; 分母=Σ合同 3500
     const records: Record<string, PaymentRecordsEntry> = {
       'P-1': { records: [{ amount: 800, date: '2026-03-01' } as any] },
       'P-2': { records: [{ amount: 300, date: '2025-12-01' } as any], },
@@ -45,7 +45,7 @@ describe('computeKpis', () => {
     expect(k.paymentRatio).toBeCloseTo(1100 / 3500)
   })
   it('计划为 0 → 达成率 null', () => {
-    // P-3 orgL4 为空 = 异常, 排除后 exp=0 → null
+    // P-3 orgL4 为空 = 异常, 排除后 con(合同)=0 → null
     expect(computeKpis([PROJECTS[2]], {}).paymentRatio).toBeNull()
   })
   it('[守护] 全部项目异常时达成率为 null', () => {

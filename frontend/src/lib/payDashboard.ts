@@ -107,7 +107,7 @@ export interface OrgRank {
   contractTotal: number
 }
 
-/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款=Σ流水(到账日∈R)；达成率=已回/计划。sortBy 降序全量(组件自行 slice)。 */
+/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款=Σ流水(到账日∈R)；达成率=已回/合同（paymentPmis.contract）。sortBy 降序全量(组件自行 slice)。 */
 export function payOrgRanking(
   projects: Project[],
   paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
