@@ -9,10 +9,15 @@ const data = useDataStore()
 const filter = useFilterStore()
 
 const summary = computed(() =>
-  payDashSummary(filter.filteredPayNodes, data.data?.projects ?? [], {
-    excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
-    viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
-  }),
+  payDashSummary(
+    filter.filteredPayNodes,
+    data.data?.projects ?? [],
+    { excludeActive: filter.excludeOn, excludedIds: filter.excludedIds, viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM },
+    filter.payRecordsAll,
+    data.data?.paymentNodes,
+    filter.dateStart,
+    filter.dateEnd,
+  ),
 )
 
 const metrics = computed(() => {

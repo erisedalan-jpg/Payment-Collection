@@ -1,7 +1,7 @@
-import type { Project } from '@/types/analysis'
+import type { Project, PaymentRecordsEntry, PaymentNodePmis } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
 import { filterProjects, type FilterOpts as ProjFilterOpts } from './paymentPmis'
-import { inRange } from './paymentRange'
+import { inRange, actualInRange, hasActivityInRange } from './paymentRange'
 
 export interface PayNodeFilterOpts {
   dateStart: string
@@ -33,15 +33,25 @@ export interface PayDashSummary {
   delayedProjects: number
 }
 
-/** 看板指标(同 DashSummary 字段名)。项目数按视角/排除过滤 projects(不随年份)。金额=节点收款阶段口径。 */
-export function payDashSummary(rows: PayNodeRow[], projects: Project[], opts: ProjFilterOpts): PayDashSummary {
+/** 看板指标(同 DashSummary 字段名)。已回款=流水口径(inScope项目Σ actualInRange)；项目数=区间内有回款活动。 */
+export function payDashSummary(
+  rows: PayNodeRow[],
+  projects: Project[],
+  opts: ProjFilterOpts,
+  paymentRecords?: Record<string, PaymentRecordsEntry>,
+  paymentNodes?: Record<string, PaymentNodePmis[]>,
+  start = '',
+  end = '',
+): PayDashSummary {
+  const inScope = filterProjects(projects, opts)
+  const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, start, end), 0)
   const totalExpected = rows.reduce((s, r) => s + r.expectedPayment, 0)
-  const totalActual = rows.reduce((s, r) => s + r.receivedAmount, 0)
   const totalRemaining = rows.reduce((s, r) => s + r.unpaidAmount, 0)
   const delayedPids = new Set(rows.filter((r) => r.status === '延期').map((r) => r.projectId))
+  const totalProjects = inScope.filter((p) => hasActivityInRange(paymentNodes?.[p.projectId], paymentRecords?.[p.projectId]?.records, start, end)).length
   return {
     relatedNodeCount: rows.length,
-    totalProjects: filterProjects(projects, opts).length,
+    totalProjects,
     totalExpected, totalActual, totalRemaining,
     rate: totalExpected > 0 ? totalActual / totalExpected : 0,
     delayedProjects: delayedPids.size,
