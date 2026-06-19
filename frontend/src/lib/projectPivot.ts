@@ -1,5 +1,6 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import type { CrossMatrix, PivotResult, PivotRow, PivotCol } from './pivot'
+import { isAnomalous } from './anomaly'
 
 // 项目域透视(/insight,spec 4.5):与 lib/pivot(回款节点域)并行,复用其泛型结构类型;
 // 回款域 groupByDims/PivotGroup 不动,P6 归并期再议统一。
@@ -31,8 +32,9 @@ const v = (raw: unknown, fallback = '未指定') => {
   return s === '' ? fallback : s
 }
 
+/** 回款相关列(paymentRatio/delayed)排除 isAnomalous 项目；非回款列不受影响。 */
 export function buildInsightRows(projects: Project[], pmisMap: Record<string, ProjectPmis>): InsightRow[] {
-  return projects.map((p) => {
+  return projects.filter((p) => !isAnomalous(p)).map((p) => {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     const prog = m.progress ?? {}
     const st = m.status ?? {}

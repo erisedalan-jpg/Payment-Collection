@@ -7,14 +7,15 @@ import {
 
 const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
+// orgL4 非空 = 正常项目（buildInsightRows 排除 isAnomalous，即 orgL4 为空的项目）
 const PROJECTS = [
-  { projectId: 'P-1', projectName: '甲', projectManager: '何平',
+  { projectId: 'P-1', projectName: '甲', projectManager: '何平', orgL4: '交付一组',
     payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, delayedCount: 1 },
     deliveryCosts: [], health: { overall: '风险' } },
-  { projectId: 'P-2', projectName: '乙', projectManager: '何平',
+  { projectId: 'P-2', projectName: '乙', projectManager: '何平', orgL4: '交付二组',
     payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 1000 },
     deliveryCosts: [], health: { overall: '健康' } },
-  { projectId: 'P-3', projectName: '丙', projectManager: '李四',
+  { projectId: 'P-3', projectName: '丙', projectManager: '李四', orgL4: '交付一组',
     payment: { ...PAY0 }, deliveryCosts: [], health: { overall: '健康' } },
 ] as unknown as Project[]
 
