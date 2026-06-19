@@ -10,7 +10,6 @@ import { formatCellValue } from '@/lib/cellFormat'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { projectPaymentRows, progressBuckets, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 
-defineProps<{ dim: string }>()
 const data = useDataStore()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()

@@ -21,13 +21,13 @@ describe('PayPlanView(回款进度)', () => {
   beforeEach(() => { setActivePinia(createPinia()) })
   it('渲染 3 进度桶卡（已全额/部分/未回款）', () => {
     seed()
-    const w = mount(PayPlanView, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
+    const w = mount(PayPlanView, { global: { plugins: [ElementPlus] } })
     expect(w.text()).toContain('已全额回款')
     expect(w.text()).toContain('部分回款')
     expect(w.text()).toContain('未回款')
   })
   it('空数据不崩', () => {
     const data = useDataStore(); data.data = { projects: [], projectPmis: {}, naguanExclude: {} } as any
-    expect(mount(PayPlanView, { props: { dim: 'tier' }, global: { plugins: [ElementPlus] } }).exists()).toBe(true)
+    expect(mount(PayPlanView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 })

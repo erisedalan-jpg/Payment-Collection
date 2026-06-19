@@ -26,7 +26,7 @@ describe('PayRiskView(PMIS 风险三类)', () => {
   beforeEach(() => { setActivePinia(createPinia()); useFilterStore().setPreset('all') })
   it('渲染三组标题与命中项', () => {
     seed()
-    const w = mount(PayRiskView, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
+    const w = mount(PayRiskView, { global: { plugins: [ElementPlus] } })
     expect(w.text()).toContain('延期节点')
     expect(w.text()).toContain('低回款项目')
     expect(w.text()).toContain('超支项目')
@@ -35,6 +35,6 @@ describe('PayRiskView(PMIS 风险三类)', () => {
   })
   it('空数据不崩', () => {
     const data = useDataStore(); data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
-    expect(mount(PayRiskView, { props: { dim: 'tier' }, global: { plugins: [ElementPlus] } }).exists()).toBe(true)
+    expect(mount(PayRiskView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 })

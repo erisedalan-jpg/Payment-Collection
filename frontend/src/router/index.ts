@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardView from '@/views/DashboardView.vue'
-import PayAnalysisView from '@/views/PayAnalysisView.vue'
+import BoardView from '@/views/BoardView.vue'
+import PayProjectsView from '@/views/PayProjectsView.vue'
+import PayNodesView from '@/views/PayNodesView.vue'
+import PayPlanView from '@/views/PayPlanView.vue'
+import PayRiskView from '@/views/PayRiskView.vue'
 import LedgerView from '@/views/LedgerView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import DataView from '@/views/DataView.vue'
@@ -33,11 +37,16 @@ export const router = createRouter({
     { path: '/insight', name: 'insight', component: InsightView, meta: { title: '项目分析', hideFilter: true } },
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
-    // 回款分析归并页:多维看板(board) + 业务分析五 tab;:tab? 缺省视为 board;六 tab 全依赖 FilterBar(不 hideFilter)
-    { path: '/panalysis/:tab?', name: 'panalysis', component: PayAnalysisView, meta: { title: '回款分析' } },
-    // 旧路由 redirect 兼容(保留深链):/board 保 query(dim),/analysis/:tab 映射 tab
-    { path: '/board', redirect: (to) => ({ path: '/panalysis/board', query: to.query }) },
-    { path: '/analysis/:tab', redirect: (to) => ({ path: '/panalysis/' + String(to.params.tab) }) },
+    // 回款分析五页:由旧 /panalysis 单页拆为 /payment/* 平铺独立路由(SP4);均依赖 FilterBar(不 hideFilter)
+    { path: '/payment/board', name: 'pay-board', component: BoardView, meta: { title: '多维看板' } },
+    { path: '/payment/projects', name: 'pay-projects', component: PayProjectsView, meta: { title: '回款项目' } },
+    { path: '/payment/nodes', name: 'pay-nodes', component: PayNodesView, meta: { title: '回款节点' } },
+    { path: '/payment/plan', name: 'pay-plan', component: PayPlanView, meta: { title: '回款进度' } },
+    { path: '/payment/risk', name: 'pay-risk', component: PayRiskView, meta: { title: '风险项目' } },
+    // 兼容旧深链:/panalysis/:tab? → /payment/{tab||board}; /board、/analysis/:tab 同步映射(保 query)
+    { path: '/panalysis/:tab?', redirect: (to) => ({ path: '/payment/' + String(to.params.tab || 'board'), query: to.query }) },
+    { path: '/board', redirect: (to) => ({ path: '/payment/board', query: to.query }) },
+    { path: '/analysis/:tab', redirect: (to) => ({ path: '/payment/' + String(to.params.tab) }) },
     { path: '/payment', name: 'payment', component: DashboardView, meta: { title: '回款总览' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true } },

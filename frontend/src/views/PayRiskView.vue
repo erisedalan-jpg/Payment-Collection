@@ -8,7 +8,6 @@ import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
 import { projectPaymentRows, paymentNodeRows, pmisRiskGroups, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
 
-defineProps<{ dim: string }>()
 const data = useDataStore()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()

@@ -25,12 +25,10 @@ describe('PayNodesView', () => {
 
   it('渲染节点行 + 汇总条(总数/已回款/延期/待回款) + 状态徽章', () => {
     seed()
-    const w = mount(PayNodesView, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
-    // 汇总条文字
+    const w = mount(PayNodesView, { global: { plugins: [ElementPlus] } })
     expect(w.text()).toContain('节点总数')
     expect(w.text()).toContain('已回款')
     expect(w.text()).toContain('延期')
-    // el-table 在 JSDOM 不渲染行内容，改为验证 DataTable rows prop 含节点数据
     const dt = w.findComponent(DataTable)
     expect(dt.exists()).toBe(true)
     const rows = dt.props('rows') as Array<Record<string, unknown>>
@@ -40,10 +38,10 @@ describe('PayNodesView', () => {
     expect(rows.some((r) => r.status === '延期')).toBe(true)
   })
 
-  it('按选中维度分组(dim 联动)：dim=dept 出部门分组与组值', () => {
+  it('内置维度控件(SegToggle)存在，默认 dept 出部门分组与组值', () => {
     seed()
-    const w = mount(PayNodesView, { props: { dim: 'dept' }, global: { plugins: [ElementPlus] } })
-    // 原生分组表在 JSDOM 可渲染：维度 join 到节点所属项目 orgL4
+    const w = mount(PayNodesView, { global: { plugins: [ElementPlus] } })
+    expect(w.find('[data-test="seg-dept"]').exists()).toBe(true)
     expect(w.text()).toContain('部门分组')
     expect(w.text()).toContain('组1')
   })
@@ -51,6 +49,6 @@ describe('PayNodesView', () => {
   it('空数据不崩', () => {
     const data = useDataStore()
     data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
-    expect(mount(PayNodesView, { props: { dim: 'tier' }, global: { plugins: [ElementPlus] } }).exists()).toBe(true)
+    expect(mount(PayNodesView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 })
