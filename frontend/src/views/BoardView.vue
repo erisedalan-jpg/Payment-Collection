@@ -34,7 +34,7 @@ const SORT_OPTS = [
   { value: 'actualSum', label: '已回款' },
   { value: 'rate', label: '完成率' },
   { value: 'projectCount', label: '项目数' },
-  { value: 'delayedNodeSum', label: '延期数' },
+  { value: 'delayedNodeSum', label: '延期节点数' },
 ]
 
 const initDim =

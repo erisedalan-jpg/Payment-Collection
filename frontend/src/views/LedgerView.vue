@@ -92,7 +92,7 @@ const columns = [
       <div class="st-card"><div class="st-label">已全额回款</div><div class="st-val" style="color:var(--c-paid)">{{ statusCounts.fullPaid }}</div></div>
       <div class="st-card"><div class="st-label">部分回款</div><div class="st-val" style="color:var(--c-pending)">{{ statusCounts.partial }}</div></div>
       <div class="st-card"><div class="st-label">未回款</div><div class="st-val" style="color:var(--accent)">{{ statusCounts.unpaid }}</div></div>
-      <div class="st-card"><div class="st-label">延期</div><div class="st-val" style="color:var(--danger)">{{ statusCounts.delayed }}</div></div>
+      <div class="st-card"><div class="st-label">延期项目数</div><div class="st-val" style="color:var(--danger)">{{ statusCounts.delayed }}</div></div>
     </div>
 
     <div class="tier-cards">
