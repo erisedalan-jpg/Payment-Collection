@@ -52,6 +52,19 @@ describe('paymentPmisInRange', () => {
     expect(r.actualTotal).toBe(500)      // 400+100
     expect(r.delayedCount).toBe(1)
   })
+  it('delayedAmount=Σ延期节点未收(计划日∈R)', () => {
+    const ns = [
+      N('2026-02-01', 1000, 1000, '延期'),
+      N('2026-03-01', 500, 200, '延期'),
+      N('2026-04-01', 300, 300, '待回款'),
+    ]
+    const r = paymentPmisInRange(2000, ns, [], '2026-01-01', '2026-12-31')
+    expect(r.delayedAmount).toBe(1200)   // 1000+200(待回款300不计)
+  })
+  it('全部不变式:delayedAmount=Σ全延期节点未收', () => {
+    const ns = [N('2026-02-01', 1000, 1000, '延期'), N('2025-12-01', 500, 500, '延期')]
+    expect(paymentPmisInRange(0, ns, [], '', '').delayedAmount).toBe(1500)
+  })
 })
 
 describe('hasActivityInRange', () => {
