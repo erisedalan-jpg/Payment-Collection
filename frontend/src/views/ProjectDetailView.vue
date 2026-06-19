@@ -138,8 +138,12 @@ const myMilestones = computed(() =>
 const originMilestones = computed(() =>
   ((data.data?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[page.value.closedId || ''] ?? [])
 
-const payRec = computed(() =>
-  ((data.data?.paymentRecords ?? {}) as Record<string, PaymentRecordsEntry>)[p.value?.projectId || ''] ?? null)
+const payRec = computed(() => {
+  const m = (data.data?.paymentRecords ?? {}) as Record<string, PaymentRecordsEntry>
+  const pid = p.value?.projectId || ''
+  const rid = p.value?.relatedClosedId || ''
+  return m[pid] ?? (rid ? m[rid] : null) ?? null
+})
 const payRecSummary = computed(() => [
   { k: '累计回款(万)', v: fmtWan(payRec.value?.total) },
   { k: '回款笔数', v: String(payRec.value?.count ?? 0) },

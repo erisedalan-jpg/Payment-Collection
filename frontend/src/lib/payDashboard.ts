@@ -45,6 +45,7 @@ export function payDashSummary(
 ): PayDashSummary {
   const inScope = filterProjects(projects, opts)
   const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, start, end), 0)
+  const totalContract = inScope.reduce((s, p) => s + (p.paymentPmis?.contract ?? 0), 0)
   const totalExpected = rows.reduce((s, r) => s + r.expectedPayment, 0)
   const totalRemaining = rows.reduce((s, r) => s + r.unpaidAmount, 0)
   const delayedPids = new Set(rows.filter((r) => r.status === '延期').map((r) => r.projectId))
@@ -53,7 +54,7 @@ export function payDashSummary(
     relatedNodeCount: rows.length,
     totalProjects,
     totalExpected, totalActual, totalRemaining,
-    rate: totalExpected > 0 ? totalActual / totalExpected : 0,
+    rate: totalContract > 0 ? totalActual / totalContract : 0,
     delayedProjects: delayedPids.size,
   }
 }
@@ -103,9 +104,10 @@ export interface OrgRank {
   actualTotal: number
   actualTotalWan: number
   achievementRate: number
+  contractTotal: number
 }
 
-/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款=Σ流水(到账日∈R)；达成率=已回/计划。sortBy 降序全量(组件自行 slice)。 */
+/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款=Σ流水(到账日∈R)；达成率=已回/合同（paymentPmis.contract）。sortBy 降序全量(组件自行 slice)。 */
 export function payOrgRanking(
   projects: Project[],
   paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
@@ -117,14 +119,15 @@ export function payOrgRanking(
   const m: Record<string, OrgRank> = {}
   for (const p of projects) {
     const org = (p.orgL4 ?? '').trim() || '未指定'
-    if (!m[org]) m[org] = { org, expectedTotal: 0, actualTotal: 0, actualTotalWan: 0, achievementRate: 0 }
+    if (!m[org]) m[org] = { org, expectedTotal: 0, actualTotal: 0, actualTotalWan: 0, achievementRate: 0, contractTotal: 0 }
     for (const n of paymentNodes?.[p.projectId] ?? []) {
       if (inRange(n.planDate || '', start, end)) m[org].expectedTotal += Number(n.expectedPayment ?? 0)
     }
     m[org].actualTotal += actualInRange(paymentRecords?.[p.projectId]?.records, start, end)
+    m[org].contractTotal += p.paymentPmis?.contract ?? 0
   }
   return Object.values(m)
-    .map((o) => ({ ...o, achievementRate: o.expectedTotal > 0 ? o.actualTotal / o.expectedTotal : 0, actualTotalWan: o.actualTotal / 10000 }))
+    .map((o) => ({ ...o, achievementRate: o.contractTotal > 0 ? o.actualTotal / o.contractTotal : 0, actualTotalWan: o.actualTotal / 10000 }))
     .sort((a, b) => b[sortBy] - a[sortBy])
 }
 
