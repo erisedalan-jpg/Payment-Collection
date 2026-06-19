@@ -170,13 +170,12 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
     .map(([value, grp]) => {
       const contractSum = grp.reduce((s, r) => s + r.contract, 0)
       const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
-      const expSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
       return {
         value,
         projectCount: grp.length,
         contractSum,
         actualSum,
-        rate: expSum > 0 ? actualSum / expSum : null,   // 已回/计划
+        rate: contractSum > 0 ? actualSum / contractSum : null,   // 已回/合同
         delayedNodeSum: grp.reduce((s, r) => s + r.delayedCount, 0),
         remainingSum: grp.reduce((s, r) => s + r.remainingTotal, 0),
         nodeSum: grp.reduce((s, r) => s + r.nodeCount, 0),
@@ -289,7 +288,7 @@ export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucke
     const contractSum = grp.reduce((s, r) => s + r.contract, 0)
     const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
     const expectedSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
-    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: expectedSum > 0 ? actualSum / expectedSum : null }
+    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: contractSum > 0 ? actualSum / contractSum : null }
   })
   return { buckets, unknown }
 }

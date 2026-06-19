@@ -43,7 +43,11 @@ describe('payDashSummary', () => {
     node({ projectId: 'P1', expectedPayment: 1000, receivedAmount: 600, unpaidAmount: 400, status: '部分回款', planDate: '2026-02-01' }),
     node({ projectId: 'P2', expectedPayment: 500, receivedAmount: 0, unpaidAmount: 500, status: '延期', planDate: '2026-08-01' }),
   ]
-  const projects = [{ projectId: 'P1', orgL4: 'A组', projectManager: '张三' }, { projectId: 'P2', orgL4: 'B组', projectManager: '李四' }] as any
+  // paymentPmis.contract：P1=1200, P2=1000，Σ=2200（用于新 rate 分母）
+  const projects = [
+    { projectId: 'P1', orgL4: 'A组', projectManager: '张三', paymentPmis: { contract: 1200 } },
+    { projectId: 'P2', orgL4: 'B组', projectManager: '李四', paymentPmis: { contract: 1000 } },
+  ] as any
   const opts = { viewMode: 'global' as const, viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} }
   // paymentRecords: P1 有流水 700, P2 有流水 200
   const paymentRecords = {
@@ -56,13 +60,14 @@ describe('payDashSummary', () => {
     P2: [{ planDate: '2026-08-01', expectedPayment: 500, unpaidAmount: 500, reached: false, status: '延期' }],
   } as any
 
-  it('全部口径: 已回款=Σ全流水(inScope), 完成率=totalActual/totalExpected, 延期项目/relatedNodeCount', () => {
+  it('全部口径: 已回款=Σ全流水(inScope), 完成率=totalActual/Σcontract, 延期项目/relatedNodeCount', () => {
     const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '', '')
     expect(s.relatedNodeCount).toBe(2)
     expect(s.totalActual).toBe(900)           // P1:700 + P2:200
     expect(s.totalExpected).toBe(1500)        // 来自 rows
     expect(s.totalRemaining).toBe(900)        // 来自 rows
-    expect(s.rate).toBeCloseTo(900 / 1500)    // 流水/计划
+    // 分母改为 Σcontract=1200+1000=2200
+    expect(s.rate).toBeCloseTo(900 / 2200)
     expect(s.delayedProjects).toBe(1)
     // 全部下两个项目均有活动
     expect(s.totalProjects).toBe(2)
@@ -78,7 +83,8 @@ describe('payDashSummary', () => {
   it('全部口径不变式: start=end="" 时 totalActual=Σ全流水(inScope)', () => {
     const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '', '')
     expect(s.totalActual).toBe(900)
-    expect(s.rate).toBeCloseTo(s.totalActual / s.totalExpected)
+    // 分母改为 Σcontract=2200
+    expect(s.rate).toBeCloseTo(900 / 2200)
   })
 
   it('无 paymentRecords 时 totalActual=0', () => {
@@ -174,10 +180,10 @@ describe('payTierStats', () => {
 import { payOrgRanking, payMonthlyTrend, payQuarterlyTrend } from './payDashboard'
 
 describe('payOrgRanking', () => {
-  // 两个 L4 服务组，各有一个项目
+  // 两个 L4 服务组，各有一个项目；paymentPmis.contract 用于新达成率分母
   const projects = [
-    { projectId: 'P1', orgL4: 'A组', projectManager: '张三' },
-    { projectId: 'P2', orgL4: 'B组', projectManager: '李四' },
+    { projectId: 'P1', orgL4: 'A组', projectManager: '张三', paymentPmis: { contract: 1200 } },
+    { projectId: 'P2', orgL4: 'B组', projectManager: '李四', paymentPmis: { contract: 2500 } },
   ] as any
 
   // P1: 计划节点 2026-02-01 期望=1000；P2: 计划节点 2026-08-01 期望=2000
@@ -192,21 +198,23 @@ describe('payOrgRanking', () => {
     P2: { records: [{ date: '2026-08-05', amount: 500 }] },
   } as any
 
-  it('全部口径(start=end=""): 计划=Σ全节点, 已回款=Σ全流水, 达成率=已回/计划, 按 actualTotal 降序', () => {
+  it('全部口径(start=end=""): 计划=Σ全节点, 已回款=Σ全流水, 达成率=已回/合同, 按 actualTotal 降序', () => {
     const r = payOrgRanking(projects, paymentNodes, paymentRecords, '', '', 'actualTotal')
     expect(r[0].org).toBe('A组')
     expect(r[0].expectedTotal).toBe(1000)
     expect(r[0].actualTotal).toBe(800)
-    expect(r[0].achievementRate).toBeCloseTo(0.8)
+    // 分母改为合同：A组 contract=1200 → 800/1200≈0.667
+    expect(r[0].achievementRate).toBeCloseTo(800 / 1200)
     expect(r[1].org).toBe('B组')
     expect(r[1].actualTotal).toBe(500)
   })
 
-  it('按 achievementRate 降序: A组(0.8) > B组(0.25)', () => {
+  it('按 achievementRate 降序: A组(800/1200) > B组(500/2500)', () => {
     const r = payOrgRanking(projects, paymentNodes, paymentRecords, '', '', 'achievementRate')
     expect(r[0].org).toBe('A组')
-    expect(r[0].achievementRate).toBeCloseTo(0.8)
-    expect(r[1].achievementRate).toBeCloseTo(0.25)
+    // A组: 800/1200≈0.667; B组: 500/2500=0.2（分母改合同）
+    expect(r[0].achievementRate).toBeCloseTo(800 / 1200)
+    expect(r[1].achievementRate).toBeCloseTo(500 / 2500)
   })
 
   it('区间 2026-01-01~2026-06-30: 只计 P1 节点(计划日 2026-02-01)和 P1 流水(到账日 2026-02-10)', () => {

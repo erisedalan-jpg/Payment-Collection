@@ -51,7 +51,7 @@ export function paymentPmisInRange(
     reachedCount: ns.filter((n) => n.reached).length,
     delayedCount: ns.filter((n) => n.status === '延期').length,
     delayedAmount,
-    paymentRatio: expectedTotal > 0 ? round4(actualTotal / expectedTotal) : null,
+    paymentRatio: contract > 0 ? round4(actualTotal / contract) : null,
   }
 }
 

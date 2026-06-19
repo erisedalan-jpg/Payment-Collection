@@ -31,9 +31,9 @@ describe('DashMetrics', () => {
     expect(text).toContain('项目数')
     expect(text).toContain('回款节点')
     expect(text).toContain('延期')
-    // 流水口径: totalActual=800000, totalExpected=1000000(来自节点rows), rate=80%
-    // 与节点口径(60%)不同, 确保已切换为流水口径
-    expect(text).toContain('80%')
+    // 流水口径: totalActual=800000, totalContract=2000000(paymentPmis.contract), rate=40%
+    // 分母改为合同总额（非计划 totalExpected=1000000），与节点口径(60%)和旧流水口径(80%)均不同
+    expect(text).toContain('40%')
   })
 
   it('无流水时已回款=0, 完成率=0%', () => {

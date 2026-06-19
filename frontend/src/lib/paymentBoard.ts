@@ -145,7 +145,7 @@ function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoa
     actualSum,
     expectedSum,
     pendingSum: grows.reduce((s, r) => s + r.remainingTotal, 0),
-    rate: expectedSum > 0 ? actualSum / expectedSum : null,
+    rate: contractSum > 0 ? actualSum / contractSum : null,
     delayedNodeSum: grows.reduce((s, r) => s + r.delayedCount, 0),
   }
 }
