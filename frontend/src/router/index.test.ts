@@ -1,49 +1,59 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { router } from './index'
 
 describe('router', () => {
+  beforeEach(async () => { await router.push('/') })
+
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/panalysis/board', '/calendar', '/ledger', '/data', '/about', '/projects', '/activity', '/payment', '/insight']) {
+    for (const path of ['/', '/payment', '/payment/board', '/payment/projects', '/payment/nodes', '/payment/plan', '/payment/risk', '/calendar', '/ledger', '/data', '/about', '/projects', '/activity', '/insight']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })
 
-  it('panalysis / about 解析到真实视图（非占位 PageStub）', () => {
-    const p = router.resolve('/panalysis/board')
+  it('/payment/board 解析到 BoardView、/about 解析到 AboutView（非占位 PageStub）', () => {
+    const p = router.resolve('/payment/board')
     const a = router.resolve('/about')
-    expect((p.matched[0].components?.default as any).__name).toBe('PayAnalysisView')
+    expect((p.matched[0].components?.default as any).__name).toBe('BoardView')
     expect((a.matched[0].components?.default as any).__name).toBe('AboutView')
   })
 
-  it('resolves panalysis pages with tab param', () => {
-    const r = router.resolve('/panalysis/plan')
-    expect(r.matched.length).toBeGreaterThan(0)
-    expect(r.name).toBe('panalysis')
-    expect(r.params.tab).toBe('plan')
-  })
-
-  it('panalysis 缺省 tab 仍解析到 panalysis(模板默认 board)', () => {
-    const r = router.resolve('/panalysis')
-    expect(r.name).toBe('panalysis')
-    expect(r.params.tab).toBe('')
+  it('五条 /payment/* 路由各自命名', () => {
+    expect(router.resolve('/payment/board').name).toBe('pay-board')
+    expect(router.resolve('/payment/projects').name).toBe('pay-projects')
+    expect(router.resolve('/payment/nodes').name).toBe('pay-nodes')
+    expect(router.resolve('/payment/plan').name).toBe('pay-plan')
+    expect(router.resolve('/payment/risk').name).toBe('pay-risk')
   })
 
   // 函数式 redirect 仅在导航时生效(resolve 不跟随),故用 push 后断言 currentRoute
-  it('旧 /board 导航 redirect 到 /panalysis/board 并保 query(dim)', async () => {
+  it('旧 /panalysis/:tab 导航 redirect 到 /payment/:tab', async () => {
+    await router.push('/panalysis/plan')
+    const cur = router.currentRoute.value
+    expect(cur.name).toBe('pay-plan')
+    expect(cur.redirectedFrom?.path).toBe('/panalysis/plan')
+  })
+
+  it('旧 /panalysis 缺省 redirect 到 /payment/board', async () => {
+    await router.push('/panalysis')
+    const cur = router.currentRoute.value
+    expect(cur.name).toBe('pay-board')
+    expect(cur.redirectedFrom?.path).toBe('/panalysis')
+  })
+
+  it('旧 /board 导航 redirect 到 /payment/board 并保 query(dim)', async () => {
     await router.push('/board?dim=orgL4')
     const cur = router.currentRoute.value
-    expect(cur.name).toBe('panalysis')
-    expect(cur.params.tab).toBe('board')
+    expect(cur.name).toBe('pay-board')
     expect(cur.query.dim).toBe('orgL4')
     expect(cur.redirectedFrom?.path).toBe('/board')
   })
 
-  it('旧 /analysis/:tab 导航 redirect 到 /panalysis/:tab', async () => {
-    await router.push('/analysis/plan')
+  it('旧 /analysis/:tab 导航 redirect 到 /payment/:tab', async () => {
+    await router.push('/analysis/risk')
     const cur = router.currentRoute.value
-    expect(cur.name).toBe('panalysis')
-    expect(cur.params.tab).toBe('plan')
-    expect(cur.redirectedFrom?.path).toBe('/analysis/plan')
+    expect(cur.name).toBe('pay-risk')
+    expect(cur.redirectedFrom?.path).toBe('/analysis/risk')
+    expect(Object.keys(cur.query).length).toBe(0)
   })
 
   it('resolves project detail with id param', () => {
@@ -57,7 +67,7 @@ describe('router', () => {
     expect(r.name).toBe('overview')
   })
 
-  it('/ resolves overview and /payment resolves old dashboard', () => {
+  it('/ resolves overview and /payment resolves dashboard', () => {
     expect(router.resolve('/').name).toBe('overview')
     expect(router.resolve('/payment').name).toBe('payment')
   })

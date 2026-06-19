@@ -10,8 +10,14 @@ function makeRouter() {
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'dashboard', component: { template: '<div/>' } },
+      { path: '/payment', component: { template: '<div/>' } },
+      { path: '/payment/board', component: { template: '<div/>' } },
+      { path: '/payment/projects', component: { template: '<div/>' } },
+      { path: '/payment/nodes', component: { template: '<div/>' } },
+      { path: '/payment/plan', component: { template: '<div/>' } },
+      { path: '/payment/risk', component: { template: '<div/>' } },
+      { path: '/calendar', component: { template: '<div/>' } },
       { path: '/ledger', name: 'ledger', component: { template: '<div/>' } },
-      { path: '/panalysis/:tab?', name: 'panalysis', component: { template: '<div/>' } },
       { path: '/:pathMatch(.*)*', component: { template: '<div/>' } },
     ],
   })
@@ -35,13 +41,17 @@ describe('AppSidebar', () => {
     expect(text).toContain('项目动态')
     expect(text).toContain('项目分析')        // 项目组（P5 新）
     expect(text).toContain('回款总览')        // 回款组：旧首页收编更名
-    expect(text).toContain('回款分析')        // P6 归并:多维看板+业务分析单入口
+    expect(text).toContain('多维看板')        // SP4 拆分:回款分析单入口拆为独立页
+    expect(text).toContain('回款项目')
+    expect(text).toContain('回款节点')
+    expect(text).toContain('回款进度')
+    expect(text).toContain('风险项目')
     expect(text).toContain('回款日历')
     expect(text).toContain('数据管理')        // 工具组
     expect(text).not.toContain('看板首页')    // 旧 label 退场
-    expect(text).not.toContain('多维看板')    // P6 归并入「回款分析」,旧 label 退场
-    // 回款组为低一级呈现（缩进样式类存在）;2D 删「临期跟进」后为 4 项
-    expect(wrapper.findAll('.nav-sub').length).toBe(4)
+    expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
+    // 回款组为低一级呈现;SP4 拆分后为 8 项
+    expect(wrapper.findAll('.nav-sub').length).toBe(8)
   })
 
   it('toggle button flips uiStore collapsed', async () => {

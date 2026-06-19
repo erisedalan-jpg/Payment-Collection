@@ -5,12 +5,11 @@ import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
-import ColumnFilter from './ColumnFilter.vue'
+import ColumnFilter from '@/components/ColumnFilter.vue'
 import { formatCellValue } from '@/lib/cellFormat'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { projectPaymentRows, progressBuckets, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 
-defineProps<{ dim: string }>()
 const data = useDataStore()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()
