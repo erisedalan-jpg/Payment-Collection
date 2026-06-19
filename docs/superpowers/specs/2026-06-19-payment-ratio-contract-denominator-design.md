@@ -74,8 +74,10 @@ def _collection_nodes_for(pid, rid, collection_stages):
 | `paymentPmis.ts:179` summaryByDim | `expSum>0 ? actualSum/expSum` | `contractSum>0 ? actualSum/contractSum`（contractSum 已在该函数聚合） |
 | `paymentPmis.ts:292` progressBuckets | `expectedSum>0 ? actualSum/expectedSum` | `contractSum>0 ? actualSum/contractSum`（需在桶内累加 contractSum） |
 | `paymentBoard.ts:148` buildGroup | `expectedSum>0 ? actualSum/expectedSum` | `contractSum>0 ? actualSum/contractSum`（contractSum 已在 buildGroup 算） |
-| `payDashboard.ts` payDashSummary rate | `totalExpected>0 ? totalActual/totalExpected` | 分母改 Σcontract（累加项目 contract） |
-| `payDashboard.ts` payTierStats rate | 同上按档 | 分母改该档 Σcontract |
+| `payDashboard.ts` payDashSummary rate | `totalExpected>0 ? totalActual/totalExpected` | 分母改 Σcontract（inScope 累加 contract） |
+| `payDashboard.ts` payOrgRanking.achievementRate（服务组达成排名） | `expectedTotal>0 ? actualTotal/expectedTotal` | 分母改该组 Σcontract（OrgRank 加 contractTotal 累加） |
+
+> 注：`payTierStats` 仅产 expectedAmountWan/actualAmountWan，**无 rate 字段，非比率点，不改**（清点初稿曾误列，已剔除）。
 | `ledger.ts:42` ledgerRows r | `expectedPayment>0 ? actualPayment/expectedPayment` | `contract>0 ? actualPayment/contract`（行级 contract 来自项目 paymentPmis.contract，需在 ledgerRows 取到） |
 | `ledger.ts:81` ledgerSummary rate | `totalExp>0 ? totalAct/totalExp` | 分母改 Σcontract（汇总累加 contract） |
 | `projectPivot.ts:154` groupInsight rate | `exp>0 ? act/exp` | `contractSum>0 ? act/contractSum`（Insight 项目透视回款完成率列；需在分桶累加 contract） |
