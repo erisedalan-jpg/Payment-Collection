@@ -27,5 +27,23 @@ const option = computed(() => ({
 </script>
 
 <template>
-  <ChartBox :option="option" :height="height || '300px'" />
+  <div class="pbc-scroll">
+    <div
+      class="pbc-inner"
+      :style="{ minWidth: `max(100%, ${Math.max(props.categories.length, 1) * 48}px)` }"
+    >
+      <ChartBox :option="option" :height="height || '300px'" />
+    </div>
+  </div>
 </template>
+
+<style scoped>
+/* 横向滑动容器：桶多时整体变宽，左右滑动 */
+.pbc-scroll {
+  overflow-x: auto;
+}
+/* 内层随 min-width 撑开，ChartBox width:100% 跟随此宽度 */
+.pbc-inner {
+  height: 100%;
+}
+</style>

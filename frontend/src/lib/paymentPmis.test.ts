@@ -116,7 +116,7 @@ describe('projectPaymentRows / summaryByDim', () => {
   // nodes/records 构造：让全部模式下 paymentPmisInRange 返回与旧 paymentPmis 一致的数值
   const nodesA: PaymentNodePmis[] = [
     { stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.5, expectedPayment: 1_000_000, unpaidAmount: 500_000, reached: true, status: '已回款' } as PaymentNodePmis,
-    { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 300_000, unpaidAmount: 0, reached: false, status: '延期' } as PaymentNodePmis,
+    { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 300_000, unpaidAmount: 150_000, reached: false, status: '延期' } as PaymentNodePmis,
     { stage: '质保', planDate: '2026-06-01', actualDate: '', payRatio: 0.2, expectedPayment: 200_000, unpaidAmount: 200_000, reached: false, status: '待回款' } as PaymentNodePmis,
   ]
   const nodesB: PaymentNodePmis[] = [
@@ -171,8 +171,8 @@ describe('projectPaymentRows / summaryByDim', () => {
     // actualSum=2_000_000, expSum=1_500_000+1_000_000=2_500_000, rate=2_000_000/2_500_000
     expect(s[0]).toMatchObject({ value: '组1', projectCount: 2, contractSum: 3_000_000, actualSum: 2_000_000, delayedNodeSum: 1 })
     expect(s[0].rate).toBeCloseTo(2_000_000 / 2_500_000, 6)
-    // remainingSum: A=unpaid之和=500_000+0+200_000=700_000, B=0
-    expect(s[0].remainingSum).toBeCloseTo(700_000, 0)
+    // remainingSum: A=unpaid之和=500_000+150_000+200_000=850_000, B=0
+    expect(s[0].remainingSum).toBeCloseTo(850_000, 0)
   })
 
   it('summaryByDim 分母(expSum) 0 → rate null', () => {
@@ -208,6 +208,45 @@ describe('projectPaymentRows / summaryByDim', () => {
     const expSum = a.expectedTotal + b.expectedTotal
     const actSum = a.actualTotal + b.actualTotal
     expect(s[0].rate).toBeCloseTo(actSum / expSum, 6)
+  })
+
+  it('projectPaymentRows 行含 delayedAmount=Σ延期节点未收(全部模式)', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec)
+    // A: nodesA 中 终验(延期,unpaidAmount=150_000) → delayedAmount=150_000
+    const a = rows.find((r) => r.projectId === 'A')!
+    expect(a.delayedAmount).toBe(150_000)
+    // B: nodesB 中无延期节点 → delayedAmount=0
+    const b = rows.find((r) => r.projectId === 'B')!
+    expect(b.delayedAmount).toBe(0)
+  })
+
+  it('summaryByDim 新增 nodeSum/reachedSum/delayedProjectCount/delayedAmountSum', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec)
+    const s = summaryByDim(rows, 'dept')[0]
+    // A: nodeCount=3, reachedCount=1, delayedCount=1; B: nodeCount=2, reachedCount=2, delayedCount=0
+    expect(s.nodeSum).toBe(5)
+    expect(s.reachedSum).toBe(3)
+    // delayedProjectCount: 有延期节点(delayedCount>0)的项目数 → A有1，B没有 → 1
+    expect(s.delayedProjectCount).toBe(1)
+    expect(s.delayedAmountSum).toBe(150_000)
+  })
+
+  it('全部不变式:summaryByDim 新字段=全量口径', () => {
+    const rows = projectPaymentRows(ps, map, payNodes, payRec, '', '')
+    const s = summaryByDim(rows, 'dept')[0]
+    // nodeSum = Σ行 nodeCount
+    const totalNodeSum = rows.reduce((acc, r) => acc + r.nodeCount, 0)
+    expect(s.nodeSum).toBe(totalNodeSum)
+    // reachedSum = Σ行 reachedCount
+    const totalReachedSum = rows.reduce((acc, r) => acc + r.reachedCount, 0)
+    expect(s.reachedSum).toBe(totalReachedSum)
+    // delayedProjectCount = count(行中 delayedCount>0)
+    const totalDelayedProjectCount = rows.filter((r) => r.delayedCount > 0).length
+    expect(s.delayedProjectCount).toBe(totalDelayedProjectCount)
+    // delayedAmountSum = Σ行 delayedAmount；fixture 中 A 延期节点 unpaidAmount=150_000 → 非零有判别力
+    const totalDelayedAmountSum = rows.reduce((acc, r) => acc + (r.delayedAmount ?? 0), 0)
+    expect(s.delayedAmountSum).toBe(totalDelayedAmountSum)
+    expect(s.delayedAmountSum).toBeGreaterThan(0)
   })
 })
 
