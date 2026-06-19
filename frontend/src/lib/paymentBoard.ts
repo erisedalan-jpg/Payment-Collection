@@ -1,6 +1,7 @@
-import type { Project, ProjectPmis } from '@/types/analysis'
+import type { Project, ProjectPmis, Paymentnodes, Paymentrecords } from '@/types/analysis'
 import type { CrossMatrix, PivotResult, PivotRow, PivotCol } from './pivot'
 import { deriveTier, deriveProgress, deriveDept, deriveStage } from './paymentPmis'
+import { paymentPmisInRange } from './paymentRange'
 
 // 回款看板透视(/board,2B):镜像 projectPivot(/insight 项目级透视),复用 lib/pivot 泛型结构类型;
 // 数据底座改用 PMIS 项目级指标(paymentPmis),回款节点域 lib/pivot 不动。
@@ -24,20 +25,34 @@ export interface PayBoardRow {
   contract: number
   actualTotal: number
   expectedTotal: number
+  remainingTotal: number
   delayedCount: number
   paymentRatio: number | null
   projectAmount: number
   paymentStatus: string
 }
 
-export function buildPayBoardRows(projects: Project[], pmisMap?: Record<string, ProjectPmis>): PayBoardRow[] {
+export function buildPayBoardRows(
+  projects: Project[],
+  pmisMap?: Record<string, ProjectPmis>,
+  paymentNodes?: Paymentnodes,
+  paymentRecords?: Paymentrecords,
+  start = '',
+  end = '',
+): PayBoardRow[] {
   return projects.map((p) => {
     const pmis = p.paymentPmis ?? null
     const cust = (pmisMap?.[p.projectId]?.customer ?? {}) as Record<string, unknown>
-    const contract = pmis?.contract ?? 0
     const dept = deriveDept(p)
-    const progress = deriveProgress(contract, p.payment?.paymentRatio)
     const manager = v(p.projectManager)
+    const rp = paymentPmisInRange(
+      pmis?.contract ?? 0,
+      paymentNodes?.[p.projectId],
+      paymentRecords?.[p.projectId]?.records,
+      start,
+      end,
+    )
+    const progress = deriveProgress(rp.contract, rp.paymentRatio)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -47,14 +62,15 @@ export function buildPayBoardRows(projects: Project[], pmisMap?: Record<string, 
       stage: deriveStage(p.projectId, pmisMap),
       manager,
       industry: v(cust['行业']),
-      tier: deriveTier(pmis?.contract),
+      tier: deriveTier(rp.contract),
       progress,
-      contract,
-      actualTotal: pmis?.actualTotal ?? 0,
-      expectedTotal: pmis?.expectedTotal ?? 0,
-      delayedCount: pmis?.delayedCount ?? 0,
-      paymentRatio: p.payment?.paymentRatio ?? null,
-      projectAmount: contract,
+      contract: rp.contract,
+      actualTotal: rp.actualTotal,
+      expectedTotal: rp.expectedTotal,
+      remainingTotal: rp.remainingTotal,
+      delayedCount: rp.delayedCount,
+      paymentRatio: rp.paymentRatio,
+      projectAmount: rp.contract,
       paymentStatus: progress,
     }
   })
@@ -112,6 +128,7 @@ export interface PayBoardGroup {
 function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoardGroup {
   const contractSum = grows.reduce((s, r) => s + r.contract, 0)
   const actualSum = grows.reduce((s, r) => s + r.actualTotal, 0)
+  const expectedSum = grows.reduce((s, r) => s + r.expectedTotal, 0)
   return {
     key,
     values,
@@ -119,9 +136,9 @@ function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoa
     projectCount: grows.length,
     contractSum,
     actualSum,
-    expectedSum: grows.reduce((s, r) => s + r.expectedTotal, 0),
-    pendingSum: grows.reduce((s, r) => s + Math.max(r.contract - r.actualTotal, 0), 0),
-    rate: contractSum > 0 ? actualSum / contractSum : null,
+    expectedSum,
+    pendingSum: grows.reduce((s, r) => s + r.remainingTotal, 0),
+    rate: expectedSum > 0 ? actualSum / expectedSum : null,
     delayedNodeSum: grows.reduce((s, r) => s + r.delayedCount, 0),
   }
 }

@@ -4,6 +4,7 @@ import {
   calDateData, calListGroups, calUpcoming, calYearHeat,
 } from './calendar'
 import type { PayNodeRow } from './paymentPmis'
+import type { Paymentrecords } from '@/types/analysis'
 
 function pn(p: Partial<PayNodeRow>): PayNodeRow {
   return { projectId: 'P1', projectName: '甲', stage: '到货款', planDate: '2026-02-10', actualDate: '',
@@ -36,18 +37,30 @@ describe('applyCalFilters', () => {
 })
 
 describe('calDashboardStats', () => {
-  it('当月 Σ未收/已收 + 延期 + 7天到期', () => {
+  it('当月 Σ未收/已收(流水) + 延期 + 7天到期', () => {
     const now = new Date('2026-02-15T00:00:00')
     const rows = [
-      pn({ planDate: '2026-02-10', unpaidAmount: 30000, receivedAmount: 10000, status: '部分回款' }),
-      pn({ planDate: '2026-02-18', unpaidAmount: 50000, status: '延期' }),
+      pn({ projectId: 'P1', planDate: '2026-02-10', unpaidAmount: 30000, receivedAmount: 10000, status: '部分回款' }),
+      pn({ projectId: 'P2', planDate: '2026-02-18', unpaidAmount: 50000, status: '延期' }),
     ]
-    const d = calDashboardStats(rows, { orgL3_1: '', orgL4: '', pm: '' }, now)
+    // P1 有当月流水 12000，P2 有当月流水 5000（另有上月流水 9000 不应计入）
+    const paymentRecords: Paymentrecords = {
+      P1: { records: [{ amount: 12000, date: '2026-02-08' }, { amount: 9000, date: '2026-01-20' }] },
+      P2: { records: [{ amount: 5000, date: '2026-02-20' }] },
+    }
+    const d = calDashboardStats(rows, { orgL3_1: '', orgL4: '', pm: '' }, now, paymentRecords)
     expect(d.mRemaining).toBe(80000)
-    expect(d.mActual).toBe(10000)
+    // 当月已回款=流水口径：P1(12000) + P2(5000) = 17000，不含上月 9000
+    expect(d.mActual).toBe(17000)
     expect(d.mCount).toBe(2)
     expect(d.delayed).toBe(1)
     expect(d.upcoming7).toBe(1)
+  })
+  it('未传 paymentRecords 时 mActual=0', () => {
+    const now = new Date('2026-02-15T00:00:00')
+    const rows = [pn({ projectId: 'P1', planDate: '2026-02-10', unpaidAmount: 30000, receivedAmount: 10000, status: '部分回款' })]
+    const d = calDashboardStats(rows, { orgL3_1: '', orgL4: '', pm: '' }, now)
+    expect(d.mActual).toBe(0)
   })
 })
 

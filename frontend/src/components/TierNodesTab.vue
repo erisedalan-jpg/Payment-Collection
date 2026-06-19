@@ -6,6 +6,7 @@ import { useProjectDetailStore } from '@/stores/projectDetail'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { paymentNodeRows, nodeSummary, filterProjects, PAY_FACET_DIMS } from '@/lib/paymentPmis'
+import { inRange } from '@/lib/paymentRange'
 
 const props = defineProps<{ dim: string }>()
 const data = useDataStore()
@@ -20,7 +21,9 @@ const rows = computed(() => {
     excludeActive: filter.excludeOn,
     excludedIds: filter.excludedIds,
   })
-  return paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
+  const allNodes = paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
+  // 按计划日∈区间过滤（全部区间时 inRange 恒真）
+  return allNodes.filter((n) => inRange(n.planDate, filter.dateStart, filter.dateEnd))
 })
 const sum = computed(() => nodeSummary(rows.value))
 

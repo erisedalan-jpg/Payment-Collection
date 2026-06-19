@@ -4,10 +4,12 @@ import { useFilterStore } from '@/stores/filter'
 
 const f = useFilterStore()
 
-const year = computed({
-  get: () => f.filterYear,
-  set: (v: string) => f.setYear(v),
-})
+const PRESETS = [
+  { key: 'month', label: '本月' },
+  { key: 'quarter', label: '本季' },
+  { key: 'year', label: '本年' },
+  { key: 'all', label: '全部' },
+] as const
 
 const mode = computed({
   get: () => f.viewMode,
@@ -23,9 +25,12 @@ const mode = computed({
   <div class="filter-bar">
     <label class="fb-item">
       周期
-      <select data-test="year-select" v-model="year">
-        <option v-for="o in f.yearOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
-      </select>
+      <el-date-picker data-test="date-range" :model-value="[f.dateStart, f.dateEnd]" type="daterange"
+        value-format="YYYY-MM-DD" range-separator="至" start-placeholder="起" end-placeholder="止" size="small"
+        @update:model-value="(v: any) => f.setDateRange(v?.[0] ?? '', v?.[1] ?? '')" />
+      <span class="fb-presets">
+        <button v-for="p in PRESETS" :key="p.key" type="button" class="fb-preset" @click="f.setPreset(p.key)">{{ p.label }}</button>
+      </span>
     </label>
 
     <label class="fb-item">
@@ -62,4 +67,7 @@ const mode = computed({
 .fb-item { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .fb-item select { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line2); border-radius: var(--r-sm);
   font-size: var(--fs-1); background: var(--card2); color: var(--txt); }
+.fb-presets { display: inline-flex; gap: var(--sp-1); }
+.fb-preset { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line2); border-radius: var(--r-sm);
+  background: var(--card2); color: var(--sub); font-size: var(--fs-1); cursor: pointer; }
 </style>

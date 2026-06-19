@@ -3,8 +3,9 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import TierStrip from './TierStrip.vue'
 import { useDataStore } from '@/stores/data'
+import { useFilterStore } from '@/stores/filter'
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
 
 describe('TierStrip', () => {
   it('每档渲染一条进度行并显示完成率(收款阶段口径)', () => {
@@ -18,6 +19,7 @@ describe('TierStrip', () => {
       paymentNodes: { P1: [
         { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.6, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
       ] },
+      paymentRecords: { P1: { records: [{ amount: 600000, date: '2026-02-01' }] } },
     } as any
     const w = mount(TierStrip, { global: { stubs: { BoardDrilldownModal: true } } })
     expect(w.findAll('.ts-row').length).toBe(3)
@@ -36,6 +38,7 @@ describe('TierStrip', () => {
       paymentNodes: { P1: [
         { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.6, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
       ] },
+      paymentRecords: { P1: { records: [{ amount: 600000, date: '2026-02-01' }] } },
     } as any
     const w = mount(TierStrip, { global: { stubs: { BoardDrilldownModal: true } } })
     await w.findAll('.ts-row')[0].trigger('click')

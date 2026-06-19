@@ -23,12 +23,29 @@ function seed() {
 }
 
 describe('FilterBar', () => {
-  it('year select reflects and updates store', async () => {
+  it('renders date-range picker', () => {
+    seed()
+    const wrapper = mount(FilterBar)
+    expect(wrapper.find('[data-test="date-range"]').exists()).toBe(true)
+  })
+
+  it('renders at least 4 preset buttons', () => {
+    seed()
+    const wrapper = mount(FilterBar)
+    const buttons = wrapper.findAll('.fb-preset')
+    expect(buttons.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('preset button "全部" calls setPreset("all") and clears range', async () => {
     seed()
     const f = useFilterStore()
+    f.setDateRange('2026-01-01', '2026-12-31')
     const wrapper = mount(FilterBar)
-    await wrapper.get('[data-test="year-select"]').setValue('2026')
-    expect(f.filterYear).toBe('2026')
+    const allBtn = wrapper.findAll('.fb-preset').find((b) => b.text() === '全部')
+    expect(allBtn).toBeTruthy()
+    await allBtn!.trigger('click')
+    expect(f.dateStart).toBe('')
+    expect(f.dateEnd).toBe('')
   })
 
   it('view select to L4 then choose dept updates store', async () => {
