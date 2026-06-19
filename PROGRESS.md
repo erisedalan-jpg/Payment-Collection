@@ -4,10 +4,10 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.13.0**
-- 最近更新：2026-06-19（SP4 /panalysis 五页拆分：旧 `/panalysis/:tab?` 单页拆为 `/payment/{board,projects,nodes,plan,risk}` 五条独立平铺路由，去 tab 栏、组件归位 views/、删 PayAnalysisView 宿主；维度控件仅留回款节点页（其余三页删声明未用的死 dim prop）；侧栏「回款」展开 8 项；旧 /panalysis、/board、/analysis 兼容 redirect）
-- 上一版本：V1.12.0（2026-06-19，SP3 /payment 页面重做：回款数据表按 L4 分组显示(11 列可排序全宽)；OrgRanking 展全部 L4 不截断；趋势图整数万刻度+横向滚动；去除 TierStrip 档位条；部门汇总迁出看板）
-- 上上版本：V1.11.0（2026-06-19，SP2 日期范围筛选+口径统一：filter store 默认本年度；FilterBar 区间/预设；回款看板六卡/board/部门/趋势/日历/台账随区间联动；SP1-followup 复核关闭；Task 11 view 测试去时间耦合）
+- 当前版本：**V1.14.0**
+- 最近更新：2026-06-19（SP5 /payment/board 多维看板重做：维度集改 L4部门/项目级别/行业/项目阶段/标签（移除 项目经理/金额档/进度态），指标改 项目数/合同总额/计划回款/完成率/延期节点；排名表去独立排序控件改 DataTable 表头排序；柱状图加数字（已回/待回柱内、总计柱顶、整数万）；标签按多值炸开分组（一项目计入它每个标签组）；交叉/透视维度同步。**大需求 5 子项目收官**）
+- 上一版本：V1.13.0（2026-06-19，SP4 /panalysis 五页拆分：旧 `/panalysis/:tab?` 单页拆为 `/payment/{board,projects,nodes,plan,risk}` 五条独立平铺路由，去 tab 栏、组件归位 views/、删 PayAnalysisView 宿主；维度控件仅留回款节点页；侧栏「回款」展开 8 项；旧路径兼容 redirect）
+- 上上版本：V1.12.0（2026-06-19，SP3 /payment 页面重做：回款数据表按 L4 分组显示(11 列可排序全宽)；OrgRanking 展全部 L4 不截断；趋势图整数万刻度+横向滚动；去除 TierStrip 档位条；部门汇总迁出看板）
 - 维护语言：简体中文
 
 ---
@@ -16,6 +16,7 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.14.0 SP5 /payment/board 多维看板重做（2026-06-19，**大需求 5 子项目收官**）：维度集 6→5（dept『L4部门』/projectLevel『项目级别』/industry『行业』/stage『项目阶段』/tag『标签』multi；移除 项目经理/金额档/进度态），指标 7→5（项目数/合同总额/计划回款/完成率/延期节点，去已回款/待回款）；`paymentBoard.groupPayBoard` 改笛卡尔积多值炸开（含 tag 维一项目计入它每个标签组、组间重复计数、空标签『无标签』；非 tag 维零回归）；`PayBoardRow` 加 projectLevel/tags、buildPayBoardRows 追加 tagAssignments 参；排名模式去独立「排序」控件改 `DataTable` 表头排序（列 维度名+5指标、行下钻、无已回/待回列）；柱状图 已回(绿)/待回(黄) label inside + 透明总计 series 柱顶(已回+待回) 整数万、按计划回款降序 Top15；BoardView 接入 projectTags store(assignments 第7参)、deep-link orgL4→dept 别名；交叉/透视复用 groupPayBoard 自动获 tag 炸开。遗留维字段 manager/tier/progress 按需保留(BoardDrilldownModal 仍读)并加注释。纯前端零口径变更。合并 SHA: b690de3
 - V1.13.0 SP4 /panalysis 五页拆分（2026-06-19）：旧 `/panalysis/:tab?` 单页（PayAnalysisView 内 tab 切换 5 组件）拆为 `/payment/{board,projects,nodes,plan,risk}` 五条独立平铺路由（name pay-*，不 hideFilter），去顶部 tab 栏；四 facet 组件 git mv 归位 `views/`(PayProjectsView/PayNodesView/PayPlanView/PayRiskView，保 rename 历史)、删 PayAnalysisView 宿主；维度控件仅留回款节点页（plan/risk/projects 删声明未用的死 dim prop、不加控件）；侧栏「回款」单入口展开 8 项；旧 `/panalysis/:tab?`(缺省→board)、`/board`、`/analysis/:tab` 兼容 redirect（保 query）、goBoard→/payment/board。纯前端纯结构搬迁，不动回款口径/数据层。合并 SHA: 19c0a36
 - V1.12.0 SP3 /payment 页面重做（2026-06-19）：回款数据表按 L4 分组展示(11 列可排序、全宽铺满)；OrgRanking 展全部 L4 行不截断；待回款趋势图整数万刻度+容器横向滚动；去除 TierStrip 档位条；部门汇总迁出看板独立展示。合并 SHA: cb13883
 - V1.11.0 SP2 日期范围筛选+口径统一（2026-06-19）：filter store 默认本年度(dateStart/dateEnd ref)；FilterBar 区间/预设；回款看板六卡/board/部门汇总/趋势/日历/台账随区间联动；SP1-followup 复核（computeKpis 已套 `!isAnomalous`、buildInsightRows 对异常项目回款字段置 0，口径安全，关闭）。合并 SHA: 190c385
