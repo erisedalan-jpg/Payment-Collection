@@ -18,7 +18,7 @@ onMounted(() => { if (!data.data) data.load() })
 const projects = computed(() => (data.data?.projects ?? []) as Project[])
 const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 
-const kpis = computed(() => computeKpis(projects.value, pmisMap.value))
+const kpis = computed(() => computeKpis(projects.value, pmisMap.value, data.data?.paymentRecords))
 const health = computed(() => healthSummary(projects.value))
 const band = computed(() => paymentBand(
   paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
