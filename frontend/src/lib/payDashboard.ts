@@ -1,9 +1,11 @@
 import type { Project } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
 import { filterProjects, type FilterOpts as ProjFilterOpts } from './paymentPmis'
+import { inRange } from './paymentRange'
 
 export interface PayNodeFilterOpts {
-  filterYear: string
+  dateStart: string
+  dateEnd: string
   viewMode: 'global' | 'l4' | 'pm'
   viewL4: string
   viewPM: string
@@ -11,33 +13,14 @@ export interface PayNodeFilterOpts {
   excludedIds: Record<string, boolean>
 }
 
-const Q_RANGE: Record<string, [string, string]> = {
-  Q1: ['01', '03'], Q2: ['04', '06'], Q3: ['07', '09'], Q4: ['10', '12'],
-}
-
-/** 镜像 lib/filterNodes：视角(dept/projectManager) → 排除 → 年份/季度(按 planDate 月份)。无 planDate 的节点在年/季筛选被排除。 */
+/** 镜像 lib/filterNodes：视角(dept/projectManager) → 排除 → 日期区间(按 planDate)。无 planDate 的节点在限定区间被排除。 */
 export function filterPayNodes(rows: PayNodeRow[], opts: PayNodeFilterOpts): PayNodeRow[] {
   let ns = rows
   if (opts.viewMode === 'l4' && opts.viewL4) ns = ns.filter((r) => r.dept === opts.viewL4)
   if (opts.viewMode === 'pm' && opts.viewPM) ns = ns.filter((r) => r.projectManager === opts.viewPM)
   if (opts.excludeActive && opts.excludedIds) ns = ns.filter((r) => !opts.excludedIds[r.projectId])
-  const fy = opts.filterYear
-  if (fy === 'all') return ns
-  const mo = (r: PayNodeRow) => (r.planDate || '').slice(0, 7)
-  if (fy.includes('-Q')) {
-    const keyPart = fy.startsWith('upto') ? fy.slice(4) : fy
-    const [qYear, qn] = keyPart.split('-Q')
-    const range = Q_RANGE['Q' + qn]
-    if (!range) return ns
-    const mStart = `${qYear}-${range[0]}`, mEnd = `${qYear}-${range[1]}`
-    return ns.filter((r) => { const m = mo(r); return !!m && m >= mStart && m <= mEnd })
-  }
-  if (fy.startsWith('upto')) {
-    const end = `${fy.slice(4)}-12`
-    return ns.filter((r) => { const m = mo(r); return !!m && m <= end })
-  }
-  const start = `${fy}-01`, end = `${fy}-12`
-  return ns.filter((r) => { const m = mo(r); return !!m && m >= start && m <= end })
+  if (opts.dateStart || opts.dateEnd) return ns.filter((r) => inRange(r.planDate || '', opts.dateStart, opts.dateEnd))
+  return ns
 }
 
 export interface PayDashSummary {
@@ -124,14 +107,24 @@ export interface PeriodSeries {
 
 const TIER_KEYS = ['100万以上', '50-100万', '50万以下'] as const
 
-function isSpecificYear(filterYear: string): boolean {
-  return filterYear !== 'all' && !filterYear.startsWith('upto') && !filterYear.includes('-Q')
-}
 function quarterOf(planMonth: string): string {
   const [y, moStr] = planMonth.split('-')
   const mo = parseInt(moStr, 10)
   const q = mo <= 3 ? 'Q1' : mo <= 6 ? 'Q2' : mo <= 9 ? 'Q3' : 'Q4'
   return `${y}-${q}`
+}
+
+function fillKeysFromRange(start: string, end: string, gran: 'month' | 'quarter'): string[] {
+  if (!start || !end) return []
+  const sy = +start.slice(0, 4), sm = +start.slice(5, 7), ey = +end.slice(0, 4), em = +end.slice(5, 7)
+  const out: string[] = []
+  if (gran === 'month') {
+    for (let y = sy, m = sm; y < ey || (y === ey && m <= em); m === 12 ? (m = 1, y++) : m++) out.push(`${y}-${String(m).padStart(2, '0')}`)
+  } else {
+    const sq = Math.floor((sm - 1) / 3), eq = Math.floor((em - 1) / 3)
+    for (let y = sy, q = sq; y < ey || (y === ey && q <= eq); q === 3 ? (q = 0, y++) : q++) out.push(`${y}-Q${q + 1}`)
+  }
+  return out
 }
 
 /** 待回款趋势：未全额回款(status≠已回款)的节点按 planDate 月份/季度分桶,待回款=Σunpaid(万),按 tier 分层。 */
@@ -157,13 +150,9 @@ function buildPaySeries(rows: PayNodeRow[], keyOf: (planMonth: string) => string
   return { categories, series: TIER_KEYS.map((t) => ({ tier: t, data: categories.map((c) => byTier[t][c] || 0) })) }
 }
 
-export function payQuarterlyTrend(rows: PayNodeRow[], filterYear: string): PeriodSeries {
-  const fill = isSpecificYear(filterYear) ? ['Q1', 'Q2', 'Q3', 'Q4'].map((q) => `${filterYear}-${q}`) : []
-  return buildPaySeries(rows, quarterOf, fill)
+export function payQuarterlyTrend(rows: PayNodeRow[], start: string, end: string): PeriodSeries {
+  return buildPaySeries(rows, quarterOf, fillKeysFromRange(start, end, 'quarter'))
 }
-export function payMonthlyTrend(rows: PayNodeRow[], filterYear: string): PeriodSeries {
-  const fill = isSpecificYear(filterYear)
-    ? Array.from({ length: 12 }, (_, i) => `${filterYear}-${String(i + 1).padStart(2, '0')}`)
-    : []
-  return buildPaySeries(rows, (m) => m, fill)
+export function payMonthlyTrend(rows: PayNodeRow[], start: string, end: string): PeriodSeries {
+  return buildPaySeries(rows, (m) => m, fillKeysFromRange(start, end, 'month'))
 }

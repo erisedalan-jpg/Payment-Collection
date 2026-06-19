@@ -9,36 +9,24 @@ import { filterPayNodes } from '@/lib/payDashboard'
 const EXCLUDE_ON_KEY = 'pa_exclude_on'
 const EXCLUDE_TAGS_KEY = 'pa_exclude_tags'
 
-export interface YearOption { key: string; label: string }
-
-function buildYearOptions(): YearOption[] {
-  const y = new Date().getFullYear()
-  const qs = ['Q1', 'Q2', 'Q3', 'Q4']
-  const opts: YearOption[] = [
-    { key: 'all', label: '全部' },
-    { key: String(y), label: '本年度' },
-    { key: String(y + 1), label: '下一年度' },
-    { key: `upto${y}`, label: '至本年度' },
-    { key: `upto${y + 1}`, label: '至下一年度' },
-  ]
-  for (const yr of [y, y + 1]) {
-    for (const q of qs) opts.push({ key: `${yr}-${q}`, label: `${yr}年${q}季度` })
-  }
-  for (const yr of [y, y + 1]) {
-    for (const q of qs) opts.push({ key: `upto${yr}-${q}`, label: `至${yr}年${q}季度` })
-  }
-  return opts
-}
-
 export const useFilterStore = defineStore('filter', () => {
   const data = useDataStore()
 
-  const filterYear = ref('all')
+  const dateStart = ref('')   // 本任务默认「全部」过渡;Task 11 翻本年度
+  const dateEnd = ref('')
   const viewMode = ref<ViewMode>('global')
   const viewL4 = ref('')
   const viewPM = ref('')
 
-  const yearOptions = computed(buildYearOptions)
+  function setDateRange(start: string, end: string) { dateStart.value = start || ''; dateEnd.value = end || '' }
+  function setPreset(key: 'month' | 'quarter' | 'year' | 'all') {
+    if (key === 'all') { dateStart.value = ''; dateEnd.value = ''; return }
+    const now = new Date(); const y = now.getFullYear(); const pad = (n: number) => String(n).padStart(2, '0')
+    if (key === 'year') { dateStart.value = `${y}-01-01`; dateEnd.value = `${y}-12-31`; return }
+    if (key === 'quarter') { const q = Math.floor(now.getMonth() / 3); const sm = q * 3 + 1
+      dateStart.value = `${y}-${pad(sm)}-01`; dateEnd.value = `${y}-${pad(sm + 2)}-${pad(new Date(y, sm + 2, 0).getDate())}`; return }
+    const m = now.getMonth() + 1; dateStart.value = `${y}-${pad(m)}-01`; dateEnd.value = `${y}-${pad(m)}-${pad(new Date(y, m, 0).getDate())}`
+  }
 
   const l4Options = computed(() => {
     const set = new Set<string>()
@@ -75,16 +63,14 @@ export const useFilterStore = defineStore('filter', () => {
   const payNodeRowsAll = computed(() =>
     paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
   )
+  const payRecordsAll = computed(() => data.data?.paymentRecords ?? {})
   const filteredPayNodes = computed(() =>
     filterPayNodes(payNodeRowsAll.value, {
-      filterYear: filterYear.value, viewMode: viewMode.value, viewL4: viewL4.value, viewPM: viewPM.value,
+      dateStart: dateStart.value, dateEnd: dateEnd.value, viewMode: viewMode.value, viewL4: viewL4.value, viewPM: viewPM.value,
       excludeActive: excludeOn.value, excludedIds: excludedIds.value,
     }),
   )
 
-  function setYear(key: string) {
-    filterYear.value = key
-  }
   function setViewGlobal() {
     viewMode.value = 'global'
     viewL4.value = ''
@@ -109,9 +95,9 @@ export const useFilterStore = defineStore('filter', () => {
   }
 
   return {
-    filterYear, viewMode, viewL4, viewPM,
-    yearOptions, l4Options, pmOptions, filteredPayNodes,
-    setYear, setViewGlobal, setViewL4, setViewPM,
+    dateStart, dateEnd, viewMode, viewL4, viewPM,
+    l4Options, pmOptions, filteredPayNodes, payRecordsAll,
+    setDateRange, setPreset, setViewGlobal, setViewL4, setViewPM,
     excludeOn, excludeTags, excludedIds, setExclude,
   }
 })
