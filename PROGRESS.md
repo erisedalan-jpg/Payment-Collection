@@ -56,6 +56,8 @@
 
 ## Backlog（按优先级，来源：2026-06-03 代码评审 + harness 评估）
 
+- [ ] **SP1-followup（2026-06-19，供 SP2 复核）**：异常项目(orgL4 空)硬排除仅施于 `filterProjects`/`paymentNodeRows`；`overview.ts computeKpis`「回款达成率」KPI 与 `InsightView` 回款列直接累加原始 projects、未套排除（当前异常项目 0 节点→0 影响）。SP2 口径统一时一并复核，避免异常项目带金额时口径漂移。
+
 ### 🔴 严重（小改动、高收益，建议优先）
 - [x] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。（A2 完成：ThreadingHTTPServer + create_server）
 - [x] **B-2** `server.py:1319` 绑定 `127.0.0.1` 而非 `""`：避免局域网无认证访问/触发同步/清空数据。（A2 完成：绑定 127.0.0.1）
