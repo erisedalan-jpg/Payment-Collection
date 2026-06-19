@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { router } from './index'
 
 describe('router', () => {
+  beforeEach(async () => { await router.push('/') })
+
   it('resolves all top-level pages', () => {
     for (const path of ['/', '/payment', '/payment/board', '/payment/projects', '/payment/nodes', '/payment/plan', '/payment/risk', '/calendar', '/ledger', '/data', '/about', '/projects', '/activity', '/insight']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
@@ -51,6 +53,7 @@ describe('router', () => {
     const cur = router.currentRoute.value
     expect(cur.name).toBe('pay-risk')
     expect(cur.redirectedFrom?.path).toBe('/analysis/risk')
+    expect(Object.keys(cur.query).length).toBe(0)
   })
 
   it('resolves project detail with id param', () => {

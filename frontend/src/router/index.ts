@@ -38,6 +38,8 @@ export const router = createRouter({
     { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
     // 回款分析五页:由旧 /panalysis 单页拆为 /payment/* 平铺独立路由(SP4);均依赖 FilterBar(不 hideFilter)
+    // /payment(精确)与 /payment/*(精确子路径)均为精确路由、互不遮蔽，定义顺序不影响解析；
+    // 后续新增回款子页须保持精确路径，勿引入 /payment/:param 通配，否则会遮蔽 DashboardView。
     { path: '/payment/board', name: 'pay-board', component: BoardView, meta: { title: '多维看板' } },
     { path: '/payment/projects', name: 'pay-projects', component: PayProjectsView, meta: { title: '回款项目' } },
     { path: '/payment/nodes', name: 'pay-nodes', component: PayNodesView, meta: { title: '回款节点' } },
