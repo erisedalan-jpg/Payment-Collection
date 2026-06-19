@@ -7,7 +7,6 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { projectPaymentRows, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 
-const props = defineProps<{ dim?: string }>()
 const data = useDataStore()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()

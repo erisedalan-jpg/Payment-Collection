@@ -32,7 +32,6 @@ describe('PayProjectsView', () => {
   it('渲染项目明细行，部门汇总不再出现', async () => {
     seed()
     const w = mount(PayProjectsView, {
-      props: { dim: 'dept' },
       global: { plugins: [ElementPlus] },
     })
     await flushPromises()
@@ -46,7 +45,6 @@ describe('PayProjectsView', () => {
   it('明细表含预期列头', async () => {
     seed()
     const w = mount(PayProjectsView, {
-      props: { dim: 'dept' },
       global: { plugins: [ElementPlus] },
     })
     await flushPromises()
@@ -63,7 +61,6 @@ describe('PayProjectsView', () => {
       naguanExclude: {}, projects: [], projectPmis: {},
     } as any
     const w = mount(PayProjectsView, {
-      props: { dim: 'tier' },
       global: { plugins: [ElementPlus] },
     })
     await flushPromises()
