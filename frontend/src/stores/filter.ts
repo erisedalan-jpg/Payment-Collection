@@ -12,8 +12,9 @@ const EXCLUDE_TAGS_KEY = 'pa_exclude_tags'
 export const useFilterStore = defineStore('filter', () => {
   const data = useDataStore()
 
-  const dateStart = ref('')   // 本任务默认「全部」过渡;Task 11 翻本年度
-  const dateEnd = ref('')
+  const _y = new Date().getFullYear()
+  const dateStart = ref(`${_y}-01-01`)   // 默认本年度(Task 11)
+  const dateEnd = ref(`${_y}-12-31`)
   const viewMode = ref<ViewMode>('global')
   const viewL4 = ref('')
   const viewPM = ref('')
