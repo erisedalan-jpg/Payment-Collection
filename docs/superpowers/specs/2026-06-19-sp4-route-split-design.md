@@ -13,7 +13,7 @@
 
 1. **导航/路由模型 = /payment/* 平铺、去 tab 栏**（用户在 A/B/C 三选中选 A）。五页全部落 `/payment/*`，侧栏「回款」分组各列一项，删除顶部 av-tabs 栏。
 2. **组件归位**：四个 facet 组件（`ProjectsOverviewTab`/`TierNodesTab`/`PlanTab`/`RiskTab`）`git mv` 重命名进 `views/`（"Tab" 名已失真，且 views/ 是本项目路由页约定）；`BoardView.vue` 已是 view，直接挂 `/payment/board`；删除 `PayAnalysisView.vue`（tab 栏宿主）。
-3. **维度控件下沉**：nodes/plan/risk 三页 `dim` 由原 prop 改为页内 `ref('dept')` + 各自渲染 `SegToggle`，**每页独立、默认 dept、切页不串**（无跨页持久化需求，YAGNI）。`回款项目` 页无维度控件（`ProjectsOverviewTab.dim?` 声明但从未使用，删 prop 干净）。
+3. **维度控件下沉（仅 nodes）**：复查代码后确认——四个 facet 组件里**只有 `nodes`(回款节点) 真正使用 `dim`**（dimField/dimLabel/byDim 分组）。`plan` 按进度桶分组、`risk` 按固定三档分组、`projects` 明细表，三者的 `dim`(`PlanTab`/`RiskTab` 为 `dim:string`、`ProjectsOverviewTab` 为 `dim?:string`) 都是**声明却从未引用的死 prop**；旧共享 SegToggle 在这三页是可见但无反应的死控件。故：`nodes` 页 `dim` 由 prop 改页内 `ref('dept')` + 渲染 `SegToggle`（默认 dept）；`plan`/`risk`/`projects` 三页**直接删死 prop、不加任何维度控件**（复刻死控件等于保留 bug，用户 2026-06-19 确认）。
 4. **保留 redirect**：旧 `/panalysis/:tab?`、`/board`、`/analysis/:tab` 全部 redirect 到新 `/payment/*`，保深链与 query。
 
 ---
@@ -55,10 +55,10 @@
 
 | 原文件 | 新文件 | 变更 |
 |---|---|---|
-| `components/ProjectsOverviewTab.vue` | `views/PayProjectsView.vue` | 删 `defineProps<{ dim?: string }>()`（未使用） |
+| `components/ProjectsOverviewTab.vue` | `views/PayProjectsView.vue` | 删 `defineProps<{ dim?: string }>()`（声明未用） |
 | `components/TierNodesTab.vue` | `views/PayNodesView.vue` | `dim` prop → 内部 `ref` + SegToggle（见 §4） |
-| `components/PlanTab.vue` | `views/PayPlanView.vue` | 同上 |
-| `components/RiskTab.vue` | `views/PayRiskView.vue` | 同上 |
+| `components/PlanTab.vue` | `views/PayPlanView.vue` | 删 `defineProps<{ dim: string }>()`（声明未用），不加控件 |
+| `components/RiskTab.vue` | `views/PayRiskView.vue` | 删 `defineProps<{ dim: string }>()`（声明未用），不加控件 |
 | `views/PayAnalysisView.vue` | **删除** | tab 栏宿主，不再需要 |
 | `views/PayAnalysisView.test.ts` | **删除** | 随 view 删 |
 | `views/BoardView.vue` | （不动） | 直接挂 `/payment/board` |
@@ -68,12 +68,12 @@
 
 ---
 
-## 4. 维度控件下沉（`PayNodesView` / `PayPlanView` / `PayRiskView`）
+## 4. 维度控件下沉（仅 `PayNodesView`）
 
-原 `PayAnalysisView` 顶部共享一个 `SegToggle`（`v-model="dim"`，选项来自 `PAY_FACET_DIMS`），经 prop 下传三页。拆分后该控件随 view 各自内置：
+原 `PayAnalysisView` 顶部共享一个 `SegToggle`（`v-model="dim"`，选项来自 `PAY_FACET_DIMS`），经 prop 下传，但只有 `nodes` 真正消费。拆分后该控件并入 `PayNodesView`：
 
-- 三页脚本：删 `defineProps<{ dim: string }>()`，改 `const dim = ref<'dept'|'stage'|'tier'|'progress'>('dept')`；`import { ref } from 'vue'`、`import SegToggle from '@/components/SegToggle.vue'`、`import { PAY_FACET_DIMS } from '@/lib/paymentPmis'`（PlanTab/RiskTab 已 import paymentPmis，仅补 PAY_FACET_DIMS）。
-- 三页模板顶部加一行维度控件：
+- `PayNodesView` 脚本：删 `defineProps<{ dim: string }>()`，改 `const dim = ref<'dept'|'stage'|'tier'|'progress'>('dept')`；`computed` 内 `props.dim` 改 `dim.value`；`import` 补 `ref`（已 import computed，改为 `import { computed, ref } from 'vue'`）与 `SegToggle from '@/components/SegToggle.vue'`（`PAY_FACET_DIMS` 已 import）。
+- `PayNodesView` 模板顶部加一行维度控件：
 
 ```vue
 <div class="pv-ctl">
@@ -82,9 +82,9 @@
 </div>
 ```
 
-其中 `const DIM_OPTS = PAY_FACET_DIMS.map((d) => ({ value: d.key, label: d.label }))`。样式 `.pv-ctl`/`.pv-label` 复用原 `PayAnalysisView` 的 `.av-ctl`/`.av-label` 取值（间距/字号用令牌，不手写散值）。
+其中 `const DIM_OPTS = PAY_FACET_DIMS.map((d) => ({ value: d.key, label: d.label }))`。样式 `.pv-ctl`/`.pv-label` 复用原 `PayAnalysisView` 的 `.av-ctl`/`.av-label` 取值（`display:flex;align-items:center;gap:var(--sp-2)` 与 `font-size:var(--fs-1);color:var(--mut)`，令牌化不手写散值）。
 
-- `PayProjectsView`：无维度控件，仅删 `dim?` prop，其余不动。
+- `PayProjectsView` / `PayPlanView` / `PayRiskView`：删死 `dim` prop，**不加**任何维度控件，其余逻辑不动。
 
 ---
 
@@ -124,7 +124,7 @@ export function goBoard(router: Router, dim: string): void {
 | `components/OrgRanking.test.ts` | 点击排名行期望跳 `/payment/board?dim=orgL4` |
 | `layout/AppSidebar.test.ts` | 路由桩 `/panalysis` → 八条 `/payment/*` + `/calendar`/`/ledger`；断言侧栏渲染新链接 |
 | `views/PayAnalysisView.test.ts` | **删除** |
-| 四个改名 view 的 `.test.ts` | 随 `git mv` 改名 + 更新 import；原靠 `:dim` prop 驱动分组的用例改为驱动内部 SegToggle（或断言默认 dept 分组）；nodes/plan/risk 各加「维度控件（SegToggle）存在」断言 |
+| 四个改名 view 的 `.test.ts` | 随 `git mv` 改名 + 更新 import；`PayProjectsView`/`PayPlanView`/`PayRiskView` 的 `mount(..., { props: { dim } })` 去掉 `dim`（不再是 prop）；`PayNodesView` 改为不传 prop（dim 内部默认 dept），「dim=dept 出部门分组」用例仍成立（默认即 dept），并加「维度控件 SegToggle 存在」断言（`w.find('[data-test=seg-dept]').exists()`） |
 
 ---
 
