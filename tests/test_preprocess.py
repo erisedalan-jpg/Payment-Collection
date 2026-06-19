@@ -198,6 +198,24 @@ class TestRatioHelpers:
         assert P._parse_completion_pct("") is None
 
 
+# ── _overview_or_empty：空「项目验收日期」sheet 时返回完整 4 元组默认 ──
+# 回归：清空数据后 yundocs_data 为空 → overview_sheet 为 None，
+# 历史上 main() 的 else 分支漏赋 naguan_exclude，导致组装输出时 UnboundLocalError
+# 崩在写盘前、analysis_data.json 从未产出。此 helper 保证空 sheet 也得到 ([], {}, {}, [])。
+class TestOverviewOrEmpty:
+    def test_none_sheet_returns_full_defaults(self):
+        assert P._overview_or_empty(None) == ([], {}, {}, [])
+
+    def test_empty_sheet_returns_full_defaults(self):
+        assert P._overview_or_empty([]) == ([], {}, {}, [])
+
+    def test_naguan_exclude_is_dict_not_missing(self):
+        # 第 3 个元素(naguan_exclude)必须是可 .items() 的 dict——正是崩溃点
+        _, _, naguan_exclude, _ = P._overview_or_empty(None)
+        assert naguan_exclude == {}
+        assert dict(naguan_exclude.items()) == {}
+
+
 def test_backfill_final_acceptance():
     import preprocess_data as P
     project_pmis = {
