@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { PageKey } from '@/lib/pageAccess'
+import { useAuthStore } from '@/stores/auth'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import BoardView from '@/views/BoardView.vue'
@@ -69,4 +70,14 @@ export const router = createRouter({
     // catch-all(含 '/')渲染项目总览——P4 起 '/' 为项目主域首页,旧回款看板迁 /payment
     { path: '/:pathMatch(.*)*', name: 'overview', component: OverviewView, alias: '/', meta: { title: '项目总览', hideFilter: true, pageKey: 'overview' } },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  if (to.path === '/login') return true
+  await auth.ensureReady()
+  if (!auth.isLoggedIn) return { path: '/login' }
+  const key = to.meta.pageKey
+  if (auth.isSuper || !key || auth.canAccess(key)) return true
+  return { path: auth.firstAllowedPath() }
 })
