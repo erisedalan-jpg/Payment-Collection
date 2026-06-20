@@ -201,3 +201,28 @@ def test_super_delete_normal_revokes_session(admin_server):
         == 200
     )
     assert _req(port, "GET", "/api/auth/me", liu_cookie)[0] == 401
+
+
+def test_super_create_non_string_displayname_400_not_500(admin_server):
+    """I-1 回归:非字符串 displayName 须受控 400(ERR_VALIDATION),不得逃逸成 500/断连。"""
+    port = admin_server
+    _, cookie, _ = _login(port, "boss", "bosspw")
+    status, data = _req(
+        port, "POST", "/api/admin/accounts/create", cookie,
+        {"account": "newbie", "password": "pw12345", "displayName": {"x": 1},
+         "allowedPages": ["projects"], "allowedL4": ["北京"]},
+    )
+    assert status == 400 and data.get("code") == "validation_error"
+    # 账号不应因异常逃逸而被部分写入
+    _, lst = _req(port, "GET", "/api/admin/accounts", cookie)
+    assert "newbie" not in {a["account"] for a in lst["accounts"]}
+
+
+def test_super_update_non_string_account_400(admin_server):
+    port = admin_server
+    _, cookie, _ = _login(port, "boss", "bosspw")
+    status, _ = _req(
+        port, "POST", "/api/admin/accounts/update", cookie,
+        {"account": ["liu"], "displayName": "x"},
+    )
+    assert status == 400

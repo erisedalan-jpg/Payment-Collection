@@ -157,3 +157,28 @@ def test_add_edit_remove_roundtrip(tmp_path, monkeypatch):
     assert auth.load_accounts()['users']['dan']['allowedL4'] == ['上海', '北京']
     auth.remove_account('dan')
     assert 'dan' not in auth.load_accounts()['users']
+
+
+def test_create_account_non_string_fields_raise():
+    acc = _fresh_accounts()
+    import pytest
+    # 非字符串 account → ValueError(非 TypeError 逃逸)
+    with pytest.raises(ValueError):
+        auth.create_account(acc, ['a'], 'pw', 'n', ['projects'], ['北京'])
+    # 非字符串 displayName(dict/list) → ValueError(非 KeyError(slice)/脏数据落盘)
+    with pytest.raises(ValueError):
+        auth.create_account(acc, 'newbie', 'pw', {'x': 1}, ['projects'], ['北京'])
+    with pytest.raises(ValueError):
+        auth.create_account(acc, 'newbie', 'pw', ['a', 'b'], ['projects'], ['北京'])
+
+
+def test_update_delete_non_string_account_raise():
+    acc = _fresh_accounts()
+    import pytest
+    # 非字符串 account 不再因 `in dict` 抛 TypeError,统一 ValueError
+    with pytest.raises(ValueError):
+        auth.update_account(acc, ['liu'], display_name='x')
+    with pytest.raises(ValueError):
+        auth.update_account(acc, 'liu', display_name={'x': 1})
+    with pytest.raises(ValueError):
+        auth.delete_account(acc, ['liu'])
