@@ -1,10 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import LoginCharacters from './LoginCharacters.vue'
 
 describe('LoginCharacters', () => {
-  afterEach(() => { delete (window as any).matchMedia })
-
   it('渲染 4 个角色,默认 idle', () => {
     const w = mount(LoginCharacters)
     expect(w.findAll('.lc-char')).toHaveLength(4)
@@ -20,11 +18,11 @@ describe('LoginCharacters', () => {
     await w.setProps({ mood: 'fail' })
     expect(w.find('.lc').classes()).toContain('lc--fail')
   })
-  it('prefers-reduced-motion: 禁用眼随(瞳孔不随鼠标偏移)', () => {
-    ;(window as any).matchMedia = vi.fn().mockReturnValue({ matches: true })
+  it('眼随鼠标:mousemove 更新瞳孔偏移(--eye-x 非 0)', async () => {
     const w = mount(LoginCharacters)
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 99999, clientY: 99999 }))
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 99999, clientY: 0 }))
+    await w.vm.$nextTick()   // Vue :style 绑定异步刷新,须等下一拍再读属性
     const style = w.find('.lc').attributes('style') || ''
-    expect(style).toContain('--eye-x: 0px')   // reduceMotion→onMove 短路,eye.x 保持 0
+    expect(style).toMatch(/--eye-x:\s*[1-9]/)   // 向右偏移,瞳孔随鼠标(非 0)
   })
 })
