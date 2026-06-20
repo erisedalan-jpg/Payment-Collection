@@ -165,11 +165,11 @@ _AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me')
 
 def _path_needs_auth(path):
     """纯函数：判断路径是否需要登录鉴权。
-    豁免：/api/login、/api/logout、/api/auth/me 及非 /api、/data 路径。
-    拦截：其余 /api/* 与 /data/* 路径。"""
+    豁免：/api/login、/api/logout、/api/auth/me 及非受保护路径。
+    拦截：/api/* /data/* /input/* /yundocs_data/* /report/* /log/* 路径。"""
     if path in _AUTH_EXEMPT:
         return False
-    return path.startswith('/api/') or path.startswith('/data/')
+    return path.startswith(('/api/', '/data/', '/input/', '/yundocs_data/', '/report/', '/log/'))
 
 
 _history_lock = threading.Lock()
@@ -432,6 +432,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if not self._auth_gate():
             return
+
         if parsed.path == '/api/import':
             self.handle_import()
         elif parsed.path == '/api/followup/add':
