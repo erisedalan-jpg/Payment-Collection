@@ -66,6 +66,9 @@ def test_path_needs_auth():
     assert server._path_needs_auth('/') is False
     assert server._path_needs_auth('/assets/index.js') is False
     assert server._path_needs_auth('/index.html') is False
+    assert server._path_needs_auth('/input/payment_records.csv') is True
+    assert server._path_needs_auth('/yundocs_data/x.json') is True
+    assert server._path_needs_auth('/report/x.csv') is True
 
 
 def test_auth_gate_blocks_unauthenticated(tmp_path, monkeypatch):
@@ -83,6 +86,11 @@ def test_auth_gate_blocks_unauthenticated(tmp_path, monkeypatch):
         r = conn.getresponse()
         assert r.status == 401
         r.read()
+        # 未带 cookie 访 /input → 401
+        conn.request("GET", "/input/payment_records.csv")
+        ri = conn.getresponse()
+        assert ri.status == 401
+        ri.read()
         # 登录拿 cookie
         conn.request("POST", "/api/login", json.dumps({"account": "admin", "password": "wxtnb"}),
                      {"Content-Type": "application/json"})

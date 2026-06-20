@@ -48,6 +48,7 @@ describe('stores/auth', () => {
 })
 
 describe('stores/auth 访问控制', () => {
+  beforeEach(() => setActivePinia(createPinia()))
   it('ensureReady 多次调用只 fetchMe 一次', async () => {
     ;(fetchMe as any).mockResolvedValue(null)
     const s = useAuthStore()
