@@ -90,9 +90,9 @@ const deptAbnormalOption = computed(() => {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { data: ['延期', '严重延期', '未发布'], bottom: 0 },
-    grid: { left: 40, right: 20, top: 10, bottom: 70 },
+    grid: { left: 56, right: 20, top: 10, bottom: 70 },
     xAxis: { type: 'category', data: d.map((x) => wrapDept(x.orgL4)), axisLabel: { interval: 0, fontSize: 11 } },
-    yAxis: { type: 'value', name: '异常项目数' },
+    yAxis: { type: 'value', name: '异常项目数', nameLocation: 'middle', nameGap: 38, nameRotate: 90 },
     series: [
       { name: '延期', type: 'bar', stack: 'ab', color: s.warn, label: dataLabel, data: d.map((x) => x.delayed) },
       { name: '严重延期', type: 'bar', stack: 'ab', color: s.danger, label: dataLabel, data: d.map((x) => x.severe) },
@@ -104,9 +104,9 @@ const complianceOption = computed(() => {
   const c = deptComplianceRate(mps.value, deptOrder.value), s = sc.value
   return {
     tooltip: { trigger: 'axis' },
-    grid: { left: 50, right: 20, top: 20, bottom: 70 },
+    grid: { left: 56, right: 20, top: 20, bottom: 70 },
     xAxis: { type: 'category', data: c.map((x) => wrapDept(x.orgL4)), axisLabel: { interval: 0, fontSize: 11 } },
-    yAxis: { type: 'value', name: '合规率(%)', min: 0, max: 100 },
+    yAxis: { type: 'value', name: '合规率(%)', min: 0, max: 100, nameLocation: 'middle', nameGap: 40, nameRotate: 90 },
     series: [{
       name: '里程碑合规率', type: 'line', smooth: true, color: s.ok, areaStyle: { opacity: 0.08 },
       label: { show: true, formatter: (p: any) => p.value + '%', color: (p: any) => (p.value < 100 ? s.danger : s.ok) },
@@ -129,8 +129,8 @@ const faCountOption = computed(() => {
   const c = chart.value
   return {
     tooltip: { trigger: 'axis' }, legend: { data: ['计划项目数', '实际完成数'], bottom: 0 },
-    grid: { left: 40, right: 20, top: 10, bottom: 40 },
-    xAxis: { type: 'category', data: fa.value.periods }, yAxis: { type: 'value', name: '项目数' },
+    grid: { left: 56, right: 20, top: 10, bottom: 40 },
+    xAxis: { type: 'category', data: fa.value.periods }, yAxis: { type: 'value', name: '项目数', nameLocation: 'middle', nameGap: 36, nameRotate: 90 },
     series: [
       { name: '计划项目数', type: 'bar', barWidth: '40%', color: c[5], label: topLabel, data: fa.value.planCount },
       { name: '实际完成数', type: 'bar', barWidth: '22%', barGap: '-55%', color: c[2], label: topLabel, data: fa.value.actualCount },
@@ -141,8 +141,8 @@ const faAmountOption = computed(() => {
   const c = chart.value
   return {
     tooltip: { trigger: 'axis' }, legend: { data: ['计划金额', '实际完成金额'], bottom: 0 },
-    grid: { left: 50, right: 20, top: 10, bottom: 40 },
-    xAxis: { type: 'category', data: fa.value.periods }, yAxis: { type: 'value', name: '金额(万)' },
+    grid: { left: 56, right: 20, top: 10, bottom: 40 },
+    xAxis: { type: 'category', data: fa.value.periods }, yAxis: { type: 'value', name: '金额(万)', nameLocation: 'middle', nameGap: 38, nameRotate: 90 },
     series: [
       { name: '计划金额', type: 'bar', barWidth: '40%', color: c[3], label: topLabel, data: fa.value.planAmountWan },
       { name: '实际完成金额', type: 'bar', barWidth: '22%', barGap: '-55%', color: c[1], label: topLabel, data: fa.value.actualAmountWan },
@@ -171,8 +171,8 @@ const nodeDistOption = computed(() => {
   return {
     tooltip: { trigger: 'axis' },
     legend: { data: ['到货(关联回款)', '初验(关联回款)', '终验', '服务完成'], bottom: 0 },
-    grid: { left: 40, right: 20, top: 10, bottom: 50 },
-    xAxis: { type: 'category', data: MONTH_LABELS }, yAxis: { type: 'value', name: '节点数' },
+    grid: { left: 56, right: 20, top: 10, bottom: 50 },
+    xAxis: { type: 'category', data: MONTH_LABELS }, yAxis: { type: 'value', name: '节点数', nameLocation: 'middle', nameGap: 36, nameRotate: 90 },
     series: [
       line('到货(关联回款)', c[0], nd.value.arrival),
       line('初验(关联回款)', c[2], nd.value.firstAccept),

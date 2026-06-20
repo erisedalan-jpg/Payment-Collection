@@ -41,9 +41,9 @@ const distOption = computed(() => {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { data: ['超支不足5k', '超支大于5k'], top: 0 },
-    grid: { left: 40, right: 20, top: 36, bottom: 64 },
+    grid: { left: 56, right: 20, top: 36, bottom: 64 },
     xAxis: { type: 'category', data: d.map((x) => x.orgL4), axisLabel: { interval: 0, rotate: d.length > 6 ? 30 : 0, fontSize: 11, margin: 10 } },
-    yAxis: { type: 'value', name: '超支项目数' },
+    yAxis: { type: 'value', name: '超支项目数', nameLocation: 'middle', nameGap: 38, nameRotate: 90 },
     series: [
       { name: '超支不足5k', type: 'bar', stack: 't', color: s.warn, label: lbl, data: d.map((x) => x.under5k) },
       { name: '超支大于5k', type: 'bar', stack: 't', color: s.danger, label: lbl, data: d.map((x) => x.over5k) },
