@@ -110,6 +110,7 @@ const complianceOption = computed(() => {
     series: [{
       name: '里程碑合规率', type: 'line', smooth: true, color: s.ok, areaStyle: { opacity: 0.08 },
       label: { show: true, formatter: (p: any) => p.value + '%', color: (p: any) => (p.value < 100 ? s.danger : s.ok) },
+      labelLayout: { moveOverlap: 'shiftY' },
       data: c.map((x) => x.rate),
     }],
   }
@@ -235,9 +236,9 @@ defineExpose({ faGran, onNodeClick, nodeYear })
       </div>
 
       <div class="mv-grid2">
-        <div class="mv-card"><div class="mv-card-h">里程碑到期提醒</div><ChartBox :option="reminderOption" height="240px" /></div>
-        <div class="mv-card"><div class="mv-card-h">部门异常项目分布(Top15)</div><ChartBox :option="deptAbnormalOption" height="240px" /></div>
-        <div class="mv-card"><div class="mv-card-h">部门里程碑合规率</div><ChartBox :option="complianceOption" height="240px" /></div>
+        <div class="mv-card"><div class="mv-card-h">里程碑到期提醒</div><ChartBox :option="reminderOption" height="300px" /></div>
+        <div class="mv-card"><div class="mv-card-h">部门异常项目分布(Top15)</div><ChartBox :option="deptAbnormalOption" height="300px" /></div>
+        <div class="mv-card"><div class="mv-card-h">部门里程碑合规率</div><ChartBox :option="complianceOption" height="300px" /></div>
       </div>
 
       <div class="mv-card">

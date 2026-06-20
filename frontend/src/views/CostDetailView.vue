@@ -40,9 +40,9 @@ const distOption = computed(() => {
   const lbl = { show: true, formatter: (p: any) => p.value || '' }
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { data: ['超支不足5k', '超支大于5k'], bottom: 0 },
-    grid: { left: 40, right: 20, top: 10, bottom: 50 },
-    xAxis: { type: 'category', data: d.map((x) => x.orgL4), axisLabel: { interval: 0, rotate: d.length > 6 ? 30 : 0, fontSize: 11 } },
+    legend: { data: ['超支不足5k', '超支大于5k'], top: 0 },
+    grid: { left: 40, right: 20, top: 36, bottom: 64 },
+    xAxis: { type: 'category', data: d.map((x) => x.orgL4), axisLabel: { interval: 0, rotate: d.length > 6 ? 30 : 0, fontSize: 11, margin: 10 } },
     yAxis: { type: 'value', name: '超支项目数' },
     series: [
       { name: '超支不足5k', type: 'bar', stack: 't', color: s.warn, label: lbl, data: d.map((x) => x.under5k) },
@@ -124,7 +124,7 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
     <template v-else>
       <MetricGrid :items="kpiItems" :col-min="'160px'" />
       <div class="cd-grid2">
-        <div class="cd-card"><div class="cd-card-h">超支项目分布(按 L4,剔 XS)</div><ChartBox :option="distOption" height="260px" /></div>
+        <div class="cd-card"><div class="cd-card-h">超支项目分布(按 L4,剔 XS)</div><ChartBox :option="distOption" height="300px" /></div>
         <div class="cd-card"><div class="cd-card-h">L4 部门成本情况汇总</div><DataTable :columns="L4_COLS" :rows="l4Rows" :show-count="false">
           <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}%</span></template>
         </DataTable></div>
