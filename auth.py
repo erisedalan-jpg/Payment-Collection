@@ -3,6 +3,7 @@ data/accounts.json 为本地敏感数据(gitignored);明文密码不落盘、不
 from __future__ import annotations
 
 import os
+import re
 import sys
 import json
 import time
@@ -152,3 +153,127 @@ def build_set_cookie(token: str) -> str:
 
 def build_clear_cookie() -> str:
     return f'{COOKIE_NAME}=; Max-Age=0; HttpOnly; SameSite=Lax; Path=/'
+
+
+# -- SP-5 账号管理 --
+_ACCOUNT_RE = re.compile(r'^[A-Za-z0-9_.-]{1,64}$')
+_accounts_mutate_lock = threading.Lock()
+
+
+def _validate_account_name(account: str) -> str:
+    name = (account or '').strip()
+    if not _ACCOUNT_RE.match(name):
+        raise ValueError('账号名须为 1-64 位字母/数字/下划线/点/连字符')
+    return name
+
+
+def _validate_password(password: str) -> None:
+    if not isinstance(password, str) or not (1 <= len(password) <= 256):
+        raise ValueError('密码长度须为 1-256')
+
+
+def _validate_str_list(values, field: str) -> list:
+    if not isinstance(values, list):
+        raise ValueError(f'{field} 须为数组')
+    out: list = []
+    for v in values:
+        if not isinstance(v, str) or not (1 <= len(v) <= 64):
+            raise ValueError(f'{field} 各项须为 1-64 位字符串')
+        if v not in out:
+            out.append(v)
+    if len(out) > 100:
+        raise ValueError(f'{field} 项数过多')
+    return out
+
+
+def create_account(accounts: dict, account: str, password: str, display_name: str,
+                   pages: list, l4: list) -> dict:
+    name = _validate_account_name(account)
+    _validate_password(password)
+    users = accounts.get('users', {})
+    if name in users:
+        raise ValueError(f'账号 {name} 已存在')
+    pages = _validate_str_list(pages, 'allowedPages')
+    l4 = _validate_str_list(l4, 'allowedL4')
+    new_users = dict(users)
+    new_users[name] = _make_user(password, (display_name or name)[:64],
+                                 is_super=False, pages=pages, l4=l4)
+    out = dict(accounts)
+    out['users'] = new_users
+    return out
+
+
+def update_account(accounts: dict, account: str, *, display_name=None, pages=None,
+                   l4=None, password=None) -> dict:
+    users = accounts.get('users', {})
+    if account not in users:
+        raise KeyError(account)
+    if users[account].get('isSuper'):
+        raise ValueError('不可经界面修改超级管理员')
+    rec = dict(users[account])
+    if display_name is not None:
+        rec['displayName'] = (display_name or account)[:64]
+    if pages is not None:
+        rec['allowedPages'] = _validate_str_list(pages, 'allowedPages')
+    if l4 is not None:
+        rec['allowedL4'] = _validate_str_list(l4, 'allowedL4')
+    if password is not None:
+        _validate_password(password)
+        salt = secrets.token_hex(16)
+        rec['salt'] = salt
+        rec['hash'] = hash_password(password, salt)
+    new_users = dict(users)
+    new_users[account] = rec
+    out = dict(accounts)
+    out['users'] = new_users
+    return out
+
+
+def delete_account(accounts: dict, account: str) -> dict:
+    users = accounts.get('users', {})
+    if account not in users:
+        raise KeyError(account)
+    if users[account].get('isSuper'):
+        raise ValueError('不可经界面删除超级管理员')
+    new_users = dict(users)
+    del new_users[account]
+    out = dict(accounts)
+    out['users'] = new_users
+    return out
+
+
+def destroy_sessions_for_account(account: str) -> None:
+    with _sessions_lock:
+        for tok in [t for t, s in _sessions.items() if s.get('account') == account]:
+            _sessions.pop(tok, None)
+
+
+def list_public_accounts() -> list:
+    users = load_accounts().get('users', {})
+    return [public_user(acc, users[acc]) for acc in sorted(users)]
+
+
+def add_account(account: str, password: str, display_name: str, pages: list, l4: list) -> dict:
+    with _accounts_mutate_lock:
+        data = load_accounts()
+        data = create_account(data, account, password, display_name, pages, l4)
+        save_accounts(data)
+        name = _validate_account_name(account)
+        return public_user(name, data['users'][name])
+
+
+def edit_account(account: str, *, display_name=None, pages=None, l4=None, password=None) -> dict:
+    with _accounts_mutate_lock:
+        data = load_accounts()
+        data = update_account(data, account, display_name=display_name, pages=pages,
+                              l4=l4, password=password)
+        save_accounts(data)
+        return public_user(account, data['users'][account])
+
+
+def remove_account(account: str) -> None:
+    with _accounts_mutate_lock:
+        data = load_accounts()
+        data = delete_account(data, account)
+        save_accounts(data)
+    destroy_sessions_for_account(account)
