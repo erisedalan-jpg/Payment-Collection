@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectTagsStore } from '@/stores/projectTags'
@@ -8,10 +8,14 @@ import type { Project, ProjectPmis, MilestoneItem } from '@/types/analysis'
 import {
   buildMilestoneProjects, statusKpis,
   reminderBuckets, deptAbnormalTop15, deptComplianceRate,
+  finalAcceptStats, availableYears, nodeDistribution, nodesForDrill,
+  type DistSeries, type MilestoneDrillRow,
 } from '@/lib/milestoneAnalytics'
-import { STATUS_LIGHT, STATUS_DARK, MUTED_LIGHT, MUTED_DARK } from '@/charts/echartsTheme'
+import { STATUS_LIGHT, STATUS_DARK, MUTED_LIGHT, MUTED_DARK, CHART_LIGHT, CHART_DARK } from '@/charts/echartsTheme'
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
+import SegToggle from '@/components/SegToggle.vue'
+import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -107,6 +111,78 @@ const complianceOption = computed(() => {
     }],
   }
 })
+
+const chart = computed(() => (dark.value ? CHART_DARK : CHART_LIGHT))
+const topLabel = { show: true, position: 'top', formatter: (p: any) => p.value || '' }
+
+// B 终验完成情况（双图：项目数 + 金额万元）
+const faGran = ref<'quarter' | 'month'>('quarter')
+const faYear = ref<number | null>(null)
+const GRAN_OPTS = [{ value: 'quarter', label: '按季度' }, { value: 'month', label: '按月度' }]
+const faYearOpts = computed(() => availableYears(mps.value, 'finalAccept'))
+const fa = computed(() => finalAcceptStats(mps.value, faGran.value, faYear.value))
+const faCountOption = computed(() => {
+  const c = chart.value
+  return {
+    tooltip: { trigger: 'axis' }, legend: { data: ['计划项目数', '实际完成数'], bottom: 0 },
+    grid: { left: 40, right: 20, top: 10, bottom: 40 },
+    xAxis: { type: 'category', data: fa.value.periods }, yAxis: { type: 'value', name: '项目数' },
+    series: [
+      { name: '计划项目数', type: 'bar', barWidth: '40%', color: c[5], label: topLabel, data: fa.value.planCount },
+      { name: '实际完成数', type: 'bar', barWidth: '22%', barGap: '-55%', color: c[2], label: topLabel, data: fa.value.actualCount },
+    ],
+  }
+})
+const faAmountOption = computed(() => {
+  const c = chart.value
+  return {
+    tooltip: { trigger: 'axis' }, legend: { data: ['计划金额', '实际完成金额'], bottom: 0 },
+    grid: { left: 50, right: 20, top: 10, bottom: 40 },
+    xAxis: { type: 'category', data: fa.value.periods }, yAxis: { type: 'value', name: '金额(万)' },
+    series: [
+      { name: '计划金额', type: 'bar', barWidth: '40%', color: c[3], label: topLabel, data: fa.value.planAmountWan },
+      { name: '实际完成金额', type: 'bar', barWidth: '22%', barGap: '-55%', color: c[1], label: topLabel, data: fa.value.actualAmountWan },
+    ],
+  }
+})
+
+// E 关键节点分布（多线按月，年份过滤，点击下钻）
+const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+const SERIES_KEY: Record<string, DistSeries> = {
+  '到货(关联回款)': 'arrival', '初验(关联回款)': 'firstAccept', '终验': 'finalAccept', '服务完成': 'serviceDone',
+}
+const nodeYear = ref<number | null>(null)
+const nodeYearOpts = computed(() => availableYears(mps.value, 'node'))
+const nd = computed(() => nodeDistribution(mps.value, nodeYear.value))
+const lineLabel = { show: true, formatter: (p: any) => p.value || '', }
+const nodeDistOption = computed(() => {
+  const c = chart.value, s = sc.value
+  const line = (name: string, color: string, d: number[]) => ({ name, type: 'line', smooth: true, color, label: lineLabel, labelLayout: { moveOverlap: 'shiftY' }, data: d })
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['到货(关联回款)', '初验(关联回款)', '终验', '服务完成'], bottom: 0 },
+    grid: { left: 40, right: 20, top: 10, bottom: 50 },
+    xAxis: { type: 'category', data: MONTH_LABELS }, yAxis: { type: 'value', name: '节点数' },
+    series: [
+      line('到货(关联回款)', c[0], nd.value.arrival),
+      line('初验(关联回款)', c[2], nd.value.firstAccept),
+      line('终验', s.warn, nd.value.finalAccept),
+      line('服务完成', s.danger, nd.value.serviceDone),
+    ],
+  }
+})
+
+const drillOpen = ref(false)
+const drillTitle = ref('')
+const drillRows = ref<MilestoneDrillRow[]>([])
+function onNodeClick(params: any) {
+  const key = SERIES_KEY[params?.seriesName]
+  if (!key) return
+  drillRows.value = nodesForDrill(mps.value, key, params.dataIndex, nodeYear.value)
+  drillTitle.value = `${params.seriesName} · ${MONTH_LABELS[params.dataIndex]}`
+  drillOpen.value = true
+}
+defineExpose({ faGran, onNodeClick })
 </script>
 
 <template>
@@ -126,11 +202,41 @@ const complianceOption = computed(() => {
     <template v-else>
       <MetricGrid :items="kpiItems" />
 
+      <div class="mv-card">
+        <div class="mv-card-h">
+          项目终验完成情况
+          <span class="mv-card-tools">
+            <el-select v-model="faYear" size="small" clearable placeholder="全部年份" style="width: 120px">
+              <el-option v-for="y in faYearOpts" :key="y" :value="y" :label="y + '年'" />
+            </el-select>
+            <SegToggle v-model="faGran" :options="GRAN_OPTS" />
+          </span>
+        </div>
+        <div class="mv-grid2-half">
+          <ChartBox :option="faCountOption" height="240px" />
+          <ChartBox :option="faAmountOption" height="240px" />
+        </div>
+      </div>
+
       <div class="mv-grid2">
         <div class="mv-card"><div class="mv-card-h">里程碑到期提醒</div><ChartBox :option="reminderOption" height="240px" /></div>
         <div class="mv-card"><div class="mv-card-h">部门异常项目分布(Top15)</div><ChartBox :option="deptAbnormalOption" height="240px" /></div>
         <div class="mv-card"><div class="mv-card-h">部门里程碑合规率</div><ChartBox :option="complianceOption" height="240px" /></div>
       </div>
+
+      <div class="mv-card">
+        <div class="mv-card-h">
+          关键里程碑节点分布
+          <span class="mv-card-tools">
+            <el-select v-model="nodeYear" size="small" clearable placeholder="全部年份" style="width: 120px">
+              <el-option v-for="y in nodeYearOpts" :key="y" :value="y" :label="y + '年'" />
+            </el-select>
+          </span>
+        </div>
+        <ChartBox :option="nodeDistOption" height="280px" @datapoint-click="onNodeClick" />
+      </div>
+
+      <MilestoneDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
     </template>
   </div>
 </template>
@@ -142,6 +248,8 @@ const complianceOption = computed(() => {
 .mv-ex-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .mv-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--gap-card); }
 .mv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
-.mv-card-h { font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
+.mv-card-h { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
+.mv-card-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.mv-grid2-half { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
 .mv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 </style>
