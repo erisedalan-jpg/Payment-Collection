@@ -46,3 +46,29 @@ describe('stores/auth', () => {
     expect(s.user).toBeNull()
   })
 })
+
+describe('stores/auth 访问控制', () => {
+  it('ensureReady 多次调用只 fetchMe 一次', async () => {
+    ;(fetchMe as any).mockResolvedValue(null)
+    const s = useAuthStore()
+    await Promise.all([s.ensureReady(), s.ensureReady(), s.ensureReady()])
+    expect((fetchMe as any).mock.calls.length).toBe(1)
+  })
+  it('canAccess:超管恒真,普通按 allowedPages', () => {
+    const s = useAuthStore()
+    s.user = { account: 'a', displayName: 'a', isSuper: true, allowedPages: [], allowedL4: [] }
+    expect(s.canAccess('data')).toBe(true)
+    s.user = { account: 'b', displayName: 'b', isSuper: false, allowedPages: ['data'], allowedL4: [] }
+    expect(s.canAccess('data')).toBe(true)
+    expect(s.canAccess('about')).toBe(false)
+  })
+  it('firstAllowedPath:超管→/,普通→首个有权 nav 路径,无权→/login', () => {
+    const s = useAuthStore()
+    s.user = { account: 'a', displayName: 'a', isSuper: true, allowedPages: [], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/')
+    s.user = { account: 'b', displayName: 'b', isSuper: false, allowedPages: ['data'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/data')
+    s.user = { account: 'c', displayName: 'c', isSuper: false, allowedPages: [], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/login')
+  })
+})
