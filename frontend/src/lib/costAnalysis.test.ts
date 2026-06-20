@@ -35,10 +35,21 @@ describe('buildCostRows', () => {
     const x = rows.find((r) => r.projectId === 'XS9')!
     expect(x).toMatchObject({ xs: true, status: '未超支' }) // XS 强制未超支
   })
+  it('交付剩余字段映射(缺类别/无 deliveryCosts → 0)', () => {
+    const projects2 = [
+      { projectId: 'W1', projectName: 'a', projectManager: '', orgL4: 'D1', orgL3_1: '', paymentPmis: { contract: 500 },
+        deliveryCosts: [{ 类别: '交付部门人工成本', 剩余预算: 30 }, { 类别: '交付外包服务成本', 剩余预算: 70 }] },
+      { projectId: 'W2', projectName: 'b', projectManager: '', orgL4: 'D1', orgL3_1: '', paymentPmis: { contract: 200 } },
+    ] as any
+    const pmis2 = { W1: { cost: { 剩余预算: 5 } }, W2: { cost: { 剩余预算: 9 } } } as any
+    const rows = buildCostRows(projects2, pmis2)
+    expect(rows[0]).toMatchObject({ amount: 500, remaining: 5, deliveryDeptRemaining: 30, deliveryOutsourceRemaining: 70 })
+    expect(rows[1]).toMatchObject({ amount: 200, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 })
+  })
 })
 
 function cr(o: Partial<any> = {}): any {
-  return { projectId: 'W', projectName: 'x', projectType: '', orgL3: '', orgL3_1: '', orgL4: 'D1', manager: '', amount: 0, status: '未超支', totalBudget: 0, actualCost: 0, remaining: 0, xs: false, ...o }
+  return { projectId: 'W', projectName: 'x', projectType: '', orgL3: '', orgL3_1: '', orgL4: 'D1', manager: '', amount: 0, status: '未超支', totalBudget: 0, actualCost: 0, remaining: 0, xs: false, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0, ...o }
 }
 
 describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
@@ -62,5 +73,14 @@ describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
     const s = costL4Summary(rows)
     expect(s.find((x) => x.orgL4 === 'A')).toMatchObject({ total: 2, over5k: 2, over5kRatio: 100 })
     expect(s.find((x) => x.orgL4 === 'B')).toMatchObject({ total: 2, normal: 1, under5k: 1, over5k: 0, over5kRatio: 0 })
+  })
+  it('L4 汇总四金额列求和(剔 XS)', () => {
+    const rows = [
+      cr({ orgL4: 'A', amount: 1000, remaining: 100, deliveryDeptRemaining: 10, deliveryOutsourceRemaining: 20 }),
+      cr({ orgL4: 'A', amount: 2000, remaining: -50, deliveryDeptRemaining: 5, deliveryOutsourceRemaining: 0 }),
+      cr({ orgL4: 'A', amount: 9999, xs: true }),
+    ]
+    const a = costL4Summary(rows).find((x) => x.orgL4 === 'A')!
+    expect(a).toMatchObject({ contractTotal: 3000, remainingTotal: 50, deliveryDeptRemaining: 15, deliveryOutsourceRemaining: 20 })
   })
 })
