@@ -20,6 +20,7 @@ export interface CostRow {
   orgL3: string; orgL3_1: string; orgL4: string; manager: string
   amount: number; status: CostStatus
   totalBudget: number; actualCost: number; remaining: number; xs: boolean
+  deliveryDeptRemaining: number; deliveryOutsourceRemaining: number
 }
 
 /** 全部主域项目装配成本行(明细表用;XS 保留并标记)。 */
@@ -28,6 +29,8 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
     const m = (pmis[p.projectId] ?? {}) as any
     const cost = m.cost ?? {}
     const rb = cost.剩余预算
+    const dc = p.deliveryCosts ?? []
+    const findRem = (cat: string) => Number(dc.find((c: any) => c.类别 === cat)?.剩余预算 ?? 0)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -42,6 +45,8 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
       actualCost: Number(cost.核算 ?? 0),
       remaining: Number(rb ?? 0),
       xs: isXs(p.projectId),
+      deliveryDeptRemaining: findRem('交付部门人工成本'),
+      deliveryOutsourceRemaining: findRem('交付外包服务成本'),
     }
   })
 }
@@ -72,14 +77,18 @@ export function costL4Dist(rows: CostRow[]): CostL4Dist[] {
   return Object.values(m).sort((a, b) => a.orgL4.localeCompare(b.orgL4))
 }
 
-export interface CostL4Summary { orgL4: string; total: number; normal: number; under5k: number; over5k: number; over5kRatio: number }
+export interface CostL4Summary { orgL4: string; total: number; normal: number; under5k: number; over5k: number; over5kRatio: number; contractTotal: number; remainingTotal: number; deliveryDeptRemaining: number; deliveryOutsourceRemaining: number }
 export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
   const m: Record<string, CostL4Summary> = {}
   for (const r of rows) {
     if (r.xs) continue
     const d = r.orgL4 || '未知'
-    if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, over5kRatio: 0 }
+    if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, over5kRatio: 0, contractTotal: 0, remainingTotal: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 }
     m[d].total++
+    m[d].contractTotal += r.amount
+    m[d].remainingTotal += r.remaining
+    m[d].deliveryDeptRemaining += r.deliveryDeptRemaining
+    m[d].deliveryOutsourceRemaining += r.deliveryOutsourceRemaining
     if (r.status === '未超支') m[d].normal++
     else if (r.status === '超支不足5k') m[d].under5k++
     else if (r.status === '超支大于5k') m[d].over5k++
