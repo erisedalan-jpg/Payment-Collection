@@ -38,6 +38,11 @@ const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key))
         <RouterLink v-for="link in toolLinks" :key="link.to" :to="link.to"
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
+
+      <div v-if="auth.isSuper" class="section">
+        <div class="section-label">系统管理</div>
+        <RouterLink to="/admin" class="nav-item" active-class="active">账号管理</RouterLink>
+      </div>
     </nav>
   </aside>
   <button data-test="sidebar-toggle" class="sidebar-toggle" title="折叠/展开菜单"

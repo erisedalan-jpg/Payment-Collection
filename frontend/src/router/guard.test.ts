@@ -41,4 +41,17 @@ describe('router 守卫', () => {
     await router.push('/login')
     expect(router.currentRoute.value.path).toBe('/login')
   })
+
+  it('requiresSuper 路由:超管放行', async () => {
+    setUser({ account: 'a', displayName: 'a', isSuper: true, allowedPages: [], allowedL4: [] })
+    await router.push('/admin')
+    expect(router.currentRoute.value.path).toBe('/admin')
+  })
+
+  it('requiresSuper 路由:普通用户重定向到 firstAllowedPath', async () => {
+    setUser({ account: 'b', displayName: 'b', isSuper: false, allowedPages: ['projects'], allowedL4: [] })
+    await router.push('/admin')
+    expect(router.currentRoute.value.path).not.toBe('/admin')
+    expect(router.currentRoute.value.path).toBe('/projects')
+  })
 })

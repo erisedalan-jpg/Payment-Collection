@@ -28,6 +28,7 @@ function makeRouter() {
       { path: '/data', component: { template: '<div/>' } },
       { path: '/governance', component: { template: '<div/>' } },
       { path: '/about', component: { template: '<div/>' } },
+      { path: '/admin', component: { template: '<div/>' } },
       { path: '/:pathMatch(.*)*', component: { template: '<div/>' } },
     ],
   })
@@ -107,5 +108,31 @@ describe('AppSidebar 权限过滤', () => {
     expect(w.text()).toContain('数据管理')
     expect(w.text()).not.toContain('在建项目')
     expect(w.text()).not.toContain('回款台账')
+  })
+})
+
+describe('AppSidebar 系统管理入口', () => {
+  it('超管见"账号管理"链接', async () => {
+    const router = makeRouter()
+    router.push('/')
+    await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: [], allowedL4: [] }
+    const w = mount(AppSidebar, { global: { plugins: [router] } })
+    expect(w.text()).toContain('账号管理')
+    const links = w.findAll('a')
+    expect(links.some((l) => l.attributes('href') === '/admin')).toBe(true)
+  })
+
+  it('普通用户不见"账号管理"链接', async () => {
+    const router = makeRouter()
+    router.push('/')
+    await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 'n', displayName: 'n', isSuper: false, allowedPages: ['data'], allowedL4: [] }
+    const w = mount(AppSidebar, { global: { plugins: [router] } })
+    expect(w.text()).not.toContain('账号管理')
+    const links = w.findAll('a')
+    expect(links.some((l) => l.attributes('href') === '/admin')).toBe(false)
   })
 })

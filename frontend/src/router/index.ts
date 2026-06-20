@@ -22,6 +22,7 @@ import MilestoneView from '@/views/MilestoneView.vue'
 import CostDetailView from '@/views/CostDetailView.vue'
 import ClosedProjectsView from '@/views/ClosedProjectsView.vue'
 import ClosedProjectDetailView from '@/views/ClosedProjectDetailView.vue'
+import AdminView from '@/views/AdminView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -30,6 +31,7 @@ declare module 'vue-router' {
     hideFilter?: boolean
     fullscreen?: boolean
     pageKey?: PageKey
+    requiresSuper?: boolean
   }
 }
 
@@ -67,6 +69,7 @@ export const router = createRouter({
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true, pageKey: 'data' } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true, pageKey: 'governance' } },
     { path: '/about', name: 'about', component: AboutView, meta: { title: '关于产品', hideFilter: true, pageKey: 'about' } },
+    { path: '/admin', name: 'admin', component: AdminView, meta: { title: '账号管理', hideFilter: true, requiresSuper: true } },
     // catch-all(含 '/')渲染项目总览——P4 起 '/' 为项目主域首页,旧回款看板迁 /payment
     { path: '/:pathMatch(.*)*', name: 'overview', component: OverviewView, alias: '/', meta: { title: '项目总览', hideFilter: true, pageKey: 'overview' } },
   ],
@@ -77,6 +80,7 @@ router.beforeEach(async (to) => {
   if (to.path === '/login') return true
   await auth.ensureReady()
   if (!auth.isLoggedIn) return { path: '/login' }
+  if (to.meta.requiresSuper && !auth.isSuper) return { path: auth.firstAllowedPath() }
   const key = to.meta.pageKey
   if (auth.isSuper || !key || auth.canAccess(key)) return true
   return { path: auth.firstAllowedPath() }
