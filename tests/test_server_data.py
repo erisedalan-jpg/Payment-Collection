@@ -52,7 +52,9 @@ def test_data_scoped_by_l4(tmp_path, monkeypatch):
         # 超管 → 全量
         conn, ck = _login(port, "super")
         conn.request("GET", "/data/analysis_data.json", headers={"Cookie": ck})
-        r = conn.getresponse(); body = json.loads(r.read())
+        r = conn.getresponse()
+        assert r.status == 200
+        body = json.loads(r.read())
         assert {p["projectId"] for p in body["projects"]} == {"P1", "P2"}
         # D1 用户 → 仅 D1
         conn2, ck2 = _login(port, "d1")

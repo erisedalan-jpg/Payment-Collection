@@ -1,3 +1,4 @@
+import json
 import data_scope
 
 
@@ -15,6 +16,14 @@ def _fixture():
         "paymentNodes": {"P1": [{}, {}], "P2": [{}], "C9": [{}]},
         "paymentRecords": {"P1": {}, "P2": {}},
         "followupRecords": {"P1": {}, "P2": {}},
+        "tagSeed": {"P1": ["t"], "P2": ["t"]},
+        "projectOverview": {
+            "columns": ["项目编号", "项目名称"],
+            "projects": [
+                {"projectId": "P1", "orgL4": "D1", "项目名称": "项目一"},
+                {"projectId": "P2", "orgL4": "D2", "项目名称": "项目二"},
+            ],
+        },
         "events": [{"projectId": "P1"}, {"projectId": "P2"}, {"projectId": "C9"}],
         "dataQuality": {"summary": {"matchRate": 0.9}},
         "periodCompare": {"lastSync": {}},
@@ -52,6 +61,11 @@ def test_filter_by_l4():
     # 系统统计透传
     assert out["dataQuality"] == f["dataQuality"]
     assert out["periodCompare"] == f["periodCompare"]
+    # tagSeed 按 projectId 裁切
+    assert set(out["tagSeed"].keys()) == {"P1"}
+    # projectOverview.projects 裁切，columns 保留
+    assert [r["projectId"] for r in out["projectOverview"]["projects"]] == ["P1"]
+    assert out["projectOverview"]["columns"] == f["projectOverview"]["columns"]
     # 不改入参
     assert len(f["projects"]) == 4
 
@@ -60,3 +74,11 @@ def test_filter_not_mutate_input():
     f = _fixture()
     data_scope.filter_analysis_data(f, ["D1"])
     assert set(f["paymentNodes"].keys()) == {"P1", "P2", "C9"}
+
+
+def test_no_foreign_projectid_leak():
+    """深层结构守卫：D2 的 projectId P2 不得出现在 D1 用户收到的任何字段中。"""
+    f = _fixture()
+    out = data_scope.filter_analysis_data(f, ["D1"])
+    blob = json.dumps(out, ensure_ascii=False)
+    assert "P2" not in blob
