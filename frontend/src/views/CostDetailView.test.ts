@@ -6,6 +6,7 @@ import CostDetailView from './CostDetailView.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable from '@/components/DataTable.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { useDataStore } from '@/stores/data'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -31,6 +32,31 @@ function seed() {
 }
 
 const opts = { global: { plugins: [ElementPlus], stubs: { VChart: true } } }
+
+describe('CostDetailView 明细表', () => {
+  it('明细表含全部 3 项目(XS 保留);L4 多选筛选缩小', async () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    // 明细 DataTable 是第二个(L4 汇总是第一个)
+    const tables = w.findAllComponents({ name: 'DataTable' })
+    const detail = tables[tables.length - 1]
+    expect((detail.props('rows') as any[]).length).toBe(3)
+    ;(w.vm as any).fL4 = ['D2']
+    await w.vm.$nextTick()
+    expect((detail.props('rows') as any[]).map((r: any) => r.projectId)).toEqual(['XS9'])
+  })
+  it('成本状态多选 + 导出按钮 + 序号列', async () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    ;(w.vm as any).fStatus = ['超支大于5k']
+    await w.vm.$nextTick()
+    const tables = w.findAllComponents({ name: 'DataTable' })
+    const detail = tables[tables.length - 1]
+    expect((detail.props('rows') as any[]).map((r: any) => r.projectId)).toEqual(['WS1'])
+    expect((detail.props('rows') as any[])[0]._seq).toBe(1)
+    expect(w.find('[data-test="cost-export"]').exists()).toBe(true)
+  })
+})
 
 describe('CostDetailView 上半', () => {
   it('标题 + 4 KPI(剔 XS:总数2/未超支1/不足5k0/大于5k1)', () => {
