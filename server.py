@@ -160,6 +160,7 @@ ERR_PARSE = "parse_error"             # 请求体解析失败
 ERR_NOT_FOUND = "not_found"           # 记录不存在
 ERR_INTERNAL = "internal_error"       # 其它内部错误
 ERR_AUTH = "auth_failed"              # 登录鉴权失败
+ERR_FORBIDDEN = "forbidden"           # 权限不足(非超管)
 
 _AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me')
 
@@ -392,6 +393,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_reprocess()
         elif parsed.path == '/api/auth/me':
             self.handle_auth_me()
+        elif parsed.path == '/api/admin/accounts':
+            self.handle_admin_accounts_list()
         elif parsed.path == '/data/analysis_data.json':
             self.handle_data_json()
         else:
@@ -485,6 +488,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_login()
         elif parsed.path == '/api/logout':
             self.handle_logout()
+        elif parsed.path == '/api/admin/accounts/create':
+            self.handle_admin_account_create()
+        elif parsed.path == '/api/admin/accounts/update':
+            self.handle_admin_account_update()
+        elif parsed.path == '/api/admin/accounts/delete':
+            self.handle_admin_account_delete()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1222,6 +1231,91 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
                 return False
         return True
+
+    def _require_super(self):
+        """校验当前会话为超级管理员;否则发 403 并返回 None。返回超管 account。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec or not rec.get('isSuper'):
+            self._send_json(403, _error_payload(ERR_FORBIDDEN, "需要超级管理员权限"))
+            return None
+        return account
+
+    def _read_json_body(self):
+        """读 POST JSON body;失败返回 None(调用方负责报 400)。"""
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            return json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception:
+            return None
+
+    def handle_admin_accounts_list(self):
+        if self._require_super() is None:
+            return
+        self._send_json(200, {"success": True, "accounts": auth.list_public_accounts()})
+
+    def handle_admin_account_create(self):
+        if self._require_super() is None:
+            return
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            user = auth.add_account(
+                data.get('account', ''), data.get('password', ''),
+                data.get('displayName', ''), data.get('allowedPages', []),
+                data.get('allowedL4', []))
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._send_json(200, {"success": True, "user": user})
+
+    def handle_admin_account_update(self):
+        if self._require_super() is None:
+            return
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        account = data.get('account', '')
+        try:
+            user = auth.edit_account(
+                account,
+                display_name=data.get('displayName'),
+                pages=data.get('allowedPages'),
+                l4=data.get('allowedL4'),
+                password=data.get('password'))
+        except KeyError:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, f"账号不存在: {account}"))
+            return
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._send_json(200, {"success": True, "user": user})
+
+    def handle_admin_account_delete(self):
+        super_account = self._require_super()
+        if super_account is None:
+            return
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        account = data.get('account', '')
+        if account == super_account:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "不能删除自己"))
+            return
+        try:
+            auth.remove_account(account)
+        except KeyError:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, f"账号不存在: {account}"))
+            return
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._send_json(200, {"success": True})
 
     def handle_login(self):
         try:
