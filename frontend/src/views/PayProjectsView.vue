@@ -58,7 +58,7 @@ function onRow(row: Record<string, any>) {
         <span class="u-num" :style="{ color: rateColorPmis(value) }">{{ fmtRatio(value) }}</span>
       </template>
     </DataTable>
-    <div class="pov-pager">
+    <div v-if="rows.length" class="pov-pager">
       <span class="u-num">共 {{ rows.length }} 条</span>
       <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
         :page-sizes="[20, 50, 80, 100]" :total="rows.length"

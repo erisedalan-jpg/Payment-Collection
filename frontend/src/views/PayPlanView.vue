@@ -84,7 +84,7 @@ function onRow(r: Record<string, any>) { pd.open(r.projectId) }
         </tbody>
       </table>
     </div>
-    <div class="pp-pager">
+    <div v-if="filteredRows.length" class="pp-pager">
       <span class="u-num">共 {{ filteredRows.length }} 条</span>
       <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
         :page-sizes="[20, 50, 80, 100]" :total="filteredRows.length"
