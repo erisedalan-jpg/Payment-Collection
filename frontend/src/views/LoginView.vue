@@ -65,8 +65,9 @@ async function onSubmit() {
 
 <style scoped>
 .lv { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; background: var(--bg); }
-.lv-left { display: flex; align-items: center; justify-content: center; background: var(--card2); padding: var(--sp-6); }
-.lv-right { display: flex; align-items: center; justify-content: center; padding: var(--sp-6); }
+/* 左栏角色靠右、右栏表单靠左,在中缝两侧靠拢(内侧留白收紧 --sp-5),角色"望向"表单更具互动感。 */
+.lv-left { display: flex; align-items: center; justify-content: flex-end; background: var(--card2); padding: var(--sp-6) var(--sp-5) var(--sp-6) var(--sp-7); }
+.lv-right { display: flex; align-items: center; justify-content: flex-start; padding: var(--sp-6) var(--sp-7) var(--sp-6) var(--sp-5); }
 .lv-form { width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); padding: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-3); }
 .lv-title { font-size: var(--fs-5); font-weight: 700; color: var(--txt); margin: 0; }
 .lv-sub { font-size: var(--fs-1); color: var(--mut); margin: 0 0 var(--sp-2); }
