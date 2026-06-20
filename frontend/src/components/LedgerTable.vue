@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, toRef } from 'vue'
 import ColumnFilter from './ColumnFilter.vue'
 import { fmtYuan, fmtRatio } from '@/lib/format'
+import { usePagedRows } from '@/lib/usePagedRows'
 
 interface LedgerCol {
   key: string
@@ -16,6 +17,8 @@ const props = defineProps<{
   sourceRows: Record<string, any>[]
 }>()
 
+const { paged, currentPage, pageSize } = usePagedRows(toRef(props, 'projects'), 50)
+
 const expandedIdx = ref(-1)
 // 忠实移植 filterLedger 的 _expandedLedgerIdx=-1：过滤导致数据集变化时收起下钻
 watch(
@@ -24,6 +27,10 @@ watch(
     expandedIdx.value = -1
   },
 )
+// 翻页时收起已展开行（expandedIdx 是当前页内索引，跨页须复位避免串位）
+watch(currentPage, () => {
+  expandedIdx.value = -1
+})
 function toggle(idx: number) {
   expandedIdx.value = expandedIdx.value === idx ? -1 : idx
 }
@@ -44,7 +51,7 @@ function cell(row: Record<string, any>, col: LedgerCol) {
         </tr>
       </thead>
       <tbody>
-        <template v-for="(p, idx) in projects.slice(0, 500)" :key="p.projectId">
+        <template v-for="(p, idx) in paged" :key="p.projectId">
           <tr v-activate class="lt-row" :class="{ expanded: expandedIdx === idx }" @click="toggle(idx)">
             <td v-for="col in columns" :key="col.key" :title="String(p[col.key] ?? '')">
               {{ cell(p, col) }}
@@ -84,7 +91,18 @@ function cell(row: Record<string, any>, col: LedgerCol) {
         </template>
       </tbody>
     </table>
-    <div class="lt-count">共 {{ projects.length }} 条记录</div>
+    <div class="lt-foot">
+      <span class="lt-count">共 {{ projects.length }} 条记录</span>
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]"
+        :total="projects.length"
+        layout="sizes, prev, pager, next"
+        size="small"
+        background
+      />
+    </div>
   </div>
 </template>
 
@@ -113,5 +131,6 @@ function cell(row: Record<string, any>, col: LedgerCol) {
 .lt-node-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .lt-node-table th { background: var(--line); }
 .lt-nodes-empty { color: var(--mut); font-size: 12px; }
-.lt-count { font-size: 12px; color: var(--mut); padding: 6px 0; }
+.lt-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; padding: var(--sp-2) 0; }
+.lt-count { font-size: 12px; color: var(--mut); }
 </style>
