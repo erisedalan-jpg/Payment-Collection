@@ -1,5 +1,5 @@
 import type { MilestoneProject, MilestoneStatus } from './milestoneAnalytics'
-import { ymd } from './milestoneAnalytics'
+import { ymd, reminderBounds, addDays } from './milestoneAnalytics'
 
 export const NODE_TYPES = [
   '项目启动', '到货', '服务进场', '交付完工', '初验', '项目完工（服务离场）',
@@ -42,8 +42,6 @@ export function buildDelayedRows(ps: MilestoneProject[], now: Date): DelayedRow[
 }
 
 export { dayDiff }
-
-import { reminderBounds, addDays } from './milestoneAnalytics'
 
 export type ReminderWin = '7d' | '30d' | 'quarter'
 export interface ReminderRow {
