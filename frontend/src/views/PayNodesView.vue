@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { usePagedRows } from '@/lib/usePagedRows'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
@@ -28,6 +29,7 @@ const rows = computed(() => {
   return allNodes.filter((n) => inRange(n.planDate, filter.dateStart, filter.dateEnd))
 })
 const sum = computed(() => nodeSummary(rows.value))
+const { paged, currentPage, pageSize } = usePagedRows(rows, 50)
 
 // 按选中维度分组（spec §3：节点 tab 可按维度分组；维度已 join 到节点所属项目）
 // 维度 key 'stage' 取项目阶段字段 projStage（区别于节点阶段名 stage）
@@ -93,11 +95,17 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
         </tbody>
       </table>
     </section>
-    <DataTable :columns="COLS" :rows="rows" clickable @row-click="onRow">
+    <DataTable :columns="COLS" :rows="paged" clickable @row-click="onRow">
       <template #cell-status="{ value }">
         <span class="st-badge" :class="STATUS_CLASS[value] || 'st-warn'">{{ value }}</span>
       </template>
     </DataTable>
+    <div class="pn-pager">
+      <span class="u-num">共 {{ rows.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="rows.length"
+        layout="sizes, prev, pager, next" size="small" background />
+    </div>
   </div>
 </template>
 
@@ -119,4 +127,6 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
 .st-ok { background: var(--ok-bg); color: var(--ok-text); }
 .st-danger { background: var(--danger-bg); color: var(--danger-text); }
 .st-warn { background: var(--warn-bg); color: var(--warn-text); }
+.pn-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.pn-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

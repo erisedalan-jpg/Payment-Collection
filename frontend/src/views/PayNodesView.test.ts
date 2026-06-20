@@ -51,4 +51,19 @@ describe('PayNodesView', () => {
     data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
     expect(mount(PayNodesView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
+
+  it('分页:节点表只渲染一页,汇总仍按全集', async () => {
+    const data = useDataStore(); useFilterStore().setPreset('all')
+    data.data = {
+      projects: [{ projectId: 'A', projectName: '甲', orgL4: '组1', payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 2_000_000 } }],
+      paymentNodes: { A: Array.from({ length: 60 }, (_, i) => ({
+        stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.1, expectedPayment: 1000, reached: true, status: '已回款',
+      })) },
+      projectPmis: { A: { progress: { 项目阶段: '实施' } } },
+      naguanExclude: {},
+    } as any
+    const w = mount(PayNodesView, { global: { plugins: [ElementPlus] } })
+    expect((w.findComponent(DataTable).props('rows') as any[]).length).toBe(50)
+    expect(w.text()).toContain('节点总数')
+  })
 })
