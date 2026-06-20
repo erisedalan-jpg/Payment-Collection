@@ -25,6 +25,7 @@ import logging
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from urllib.parse import urlparse, parse_qs
+import auth
 import config
 import data_history
 import manual_import
@@ -157,6 +158,7 @@ ERR_BUSY = "busy"                     # 同步/导入互斥冲突
 ERR_PARSE = "parse_error"             # 请求体解析失败
 ERR_NOT_FOUND = "not_found"           # 记录不存在
 ERR_INTERNAL = "internal_error"       # 其它内部错误
+ERR_AUTH = "auth_failed"              # 登录鉴权失败
 
 _history_lock = threading.Lock()
 history_state = {"running": False}   # 回滚/撤销进行中标志,供 sync/import/pmis/reprocess 反向互斥
@@ -352,6 +354,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
             self.handle_reprocess()
+        elif parsed.path == '/api/auth/me':
+            self.handle_auth_me()
         else:
             translated = self.translate_path(parsed.path)
             if os.path.isfile(translated):
@@ -436,6 +440,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_manual_import()
         elif parsed.path == '/api/manual/rollback':
             self.handle_manual_rollback()
+        elif parsed.path == '/api/login':
+            self.handle_login()
+        elif parsed.path == '/api/logout':
+            self.handle_logout()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1121,7 +1129,50 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
-    
+
+    def _send_json(self, status, payload, extra_headers=None):
+        body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Length', str(len(body)))
+        for k, v in (extra_headers or []):
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_login(self):
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        account = (data.get('account') or '').strip()
+        password = data.get('password') or ''
+        user = auth.authenticate(account, password)
+        if not user:
+            self._send_json(401, _error_payload(ERR_AUTH, "账号或密码错误"))
+            return
+        token = auth.create_session(account)
+        self._send_json(200, {"success": True, "user": user},
+                        [('Set-Cookie', auth.build_set_cookie(token))])
+
+    def handle_logout(self):
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        auth.destroy_session(token)
+        self._send_json(200, {"success": True},
+                        [('Set-Cookie', auth.build_clear_cookie())])
+
+    def handle_auth_me(self):
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not account or not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录"))
+            return
+        self._send_json(200, {"success": True, "user": auth.public_user(account, rec)})
+
     def log_message(self, format, *args):
         # API 请求记录到日志文件
         msg = format % args
@@ -1710,6 +1761,8 @@ def main():
     logger.info(f"访问: http://localhost:{PORT}")
     logger.info(f"同步API: http://localhost:{PORT}/api/sync")
     
+    # 首次启动：账号种子（仅文件不存在时生成两个超管）
+    auth.seed_default_accounts()
     # 首次启动创建桌面快捷方式
     _create_desktop_shortcut()
     
