@@ -8,6 +8,7 @@ export interface MilestoneProject {
   manager: string
   orgL4: string
   orgL3_1: string
+  orgL3: string
   projectType: string
   contract: number
   status: MilestoneStatus
@@ -52,6 +53,7 @@ export function buildMilestoneProjects(
       manager: (p.projectManager ?? '').trim(),
       orgL4: (p.orgL4 ?? '').trim(),
       orgL3_1: (p.orgL3_1 ?? '').trim(),
+      orgL3: (m.team?.L3部门 ?? '').trim(),
       projectType: (m.status?.项目类型 ?? '').trim(),
       contract: Number(p.paymentPmis?.contract ?? 0),
       status: normalizeStatus(m.progress?.里程碑进度状态),
@@ -76,11 +78,11 @@ export function statusKpis(ps: MilestoneProject[]): StatusKpis {
 function nodeByName(p: MilestoneProject, kw: string): MilestoneItem | undefined {
   return p.nodes.find((n) => (n.name ?? '').includes(kw))
 }
-function ymd(d: Date): string {
+export function ymd(d: Date): string {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
-function addDays(d: Date, n: number): string {
+export function addDays(d: Date, n: number): string {
   return ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
 }
 function quarterRange(d: Date): [string, string] {
@@ -100,12 +102,15 @@ function prOf(it: MilestoneItem): 'high' | 'mid' | 'low' {
 
 // ---- 到期提醒（A 图）----
 export interface ReminderWindow { high: number; mid: number; low: number; projectCount: number }
+export function reminderBounds(now: Date): { today: string; d7: string; d30: string; qs: string; qe: string } {
+  const [qs, qe] = quarterRange(now)
+  return { today: ymd(now), d7: addDays(now, 7), d30: addDays(now, 30), qs, qe }
+}
 /** now 由调用方传入(纯函数,便于测试)。窗口:7天[今,今+7]、30天[今,今+30]、本季度[季初,季末];actualDate 非空(已完成)不计。 */
 export function reminderBuckets(
   ps: MilestoneProject[], now: Date,
 ): { windows: Record<'7d' | '30d' | 'quarter', ReminderWindow> } {
-  const today = ymd(now), d7 = addDays(now, 7), d30 = addDays(now, 30)
-  const [qs, qe] = quarterRange(now)
+  const { today, d7, d30, qs, qe } = reminderBounds(now)
   type Acc = { high: number; mid: number; low: number; pids: Set<string> }
   const mk = (): Acc => ({ high: 0, mid: 0, low: 0, pids: new Set() })
   const w7 = mk(), w30 = mk(), wq = mk()
