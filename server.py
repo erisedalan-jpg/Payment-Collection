@@ -174,6 +174,28 @@ def _path_needs_auth(path):
     return path.startswith(('/api/', '/data/', '/input/', '/yundocs_data/', '/report/', '/log/'))
 
 
+# 仅超管可访问的写/运维端点(数据更新/导入/清空/回滚/停服/原始文件下载/数据历史/文件状态等);
+# 内容端点(followup/tags)与状态轮询(sync-status/import-status)不在此列,普通管理员可用。
+_SUPER_ONLY_PATHS = frozenset({
+    '/api/sync', '/api/clear-data', '/api/reprocess',
+    '/api/stop', '/api/stop-sync', '/api/stop-import',
+    '/api/data-history', '/api/manual/backups',
+    '/api/files/status', '/api/pmis/links', '/api/pmis/download',
+    '/api/import', '/api/pmis/upload', '/api/inputs/upload',
+    '/api/data-history/rollback', '/api/data-history/undo-rollback',
+    '/api/manual/import', '/api/manual/rollback',
+})
+
+
+def _is_protected_data_path(path):
+    """原始数据文件路径:仅超管可直读(含 accounts.json 口令哈希 / 原始 CSV / events.json 等)。
+    /data/analysis_data.json 例外——经 handle_data_json 按账号 allowedL4 过滤后下发。
+    P0-1:堵住非超管经静态文件直链绕过 L4 隔离、下载全量未脱敏原始数据。"""
+    if path == '/data/analysis_data.json':
+        return False
+    return path.startswith(('/data/', '/input/', '/yundocs_data/', '/report/', '/log/'))
+
+
 _history_lock = threading.Lock()
 history_state = {"running": False}   # 回滚/撤销进行中标志,供 sync/import/pmis/reprocess 反向互斥
 
@@ -351,6 +373,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if not self._auth_gate():
             return
+        if not self._authz_gate():
+            return
 
         # 拦截静态文件请求，强制添加 charset=utf-8
         if parsed.path.endswith(('.js', '.css', '.html')):
@@ -458,6 +482,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         if not self._auth_gate():
+            return
+        if not self._authz_gate():
             return
 
         if parsed.path == '/api/import':
@@ -1229,6 +1255,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             token = auth.parse_cookie_token(self.headers.get('Cookie'))
             if not auth.validate_session(token):
                 self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+                return False
+        return True
+
+    def _authz_gate(self):
+        """二级授权(须在 _auth_gate 放行后调用):超管专属写/运维端点、/api/admin/*、
+        原始数据文件 对非超管返回 403。放行返回 True;已发 403 返回 False。"""
+        path = urlparse(self.path).path
+        if path in _SUPER_ONLY_PATHS or path.startswith('/api/admin/') or _is_protected_data_path(path):
+            if self._require_super() is None:
                 return False
         return True
 
