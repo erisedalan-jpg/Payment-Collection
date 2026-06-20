@@ -54,7 +54,7 @@ const L4_COLS: DataColumn[] = [
   { key: 'normal', label: '未超支', width: 90, num: true },
   { key: 'under5k', label: '超支不足5k', width: 110, num: true },
   { key: 'over5k', label: '超支大于5k', width: 110, num: true },
-  { key: 'over5kRatio', label: '超支占比', width: 100, num: true, formatter: (v) => v + '%' },
+  { key: 'over5kRatio', label: '超支占比', width: 100, num: true },
 ]
 </script>
 
@@ -69,7 +69,7 @@ const L4_COLS: DataColumn[] = [
       <div class="cd-grid2">
         <div class="cd-card"><div class="cd-card-h">超支项目分布(按 L4,剔 XS)</div><ChartBox :option="distOption" height="260px" /></div>
         <div class="cd-card"><div class="cd-card-h">L4 部门成本情况汇总</div><DataTable :columns="L4_COLS" :rows="l4Rows" :show-count="false">
-          <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}</span></template>
+          <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}%</span></template>
         </DataTable></div>
       </div>
     </template>
