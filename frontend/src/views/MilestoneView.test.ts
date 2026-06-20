@@ -7,6 +7,9 @@ import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
 import SegToggle from '@/components/SegToggle.vue'
+import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
+import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
+import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
@@ -97,5 +100,18 @@ describe('MilestoneView 终验/节点分布', () => {
     seed()
     const w = mount(MilestoneView, opts)
     expect((w.vm as any).nodeYear).toBe(2026)
+  })
+})
+
+describe('MilestoneView 明细 tab', () => {
+  it('默认显延期清单 tab;切换到到期提醒/在建计划', async () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    expect(w.findComponent(MilestoneDelayedTab).exists()).toBe(true)
+    expect(w.findComponent(MilestoneReminderTab).exists()).toBe(false)
+    await w.get('[data-test="seg-reminder"]').trigger('click')
+    expect(w.findComponent(MilestoneReminderTab).exists()).toBe(true)
+    await w.get('[data-test="seg-plan"]').trigger('click')
+    expect(w.findComponent(MilestonePlanTab).exists()).toBe(true)
   })
 })
