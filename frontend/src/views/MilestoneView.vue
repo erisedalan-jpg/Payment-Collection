@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectTagsStore } from '@/stores/projectTags'
@@ -153,6 +153,12 @@ const SERIES_KEY: Record<string, DistSeries> = {
 }
 const nodeYear = ref<number | null>(null)
 const nodeYearOpts = computed(() => availableYears(mps.value, 'node'))
+// 默认当年(缺则取最新可用年);仅首次自动设,用户清空/改选后不覆盖
+watch(nodeYearOpts, (opts) => {
+  if (nodeYear.value != null || !opts.length) return
+  const cur = new Date().getFullYear()
+  nodeYear.value = opts.includes(cur) ? cur : opts[opts.length - 1]
+}, { immediate: true })
 const nd = computed(() => nodeDistribution(mps.value, nodeYear.value))
 const lineLabel = { show: true, formatter: (p: any) => p.value || '', }
 const nodeDistOption = computed(() => {
@@ -182,7 +188,7 @@ function onNodeClick(params: any) {
   drillTitle.value = `${params.seriesName} · ${MONTH_LABELS[params.dataIndex]}`
   drillOpen.value = true
 }
-defineExpose({ faGran, onNodeClick })
+defineExpose({ faGran, onNodeClick, nodeYear })
 </script>
 
 <template>

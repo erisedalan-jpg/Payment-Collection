@@ -93,4 +93,9 @@ describe('MilestoneView 终验/节点分布', () => {
     expect(w.findComponent(MilestoneDrillModal).props('modelValue')).toBe(true)
     expect(w.findComponent(MilestoneDrillModal).props('rows').length).toBeGreaterThanOrEqual(1)
   })
+  it('节点分布年份默认当年/最新可用年(seed 仅 2026)', () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    expect((w.vm as any).nodeYear).toBe(2026)
+  })
 })
