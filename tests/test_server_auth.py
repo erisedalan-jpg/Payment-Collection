@@ -47,6 +47,11 @@ def test_login_me_logout_flow(tmp_path, monkeypatch):
         assert r5.status == 200
         assert "Max-Age=0" in (r5.getheader("Set-Cookie") or "")
         r5.read()
+
+        conn.request("POST", "/api/logout")
+        r6 = conn.getresponse()
+        assert r6.status == 200
+        r6.read()
     finally:
         srv.shutdown()
         srv.server_close()
