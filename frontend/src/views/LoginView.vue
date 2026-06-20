@@ -10,8 +10,8 @@ const showPassword = ref(false)
 const mood = ref<Mood>('idle')
 const error = ref('')
 
-function onAccountFocus() { mood.value = 'account' }
-function onPasswordFocus() { mood.value = showPassword.value ? 'reveal' : 'password' }
+function onAccountFocus() { error.value = ''; mood.value = 'account' }
+function onPasswordFocus() { error.value = ''; mood.value = showPassword.value ? 'reveal' : 'password' }
 function onBlur() { if (mood.value !== 'fail') mood.value = 'idle' }
 function toggleShow() {
   showPassword.value = !showPassword.value
@@ -75,7 +75,7 @@ async function onSubmit() {
 .lv-eye-btn { flex: none; padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
 .lv-eye-btn:hover { color: var(--accent); }
 .lv-error { margin: 0; padding: var(--sp-1) var(--sp-2); border-radius: var(--r-sm); background: var(--danger-bg); color: var(--danger-text); font-size: var(--fs-1); }
-.lv-submit { position: relative; overflow: hidden; height: 40px; border: none; border-radius: var(--r-sm); background: var(--accent); color: var(--on-accent); cursor: pointer; font-size: var(--fs-2); font-weight: 600; }
+.lv-submit { position: relative; overflow: hidden; width: 100%; box-sizing: border-box; height: 40px; border: none; border-radius: var(--r-sm); background: var(--accent); color: var(--on-accent); cursor: pointer; font-size: var(--fs-2); font-weight: 600; }
 .lv-submit-text { display: inline-block; transition: transform var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease); }
 .lv-submit-arrow { position: absolute; inset: 0; display: grid; place-items: center; transform: translateX(120%); transition: transform var(--dur-2) var(--ease); }
 .lv-submit:hover .lv-submit-text { transform: translateX(-120%); opacity: 0; }
