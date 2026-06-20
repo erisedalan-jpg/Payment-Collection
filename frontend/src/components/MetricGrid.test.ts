@@ -16,4 +16,16 @@ describe('MetricGrid', () => {
     expect(w.text()).toContain('53.0%')
     expect(cards[1].find('.mg-v').classes()).toContain('ok')
   })
+
+  it('clickable item 点击 emit item-click 带索引;非 clickable 不 emit', async () => {
+    const w = mount(MetricGrid, { props: { items: [
+      { k: '总数', v: '10' },
+      { k: '超支', v: '3', clickable: true },
+    ] } })
+    const cards = w.findAll('.mg-card')
+    await cards[0].trigger('click')
+    expect(w.emitted('item-click')).toBeUndefined()
+    await cards[1].trigger('click')
+    expect(w.emitted('item-click')).toEqual([[1]])
+  })
 })
