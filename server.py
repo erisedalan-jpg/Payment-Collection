@@ -28,6 +28,7 @@ from urllib.parse import urlparse, parse_qs
 import auth
 import config
 import data_history
+import data_scope
 import manual_import
 import manual_history
 
@@ -200,6 +201,27 @@ def _save_followup_records(records):
 # ── 项目标签库（2C，本地 JSON store，首次按 analysis_data.json 的 tagSeed 播种，此后本地为准、不回写云） ──
 PROJECT_TAGS_FILE = os.path.join(BASE_DIR, 'data', 'project_tags.json')
 ANALYSIS_FILE = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
+
+_analysis_cache = {'mtime': None, 'data': None}
+_analysis_cache_lock = threading.Lock()
+
+
+def _load_analysis_cached():
+    try:
+        mtime = os.path.getmtime(ANALYSIS_FILE)
+    except OSError:
+        return None
+    with _analysis_cache_lock:
+        if _analysis_cache['mtime'] != mtime:
+            try:
+                with open(ANALYSIS_FILE, 'r', encoding='utf-8') as f:
+                    _analysis_cache['data'] = json.load(f)
+                _analysis_cache['mtime'] = mtime
+            except Exception:
+                return None
+        return _analysis_cache['data']
+
+
 _tags_lock = threading.Lock()
 
 
@@ -370,6 +392,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_reprocess()
         elif parsed.path == '/api/auth/me':
             self.handle_auth_me()
+        elif parsed.path == '/data/analysis_data.json':
+            self.handle_data_json()
         else:
             translated = self.translate_path(parsed.path)
             if os.path.isfile(translated):
@@ -1157,6 +1181,37 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
+
+    def _serve_raw_data_file(self):
+        try:
+            with open(ANALYSIS_FILE, 'rb') as f:
+                body = f.read()
+        except OSError:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, "数据文件不存在"))
+            return
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_data_json(self):
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        allowed = rec.get('allowedL4', [])
+        if rec.get('isSuper') or '*' in allowed:
+            self._serve_raw_data_file()
+            return
+        data = _load_analysis_cached()
+        if data is None:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, "数据文件不存在"))
+            return
+        self._send_json(200, data_scope.filter_analysis_data(data, allowed))
 
     def _auth_gate(self):
         """检查请求路径是否需要鉴权；需要且无有效会话则返回 False（已发 401），否则返回 True。"""
