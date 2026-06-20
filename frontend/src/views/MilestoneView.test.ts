@@ -5,6 +5,8 @@ import ElementPlus from 'element-plus'
 import MilestoneView from './MilestoneView.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
+import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
+import SegToggle from '@/components/SegToggle.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
@@ -66,5 +68,29 @@ describe('MilestoneView 概览', () => {
     const w = mount(MilestoneView, opts)
     await w.get('[data-test="ms-exclude-switch"] input').setValue(true)
     expect(spy).toHaveBeenCalled()
+  })
+})
+
+describe('MilestoneView 终验/节点分布', () => {
+  it('渲染 5 个 ChartBox(含 B 双图 + E)', () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    // A + C + D + B(项目数) + B(金额) + E = 6
+    expect(w.findAllComponents(ChartBox).length).toBe(6)
+  })
+  it('终验图季/月 SegToggle 可切换', async () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    expect(w.find('[data-test="seg-month"]').exists()).toBe(true)
+    await w.get('[data-test="seg-month"]').trigger('click')
+    expect((w.vm as any).faGran).toBe('month')
+  })
+  it('节点分布图点击数据点开下钻 modal', async () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    ;(w.vm as any).onNodeClick({ seriesName: '到货(关联回款)', dataIndex: 2 })
+    await w.vm.$nextTick()
+    expect(w.findComponent(MilestoneDrillModal).props('modelValue')).toBe(true)
+    expect(w.findComponent(MilestoneDrillModal).props('rows').length).toBeGreaterThanOrEqual(1)
   })
 })
