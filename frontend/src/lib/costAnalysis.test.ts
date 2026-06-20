@@ -36,3 +36,33 @@ describe('buildCostRows', () => {
     expect(x).toMatchObject({ xs: true, status: '未超支' }) // XS 强制未超支
   })
 })
+
+import { costKpis, costL4Dist, costL4Summary } from './costAnalysis'
+
+function cr(o: Partial<any> = {}): any {
+  return { projectId: 'W', projectName: 'x', projectType: '', orgL3: '', orgL3_1: '', orgL4: 'D1', manager: '', amount: 0, status: '未超支', totalBudget: 0, actualCost: 0, remaining: 0, xs: false, ...o }
+}
+
+describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
+  const rows = [
+    cr({ orgL4: 'B', status: '未超支' }),
+    cr({ orgL4: 'B', status: '超支不足5k' }),
+    cr({ orgL4: 'A', status: '超支大于5k' }),
+    cr({ orgL4: 'A', status: '超支大于5k' }),
+    cr({ orgL4: 'A', status: 'XS忽略', xs: true }), // XS→不计
+  ]
+  it('KPI 剔 XS 计数', () => {
+    expect(costKpis(rows)).toEqual({ total: 4, normal: 1, under5k: 1, over5k: 2 })
+  })
+  it('L4 分布按 orgL4 升序、两档', () => {
+    expect(costL4Dist(rows)).toEqual([
+      { orgL4: 'A', under5k: 0, over5k: 2 },
+      { orgL4: 'B', under5k: 1, over5k: 0 },
+    ])
+  })
+  it('L4 汇总含占比(大于5k/总数)', () => {
+    const s = costL4Summary(rows)
+    expect(s.find((x) => x.orgL4 === 'A')).toMatchObject({ total: 2, over5k: 2, over5kRatio: 100 })
+    expect(s.find((x) => x.orgL4 === 'B')).toMatchObject({ total: 2, normal: 1, under5k: 1, over5k: 0, over5kRatio: 0 })
+  })
+})
