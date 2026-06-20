@@ -9,13 +9,15 @@ import {
   buildMilestoneProjects, statusKpis,
   reminderBuckets, deptAbnormalTop15, deptComplianceRate,
   finalAcceptStats, availableYears, nodeDistribution, nodesForDrill,
-  type DistSeries, type MilestoneDrillRow,
+  milestoneProjectsByStatus,
+  type DistSeries, type MilestoneDrillRow, type MilestoneStatus, type MilestoneStatusRow,
 } from '@/lib/milestoneAnalytics'
 import { STATUS_LIGHT, STATUS_DARK, MUTED_LIGHT, MUTED_DARK, CHART_LIGHT, CHART_DARK } from '@/charts/echartsTheme'
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
+import MilestoneStatusModal from '@/components/MilestoneStatusModal.vue'
 import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
@@ -52,11 +54,11 @@ const kpiItems = computed(() => {
   const k = kpi.value
   const p = (n: number) => (k.total > 0 ? (n / k.total * 100).toFixed(1) + '%' : '-')
   return [
-    { k: '项目总数', v: String(k.total) },
-    { k: '正常', v: String(k.normal), sub: p(k.normal), cls: 'ok' },
-    { k: '延期', v: String(k.delayed), sub: p(k.delayed), cls: 'warn' },
-    { k: '严重延期', v: String(k.severe), sub: p(k.severe), cls: 'danger' },
-    { k: '未发布', v: String(k.unpublished), sub: p(k.unpublished), cls: 'mut' },
+    { k: '项目总数', v: String(k.total), clickable: true },
+    { k: '正常', v: String(k.normal), sub: p(k.normal), cls: 'ok', clickable: true },
+    { k: '延期', v: String(k.delayed), sub: p(k.delayed), cls: 'warn', clickable: true },
+    { k: '严重延期', v: String(k.severe), sub: p(k.severe), cls: 'danger', clickable: true },
+    { k: '未发布', v: String(k.unpublished), sub: p(k.unpublished), cls: 'mut', clickable: true },
   ]
 })
 
@@ -185,6 +187,16 @@ const nodeDistOption = computed(() => {
 const drillOpen = ref(false)
 const drillTitle = ref('')
 const drillRows = ref<MilestoneDrillRow[]>([])
+
+const KPI_STATUS: (MilestoneStatus | null)[] = [null, '正常', '延期', '严重延期', '未发布']
+const statusOpen = ref(false)
+const statusTitle = ref('')
+const statusRows = ref<MilestoneStatusRow[]>([])
+function onKpiClick(i: number) {
+  statusRows.value = milestoneProjectsByStatus(mps.value, KPI_STATUS[i])
+  statusTitle.value = kpiItems.value[i].k
+  statusOpen.value = true
+}
 function onNodeClick(params: any) {
   const key = SERIES_KEY[params?.seriesName]
   if (!key) return
@@ -217,7 +229,7 @@ defineExpose({ faGran, onNodeClick, nodeYear })
     <div v-if="!mps.length" class="mv-empty">暂无主域里程碑数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
 
     <template v-else>
-      <MetricGrid :items="kpiItems" />
+      <MetricGrid :items="kpiItems" @item-click="onKpiClick" />
 
       <div class="mv-card">
         <div class="mv-card-h">
@@ -254,6 +266,7 @@ defineExpose({ faGran, onNodeClick, nodeYear })
       </div>
 
       <MilestoneDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
+      <MilestoneStatusModal v-model="statusOpen" :title="statusTitle" :rows="statusRows" />
 
       <div class="mv-detail">
         <SegToggle v-model="detailTab" :options="DETAIL_TABS" />
