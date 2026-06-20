@@ -9,6 +9,10 @@ import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/projectTagsApi', () => ({
+  getTags: vi.fn(async () => ({ tags: [], assignments: {} })),
+  saveTags: vi.fn(async () => ({ success: true })),
+}))
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
