@@ -6,7 +6,6 @@ import CostDetailView from './CostDetailView.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable from '@/components/DataTable.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
 import { useDataStore } from '@/stores/data'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
