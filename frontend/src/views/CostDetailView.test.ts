@@ -1,0 +1,52 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import CostDetailView from './CostDetailView.vue'
+import ChartBox from '@/charts/ChartBox.vue'
+import MetricGrid from '@/components/MetricGrid.vue'
+import DataTable from '@/components/DataTable.vue'
+import { useDataStore } from '@/stores/data'
+
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+
+function seed() {
+  const ds = useDataStore()
+  ds.data = {
+    meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
+    projectOverview: { projects: [], columns: [] }, naguanMap: {}, naguanExclude: {}, followupRecords: {},
+    projects: [
+      { projectId: 'WS1', projectName: '甲', projectManager: '张', orgL4: 'D1', orgL3_1: 'L31', paymentPmis: { contract: 2000000 } },
+      { projectId: 'WS2', projectName: '乙', projectManager: '李', orgL4: 'D1', orgL3_1: 'L31', paymentPmis: { contract: 500000 } },
+      { projectId: 'XS9', projectName: '售前', projectManager: '王', orgL4: 'D2', orgL3_1: '', paymentPmis: { contract: 0 } },
+    ],
+    projectPmis: {
+      WS1: { status: { 项目类型: '正常实施类' }, team: { L3部门: '一部' }, cost: { 总预算: 1000, 核算: 1200, 剩余预算: -8000 } },
+      WS2: { status: { 项目类型: '正常实施类' }, team: { L3部门: '一部' }, cost: { 总预算: 1000, 核算: 900, 剩余预算: 100 } },
+      XS9: { status: { 项目类型: '售前服务类' }, team: { L3部门: '二部' }, cost: { 剩余预算: -9999 } },
+    },
+  } as any
+}
+
+const opts = { global: { plugins: [ElementPlus], stubs: { VChart: true } } }
+
+describe('CostDetailView 上半', () => {
+  it('标题 + 4 KPI(剔 XS:总数2/未超支1/不足5k0/大于5k1)', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    expect(w.text()).toContain('成本分析')
+    const items = w.findComponent(MetricGrid).props('items') as any[]
+    expect(items.map((i) => i.k)).toEqual(['成本统计项目数', '未超支', '超支不足5K', '超支大于5K'])
+    expect(items.find((i) => i.k === '成本统计项目数').v).toBe('2')
+    expect(items.find((i) => i.k === '超支大于5K').v).toBe('1')
+  })
+  it('渲染超支分布 ChartBox + L4 汇总表(行=D1)', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    expect(w.findComponent(ChartBox).exists()).toBe(true)
+    // L4 汇总表(剔 XS → 仅 D1)经 DataTable props 同步断言,避免 el-table 行异步渲染
+    expect((w.findComponent(DataTable).props('rows') as any[]).some((r) => r.orgL4 === 'D1')).toBe(true)
+  })
+})
