@@ -15,6 +15,8 @@ import ProjectDetailView from '@/views/ProjectDetailView.vue'
 import ActivityView from '@/views/ActivityView.vue'
 import OverviewView from '@/views/OverviewView.vue'
 import InsightView from '@/views/InsightView.vue'
+import MilestoneView from '@/views/MilestoneView.vue'
+import CostDetailView from '@/views/CostDetailView.vue'
 import ClosedProjectsView from '@/views/ClosedProjectsView.vue'
 import ClosedProjectDetailView from '@/views/ClosedProjectDetailView.vue'
 
@@ -35,20 +37,26 @@ export const router = createRouter({
     { path: '/closed-project/:id', name: 'closed-project-detail', component: ClosedProjectDetailView, meta: { title: '已关闭项目详情', hideFilter: true } },
     { path: '/activity', name: 'activity', component: ActivityView, meta: { title: '项目动态', hideFilter: true } },
     { path: '/insight', name: 'insight', component: InsightView, meta: { title: '项目分析', hideFilter: true } },
-    { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
+    // 项目分析子页(V1.16.0):milestone/costdetail 新建,board/calendar 迁自回款子域。
+    // 均为精确路径,勿引入 /insight/:param 通配,否则会遮蔽 /insight 的 InsightView。
+    { path: '/insight/milestone', name: 'insight-milestone', component: MilestoneView, meta: { title: '里程碑管理', hideFilter: true } },
+    { path: '/insight/costdetail', name: 'insight-costdetail', component: CostDetailView, meta: { title: '成本分析', hideFilter: true } },
+    { path: '/insight/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析' } },
+    { path: '/insight/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账' } },
     // 回款分析五页:由旧 /panalysis 单页拆为 /payment/* 平铺独立路由(SP4);均依赖 FilterBar(不 hideFilter)
     // /payment(精确)与 /payment/*(精确子路径)均为精确路由、互不遮蔽，定义顺序不影响解析；
     // 后续新增回款子页须保持精确路径，勿引入 /payment/:param 通配，否则会遮蔽 DashboardView。
-    { path: '/payment/board', name: 'pay-board', component: BoardView, meta: { title: '多维看板' } },
     { path: '/payment/projects', name: 'pay-projects', component: PayProjectsView, meta: { title: '回款项目' } },
     { path: '/payment/nodes', name: 'pay-nodes', component: PayNodesView, meta: { title: '回款节点' } },
     { path: '/payment/plan', name: 'pay-plan', component: PayPlanView, meta: { title: '回款进度' } },
     { path: '/payment/risk', name: 'pay-risk', component: PayRiskView, meta: { title: '风险项目' } },
-    // 兼容旧深链:/panalysis/:tab? → /payment/{tab||board}; /board、/analysis/:tab 同步映射(保 query)
-    { path: '/panalysis/:tab?', redirect: (to) => ({ path: '/payment/' + String(to.params.tab || 'board'), query: to.query }) },
-    { path: '/board', redirect: (to) => ({ path: '/payment/board', query: to.query }) },
-    { path: '/analysis/:tab', redirect: (to) => ({ path: '/payment/' + String(to.params.tab) }) },
+    // 兼容旧深链:board/calendar 迁至 /insight 后,旧路径单跳 redirect 到新规范路径(保 query;board 依赖 ?dim=)
+    { path: '/payment/board', redirect: (to) => ({ path: '/insight/board', query: to.query }) },
+    { path: '/calendar', redirect: (to) => ({ path: '/insight/calendar', query: to.query }) },
+    { path: '/panalysis/:tab?', redirect: (to) => { const t = String(to.params.tab || 'board'); return { path: t === 'board' ? '/insight/board' : '/payment/' + t, query: to.query } } },
+    { path: '/board', redirect: (to) => ({ path: '/insight/board', query: to.query }) },
+    { path: '/analysis/:tab', redirect: (to) => { const t = String(to.params.tab); return { path: t === 'board' ? '/insight/board' : '/payment/' + t, query: to.query } } },
     { path: '/payment', name: 'payment', component: DashboardView, meta: { title: '回款总览' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true } },

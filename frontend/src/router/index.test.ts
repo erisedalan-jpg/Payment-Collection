@@ -5,20 +5,25 @@ describe('router', () => {
   beforeEach(async () => { await router.push('/') })
 
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/payment', '/payment/board', '/payment/projects', '/payment/nodes', '/payment/plan', '/payment/risk', '/calendar', '/ledger', '/data', '/about', '/projects', '/activity', '/insight']) {
+    for (const path of ['/', '/payment', '/insight/board', '/payment/projects', '/payment/nodes', '/payment/plan', '/payment/risk', '/insight/calendar', '/insight/milestone', '/insight/costdetail', '/ledger', '/data', '/about', '/projects', '/activity', '/insight']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })
 
-  it('/payment/board 解析到 BoardView、/about 解析到 AboutView（非占位 PageStub）', () => {
-    const p = router.resolve('/payment/board')
+  it('/insight/board 解析到 BoardView、/about 解析到 AboutView（非占位 PageStub）', () => {
+    const p = router.resolve('/insight/board')
     const a = router.resolve('/about')
     expect((p.matched[0].components?.default as any).__name).toBe('BoardView')
     expect((a.matched[0].components?.default as any).__name).toBe('AboutView')
   })
 
-  it('五条 /payment/* 路由各自命名', () => {
-    expect(router.resolve('/payment/board').name).toBe('pay-board')
+  it('两个新子页解析到各自 stub 视图', () => {
+    expect((router.resolve('/insight/milestone').matched[0].components?.default as any).__name).toBe('MilestoneView')
+    expect((router.resolve('/insight/costdetail').matched[0].components?.default as any).__name).toBe('CostDetailView')
+  })
+
+  it('回款四子页 + /insight/board 各自命名', () => {
+    expect(router.resolve('/insight/board').name).toBe('pay-board')
     expect(router.resolve('/payment/projects').name).toBe('pay-projects')
     expect(router.resolve('/payment/nodes').name).toBe('pay-nodes')
     expect(router.resolve('/payment/plan').name).toBe('pay-plan')
@@ -33,19 +38,38 @@ describe('router', () => {
     expect(cur.redirectedFrom?.path).toBe('/panalysis/plan')
   })
 
-  it('旧 /panalysis 缺省 redirect 到 /payment/board', async () => {
+  it('旧 /panalysis 缺省 redirect 到 /insight/board', async () => {
     await router.push('/panalysis')
     const cur = router.currentRoute.value
     expect(cur.name).toBe('pay-board')
+    expect(cur.path).toBe('/insight/board')
     expect(cur.redirectedFrom?.path).toBe('/panalysis')
   })
 
-  it('旧 /board 导航 redirect 到 /payment/board 并保 query(dim)', async () => {
+  it('旧 /board 导航 redirect 到 /insight/board 并保 query(dim)', async () => {
     await router.push('/board?dim=orgL4')
     const cur = router.currentRoute.value
     expect(cur.name).toBe('pay-board')
+    expect(cur.path).toBe('/insight/board')
     expect(cur.query.dim).toBe('orgL4')
     expect(cur.redirectedFrom?.path).toBe('/board')
+  })
+
+  it('旧 /payment/board 导航 redirect 到 /insight/board 并保 query(dim)', async () => {
+    await router.push('/payment/board?dim=orgL4')
+    const cur = router.currentRoute.value
+    expect(cur.name).toBe('pay-board')
+    expect(cur.path).toBe('/insight/board')
+    expect(cur.query.dim).toBe('orgL4')
+    expect(cur.redirectedFrom?.path).toBe('/payment/board')
+  })
+
+  it('旧 /calendar 导航 redirect 到 /insight/calendar', async () => {
+    await router.push('/calendar')
+    const cur = router.currentRoute.value
+    expect(cur.name).toBe('calendar')
+    expect(cur.path).toBe('/insight/calendar')
+    expect(cur.redirectedFrom?.path).toBe('/calendar')
   })
 
   it('旧 /analysis/:tab 导航 redirect 到 /payment/:tab', async () => {
