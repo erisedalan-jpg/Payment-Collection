@@ -60,3 +60,18 @@ describe('AppLayout FilterBar 按路由', () => {
     expect(w.find('.filter-bar').exists()).toBe(true)
   })
 })
+
+describe('AppLayout fullscreen 分支', () => {
+  it('fullscreen 路由只渲染裸 router-view(无 header/sidebar)', async () => {
+    const router = makeRouter([
+      { path: '/', component: Blank, meta: {} },
+      { path: '/login', component: { template: '<div class="routed-login">LOGIN</div>' }, meta: { fullscreen: true } },
+    ])
+    router.push('/login'); await router.isReady()
+    const w = mount(AppLayout, {
+      global: { plugins: [createPinia(), router], stubs: { AppHeader: true, AppSidebar: true, ProjectDetailDrawer: true } },
+    })
+    expect(w.find('.routed-login').exists()).toBe(true)
+    expect(w.find('.app-layout').exists()).toBe(false)   // 全屏分支不渲染外壳(Header/Sidebar 均在 .app-layout 内)
+  })
+})
