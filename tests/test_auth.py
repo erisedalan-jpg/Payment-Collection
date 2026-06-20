@@ -34,6 +34,7 @@ def test_seed_then_authenticate(tmp_path, monkeypatch):
     assert "salt" not in u and "hash" not in u            # public_user 无哈希材料
     assert auth.authenticate("admin", "wrong") is None
     assert auth.authenticate("nobody", "x") is None
+    assert auth.authenticate("wangxutong", "niubi") is not None
     assert auth.seed_default_accounts() is False           # 已存在不覆盖
 
 
@@ -60,6 +61,12 @@ def test_cookie_helpers(tmp_path, monkeypatch):
     assert auth.parse_cookie_token("a=1; b=2") is None
     assert auth.parse_cookie_token(None) is None
     assert auth.parse_cookie_token("") is None
-    assert "HttpOnly" in auth.build_set_cookie("xyz")
-    assert "pmp_session=xyz" in auth.build_set_cookie("xyz")
-    assert "Max-Age=0" in auth.build_clear_cookie()
+    sc = auth.build_set_cookie("xyz")
+    assert "pmp_session=xyz" in sc
+    assert "HttpOnly" in sc
+    assert "SameSite=Lax" in sc
+    assert "Path=/" in sc
+    cc = auth.build_clear_cookie()
+    assert "Max-Age=0" in cc
+    assert "HttpOnly" in cc
+    assert "SameSite=Lax" in cc

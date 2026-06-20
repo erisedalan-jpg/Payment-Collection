@@ -43,15 +43,16 @@ def verify_password(password: str, salt: str, expected_hash: str) -> bool:
 
 
 def load_accounts() -> dict:
-    if os.path.exists(ACCOUNTS_FILE):
-        try:
-            with open(ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            if isinstance(data, dict) and isinstance(data.get('users'), dict):
-                return data
-        except Exception:
-            pass
-    return {'version': 1, 'users': {}}
+    with _file_lock:
+        if os.path.exists(ACCOUNTS_FILE):
+            try:
+                with open(ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and isinstance(data.get('users'), dict):
+                    return data
+            except Exception:
+                pass
+        return {'version': 1, 'users': {}}
 
 
 def save_accounts(data: dict) -> None:
@@ -150,4 +151,4 @@ def build_set_cookie(token: str) -> str:
 
 
 def build_clear_cookie() -> str:
-    return f'{COOKIE_NAME}=; Max-Age=0; SameSite=Lax; Path=/'
+    return f'{COOKIE_NAME}=; Max-Age=0; HttpOnly; SameSite=Lax; Path=/'
