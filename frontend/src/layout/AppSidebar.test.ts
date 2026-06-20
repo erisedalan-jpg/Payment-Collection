@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 
 function makeRouter() {
   return createRouter({
@@ -42,6 +43,8 @@ describe('AppSidebar', () => {
     const router = makeRouter()
     router.push('/')
     await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: [], allowedL4: [] }
     const wrapper = mount(AppSidebar, { global: { plugins: [router] } })
     const text = wrapper.text()
     expect(text).toContain('项目总览')        // 项目组（P4 新首页）
@@ -72,10 +75,37 @@ describe('AppSidebar', () => {
     const router = makeRouter()
     router.push('/')
     await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: [], allowedL4: [] }
     const ui = useUiStore()
     const wrapper = mount(AppSidebar, { global: { plugins: [router] } })
     expect(ui.sidebarCollapsed).toBe(false)
     await wrapper.get('[data-test="sidebar-toggle"]').trigger('click')
     expect(ui.sidebarCollapsed).toBe(true)
+  })
+})
+
+describe('AppSidebar 权限过滤', () => {
+  it('超管显示全部分组链接', async () => {
+    const router = makeRouter()
+    router.push('/')
+    await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: [], allowedL4: [] }
+    const w = mount(AppSidebar, { global: { plugins: [router] } })
+    expect(w.text()).toContain('数据管理')
+    expect(w.text()).toContain('在建项目')
+    expect(w.text()).toContain('回款台账')
+  })
+  it('普通用户(仅 data)只显数据管理,其余 section 不显', async () => {
+    const router = makeRouter()
+    router.push('/')
+    await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 'n', displayName: 'n', isSuper: false, allowedPages: ['data'], allowedL4: [] }
+    const w = mount(AppSidebar, { global: { plugins: [router] } })
+    expect(w.text()).toContain('数据管理')
+    expect(w.text()).not.toContain('在建项目')
+    expect(w.text()).not.toContain('回款台账')
   })
 })
