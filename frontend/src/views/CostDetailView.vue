@@ -67,6 +67,12 @@ const L4_COLS: DataColumn[] = [
 ]
 
 const router = useRouter()
+const STATUS_OPTS = ['未超支', '超支不足5k', '超支大于5k']
+const fL3 = ref<string[]>([])
+const fL3_1 = ref<string[]>([])
+const fL4 = ref<string[]>([])
+const fStatus = ref<string[]>([])
+const fType = ref<string[]>([])
 const detailCardRef = ref<HTMLElement | null>(null)
 const KPI_STATUS = [null, '未超支', '超支不足5k', '超支大于5k'] as const
 function onKpiClick(i: number) {
@@ -74,12 +80,6 @@ function onKpiClick(i: number) {
   fStatus.value = s ? [s] : []
   detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-const STATUS_OPTS = ['未超支', '超支不足5k', '超支大于5k']
-const fL3 = ref<string[]>([])
-const fL3_1 = ref<string[]>([])
-const fL4 = ref<string[]>([])
-const fStatus = ref<string[]>([])
-const fType = ref<string[]>([])
 const fManager = ref('')
 const fKw = ref('')
 
