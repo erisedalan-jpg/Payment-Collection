@@ -20,11 +20,12 @@ import CostDetailView from '@/views/CostDetailView.vue'
 import ClosedProjectsView from '@/views/ClosedProjectsView.vue'
 import ClosedProjectDetailView from '@/views/ClosedProjectDetailView.vue'
 
-// 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于)
+// 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
   interface RouteMeta {
     title?: string
     hideFilter?: boolean
+    fullscreen?: boolean
   }
 }
 

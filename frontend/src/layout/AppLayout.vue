@@ -6,11 +6,13 @@ import AppSidebar from './AppSidebar.vue'
 import FilterBar from './FilterBar.vue'
 import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
 const route = useRoute()
+const fullscreen = computed(() => !!route.meta?.fullscreen)
 const showFilter = computed(() => !route.meta?.hideFilter)
 </script>
 
 <template>
-  <div class="app-layout">
+  <router-view v-if="fullscreen" />
+  <div v-else class="app-layout">
     <AppHeader />
     <div class="app-body">
       <AppSidebar />
