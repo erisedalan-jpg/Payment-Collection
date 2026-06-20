@@ -6,6 +6,7 @@ import { useProjectDetailStore } from '@/stores/projectDetail'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { projectPaymentRows, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
+import { usePagedRows } from '@/lib/usePagedRows'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -43,6 +44,8 @@ const COLS: DataColumn[] = [
   { key: 'fromOrigin', label: '来源', formatter: (v) => (v ? '售前·取原项目' : '') },
 ]
 
+const { paged, currentPage, pageSize } = usePagedRows(rows, 50)
+
 function onRow(row: Record<string, any>) {
   pd.open(row.projectId)
 }
@@ -50,13 +53,21 @@ function onRow(row: Record<string, any>) {
 
 <template>
   <div class="pov-tab">
-    <DataTable :columns="COLS" :rows="rows" clickable @row-click="onRow">
+    <DataTable :columns="COLS" :rows="paged" clickable @row-click="onRow">
       <template #cell-paymentRatio="{ value }">
         <span class="u-num" :style="{ color: rateColorPmis(value) }">{{ fmtRatio(value) }}</span>
       </template>
     </DataTable>
+    <div class="pov-pager">
+      <span class="u-num">共 {{ rows.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="rows.length"
+        layout="sizes, prev, pager, next" size="small" background />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.pov-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.pov-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

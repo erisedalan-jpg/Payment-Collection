@@ -5,6 +5,7 @@ import ElementPlus from 'element-plus'
 import PayProjectsView from './PayProjectsView.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
+import DataTable from '@/components/DataTable.vue'
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
@@ -66,5 +67,22 @@ describe('PayProjectsView', () => {
     await flushPromises()
     expect(w.exists()).toBe(true)
     expect(w.text()).not.toContain('部门汇总')
+  })
+
+  it('分页:超过页大小只渲染一页,分页条 total=全量', async () => {
+    const data = useDataStore(); useFilterStore().setPreset('all')
+    data.data = {
+      meta: { lastUpdate: 'x', totalProjects: 60, totalPaymentNodes: 0 },
+      dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
+      naguanMap: {}, naguanExclude: {},
+      projects: Array.from({ length: 60 }, (_, i) => ({
+        projectId: 'P' + i, projectName: '名' + i, projectManager: '张', orgL4: '组1',
+        paymentPmis: { contract: 100, actualTotal: 50, paymentRatio: 0.5, nodeCount: 0, reachedCount: 0, delayedCount: 0 },
+      })),
+      projectPmis: {},
+    } as any
+    const w = mount(PayProjectsView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect((w.findComponent(DataTable).props('rows') as any[]).length).toBe(50)
   })
 })
