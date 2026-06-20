@@ -42,3 +42,54 @@ export function buildDelayedRows(ps: MilestoneProject[], now: Date): DelayedRow[
 }
 
 export { dayDiff }
+
+import { reminderBounds, addDays } from './milestoneAnalytics'
+
+export type ReminderWin = '7d' | '30d' | 'quarter'
+export interface ReminderRow {
+  projectId: string; projectName: string; projectType: string; manager: string
+  orgL3: string; orgL4: string; node: string; planDate: string; payStage: string
+  linked: '是' | '否'; priority: string; priorityLabel: string; urgency: 'urgent' | 'warn' | ''
+}
+
+const PR_LABEL: Record<string, string> = { high: '高', mid: '中', low: '低' }
+
+/** 到期提醒(节点级):窗口内未完成节点逐条成行。 */
+export function buildReminderRows(ps: MilestoneProject[], now: Date, win: ReminderWin): ReminderRow[] {
+  const b = reminderBounds(now)
+  const [start, end] = win === '7d' ? [b.today, b.d7] : win === '30d' ? [b.today, b.d30] : [b.qs, b.qe]
+  const out: ReminderRow[] = []
+  for (const p of ps) {
+    for (const n of p.nodes) {
+      if ((n.actualDate ?? '').trim()) continue
+      const pd = (n.planDate ?? '').slice(0, 10)
+      if (!pd || pd < start || pd > end) continue
+      const diff = dayDiff(pd, now)
+      const pr = ((n as any).priority === 'high' || (n as any).priority === 'mid') ? (n as any).priority : 'low'
+      const payStage = ((n as any).payStage ?? '').trim()
+      out.push({
+        projectId: p.projectId, projectName: p.projectName, projectType: p.projectType, manager: p.manager,
+        orgL3: p.orgL3, orgL4: p.orgL4, node: n.name ?? '', planDate: pd, payStage,
+        linked: payStage ? '是' : '否', priority: pr, priorityLabel: PR_LABEL[pr],
+        urgency: diff <= 3 ? 'urgent' : diff <= 7 ? 'warn' : '',
+      })
+    }
+  }
+  return out
+}
+
+export interface ReminderStat { projectCount: number; nodeCount: number; within7: number; withinWeek: number }
+export function reminderStat(rows: ReminderRow[], now: Date): ReminderStat {
+  const today = reminderBounds(now).today
+  const d7 = addDays(now, 7)
+  const we = addDays(now, 7 - now.getDay()) // 本周末(下个周日)
+  const pids = new Set<string>()
+  let within7 = 0, withinWeek = 0
+  for (const r of rows) {
+    pids.add(r.projectId)
+    const pd = r.planDate.slice(0, 10)
+    if (pd >= today && pd <= d7) within7++
+    if (pd >= today && pd <= we) withinWeek++
+  }
+  return { projectCount: pids.size, nodeCount: rows.length, within7, withinWeek }
+}
