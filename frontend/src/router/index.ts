@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import BoardView from '@/views/BoardView.vue'
 import PayProjectsView from '@/views/PayProjectsView.vue'
@@ -32,6 +33,7 @@ declare module 'vue-router' {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/login', name: 'login', component: LoginView, meta: { title: '登录', fullscreen: true } },
     { path: '/projects', name: 'projects', component: ProjectsView, meta: { title: '在建项目', hideFilter: true } },
     { path: '/project/:id', name: 'project-detail', component: ProjectDetailView, meta: { title: '项目详情', hideFilter: true } },
     { path: '/projects/closed', name: 'closed-projects', component: ClosedProjectsView, meta: { title: '已关闭项目', hideFilter: true } },
