@@ -186,3 +186,67 @@ export function distSeriesOf(n: MilestoneItem): DistSeries | null {
   if (name.includes('服务完成')) return 'serviceDone'
   return null
 }
+
+// ---- 部门异常分布（C 图）+ 合规率（D 图）----
+export interface DeptAbnormal { orgL4: string; delayed: number; severe: number; unpublished: number; abnormal: number }
+export function deptAbnormalTop15(ps: MilestoneProject[]): DeptAbnormal[] {
+  const m: Record<string, DeptAbnormal> = {}
+  for (const p of ps) {
+    const d = p.orgL4
+    if (!d) continue
+    if (!m[d]) m[d] = { orgL4: d, delayed: 0, severe: 0, unpublished: 0, abnormal: 0 }
+    if (p.status === '延期') { m[d].delayed++; m[d].abnormal++ }
+    else if (p.status === '严重延期') { m[d].severe++; m[d].abnormal++ }
+    else if (p.status === '未发布') { m[d].unpublished++; m[d].abnormal++ }
+  }
+  return Object.values(m).sort((a, b) => b.abnormal - a.abnormal).slice(0, 15)
+}
+
+export interface DeptCompliance { orgL4: string; rate: number }
+export function deptComplianceRate(ps: MilestoneProject[], deptOrder: string[]): DeptCompliance[] {
+  const tot: Record<string, number> = {}, norm: Record<string, number> = {}
+  for (const p of ps) {
+    const d = p.orgL4
+    if (!d) continue
+    tot[d] = (tot[d] || 0) + 1
+    if (p.status === '正常') norm[d] = (norm[d] || 0) + 1
+  }
+  return deptOrder.map((d) => ({ orgL4: d, rate: tot[d] ? +(((norm[d] || 0) / tot[d]) * 100).toFixed(1) : 0 }))
+}
+
+// ---- 关键节点分布（E 图）+ 下钻 ----
+export interface NodeDistribution { months: number[]; arrival: number[]; firstAccept: number[]; finalAccept: number[]; serviceDone: number[] }
+export function nodeDistribution(ps: MilestoneProject[], year: number | null): NodeDistribution {
+  const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  const z = (): number[] => months.map(() => 0)
+  const out: NodeDistribution = { months, arrival: z(), firstAccept: z(), finalAccept: z(), serviceDone: z() }
+  for (const p of ps) {
+    for (const n of p.nodes) {
+      const series = distSeriesOf(n)
+      if (!series) continue
+      const pd = (n.planDate ?? '').slice(0, 10)
+      if (!pd) continue
+      if (year != null && parseInt(pd.slice(0, 4), 10) !== year) continue
+      const mo = parseInt(pd.slice(5, 7), 10)
+      if (mo < 1 || mo > 12) continue
+      out[series][mo - 1]++
+    }
+  }
+  return out
+}
+
+export interface MilestoneDrillRow { projectId: string; projectName: string; manager: string; orgL4: string; node: string; planDate: string; status: MilestoneStatus }
+export function nodesForDrill(ps: MilestoneProject[], seriesKey: DistSeries, monthIndex: number, year: number | null): MilestoneDrillRow[] {
+  const rows: MilestoneDrillRow[] = []
+  for (const p of ps) {
+    for (const n of p.nodes) {
+      if (distSeriesOf(n) !== seriesKey) continue
+      const pd = (n.planDate ?? '').slice(0, 10)
+      if (!pd) continue
+      if (year != null && parseInt(pd.slice(0, 4), 10) !== year) continue
+      if (parseInt(pd.slice(5, 7), 10) - 1 !== monthIndex) continue
+      rows.push({ projectId: p.projectId, projectName: p.projectName, manager: p.manager, orgL4: p.orgL4, node: n.name ?? '', planDate: pd, status: p.status })
+    }
+  }
+  return rows
+}

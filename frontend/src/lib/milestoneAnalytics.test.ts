@@ -120,3 +120,52 @@ describe('statusKpis', () => {
     expect(statusKpis(ps)).toEqual({ total: 3, normal: 1, delayed: 0, severe: 1, unpublished: 1 })
   })
 })
+
+import { deptAbnormalTop15, deptComplianceRate, nodeDistribution, nodesForDrill } from './milestoneAnalytics'
+
+describe('deptAbnormalTop15 / deptComplianceRate', () => {
+  const ps = [
+    mp({ projectId: '1', orgL4: 'D1', status: '延期' }),
+    mp({ projectId: '2', orgL4: 'D1', status: '严重延期' }),
+    mp({ projectId: '3', orgL4: 'D1', status: '正常' }),
+    mp({ projectId: '4', orgL4: 'D2', status: '未发布' }),
+    mp({ projectId: '5', orgL4: '', status: '延期' }), // orgL4 空→排除
+  ]
+  it('按异常数降序 + 排除空部门', () => {
+    const r = deptAbnormalTop15(ps)
+    expect(r.map((x) => x.orgL4)).toEqual(['D1', 'D2'])
+    expect(r[0]).toMatchObject({ orgL4: 'D1', delayed: 1, severe: 1, unpublished: 0, abnormal: 2 })
+    expect(r[1]).toMatchObject({ orgL4: 'D2', unpublished: 1, abnormal: 1 })
+  })
+  it('合规率=正常/部门总数×100,按 deptOrder', () => {
+    const r = deptComplianceRate(ps, ['D1', 'D2'])
+    expect(r).toEqual([{ orgL4: 'D1', rate: 33.3 }, { orgL4: 'D2', rate: 0 }])
+  })
+})
+
+describe('nodeDistribution / nodesForDrill', () => {
+  const ps = [
+    mp({ projectId: 'A', orgL4: 'D1', status: '正常', nodes: [
+      { name: '到货', planDate: '2026-03-05', actualDate: '', payStage: '到货款', priority: 'high' }, // arrival(有payStage)
+      { name: '到货', planDate: '2026-03-20', actualDate: '', payStage: '', priority: 'low' },          // 到货无payStage→不计
+      { name: '终验', planDate: '2026-06-10', actualDate: '', priority: 'high' },                       // finalAccept(无需payStage)
+    ] }),
+    mp({ projectId: 'B', orgL4: 'D2', status: '延期', nodes: [
+      { name: '服务完成', planDate: '2026-03-15', actualDate: '', priority: 'high' },                   // serviceDone(3月)
+    ] }),
+  ]
+  it('按月按系列计数(payStage 条件)', () => {
+    const d = nodeDistribution(ps, 2026)
+    expect(d.arrival[2]).toBe(1)      // 3月 1 个到货(有payStage)
+    expect(d.serviceDone[2]).toBe(1)  // 3月 1 个服务完成
+    expect(d.finalAccept[5]).toBe(1)  // 6月 1 个终验
+    expect(d.arrival.reduce((s, n) => s + n, 0)).toBe(1) // 无payStage的到货未计
+  })
+  it('year 过滤', () => {
+    expect(nodeDistribution(ps, 2025).arrival.every((n) => n === 0)).toBe(true)
+  })
+  it('下钻取该系列+月份行', () => {
+    const rows = nodesForDrill(ps, 'serviceDone', 2, 2026) // 3月=index2
+    expect(rows).toEqual([{ projectId: 'B', projectName: 'x', manager: '', orgL4: 'D2', node: '服务完成', planDate: '2026-03-15', status: '延期' }])
+  })
+})
