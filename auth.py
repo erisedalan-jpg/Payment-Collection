@@ -161,7 +161,9 @@ _accounts_mutate_lock = threading.Lock()
 
 
 def _validate_account_name(account: str) -> str:
-    name = (account or '').strip()
+    if not isinstance(account, str):
+        raise ValueError('账号名须为字符串')
+    name = account.strip()
     if not _ACCOUNT_RE.match(name):
         raise ValueError('账号名须为 1-64 位字母/数字/下划线/点/连字符')
     return name
@@ -170,6 +172,11 @@ def _validate_account_name(account: str) -> str:
 def _validate_password(password: str) -> None:
     if not isinstance(password, str) or not (1 <= len(password) <= 256):
         raise ValueError('密码长度须为 1-256')
+
+
+def _validate_display_name(display_name) -> None:
+    if display_name is not None and not isinstance(display_name, str):
+        raise ValueError('显示名须为字符串')
 
 
 def _validate_str_list(values, field: str) -> list:
@@ -190,6 +197,7 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
                    pages: list, l4: list) -> dict:
     name = _validate_account_name(account)
     _validate_password(password)
+    _validate_display_name(display_name)
     users = accounts.get('users', {})
     if name in users:
         raise ValueError(f'账号 {name} 已存在')
@@ -205,6 +213,9 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
 
 def update_account(accounts: dict, account: str, *, display_name=None, pages=None,
                    l4=None, password=None) -> dict:
+    if not isinstance(account, str):
+        raise ValueError('账号名须为字符串')
+    _validate_display_name(display_name)
     users = accounts.get('users', {})
     if account not in users:
         raise KeyError(account)
@@ -230,6 +241,8 @@ def update_account(accounts: dict, account: str, *, display_name=None, pages=Non
 
 
 def delete_account(accounts: dict, account: str) -> dict:
+    if not isinstance(account, str):
+        raise ValueError('账号名须为字符串')
     users = accounts.get('users', {})
     if account not in users:
         raise KeyError(account)
