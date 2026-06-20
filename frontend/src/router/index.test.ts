@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
 import { router } from './index'
+import { useAuthStore } from '@/stores/auth'
 
 describe('router', () => {
-  beforeEach(async () => { await router.push('/') })
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    const auth = useAuthStore()
+    auth.user = { account: 'test', displayName: 'Test', isSuper: true, allowedPages: [], allowedL4: [] }
+    vi.spyOn(auth, 'ensureReady').mockResolvedValue()
+    await router.push('/')
+  })
 
   it('resolves all top-level pages', () => {
     for (const path of ['/', '/payment', '/insight/board', '/payment/projects', '/payment/nodes', '/payment/plan', '/payment/risk', '/insight/calendar', '/insight/milestone', '/insight/costdetail', '/ledger', '/data', '/about', '/projects', '/activity', '/insight']) {
