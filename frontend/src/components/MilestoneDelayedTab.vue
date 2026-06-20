@@ -70,7 +70,7 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
       <button class="mdt-btn" @click="reset">重置</button>
       <button class="mdt-btn" data-test="delayed-export" @click="onExport">导出Excel</button>
     </div>
-    <DataTable :columns="COLS" :rows="paged" clickable @row-click="onRow">
+    <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable @row-click="onRow">
       <template #cell-projectId="{ value }"><span class="mdt-link">{{ value }}</span></template>
       <template #cell-status="{ value }"><StatusBadge :label="value" :tone="TONE[value]" /></template>
     </DataTable>

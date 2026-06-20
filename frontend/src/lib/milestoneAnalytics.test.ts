@@ -3,8 +3,8 @@ import {
   normalizeStatus, buildMilestoneProjects, statusKpis,
   reminderBuckets, finalAcceptStats, availableYears,
   deptAbnormalTop15, deptComplianceRate, nodeDistribution, nodesForDrill,
+  reminderBounds,
 } from './milestoneAnalytics'
-import { reminderBounds } from './milestoneAnalytics'
 
 function mp(over: Partial<any> = {}): any {
   return { projectId: 'X', projectName: 'x', manager: '', orgL4: 'L', orgL3_1: '', projectType: '', contract: 0, status: '正常', nodes: [], ...over }

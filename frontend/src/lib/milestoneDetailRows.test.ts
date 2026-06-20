@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDelayedRows, buildReminderRows, reminderStat } from './milestoneDetailRows'
+import { buildDelayedRows, buildReminderRows, reminderStat, buildPlanRows } from './milestoneDetailRows'
 
 function mp(over: Partial<any> = {}): any {
   return { projectId: 'X', projectName: 'x', manager: '', orgL4: 'L4', orgL3: 'L3', orgL3_1: '', projectType: 'T', contract: 0, status: '正常', nodes: [], ...over }
@@ -53,7 +53,6 @@ describe('buildDelayedRows', () => {
   })
 })
 
-import { buildPlanRows } from './milestoneDetailRows'
 
 describe('buildPlanRows', () => {
   it('每项目一行 + 节点类型计划/实际日期映射', () => {

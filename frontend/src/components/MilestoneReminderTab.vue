@@ -85,9 +85,9 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
       <button class="mrt-btn" @click="reset">重置</button>
       <button class="mrt-btn" data-test="reminder-export" @click="onExport">导出Excel</button>
     </div>
-    <DataTable :columns="COLS" :rows="paged" clickable @row-click="onRow">
+    <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable @row-click="onRow">
       <template #cell-projectId="{ value }"><span class="mrt-link">{{ value }}</span></template>
-      <template #cell-planDate="{ row, value }"><span :class="row.urgency ? 'mrt-date-' + row.urgency : ''">{{ value }}</span></template>
+      <template #cell-planDate="{ row, value }"><span :class="['u-num', row.urgency ? 'mrt-date-' + row.urgency : '']">{{ value }}</span></template>
       <template #cell-linked="{ value }"><StatusBadge :label="value" :tone="value === '是' ? 'ok' : 'mut'" /></template>
       <template #cell-priorityLabel="{ row, value }"><StatusBadge :label="value" :tone="PR_TONE[row.priority]" /></template>
     </DataTable>
