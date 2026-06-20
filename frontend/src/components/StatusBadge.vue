@@ -1,5 +1,6 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ label: string; tone?: string }>(), { tone: 'mut' })
+// label 可选:el-table 列注册阶段会以空 row 渲染一次插槽,undefined 不应触发 prop 校验告警(同 HealthBadge)
+withDefaults(defineProps<{ label?: string; tone?: string }>(), { tone: 'mut' })
 </script>
 
 <template>
