@@ -52,3 +52,7 @@ registerTheme(ENT_THEME_DARK, buildTheme(CHART_DARK, STRUCT_DARK))
 // 状态色镜像(canvas 不能读 CSS 变量,与 CHART_* 同理;契约测试与 theme.css 同步)
 export const STATUS_LIGHT = { ok: '#6ecc54', warn: '#f9d46c', danger: '#c8161d' }
 export const STATUS_DARK = { ok: '#6ecc54', warn: '#f9d46c', danger: '#d34947' }
+
+// 中性灰镜像(--mut):里程碑「未发布」等无文字状态系列用;契约测试与 theme.css 同步
+export const MUTED_LIGHT = '#6b6b6b'
+export const MUTED_DARK = '#8b8e93'
