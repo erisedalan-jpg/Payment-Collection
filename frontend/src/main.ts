@@ -17,5 +17,5 @@ app.directive('activate', vActivate)
 // 启动时按持久化的主题/字号应用到 <html>
 useSettingsStore(pinia).init()
 // 启动静默恢复登录态(失败不跳转,守卫是 SP-3)
-useAuthStore(pinia).fetchMe()
+useAuthStore(pinia).ensureReady()
 app.mount('#app')
