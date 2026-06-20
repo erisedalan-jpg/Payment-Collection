@@ -52,3 +52,23 @@ describe('buildDelayedRows', () => {
     expect(rows.find((r) => r.projectId === 'B')).toMatchObject({ projectType: 'T', orgL3: 'L3', orgL4: 'L4', status: '延期' })
   })
 })
+
+import { buildPlanRows } from './milestoneDetailRows'
+
+describe('buildPlanRows', () => {
+  it('每项目一行 + 节点类型计划/实际日期映射', () => {
+    const ps = [mp({ projectId: 'A', projectName: '甲', contract: 1234567, orgL3: 'L3', orgL3_1: 'L31', orgL4: 'L4', manager: '张', projectType: 'T', nodes: [
+      { name: '到货', planDate: '2026-03-01', actualDate: '2026-03-05', priority: 'high' },
+      { name: '终验', planDate: '2026-06-01', actualDate: '', priority: 'high' },
+    ] })]
+    const rows = buildPlanRows(ps)
+    expect(rows).toHaveLength(1)
+    const r = rows[0] as any
+    expect(r).toMatchObject({ projectId: 'A', projectName: '甲', contract: 1234567, orgL3: 'L3', orgL3_1: 'L31', orgL4: 'L4', manager: '张', projectType: 'T' })
+    expect(r['计划_到货']).toBe('2026-03-01')
+    expect(r['实际_到货']).toBe('2026-03-05')
+    expect(r['计划_终验']).toBe('2026-06-01')
+    expect(r['实际_终验']).toBe('')
+    expect(r['计划_初验']).toBe('') // 无该节点
+  })
+})

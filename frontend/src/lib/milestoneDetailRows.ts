@@ -93,3 +93,24 @@ export function reminderStat(rows: ReminderRow[], now: Date): ReminderStat {
   }
   return { projectCount: pids.size, nodeCount: rows.length, within7, withinWeek }
 }
+
+export interface PlanRow extends Record<string, string | number> {
+  projectId: string; projectName: string; contract: number
+  orgL3: string; orgL3_1: string; orgL4: string; manager: string; projectType: string
+}
+
+/** 在建里程碑计划宽表:每项目一行,12 节点类型各两列(计划/实际日期,取首个同名节点,缺为 '')。 */
+export function buildPlanRows(ps: MilestoneProject[]): PlanRow[] {
+  return ps.map((p) => {
+    const row: Record<string, string | number> = {
+      projectId: p.projectId, projectName: p.projectName, contract: p.contract,
+      orgL3: p.orgL3, orgL3_1: p.orgL3_1, orgL4: p.orgL4, manager: p.manager, projectType: p.projectType,
+    }
+    for (const t of NODE_TYPES) {
+      const n = p.nodes.find((x) => (x.name ?? '') === t)
+      row[`计划_${t}`] = (n?.planDate ?? '').slice(0, 10)
+      row[`实际_${t}`] = (n?.actualDate ?? '').slice(0, 10)
+    }
+    return row as PlanRow
+  })
+}
