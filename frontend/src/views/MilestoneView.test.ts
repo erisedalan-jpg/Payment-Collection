@@ -6,6 +6,7 @@ import MilestoneView from './MilestoneView.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
+import MilestoneStatusModal from '@/components/MilestoneStatusModal.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
@@ -113,5 +114,19 @@ describe('MilestoneView 明细 tab', () => {
     expect(w.findComponent(MilestoneReminderTab).exists()).toBe(true)
     await w.get('[data-test="seg-plan"]').trigger('click')
     expect(w.findComponent(MilestonePlanTab).exists()).toBe(true)
+  })
+})
+
+describe('MilestoneView KPI 下钻弹窗', () => {
+  it('点 KPI(严重延期)开状态弹窗,rows 仅严重延期项目', async () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    w.findComponent(MetricGrid).vm.$emit('item-click', 3)
+    await w.vm.$nextTick()
+    const modal = w.findComponent(MilestoneStatusModal)
+    expect(modal.props('modelValue')).toBe(true)
+    const mrows = modal.props('rows') as any[]
+    expect(mrows.length).toBe(1)
+    expect(mrows.every((r) => r.status === '严重延期')).toBe(true)
   })
 })
