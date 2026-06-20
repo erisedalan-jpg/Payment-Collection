@@ -3,7 +3,7 @@ import {
   normalizeStatus, buildMilestoneProjects, statusKpis,
   reminderBuckets, finalAcceptStats, availableYears,
   deptAbnormalTop15, deptComplianceRate, nodeDistribution, nodesForDrill,
-  reminderBounds,
+  reminderBounds, milestoneProjectsByStatus,
 } from './milestoneAnalytics'
 
 function mp(over: Partial<any> = {}): any {
@@ -181,5 +181,20 @@ describe('reminderBounds', () => {
   it('给出 today/d7/d30/季初季末', () => {
     const b = reminderBounds(new Date(2026, 2, 10))
     expect(b).toEqual({ today: '2026-03-10', d7: '2026-03-17', d30: '2026-04-09', qs: '2026-01-01', qe: '2026-03-31' })
+  })
+})
+
+describe('milestoneProjectsByStatus', () => {
+  const ps = [
+    mp({ projectId: 'A', projectName: '甲', manager: '张', orgL4: 'D1', contract: 100, status: '正常' }),
+    mp({ projectId: 'B', projectName: '乙', manager: '李', orgL4: 'D2', contract: 200, status: '严重延期' }),
+  ]
+  it('null 返回全部', () => {
+    expect(milestoneProjectsByStatus(ps, null)).toHaveLength(2)
+  })
+  it('指定状态只返回该状态 + 字段映射', () => {
+    expect(milestoneProjectsByStatus(ps, '严重延期')).toEqual([
+      { projectId: 'B', projectName: '乙', manager: '李', orgL4: 'D2', contract: 200, status: '严重延期' },
+    ])
   })
 })
