@@ -24,10 +24,11 @@ PBKDF2_ITERS = 200_000
 SESSION_TTL_SECONDS = 12 * 3600
 COOKIE_NAME = 'pmp_session'
 
-# 首次种子的超级管理员(用户提供 2 个明文;不臆造第 3 个,留 SP-5/手工补)
+# 首次种子的超级管理员(离线内网工具的初始凭据来源;新增超管在此追加,随后对已存在的 accounts.json 另行补齐)
 _SEED_SUPERS = [
     ('admin', 'wxtnb', '超级管理员'),
     ('wangxutong', 'niubi', 'wangxutong'),
+    ('zhangyingzhe', 'venus600', 'zhangyingzhe'),
 ]
 
 _file_lock = threading.Lock()
@@ -79,14 +80,18 @@ def _make_user(password: str, display_name: str, is_super: bool = True,
 
 
 def seed_default_accounts() -> bool:
-    """文件不存在才种子 2 个超管;已存在不动,返回 False。"""
-    if os.path.exists(ACCOUNTS_FILE):
-        return False
-    data: dict = {'version': 1, 'users': {}}
+    """确保 _SEED_SUPERS 的超管都存在:文件缺失则新建;已存在则补齐缺失的种子超管(不动既有账号/密码/权限)。
+    有新增返回 True,无改动返回 False。这样新增配置超管只需改 _SEED_SUPERS + 重启即生效。"""
+    data: dict = load_accounts() if os.path.exists(ACCOUNTS_FILE) else {'version': 1, 'users': {}}
+    users = data.setdefault('users', {})
+    added = False
     for account, pw, name in _SEED_SUPERS:
-        data['users'][account] = _make_user(pw, name, is_super=True)
-    save_accounts(data)
-    return True
+        if account not in users:
+            users[account] = _make_user(pw, name, is_super=True)
+            added = True
+    if added:
+        save_accounts(data)
+    return added
 
 
 def public_user(account: str, rec: dict) -> dict:
