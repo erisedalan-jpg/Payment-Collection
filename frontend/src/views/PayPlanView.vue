@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { usePagedRows } from '@/lib/usePagedRows'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
@@ -41,6 +42,7 @@ const COLS = [
   { key: 'paymentRatio', label: '完成率' },
 ]
 const filteredRows = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)))
+const { paged, currentPage, pageSize } = usePagedRows(filteredRows, 50)
 const fmtCol = (key: string, v: any) =>
   key === 'contract' || key === 'actualTotal' ? fmtWan(v) : key === 'paymentRatio' ? fmtRatio(v) : formatCellValue(v, key)
 function onRow(r: Record<string, any>) { pd.open(r.projectId) }
@@ -74,13 +76,19 @@ function onRow(r: Record<string, any>) { pd.open(r.projectId) }
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in filteredRows.slice(0, 300)" :key="r.projectId" class="prow" @click="onRow(r)">
+          <tr v-for="r in paged" :key="r.projectId" class="prow" @click="onRow(r)">
             <td v-for="c in COLS" :key="c.key" :style="c.key === 'paymentRatio' ? { color: rateColorPmis(r.paymentRatio) } : undefined">
               {{ fmtCol(c.key, r[c.key]) }}
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+    <div class="pp-pager">
+      <span class="u-num">共 {{ filteredRows.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="filteredRows.length"
+        layout="sizes, prev, pager, next" size="small" background />
     </div>
   </div>
 </template>
@@ -101,4 +109,6 @@ function onRow(r: Record<string, any>) { pd.open(r.projectId) }
 .ptbl th { background: var(--card2); color: var(--sub); }
 .prow { cursor: pointer; }
 .prow:hover { background: var(--hover-tint); }
+.pp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.pp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

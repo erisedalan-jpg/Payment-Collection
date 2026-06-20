@@ -30,4 +30,16 @@ describe('PayPlanView(回款进度)', () => {
     const data = useDataStore(); data.data = { projects: [], projectPmis: {}, naguanExclude: {} } as any
     expect(mount(PayPlanView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
+  it('分页:超过页大小手写表只渲染一页', () => {
+    const data = useDataStore()
+    data.data = {
+      projects: Array.from({ length: 60 }, (_, i) => ({
+        projectId: 'P' + i, projectName: '名' + i, orgL4: '组1',
+        payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 100, actualTotal: 50 },
+      })),
+      projectPmis: {}, naguanExclude: {},
+    } as any
+    const w = mount(PayPlanView, { global: { plugins: [ElementPlus] } })
+    expect(w.findAll('tr.prow').length).toBe(50)
+  })
 })
