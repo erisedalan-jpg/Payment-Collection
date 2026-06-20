@@ -3,6 +3,10 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import AppHeader from './AppHeader.vue'
 import { useDataStore } from '@/stores/data'
+import { useAuthStore } from '@/stores/auth'
+
+const pushSpy = vi.fn()
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
 beforeEach(() => setActivePinia(createPinia()))
 afterEach(() => vi.unstubAllGlobals())
@@ -24,5 +28,21 @@ describe('AppHeader', () => {
     await wrapper.get('[data-test="stop-server"]').trigger('click')
     expect(f).toHaveBeenCalled()
     expect(f.mock.calls[0][0]).toBe('/api/stop')
+  })
+})
+
+describe('AppHeader 登录态', () => {
+  it('登录后显示 displayName + 登出按钮,点击调 logout 并跳 /login', async () => {
+    const a = useAuthStore()
+    a.user = { account: 'admin', displayName: '超级管理员', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const logoutSpy = vi.spyOn(a, 'logout').mockResolvedValue()
+    const w = mount(AppHeader)
+    expect(w.text()).toContain('超级管理员')
+    await w.get('[data-test="logout"]').trigger('click')
+    expect(logoutSpy).toHaveBeenCalled()
+  })
+  it('未登录不显示登出按钮', () => {
+    const w = mount(AppHeader)
+    expect(w.find('[data-test="logout"]').exists()).toBe(false)
   })
 })
