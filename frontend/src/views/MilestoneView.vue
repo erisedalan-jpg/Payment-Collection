@@ -16,6 +16,9 @@ import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
+import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
+import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
+import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -188,6 +191,13 @@ function onNodeClick(params: any) {
   drillTitle.value = `${params.seriesName} · ${MONTH_LABELS[params.dataIndex]}`
   drillOpen.value = true
 }
+const now = new Date()
+const detailTab = ref<'delayed' | 'reminder' | 'plan'>('delayed')
+const DETAIL_TABS = [
+  { value: 'delayed', label: '延期项目清单' },
+  { value: 'reminder', label: '到期提醒' },
+  { value: 'plan', label: '在建里程碑计划' },
+]
 defineExpose({ faGran, onNodeClick, nodeYear })
 </script>
 
@@ -243,6 +253,13 @@ defineExpose({ faGran, onNodeClick, nodeYear })
       </div>
 
       <MilestoneDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
+
+      <div class="mv-detail">
+        <SegToggle v-model="detailTab" :options="DETAIL_TABS" />
+        <MilestoneDelayedTab v-if="detailTab === 'delayed'" :projects="mps" :now="now" />
+        <MilestoneReminderTab v-else-if="detailTab === 'reminder'" :projects="mps" :now="now" />
+        <MilestonePlanTab v-else :projects="mps" />
+      </div>
     </template>
   </div>
 </template>
@@ -258,4 +275,6 @@ defineExpose({ faGran, onNodeClick, nodeYear })
 .mv-card-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .mv-grid2-half { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
 .mv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.mv-detail { margin-top: var(--sp-4); }
+.mv-detail > :first-child { margin-bottom: var(--sp-3); }
 </style>
