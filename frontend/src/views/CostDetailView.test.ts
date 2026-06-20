@@ -74,4 +74,28 @@ describe('CostDetailView 上半', () => {
     // L4 汇总表(剔 XS → 仅 D1)经 DataTable props 同步断言,避免 el-table 行异步渲染
     expect((w.findComponent(DataTable).props('rows') as any[]).some((r) => r.orgL4 === 'D1')).toBe(true)
   })
+  it('点 KPI(超支大于5K)就地筛选明细表;点总数恢复', async () => {
+    ;(Element.prototype as any).scrollIntoView = vi.fn()
+    seed()
+    const w = mount(CostDetailView, opts)
+    w.findComponent(MetricGrid).vm.$emit('item-click', 3)
+    await w.vm.$nextTick()
+    const tables = w.findAllComponents({ name: 'DataTable' })
+    const detail = tables[tables.length - 1]
+    expect((detail.props('rows') as any[]).map((r) => r.projectId)).toEqual(['WS1'])
+    w.findComponent(MetricGrid).vm.$emit('item-click', 0)
+    await w.vm.$nextTick()
+    expect((detail.props('rows') as any[]).length).toBe(3)
+  })
+  it('L4 汇总表含四金额列(可排序)且求和正确', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    const l4 = w.findAllComponents({ name: 'DataTable' })[0]
+    const cols = l4.props('columns') as any[]
+    expect(cols.map((c) => c.key)).toEqual(expect.arrayContaining(['contractTotal', 'remainingTotal', 'deliveryDeptRemaining', 'deliveryOutsourceRemaining']))
+    expect(cols.find((c) => c.key === 'orgL4').sortable).toBe(true)
+    const d1 = (l4.props('rows') as any[]).find((r) => r.orgL4 === 'D1')
+    expect(d1.contractTotal).toBe(2500000)
+    expect(d1.remainingTotal).toBe(-7900)
+  })
 })

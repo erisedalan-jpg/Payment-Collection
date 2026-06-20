@@ -9,6 +9,7 @@ import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import { useRouter } from 'vue-router'
+import { fmtWan } from '@/lib/format'
 import { usePagedRows } from '@/lib/usePagedRows'
 import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -27,10 +28,10 @@ const kpi = computed(() => costKpis(rows.value))
 const kpiItems = computed(() => {
   const k = kpi.value
   return [
-    { k: '成本统计项目数', v: String(k.total) },
-    { k: '未超支', v: String(k.normal), cls: 'ok' },
-    { k: '超支不足5K', v: String(k.under5k), cls: 'warn' },
-    { k: '超支大于5K', v: String(k.over5k), cls: 'danger' },
+    { k: '成本统计项目数', v: String(k.total), clickable: true },
+    { k: '未超支', v: String(k.normal), cls: 'ok', clickable: true },
+    { k: '超支不足5K', v: String(k.under5k), cls: 'warn', clickable: true },
+    { k: '超支大于5K', v: String(k.over5k), cls: 'danger', clickable: true },
   ]
 })
 
@@ -53,15 +54,26 @@ const distOption = computed(() => {
 
 const l4Rows = computed(() => costL4Summary(rows.value))
 const L4_COLS: DataColumn[] = [
-  { key: 'orgL4', label: 'L4部门', width: 140 },
-  { key: 'total', label: '项目总数', width: 90, num: true },
-  { key: 'normal', label: '未超支', width: 90, num: true },
-  { key: 'under5k', label: '超支不足5k', width: 110, num: true },
-  { key: 'over5k', label: '超支大于5k', width: 110, num: true },
-  { key: 'over5kRatio', label: '超支占比', width: 100, num: true },
+  { key: 'orgL4', label: 'L4部门', width: 140, sortable: true },
+  { key: 'total', label: '项目总数', width: 90, num: true, sortable: true },
+  { key: 'normal', label: '未超支', width: 90, num: true, sortable: true },
+  { key: 'under5k', label: '超支不足5k', width: 110, num: true, sortable: true },
+  { key: 'over5k', label: '超支大于5k', width: 110, num: true, sortable: true },
+  { key: 'over5kRatio', label: '超支占比', width: 100, num: true, sortable: true },
+  { key: 'contractTotal', label: '合同总额(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
+  { key: 'remainingTotal', label: '剩余预算(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
+  { key: 'deliveryDeptRemaining', label: '交付部门剩余(万)', width: 130, num: true, sortable: true, formatter: (v) => fmtWan(v) },
+  { key: 'deliveryOutsourceRemaining', label: '交付外包剩余(万)', width: 130, num: true, sortable: true, formatter: (v) => fmtWan(v) },
 ]
 
 const router = useRouter()
+const detailCardRef = ref<HTMLElement | null>(null)
+const KPI_STATUS = [null, '未超支', '超支不足5k', '超支大于5k'] as const
+function onKpiClick(i: number) {
+  const s = KPI_STATUS[i]
+  fStatus.value = s ? [s] : []
+  detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 const STATUS_OPTS = ['未超支', '超支不足5k', '超支大于5k']
 const fL3 = ref<string[]>([])
 const fL3_1 = ref<string[]>([])
@@ -122,14 +134,14 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
     <div v-if="!rows.length" class="cd-empty">暂无主域成本数据——请在「数据管理」提供 PMIS 文件后点「更新数据」。</div>
 
     <template v-else>
-      <MetricGrid :items="kpiItems" :col-min="'160px'" />
+      <MetricGrid :items="kpiItems" :col-min="'160px'" @item-click="onKpiClick" />
       <div class="cd-grid2">
         <div class="cd-card"><div class="cd-card-h">超支项目分布(按 L4,剔 XS)</div><ChartBox :option="distOption" height="300px" /></div>
         <div class="cd-card"><div class="cd-card-h">L4 部门成本情况汇总</div><DataTable :columns="L4_COLS" :rows="l4Rows" :show-count="false">
           <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}%</span></template>
         </DataTable></div>
       </div>
-      <div class="cd-card">
+      <div class="cd-card" ref="detailCardRef">
         <div class="cd-card-h">项目成本明细(按 L4 组织排序)</div>
         <div class="cd-bar">
           <el-select v-model="fL3" size="small" multiple collapse-tags clearable placeholder="L3部门" style="width: 140px"><el-option v-for="o in l3Opts" :key="o" :value="o" :label="o" /></el-select>
