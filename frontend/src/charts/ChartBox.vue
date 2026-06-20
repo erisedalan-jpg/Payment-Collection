@@ -13,6 +13,8 @@ withDefaults(
   { height: '320px' },
 )
 
+const emit = defineEmits<{ 'datapoint-click': [any] }>()
+
 // 无活动 pinia 时（个别不带 store 的测试场景）回退浅色，避免抛错。
 const theme = computed(() => {
   if (!getActivePinia()) return ENT_THEME
@@ -22,7 +24,7 @@ const theme = computed(() => {
 
 <template>
   <div class="chart-box" :style="{ height }">
-    <VChart :option="option" :theme="theme" autoresize />
+    <VChart :option="option" :theme="theme" autoresize @click="(e: any) => emit('datapoint-click', e)" />
   </div>
 </template>
 

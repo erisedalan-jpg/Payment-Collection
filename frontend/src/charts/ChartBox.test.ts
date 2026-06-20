@@ -43,4 +43,14 @@ describe('ChartBox', () => {
     })
     expect(wrapper.findComponent({ name: 'VChart' }).props('theme')).toBe('ent-dark')
   })
+
+  it('转发 VChart click 为 datapoint-click', async () => {
+    const wrapper = mount(ChartBox, {
+      props: { option: {} },
+      global: { stubs: { VChart: VChartStub } },
+    })
+    wrapper.findComponent({ name: 'VChart' }).vm.$emit('click', { seriesName: '终验', dataIndex: 2 })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('datapoint-click')?.[0]?.[0]).toMatchObject({ seriesName: '终验', dataIndex: 2 })
+  })
 })

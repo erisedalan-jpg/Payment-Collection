@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { CHART_LIGHT, CHART_DARK, STRUCT_LIGHT, STRUCT_DARK, FONT_SANS, STATUS_LIGHT, STATUS_DARK } from './echartsTheme'
+import { CHART_LIGHT, CHART_DARK, STRUCT_LIGHT, STRUCT_DARK, FONT_SANS, STATUS_LIGHT, STATUS_DARK, MUTED_LIGHT, MUTED_DARK } from './echartsTheme'
 
 // 双源契约(spec 1.7):ECharts 画在 canvas 上读不到 CSS 变量,
 // echartsTheme.ts 的取值必须与 theme.css 同名令牌逐项一致 —— 改一边漏一边,这里即红。
@@ -65,5 +65,12 @@ describe('ECharts 双源契约 · 状态色(spec 1.7)', () => {
     expect(STATUS_DARK.ok).toBe(cssVar(dark, '--ok'))
     expect(STATUS_DARK.warn).toBe(cssVar(dark, '--warn'))
     expect(STATUS_DARK.danger).toBe(cssVar(dark, '--danger'))
+  })
+})
+
+describe('ECharts 双源契约 · 中性灰(MUTED)', () => {
+  it('MUTED_* 与 theme.css --mut 同步', () => {
+    expect(MUTED_LIGHT).toBe(cssVar(root, '--mut'))
+    expect(MUTED_DARK).toBe(cssVar(dark, '--mut'))
   })
 })
