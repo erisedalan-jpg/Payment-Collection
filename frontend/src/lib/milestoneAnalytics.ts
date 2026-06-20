@@ -74,6 +74,16 @@ export function statusKpis(ps: MilestoneProject[]): StatusKpis {
   return k
 }
 
+export interface MilestoneStatusRow {
+  projectId: string; projectName: string; manager: string; orgL4: string; contract: number; status: MilestoneStatus
+}
+/** 按里程碑状态筛主域项目;status 为 null 返回全部。供 KPI 卡点击下钻弹窗用。 */
+export function milestoneProjectsByStatus(ps: MilestoneProject[], status: MilestoneStatus | null): MilestoneStatusRow[] {
+  return ps
+    .filter((p) => status == null || p.status === status)
+    .map((p) => ({ projectId: p.projectId, projectName: p.projectName, manager: p.manager, orgL4: p.orgL4, contract: p.contract, status: p.status }))
+}
+
 // ---- 共享助手 ----
 function nodeByName(p: MilestoneProject, kw: string): MilestoneItem | undefined {
   return p.nodes.find((n) => (n.name ?? '').includes(kw))
