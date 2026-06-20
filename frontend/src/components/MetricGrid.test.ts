@@ -28,4 +28,16 @@ describe('MetricGrid', () => {
     await cards[1].trigger('click')
     expect(w.emitted('item-click')).toEqual([[1]])
   })
+
+  it('clickable item 键盘 Enter 激活 emit item-click;非 clickable 不可聚焦', async () => {
+    const w = mount(MetricGrid, { props: { items: [
+      { k: '总数', v: '10' },
+      { k: '超支', v: '3', clickable: true },
+    ] } })
+    const cards = w.findAll('.mg-card')
+    expect(cards[0].attributes('tabindex')).toBeUndefined()
+    expect(cards[1].attributes('tabindex')).toBe('0')
+    await cards[1].trigger('keydown.enter')
+    expect(w.emitted('item-click')).toEqual([[1]])
+  })
 })

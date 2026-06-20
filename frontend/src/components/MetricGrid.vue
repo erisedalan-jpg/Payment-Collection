@@ -12,7 +12,11 @@ const emit = defineEmits<{ 'item-click': [number] }>()
 <template>
   <div class="u-grid-auto mg" :style="{ '--col-min': colMin }">
     <div v-for="(it, i) in items" :key="i" class="mg-card" :class="{ 'mg-card--clickable': it.clickable }"
-      @click="it.clickable && emit('item-click', i)">
+      :tabindex="it.clickable ? 0 : undefined"
+      :role="it.clickable ? 'button' : undefined"
+      @click="it.clickable && emit('item-click', i)"
+      @keydown.enter.prevent="it.clickable && emit('item-click', i)"
+      @keydown.space.prevent="it.clickable && emit('item-click', i)">
       <div class="mg-k">{{ it.k }}</div>
       <div class="mg-v u-num" :class="it.cls">{{ it.v }}</div>
       <div v-if="it.sub" class="mg-sub u-num">{{ it.sub }}</div>
