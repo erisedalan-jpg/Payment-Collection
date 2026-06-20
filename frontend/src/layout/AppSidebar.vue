@@ -1,34 +1,41 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { PROJECT_LINKS, ANALYSIS_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
+const auth = useAuthStore()
+const projectLinks = computed(() => PROJECT_LINKS.filter((l) => auth.canAccess(l.key)))
+const analysisLinks = computed(() => ANALYSIS_LINKS.filter((l) => auth.canAccess(l.key)))
+const paymentLinks = computed(() => PAYMENT_LINKS.filter((l) => auth.canAccess(l.key)))
+const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key)))
 </script>
 
 <template>
   <aside class="sidebar" :class="{ collapsed: ui.sidebarCollapsed }">
     <nav class="sidebar-nav">
-      <div class="section">
+      <div v-if="projectLinks.length" class="section">
         <div class="section-label">项目</div>
-        <RouterLink v-for="link in PROJECT_LINKS" :key="link.to" :to="link.to"
+        <RouterLink v-for="link in projectLinks" :key="link.to" :to="link.to"
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
-      <div class="section">
+      <div v-if="analysisLinks.length" class="section">
         <div class="section-label">项目分析</div>
-        <RouterLink v-for="link in ANALYSIS_LINKS" :key="link.to" :to="link.to"
+        <RouterLink v-for="link in analysisLinks" :key="link.to" :to="link.to"
           class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
-      <div class="section">
+      <div v-if="paymentLinks.length" class="section">
         <div class="section-label">回款<span class="section-tag">重点子域</span></div>
-        <RouterLink v-for="link in PAYMENT_LINKS" :key="link.to" :to="link.to"
+        <RouterLink v-for="link in paymentLinks" :key="link.to" :to="link.to"
           class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
       </div>
 
-      <div class="section">
+      <div v-if="toolLinks.length" class="section">
         <div class="section-label">工具</div>
-        <RouterLink v-for="link in TOOL_LINKS" :key="link.to" :to="link.to"
+        <RouterLink v-for="link in toolLinks" :key="link.to" :to="link.to"
           class="nav-item" active-class="active">{{ link.label }}</RouterLink>
       </div>
     </nav>
