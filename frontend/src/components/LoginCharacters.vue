@@ -4,9 +4,14 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 type Mood = 'idle' | 'account' | 'password' | 'reveal' | 'fail'
 const props = withDefaults(defineProps<{ mood?: Mood }>(), { mood: 'idle' })
 
+// 防御性判断:jsdom 无 matchMedia,不抛异常
+const reduceMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 // 眼随鼠标:瞳孔相对视口中心偏移,归一化后缩放到 ±3px
 const eye = reactive({ x: 0, y: 0 })
 function onMove(e: MouseEvent) {
+  if (reduceMotion) return
   const cx = window.innerWidth / 2 || 1
   const cy = window.innerHeight / 2 || 1
   eye.x = Math.max(-1, Math.min(1, (e.clientX - cx) / cx)) * 3
@@ -24,7 +29,10 @@ function scheduleBlink() {
   }, 2000 + Math.random() * 3000)
 }
 
-onMounted(() => { window.addEventListener('mousemove', onMove); scheduleBlink() })
+onMounted(() => {
+  window.addEventListener('mousemove', onMove)
+  if (!reduceMotion) scheduleBlink()
+})
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMove)
   if (blinkTimer) clearTimeout(blinkTimer)
@@ -46,7 +54,7 @@ onUnmounted(() => {
 
 <style scoped>
 .lc { display: flex; gap: var(--sp-3); align-items: flex-end; justify-content: center; }
-/* 以下角色/眼/瞳孔的像素尺寸为纯 CSS 插画固有几何(类比 SVG 坐标),非布局间距;颜色/圆角/动效时长均走令牌。 */
+/* 以下角色/眼/瞳孔的像素尺寸与 top 偏移为纯 CSS 插画固有几何(类比 SVG 坐标),非布局间距;颜色/圆角/动效时长均走令牌。 */
 .lc-char { position: relative; width: 84px; height: 116px; transition: transform var(--dur-2) var(--ease); }
 .lc-char--1 { background: var(--chart-1); border-radius: var(--r-lg); }
 .lc-char--2 { background: var(--chart-2); border-radius: var(--r-md); height: 134px; }
