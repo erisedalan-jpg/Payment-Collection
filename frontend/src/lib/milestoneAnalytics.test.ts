@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeStatus, buildMilestoneProjects, statusKpis } from './milestoneAnalytics'
-import { reminderBuckets, finalAcceptStats, availableYears } from './milestoneAnalytics'
+import {
+  normalizeStatus, buildMilestoneProjects, statusKpis,
+  reminderBuckets, finalAcceptStats, availableYears,
+  deptAbnormalTop15, deptComplianceRate, nodeDistribution, nodesForDrill,
+} from './milestoneAnalytics'
 
 function mp(over: Partial<any> = {}): any {
   return { projectId: 'X', projectName: 'x', manager: '', orgL4: 'L', orgL3_1: '', projectType: '', contract: 0, status: '正常', nodes: [], ...over }
@@ -120,8 +123,6 @@ describe('statusKpis', () => {
     expect(statusKpis(ps)).toEqual({ total: 3, normal: 1, delayed: 0, severe: 1, unpublished: 1 })
   })
 })
-
-import { deptAbnormalTop15, deptComplianceRate, nodeDistribution, nodesForDrill } from './milestoneAnalytics'
 
 describe('deptAbnormalTop15 / deptComplianceRate', () => {
   const ps = [

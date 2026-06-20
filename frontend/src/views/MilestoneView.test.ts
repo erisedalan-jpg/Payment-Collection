@@ -72,7 +72,7 @@ describe('MilestoneView 概览', () => {
 })
 
 describe('MilestoneView 终验/节点分布', () => {
-  it('渲染 5 个 ChartBox(含 B 双图 + E)', () => {
+  it('渲染 6 个 ChartBox(含 B 双图 + E)', () => {
     seed()
     const w = mount(MilestoneView, opts)
     // A + C + D + B(项目数) + B(金额) + E = 6
