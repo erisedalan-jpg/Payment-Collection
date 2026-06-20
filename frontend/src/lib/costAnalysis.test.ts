@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isXs, costStatusOf, buildCostRows } from './costAnalysis'
+import { isXs, costStatusOf, buildCostRows, costKpis, costL4Dist, costL4Summary } from './costAnalysis'
 
 describe('isXs / costStatusOf', () => {
   it('XS 前缀(大小写不敏感)', () => {
@@ -36,8 +36,6 @@ describe('buildCostRows', () => {
     expect(x).toMatchObject({ xs: true, status: '未超支' }) // XS 强制未超支
   })
 })
-
-import { costKpis, costL4Dist, costL4Summary } from './costAnalysis'
 
 function cr(o: Partial<any> = {}): any {
   return { projectId: 'W', projectName: 'x', projectType: '', orgL3: '', orgL3_1: '', orgL4: 'D1', manager: '', amount: 0, status: '未超支', totalBudget: 0, actualCost: 0, remaining: 0, xs: false, ...o }
