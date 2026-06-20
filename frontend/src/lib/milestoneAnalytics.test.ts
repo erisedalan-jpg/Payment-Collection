@@ -4,6 +4,7 @@ import {
   reminderBuckets, finalAcceptStats, availableYears,
   deptAbnormalTop15, deptComplianceRate, nodeDistribution, nodesForDrill,
 } from './milestoneAnalytics'
+import { reminderBounds } from './milestoneAnalytics'
 
 function mp(over: Partial<any> = {}): any {
   return { projectId: 'X', projectName: 'x', manager: '', orgL4: 'L', orgL3_1: '', projectType: '', contract: 0, status: '正常', nodes: [], ...over }
@@ -80,7 +81,7 @@ const projects = [
   { projectId: 'C', projectName: '丙', projectManager: '王', orgL4: '', orgL3_1: '', isPresale: false, paymentPmis: { contract: 0 } },
 ] as any
 const pmis = {
-  A: { progress: { 里程碑进度状态: '正常' }, status: { 项目类型: '正常实施类' } },
+  A: { progress: { 里程碑进度状态: '正常' }, status: { 项目类型: '正常实施类' }, team: { L3部门: '交付一部' } },
   B: { progress: { 里程碑进度状态: '严重延期' }, status: { 项目类型: '售前服务类' } },
   C: { progress: { 里程碑进度状态: '' }, status: { 项目类型: '特殊支持类' } },
 } as any
@@ -114,6 +115,11 @@ describe('buildMilestoneProjects', () => {
   it('excludeOn=false 时 excludedIds 不生效', () => {
     const ps = buildMilestoneProjects(projects, pmis, milestones, { excludeOn: false, excludedIds: { C: true } })
     expect(ps).toHaveLength(3)
+  })
+  it('orgL3 取 team.L3部门(缺为空串)', () => {
+    const ps = buildMilestoneProjects(projects, pmis, milestones)
+    expect(ps.find((p) => p.projectId === 'A')!.orgL3).toBe('交付一部')
+    expect(ps.find((p) => p.projectId === 'B')!.orgL3).toBe('')
   })
 })
 
@@ -168,5 +174,12 @@ describe('nodeDistribution / nodesForDrill', () => {
   it('下钻取该系列+月份行', () => {
     const rows = nodesForDrill(ps, 'serviceDone', 2, 2026) // 3月=index2
     expect(rows).toEqual([{ projectId: 'B', projectName: 'x', manager: '', orgL4: 'D2', node: '服务完成', planDate: '2026-03-15', status: '延期' }])
+  })
+})
+
+describe('reminderBounds', () => {
+  it('给出 today/d7/d30/季初季末', () => {
+    const b = reminderBounds(new Date(2026, 2, 10))
+    expect(b).toEqual({ today: '2026-03-10', d7: '2026-03-17', d30: '2026-04-09', qs: '2026-01-01', qe: '2026-03-31' })
   })
 })
