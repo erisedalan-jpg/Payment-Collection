@@ -1,0 +1,32 @@
+# systemd 服务单元 —— 项目管理平台(回款跟踪)
+# 安装:sudo cp deploy/pmplatform.service /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now pmplatform
+# 生命周期交 systemd:勿用 `python server.py --stop`(依赖 netstat/taskkill,Linux 失效)。
+# 停止/重启:sudo systemctl stop|restart pmplatform
+[Unit]
+Description=Project Management Platform (回款跟踪平台)
+After=network.target
+
+[Service]
+Type=simple
+User=pmapp
+Group=pmapp
+WorkingDirectory=/opt/pmplatform
+# 固定东八区,消除回款"延期"判定的部署时区错位(审计 D-5)
+Environment=TZ=Asia/Shanghai
+ExecStart=/opt/pmplatform/.venv/bin/python server.py
+Restart=on-failure
+RestartSec=3
+# 轻量加固
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
+# 备注:
+# - 应用绑定 127.0.0.1:8080(loopback),仅本机 nginx 反代可达,对外由 nginx 终止 TLS。
+# - 启动时 server.py 会:① 自动开浏览器(无头机上在 daemon 线程内静默失败,无害,P0-5 门控待做);
+#   ② 端口清理(Linux 为 no-op,浪费约 2s,无害);③ 创建桌面快捷方式(非 Windows 直接跳过)。
+# - "停止服务"按钮会 os._exit(0) 整个进程;多用户共享服务器上不应让普通管理员触发——
+#   已由 P0-2 将 /api/stop 限超管,但仍建议后续在前端隐藏该按钮(P0-5 项)。
