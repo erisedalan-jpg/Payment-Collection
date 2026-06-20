@@ -100,7 +100,7 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
         <span class="st-badge" :class="STATUS_CLASS[value] || 'st-warn'">{{ value }}</span>
       </template>
     </DataTable>
-    <div class="pn-pager">
+    <div v-if="rows.length" class="pn-pager">
       <span class="u-num">共 {{ rows.length }} 条</span>
       <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
         :page-sizes="[20, 50, 80, 100]" :total="rows.length"
