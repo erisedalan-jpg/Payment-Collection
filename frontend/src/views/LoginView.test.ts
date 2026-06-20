@@ -50,4 +50,15 @@ describe('LoginView', () => {
     expect(w.findComponent(LoginCharacters).props('mood')).toBe('fail')
     expect(w.find('[data-test="lv-error"]').text()).toContain('后端校验未接入')
   })
+  it('失败提交后重新聚焦账号→清除错误提示', async () => {
+    const w = mountLV()
+    await w.find('input[autocomplete="username"]').setValue('admin')
+    await w.find('input[autocomplete="current-password"]').setValue('wxtnb')
+    await w.find('form').trigger('submit')
+    await w.vm.$nextTick()
+    expect(w.find('[data-test="lv-error"]').exists()).toBe(true)   // 失败后有提示
+    await w.find('input[autocomplete="username"]').trigger('focus')
+    await w.vm.$nextTick()
+    expect(w.find('[data-test="lv-error"]').exists()).toBe(false)  // 聚焦后清除
+  })
 })
