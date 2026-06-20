@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { useDataStore } from '@/stores/data'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { APP_VERSION } from '@/version'
 import DisplaySettings from '@/components/DisplaySettings.vue'
 
 const store = useDataStore()
+const auth = useAuthStore()
+const router = useRouter()
 
 async function stopServer() {
   if (!confirm('确认停止本地服务？停止后页面将无法继续使用。')) return
@@ -13,6 +17,11 @@ async function stopServer() {
   } catch {
     // 服务停止时连接会中断，忽略错误
   }
+}
+
+async function onLogout() {
+  await auth.logout()
+  router.push('/login')
 }
 </script>
 
@@ -28,6 +37,10 @@ async function stopServer() {
         <span class="date-badge">{{ store.data.meta.lastUpdate }}</span>
       </template>
       <span v-else class="no-data">未加载数据</span>
+      <template v-if="auth.user">
+        <span class="user-name">{{ auth.user.displayName || auth.user.account }}</span>
+        <button data-test="logout" class="logout-btn" @click="onLogout">登出</button>
+      </template>
       <DisplaySettings />
       <button data-test="stop-server" class="stop-btn" title="停止服务" @click="stopServer">■</button>
     </div>
@@ -47,4 +60,7 @@ async function stopServer() {
   background: none; color: var(--danger); cursor: pointer; }
 .stop-btn:hover { border-color: var(--danger); background: var(--card2); }
 .no-data { color: var(--mut); font-size: var(--fs-1); }
+.user-name { font-size: var(--fs-1); color: var(--sub); }
+.logout-btn { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-sm); background: none; color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
+.logout-btn:hover { color: var(--accent); border-color: var(--accent); }
 </style>
