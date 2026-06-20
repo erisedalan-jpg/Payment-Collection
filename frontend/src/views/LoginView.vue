@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import LoginCharacters from '@/components/LoginCharacters.vue'
-import { authenticate } from '@/lib/auth'
 
 type Mood = 'idle' | 'account' | 'password' | 'reveal' | 'fail'
 const account = ref('')
@@ -9,6 +10,8 @@ const password = ref('')
 const showPassword = ref(false)
 const mood = ref<Mood>('idle')
 const error = ref('')
+const router = useRouter()
+const auth = useAuthStore()
 
 function onAccountFocus() { error.value = ''; mood.value = 'account' }
 function onPasswordFocus() { error.value = ''; mood.value = showPassword.value ? 'reveal' : 'password' }
@@ -22,9 +25,9 @@ function toggleShow() {
 async function onSubmit() {
   error.value = ''
   if (!account.value || !password.value) { error.value = '请输入账号和密码'; return }
-  const res = await authenticate(account.value, password.value)
-  if (!res.ok) { mood.value = 'fail'; error.value = res.message || '登录失败' }
-  // SP-1 不跳转/不存登录态;成功分支留 SP-2。
+  const res = await auth.login(account.value, password.value)
+  if (res.ok) { router.push('/') }
+  else { mood.value = 'fail'; error.value = res.message || '登录失败' }
 }
 </script>
 
