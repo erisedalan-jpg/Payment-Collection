@@ -35,7 +35,27 @@ def test_seed_then_authenticate(tmp_path, monkeypatch):
     assert auth.authenticate("admin", "wrong") is None
     assert auth.authenticate("nobody", "x") is None
     assert auth.authenticate("wangxutong", "niubi") is not None
-    assert auth.seed_default_accounts() is False           # 已存在不覆盖
+    assert auth.seed_default_accounts() is False           # 已存在且无缺失→不动
+
+
+def test_seed_reconciles_missing_super(tmp_path, monkeypatch):
+    """已存在的账号库缺某个种子超管时,再次 seed 应补齐(不动既有账号/密码/权限)。"""
+    f = _fresh(tmp_path, monkeypatch)
+    assert auth.seed_default_accounts() is True
+    # 删掉一个种子超管,模拟新增配置超管前的旧库
+    data = auth.load_accounts()
+    removed = auth._SEED_SUPERS[-1][0]
+    data["users"].pop(removed)
+    # 改一个既有超管的显示名,验证 reconcile 不覆盖既有
+    data["users"]["admin"]["displayName"] = "改过的名字"
+    auth.save_accounts(data)
+    assert removed not in auth.load_accounts()["users"]
+    # 再次 seed:补回缺失的,返回 True;既有不动
+    assert auth.seed_default_accounts() is True
+    after = auth.load_accounts()["users"]
+    assert removed in after and after[removed]["isSuper"] is True
+    assert after["admin"]["displayName"] == "改过的名字"   # 既有账号未被覆盖
+    assert auth.seed_default_accounts() is False            # 再次无缺失
 
 
 def test_sessions(tmp_path, monkeypatch):
