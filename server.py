@@ -160,6 +160,18 @@ ERR_NOT_FOUND = "not_found"           # 记录不存在
 ERR_INTERNAL = "internal_error"       # 其它内部错误
 ERR_AUTH = "auth_failed"              # 登录鉴权失败
 
+_AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me')
+
+
+def _path_needs_auth(path):
+    """纯函数：判断路径是否需要登录鉴权。
+    豁免：/api/login、/api/logout、/api/auth/me 及非 /api、/data 路径。
+    拦截：其余 /api/* 与 /data/* 路径。"""
+    if path in _AUTH_EXEMPT:
+        return False
+    return path.startswith('/api/') or path.startswith('/data/')
+
+
 _history_lock = threading.Lock()
 history_state = {"running": False}   # 回滚/撤销进行中标志,供 sync/import/pmis/reprocess 反向互斥
 
@@ -314,7 +326,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     
     def do_GET(self):
         parsed = urlparse(self.path)
-        
+        if not self._auth_gate():
+            return
+
         # 拦截静态文件请求，强制添加 charset=utf-8
         if parsed.path.endswith(('.js', '.css', '.html')):
             self._serve_static_with_charset()
@@ -416,6 +430,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if not self._auth_gate():
+            return
         if parsed.path == '/api/import':
             self.handle_import()
         elif parsed.path == '/api/followup/add':
@@ -1141,6 +1157,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _auth_gate(self):
+        """检查请求路径是否需要鉴权；需要且无有效会话则返回 False（已发 401），否则返回 True。"""
+        path = urlparse(self.path).path
+        if _path_needs_auth(path):
+            token = auth.parse_cookie_token(self.headers.get('Cookie'))
+            if not auth.validate_session(token):
+                self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+                return False
+        return True
+
     def handle_login(self):
         try:
             n = int(self.headers.get('Content-Length', 0))
@@ -1150,6 +1176,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         account = (data.get('account') or '').strip()
         password = data.get('password') or ''
+        if len(account) > 256 or len(password) > 256:
+            self._send_json(401, _error_payload(ERR_AUTH, "账号或密码错误"))
+            return
         user = auth.authenticate(account, password)
         if not user:
             self._send_json(401, _error_payload(ERR_AUTH, "账号或密码错误"))
