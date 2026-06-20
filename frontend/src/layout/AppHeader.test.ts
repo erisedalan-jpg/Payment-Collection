@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import AppHeader from './AppHeader.vue'
 import { useDataStore } from '@/stores/data'
@@ -9,7 +9,7 @@ const pushSpy = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
 beforeEach(() => setActivePinia(createPinia()))
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); pushSpy.mockReset() })
 
 describe('AppHeader', () => {
   it('renders title and data update time from store', () => {
@@ -40,6 +40,8 @@ describe('AppHeader 登录态', () => {
     expect(w.text()).toContain('超级管理员')
     await w.get('[data-test="logout"]').trigger('click')
     expect(logoutSpy).toHaveBeenCalled()
+    await flushPromises()
+    expect(pushSpy).toHaveBeenCalledWith('/login')
   })
   it('未登录不显示登出按钮', () => {
     const w = mount(AppHeader)
