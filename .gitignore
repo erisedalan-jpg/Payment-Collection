@@ -33,6 +33,8 @@ data/manual_backups/
 data/followup_records.json
 # 项目标签库（运行时用户数据，2C）
 data/project_tags.json
+# 本地账号库(含密码哈希,敏感,运行时生成,SP-2)
+data/accounts.json
 # 回款比对报告（含真实业务数据，一次性诊断产物，不入库）
 report/
 
