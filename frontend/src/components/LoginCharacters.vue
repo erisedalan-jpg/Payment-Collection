@@ -46,12 +46,13 @@ onUnmounted(() => {
 
 <style scoped>
 .lc { display: flex; gap: var(--sp-3); align-items: flex-end; justify-content: center; }
+/* 以下角色/眼/瞳孔的像素尺寸为纯 CSS 插画固有几何(类比 SVG 坐标),非布局间距;颜色/圆角/动效时长均走令牌。 */
 .lc-char { position: relative; width: 84px; height: 116px; transition: transform var(--dur-2) var(--ease); }
 .lc-char--1 { background: var(--chart-1); border-radius: var(--r-lg); }
 .lc-char--2 { background: var(--chart-2); border-radius: var(--r-md); height: 134px; }
-.lc-char--3 { background: var(--chart-3); border-radius: 999px 999px var(--r-sm) var(--r-sm); height: 84px; } /* 半圆顶 */
+.lc-char--3 { background: var(--chart-3); border-radius: var(--r-full) var(--r-full) var(--r-sm) var(--r-sm); height: 84px; } /* 半圆顶 */
 .lc-char--4 { background: var(--chart-4); border-radius: var(--r-lg); height: 104px; }
-.lc-face { position: absolute; top: 20px; left: 0; right: 0; display: flex; gap: 12px; justify-content: center; }
+.lc-face { position: absolute; top: 20px; left: 0; right: 0; display: flex; gap: var(--sp-3); justify-content: center; }
 .lc-eye { width: 16px; height: 16px; border-radius: var(--r-full); background: var(--card); display: grid; place-items: center; overflow: hidden; transition: transform var(--dur-1) var(--ease); }
 .lc-pupil { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--txt); transform: translate(var(--eye-x, 0), var(--eye-y, 0)); transition: transform var(--dur-1) var(--ease); }
 
