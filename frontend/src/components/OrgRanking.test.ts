@@ -87,11 +87,11 @@ describe('OrgRanking', () => {
     expect(items[0].text()).toContain('A组')
   })
 
-  it('点击排名行跳转 /payment/board（orgL4 维度）', async () => {
+  it('点击排名行跳转 /insight/board（orgL4 维度）', async () => {
     seed()
     pushSpy.mockClear()
     const w = mount(OrgRanking)
     await w.findAll('.rank-item')[0].trigger('click')
-    expect(pushSpy).toHaveBeenCalledWith({ path: '/payment/board', query: { dim: 'orgL4' } })
+    expect(pushSpy).toHaveBeenCalledWith({ path: '/insight/board', query: { dim: 'orgL4' } })
   })
 })
