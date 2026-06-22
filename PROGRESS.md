@@ -4,10 +4,10 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.16.2**
-- 最近更新：2026-06-22（数据管理界面调整：彻底移除 WPS + 双数据来源。拆除 WPS 同步/离线导入/PMIS 在线下载全部在线抓取入口与脚本、Playwright 依赖；数据来源收敛为两条：页面上传/本地放置后点「更新数据」；collection_stages.csv 纳入页面上传白名单+文件状态展示；yundocs 数据源下线，删死键 projectOverview/naguanMap/naguanExclude；pay_projects 换源到 collection_stages）
-- 上一版本：V1.15.0（2026-06-19，回款口径修正：① 修 preprocess 售前收款阶段节点取数——本项目号优先、缺回退原项目号（找回被丢的售前计划节点，售前 Σ计划 0→21211 万）；② 全站「回款达成率/完成率」口径统一为 Σ流水净额(含负)/Σ合同总额（分母 计划→合同，修复 103% 失真，回落至合理区间）；③ 售前详情「回款数据」流水本项目优先缺回退原项目）
-- 上上版本：V1.14.0（2026-06-19，SP5 /payment/board 多维看板重做：维度集改 L4部门/项目级别/行业/项目阶段/标签，指标改 项目数/合同总额/计划回款/完成率/延期节点；排名表去独立排序控件改 DataTable 表头排序；柱状图加数字；标签多值炸开分组；交叉/透视维度同步。**大需求 5 子项目收官**）
+- 当前版本：**V1.16.3**
+- 最近更新：2026-06-22（页面调整批次 S1-S10：/activity 关闭项目不记节点移除事件 + 全量动态翻页 + 事件类型/L4 筛选；/projects 健康度后加「关注原因」列（6 类风险共用纯函数 riskReasons）；/project/:id 预算核算改以元为单位（消除万元进位）、回款表 +回款类型/实际比例、风险表 +风险描述/小类/待办任务；/payment 完成率分母选日期区间时只算区间内有活动项目合同（payDashSummary + payOrgRanking 对齐）、待回款趋势卡改名「待回款金额」；/insight + /board 图表类型多选（柱/折/饼）+ 图上数据值标签；首页健康度 CARD 整合 6 类风险分类可展开 + 下钻 /projects?riskCategory）
+- 上一版本：V1.16.2（2026-06-22，数据管理界面调整：彻底移除 WPS + 双数据来源；collection_stages.csv 纳入页面上传白名单+文件状态；删死键 projectOverview/naguanMap/naguanExclude；pay_projects 换源 collection_stages）
+- 上上版本：V1.15.0（2026-06-19，回款口径修正：流水/合同统一口径 + 售前节点取数 + 售前详情流水回退）
 - 维护语言：简体中文
 
 ---
@@ -16,6 +16,17 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.16.3（2026-06-22）页面调整批次（S1-S10，逐切片 TDD + verify 全绿，commits 60c6d80..6df10fc 含 payOrgRanking 对齐）
+  - S1 /payment 待回款趋势卡改名「待回款金额」（TrendCard）。
+  - S3 /activity 关闭项目连带消失的回款节点不再单独记「回款节点移除」事件（snapshots.diff_snapshots 跳过 closed_pids）。
+  - S4 /activity 内嵌全量保留事件（run_snapshot_pipeline 去 -100 截断）+ 翻页（50/页）+ 事件类型多选/L4 筛选（lib/activity filterEvents+pidL4、distinctEventTypes）。
+  - S5 /projects 健康度后「关注原因」列 + lib/riskReasons（5 类具体原因+数据异常短路，S5/S10 共用）。
+  - S6 /project/:id 预算核算区块改 fmtYuan 以元展示（消除万元进位精度损失）。
+  - S7 /project/:id 回款表 +回款类型/实际比例；风险表 +风险描述/风险小类/待办任务（核实真实键名后只加有值列）。
+  - S8 /payment 完成率分母：选日期区间时只算区间内有活动项目合同（payDashSummary）；payOrgRanking 达成率分母同款对齐。
+  - S9 /insight + /insight/board 图表类型多选（柱/折/饼，lib/chartOptions + ChartTypeSelector）+ 图上数据值标签（补 /insight 排名、/board 交叉缺的标签）。
+  - S10 首页健康度 CARD 整合：三档计数可点下钻 + 6 类风险分类（lib/riskClassify）可展开列项目 + 下钻 /projects?riskCategory（ProjectsView filterProjectRows）。
+  - S2 /governance 两脏值（WSGF-SF-202502100199/202601160034）查清=源台账节点超收(已收>计划)+未收为负红冲，「实际比例」列源值 2.65/1.16，治理如实告警，保持现状不改码。
 - V1.16.2（2026-06-22）数据管理界面调整：彻底移除 WPS + 双数据来源
   - 拆除 WPS 同步/离线导入/PMIS 在线下载 全部在线抓取入口与脚本（fetch_yundocs_full.py、pmis_download.py）、Playwright 依赖。
   - 数据来源收敛为两条：页面上传 / 本地放置（cron 投放 input/ 与 input/pmis/ 后点「更新数据」）。

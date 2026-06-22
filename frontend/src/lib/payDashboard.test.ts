@@ -254,6 +254,26 @@ describe('payOrgRanking', () => {
       expect(o.achievementRate).toBe(0)
     }
   })
+
+  it('区间口径分母(对齐S8): 选日期区间时达成率分母只算区间内有活动项目的合同', () => {
+    // A组两项目同组: PA 区间内有活动(2026-02), PB 区间外(2026-08); 合同各 1000
+    const projects2 = [
+      { projectId: 'PA', orgL4: 'A组', paymentPmis: { contract: 1000 } },
+      { projectId: 'PB', orgL4: 'A组', paymentPmis: { contract: 1000 } },
+    ] as any
+    const nodes2 = {
+      PA: [{ planDate: '2026-02-01', expectedPayment: 500 }],
+      PB: [{ planDate: '2026-08-01', expectedPayment: 500 }],
+    } as any
+    const recs2 = {
+      PA: { records: [{ date: '2026-02-10', amount: 600 }] },
+      PB: { records: [{ date: '2026-08-05', amount: 700 }] },
+    } as any
+    const r = payOrgRanking(projects2, nodes2, recs2, '2026-01-01', '2026-06-30', 'actualTotal')
+    const a = r.find((o) => o.org === 'A组')!
+    expect(a.actualTotal).toBe(600)                    // 只 PA 区间流水
+    expect(a.achievementRate).toBeCloseTo(600 / 1000)  // 分母只含 PA 合同 1000, 不含区间外 PB
+  })
 })
 
 describe('payMonthlyTrend/payQuarterlyTrend', () => {
