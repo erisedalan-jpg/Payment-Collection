@@ -14,8 +14,7 @@ function seed() {
   useFilterStore().setPreset('all')
   data.data = {
     meta: { lastUpdate: 'x', totalProjects: 1, totalPaymentNodes: 3 },
-    dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {},
+    dashboard: {}, summary: {}, rawNodes: [],
     projects: [
       {
         projectId: 'A', projectName: '甲', projectManager: '张三', orgL4: '组1',
@@ -58,8 +57,8 @@ describe('PayProjectsView', () => {
     useFilterStore().setPreset('all')
     data.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
-      dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-      naguanExclude: {}, projects: [], projectPmis: {},
+      dashboard: {}, summary: {}, rawNodes: [],
+      projects: [], projectPmis: {},
     } as any
     const w = mount(PayProjectsView, {
       global: { plugins: [ElementPlus] },
@@ -73,8 +72,7 @@ describe('PayProjectsView', () => {
     const data = useDataStore(); useFilterStore().setPreset('all')
     data.data = {
       meta: { lastUpdate: 'x', totalProjects: 60, totalPaymentNodes: 0 },
-      dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-      naguanMap: {}, naguanExclude: {},
+      dashboard: {}, summary: {}, rawNodes: [],
       projects: Array.from({ length: 60 }, (_, i) => ({
         projectId: 'P' + i, projectName: '名' + i, projectManager: '张', orgL4: '组1',
         paymentPmis: { contract: 100, actualTotal: 50, paymentRatio: 0.5, nodeCount: 0, reachedCount: 0, delayedCount: 0 },

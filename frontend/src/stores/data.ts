@@ -23,14 +23,10 @@ export const useDataStore = defineStore('data', () => {
     }
   }
 
-  /** 清空业务数据（projectOverview.projects），保留平台配置（meta/列定义）。忠实移植 clearData 的内存清空。 */
+  /** 清空内存业务数据（projects），保留 meta。忠实移植 clearData 的内存清空。 */
   function clearBusinessData() {
     if (!data.value) return
-    const ov = (data.value.projectOverview ?? {}) as Record<string, any>
-    data.value = {
-      ...data.value,
-      projectOverview: { ...ov, projects: [] } as any,
-    }
+    data.value = { ...data.value, projects: [] }
   }
 
   /** 强制重拉 analysis_data.json（绕过 loading 守卫 + 时间戳防缓存）。忠实移植 reloadData 的数据热更新。 */

@@ -33,8 +33,7 @@ function seed() {
       P1: { progress: { 项目阶段: '实施' }, customer: { 行业: '金融' }, status: { 项目级别: 'A级' } },
       P2: { progress: { 项目阶段: '验收' }, customer: { 行业: '政务' }, status: { 项目级别: 'B级' } },
     },
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    displayColumns: {}, followupRecords: {},
     paymentNodes: {
       P1: [
         { planDate: '2026-01-01', expectedPayment: 600000, unpaidAmount: 400000, status: '延期', reached: false },

@@ -18,8 +18,7 @@ function seed() {
     paymentNodes: { P1: [
       { stage: '到货款', planDate: '2026-02-10', actualDate: '', payRatio: 0.5, expectedPayment: 1000000, receivedAmount: 0, unpaidAmount: 500000, status: '待回款' },
     ] },
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    displayColumns: {}, followupRecords: {},
   } as any
 }
 

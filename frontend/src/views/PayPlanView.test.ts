@@ -13,7 +13,7 @@ function seed() {
       { projectId: 'B', projectName: '乙', orgL4: '组1', payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 100, actualTotal: 50 } },
       { projectId: 'C', projectName: '丙', orgL4: '组2', payment: { paymentRatio: 0 }, paymentPmis: { contract: 100, actualTotal: 0 } },
     ],
-    projectPmis: {}, naguanExclude: {},
+    projectPmis: {},
   } as any
 }
 
@@ -27,7 +27,7 @@ describe('PayPlanView(回款进度)', () => {
     expect(w.text()).toContain('未回款')
   })
   it('空数据不崩', () => {
-    const data = useDataStore(); data.data = { projects: [], projectPmis: {}, naguanExclude: {} } as any
+    const data = useDataStore(); data.data = { projects: [], projectPmis: {} } as any
     expect(mount(PayPlanView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
   it('分页:超过页大小手写表只渲染一页', () => {
@@ -37,7 +37,7 @@ describe('PayPlanView(回款进度)', () => {
         projectId: 'P' + i, projectName: '名' + i, orgL4: '组1',
         payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 100, actualTotal: 50 },
       })),
-      projectPmis: {}, naguanExclude: {},
+      projectPmis: {},
     } as any
     const w = mount(PayPlanView, { global: { plugins: [ElementPlus] } })
     expect(w.findAll('tr.prow').length).toBe(50)

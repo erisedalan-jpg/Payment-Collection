@@ -28,8 +28,8 @@ beforeEach(() => {
 function seed() {
   const ds = useDataStore()
   ds.data = {
-    meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    meta: {}, dashboard: {}, summary: {},
+    displayColumns: {}, followupRecords: {},
     rawNodes: [
       { projectId: 'P-1', nodeName: '初验款', planDate: '2026-03-31', expectedPayment: 500000, actualPayment: 0, nodeStatus: '延期', delayDays: 30, tier: '50-100万', isPaymentRelated: true, expectedMilestoneDate: '2026-03-01', isMilestoneAchieved: '否', completionStatus: '未到期' },
       { projectId: 'OLD-9', nodeName: '终验款', planDate: '2024-01-01', expectedPayment: 200000, actualPayment: 200000, nodeStatus: '已全额回款', tier: '50万以下', isPaymentRelated: true },

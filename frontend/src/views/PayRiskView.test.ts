@@ -18,7 +18,7 @@ function seed() {
         paymentPmis: { contract: 1_000_000, actualTotal: 900_000 } },
     ],
     paymentNodes: { A: [{ stage: '终验', planDate: '2026-05-01', status: '延期', expectedPayment: 100 }] },
-    projectPmis: {}, naguanExclude: {},
+    projectPmis: {},
   } as any
 }
 
@@ -34,7 +34,7 @@ describe('PayRiskView(PMIS 风险三类)', () => {
     expect(w.text()).toContain('共 1 条')
   })
   it('空数据不崩', () => {
-    const data = useDataStore(); data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
+    const data = useDataStore(); data.data = { projects: [], paymentNodes: {}, projectPmis: {} } as any
     expect(mount(PayRiskView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 })

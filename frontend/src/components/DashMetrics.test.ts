@@ -12,8 +12,7 @@ describe('DashMetrics', () => {
     const ds = useDataStore()
     ds.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
-      rawNodes: [], projectOverview: { projects: [], columns: [] },
-      naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+      rawNodes: [], displayColumns: {}, followupRecords: {},
       projects: [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } }],
       projectPmis: {},
       paymentNodes: { P1: [
@@ -40,8 +39,7 @@ describe('DashMetrics', () => {
     const ds = useDataStore()
     ds.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
-      rawNodes: [], projectOverview: { projects: [], columns: [] },
-      naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+      rawNodes: [], displayColumns: {}, followupRecords: {},
       projects: [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } }],
       projectPmis: {},
       paymentNodes: { P1: [

@@ -22,8 +22,8 @@ beforeEach(() => {
 function seed(over: Record<string, any> = {}) {
   const ds = useDataStore()
   ds.data = {
-    meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {},
+    meta: {}, dashboard: {}, summary: {}, rawNodes: [],
+    displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {},
     events: [
       { date: '2026-06-11', type: '到账', domain: 'payment', projectId: 'P-1', projectName: '甲', summary: '「初验款」到账 25 万' },
       { date: '2026-06-10', type: '阶段变更', domain: 'project', projectId: 'P-2', projectName: '乙', summary: '项目规划 → 项目执行' },

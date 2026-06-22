@@ -16,8 +16,7 @@ function seed() {
   const ds = useDataStore()
   ds.data = {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
-    rawNodes: [], projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    rawNodes: [], displayColumns: {}, followupRecords: {},
     projects: [
       { projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: '北京', paymentPmis: { contract: 2000000 } },
       { projectId: 'P2', projectName: '乙', projectManager: '李', orgL4: '上海', paymentPmis: { contract: 300000 } },

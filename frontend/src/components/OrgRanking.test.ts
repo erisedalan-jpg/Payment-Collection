@@ -24,8 +24,7 @@ function seed() {
       P1: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.8, expectedPayment: 1000000, receivedAmount: 800000, unpaidAmount: 200000, status: '部分回款' }],
       P2: [{ stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.1, expectedPayment: 1000000, receivedAmount: 100000, unpaidAmount: 900000, status: '部分回款' }],
     },
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    displayColumns: {}, followupRecords: {},
   } as any
 }
 
@@ -48,8 +47,7 @@ function seedMany(n: number) {
   ds.data = {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
     rawNodes: [], projects, projectPmis: {}, paymentNodes,
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    displayColumns: {}, followupRecords: {},
   } as any
 }
 

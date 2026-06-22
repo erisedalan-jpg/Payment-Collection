@@ -11,8 +11,7 @@ const SAMPLE = {
     { projectId: 'P1', orgL4: '北京服务组', projectManager: '张三', planMonth: '2026-02' },
     { projectId: 'P2', orgL4: '上海一服务组', projectManager: '李四', planMonth: '2027-05' },
   ],
-  projectOverview: { projects: [], columns: [] },
-  naguanMap: {}, naguanExclude: { P2: true }, displayColumns: {}, followupRecords: {},
+  displayColumns: {}, followupRecords: {},
 }
 
 beforeEach(() => {
@@ -112,8 +111,8 @@ describe('filteredPayNodes(3B)', () => {
   it('随 viewMode/dateRange 过滤收款阶段节点', () => {
     const ds = useDataStore()
     ds.data = {
-      meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] },
-      naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, rawNodes: [],
+      meta: {}, dashboard: {}, summary: {},
+      displayColumns: {}, followupRecords: {}, rawNodes: [],
       projects: [
         { projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } },
         { projectId: 'P2', projectName: '乙', projectManager: '李四', orgL4: 'B组', paymentPmis: { contract: 100000 } },

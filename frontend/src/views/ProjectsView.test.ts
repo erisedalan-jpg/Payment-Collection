@@ -28,8 +28,8 @@ beforeEach(() => {
 function seed() {
   const ds = useDataStore()
   ds.data = {
-    meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    meta: {}, dashboard: {}, summary: {}, rawNodes: [],
+    displayColumns: {}, followupRecords: {},
     projects: [
       { projectId: 'P-1', projectName: '终端安全', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '',
         payment: { relatedNodeCount: 2, expectedTotal: 100, actualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 },
@@ -89,7 +89,7 @@ describe('ProjectsView', () => {
 
   it('projects 为空 → 空态提示', () => {
     const ds = useDataStore()
-    ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] }, naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {} } as any
+    ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {} } as any
     const w = mountView()
     expect(w.text()).toContain('暂无项目主域数据')
   })
@@ -264,8 +264,8 @@ describe('ProjectsView', () => {
   it('orgL4 空项目渲染「数据异常」标记，正常项目不渲染', async () => {
     const ds = useDataStore()
     ds.data = {
-      meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-      naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+      meta: {}, dashboard: {}, summary: {}, rawNodes: [],
+      displayColumns: {}, followupRecords: {},
       projects: [
         { projectId: 'NORMAL', projectName: '正常项目', projectManager: '甲', orgL4: 'A组', isPresale: false, relatedClosedId: '',
           payment: { relatedNodeCount: 1, expectedTotal: 100, actualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 }, health: { overall: '健康' } },

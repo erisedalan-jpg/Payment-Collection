@@ -15,8 +15,7 @@ function seed() {
   const data = useDataStore()
   data.data = {
     meta: { lastUpdate: 'x', totalProjects: 2, totalPaymentNodes: 4 },
-    dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {},
+    dashboard: {}, summary: {}, rawNodes: [],
     projects: [
       {
         projectId: 'P1',
@@ -176,8 +175,7 @@ describe('PaymentL4Table', () => {
     const data = useDataStore()
     data.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
-      dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-      naguanMap: {}, naguanExclude: {},
+      dashboard: {}, summary: {}, rawNodes: [],
       projects: [],
       projectPmis: {},
       paymentNodes: {},

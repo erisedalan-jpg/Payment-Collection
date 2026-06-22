@@ -17,8 +17,7 @@ function seed() {
     dashboard: {}, summary: {},
     rawNodes: [],
     projects: [{ projectId: 'P1', orgL4: '北京服务组', projectManager: '张三' }],
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    displayColumns: {}, followupRecords: {},
   } as any
 }
 
