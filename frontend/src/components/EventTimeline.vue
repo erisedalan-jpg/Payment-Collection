@@ -2,11 +2,14 @@
 import { computed } from 'vue'
 import type { Event } from '@/types/analysis'
 import { groupEventsByDate } from '@/lib/activity'
+import { fmtWan } from '@/lib/format'
 
-const props = withDefaults(defineProps<{ events: Event[]; emptyText?: string }>(), {
+interface PidInfo { projectManager?: string; orgL4?: string; overspendAmount?: number | null }
+const props = withDefaults(defineProps<{ events: Event[]; emptyText?: string; pidInfo?: Record<string, PidInfo> }>(), {
   emptyText: '暂无动态',
 })
 const groups = computed(() => groupEventsByDate(props.events))
+function meta(pid?: string): PidInfo | undefined { return pid ? props.pidInfo?.[pid] : undefined }
 </script>
 
 <template>
@@ -17,6 +20,11 @@ const groups = computed(() => groupEventsByDate(props.events))
       <div v-for="(e, i) in g.items" :key="`${g.date}-${i}`" class="ev-item">
         <span class="ev-type" :class="e.tone ? `tone-${e.tone}` : (e.domain === 'payment' ? 'pay' : 'proj')">{{ e.type }}</span>
         <RouterLink v-if="e.projectId" class="ev-proj" :to="`/project/${e.projectId}`">{{ e.projectName || e.projectId }}</RouterLink>
+        <span v-if="meta(e.projectId)" class="ev-meta">
+          <span v-if="meta(e.projectId)!.projectManager" class="ev-meta-i">{{ meta(e.projectId)!.projectManager }}</span>
+          <span v-if="meta(e.projectId)!.orgL4" class="ev-meta-i">{{ meta(e.projectId)!.orgL4 }}</span>
+          <span v-if="(meta(e.projectId)!.overspendAmount ?? 0) > 0" class="ev-meta-i ev-meta-over">超支 {{ fmtWan(meta(e.projectId)!.overspendAmount) }} 万</span>
+        </span>
         <span class="ev-summary">{{ e.summary }}</span>
       </div>
     </div>
@@ -36,5 +44,8 @@ const groups = computed(() => groupEventsByDate(props.events))
 .ev-type.tone-danger { background: var(--danger-bg); color: var(--danger-text); }
 .ev-proj { color: var(--accent); text-decoration: none; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .ev-proj:hover { text-decoration: underline; }
+.ev-meta { display: inline-flex; gap: var(--sp-1); flex-wrap: wrap; flex-shrink: 0; }
+.ev-meta-i { font-size: var(--fs-1); color: var(--mut); padding: 0 var(--sp-1); border: 1px solid var(--line); border-radius: var(--r-sm); line-height: 1.7; }
+.ev-meta-over { color: var(--danger-text); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .ev-summary { color: var(--txt); min-width: 0; overflow-wrap: anywhere; }
 </style>
