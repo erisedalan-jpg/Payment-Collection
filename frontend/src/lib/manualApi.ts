@@ -1,4 +1,5 @@
 import { api } from '@/api/client'
+import { apiUrl } from '@/lib/baseUrl'
 
 export interface ManualError { sheet: string; row: number; col?: string; message: string }
 export interface ImportResp {
@@ -14,7 +15,7 @@ async function importManual(
   sheets: Record<string, string[][]>,
   fileName: string,
 ): Promise<ImportResp> {
-  const res = await fetch('/api/manual/import', {
+  const res = await fetch(apiUrl('/api/manual/import'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sheets, fileName }),

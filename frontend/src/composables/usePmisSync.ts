@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { apiUrl } from '@/lib/baseUrl'
 
 export const PMIS_FILE_NAMES = [
   '项目中心.xlsx', '项目基础信息数据.xlsx', '项目状态信息数据.xlsx', '项目风险数据.xlsx',
@@ -12,7 +12,7 @@ export function usePmisSync() {
     for (const f of files) {
       if (!PMIS_FILE_NAMES.includes(f.name)) continue
       const buf = await f.arrayBuffer()
-      const res = await fetch('/api/pmis/upload?name=' + encodeURIComponent(f.name), {
+      const res = await fetch(apiUrl('/api/pmis/upload') + '?name=' + encodeURIComponent(f.name), {
         method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: buf,
       })
       if (res.ok) ok++

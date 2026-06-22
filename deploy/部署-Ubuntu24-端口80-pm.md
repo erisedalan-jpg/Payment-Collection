@@ -12,9 +12,9 @@
 ---
 
 ## /pm 路径前缀做了什么(原理,便于排障)
-- 前端用 `--base=/pm/` 构建 → index.html 资源引用 `/pm/assets/...`;Vue Router 经 `import.meta.env.BASE_URL` 自动以 `/pm/` 为 base(代码已改,默认 `/` 不受影响)。
-- nginx:`/pm/` location 去掉前缀转发给 app(app 内部仍以根服务 SPA);`/api`、`/data` 在根路径转发给 app(前端 fetch 用绝对路径 /api、/data,不带 /pm)。
-- 故 app(server.py)无需改动,继续绑 127.0.0.1:8080、以根提供 SPA + /api + /data。
+- 前端用 `--base=/pm/` 构建 → index.html 资源引用 `/pm/assets/...`;Vue Router 经 `import.meta.env.BASE_URL` 自动以 `/pm/` 为 base;**所有接口/数据请求也都加了 `/pm` 前缀**(经 `lib/baseUrl.apiUrl`,如 `/pm/api/login`、`/pm/data/analysis_data.json`)。默认 `/` 构建时这些前缀为空,行为不变。
+- nginx:**唯一一个 `/pm/` location**,把 `/pm/xxx` 去掉前缀转给 app(`proxy_pass http://127.0.0.1:8080/` 末尾的 / 负责重写)。本系统**完全不占用根路径 `/api`、`/data`**,可与同机其它系统共存。
+- 故 app(server.py)无需改动,继续绑 127.0.0.1:8080、以根提供 SPA + /api + /data;前缀的加/去全在前端构建与 nginx 两端完成。
 
 ## 1. 系统准备
 ```bash
@@ -76,12 +76,14 @@ sudo systemctl status pmplatform          # 应为 active (running)
 - 日志:`journalctl -u pmplatform -f` 或 `/opt/pmplatform/log/server.log`。
 
 ## 7. nginx(端口 80 + /pm)
+因服务器共享、本系统只接管 `/pm/`(不占根路径),**推荐把 `deploy/nginx-pmplatform-port80-pm.conf` 里的 `location /pm/` 片段粘进现有监听 80 的 server 块**(别的系统已有的那个),而非新增 catch-all server(`server_name _` 会抢占别的系统):
 ```bash
-sudo cp /opt/pmplatform/deploy/nginx-pmplatform-port80-pm.conf /etc/nginx/sites-available/pmplatform
-sudo ln -s /etc/nginx/sites-available/pmplatform /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default      # 去掉默认站点,释放 80
+# 看现有站点(找到监听 80 的 server 块所在文件)
+ls /etc/nginx/sites-enabled/  ;  sudo nginx -T | grep -n "listen 80" -A2
+# 编辑那个文件,把 conf 中「用法 A」的 location = /pm 与 location /pm/ 两段粘进其 server { } 内
 sudo nginx -t && sudo systemctl reload nginx
 ```
+若本系统独占某域名/IP,则改用 conf 中「用法 B」的独立 server 块(填专用 server_name)。
 
 ## 8. 防火墙
 ```bash
@@ -89,11 +91,11 @@ sudo ufw allow 80/tcp                              # 或限网段: sudo ufw allo
 ```
 
 ## 9. 上线验证清单
-- [ ] systemctl status pmplatform = running;`curl -I http://<IP>/pm/` 返回 200,`curl -I http://<IP>/` 返回 301 → /pm/
+- [ ] systemctl status pmplatform = running;`curl -I http://<IP>/pm/` 返回 200;同机其它系统的根路径 `curl -I http://<IP>/` 不受影响
 - [ ] 浏览器开 http://<IP>/pm → 登录页;用改后的超管口令登录,旧弱口令已失效
 - [ ] 登录后各页路由形如 http://<IP>/pm/payment、刷新不 404(SPA fallback OK)
-- [ ] Network 面板:/pm/assets/*.js 200;/data/analysis_data.json 200 且响应头含 Content-Encoding: gzip;/api/auth/me 200
-- [ ] 新建受限管理员(限某 L4 + 页面):只看到其 L4 数据;`curl http://<IP>/data/accounts.json -H Cookie:...` 返回 403;/api/clear-data 等运维端点 403
+- [ ] Network 面板:/pm/assets/*.js 200;**/pm/data/analysis_data.json** 200 且响应头含 Content-Encoding: gzip;**/pm/api/auth/me** 200(都带 /pm 前缀)
+- [ ] 新建受限管理员(限某 L4 + 页面):只看到其 L4 数据;`curl http://<IP>/pm/data/accounts.json -H Cookie:...` 返回 403;`/pm/api/clear-data` 等运维端点 403
 - [ ] 「数据管理 → 更新数据」进度条实时刷新(SSE 透传 OK)
 
 ## 10. 数据备份(关键本地数据都在 data/)

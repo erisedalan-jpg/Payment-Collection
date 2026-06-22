@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AnalysisData } from '@/types/analysis'
+import { apiUrl } from '@/lib/baseUrl'
 
 // 数据源：preprocess_data.py 生成的 data/analysis_data.json（开发期经 Vite 代理到 :8080）
 export const useDataStore = defineStore('data', () => {
@@ -13,7 +14,7 @@ export const useDataStore = defineStore('data', () => {
     loading.value = true
     error.value = null
     try {
-      const res = await fetch('/data/analysis_data.json?t=' + Date.now())
+      const res = await fetch(apiUrl('/data/analysis_data.json') + '?t=' + Date.now())
       if (!res.ok) throw new Error(`加载数据失败 HTTP ${res.status}`)
       data.value = (await res.json()) as AnalysisData
     } catch (e) {
@@ -33,7 +34,7 @@ export const useDataStore = defineStore('data', () => {
   async function reload() {
     error.value = null
     try {
-      const res = await fetch('/data/analysis_data.json?t=' + Date.now())
+      const res = await fetch(apiUrl('/data/analysis_data.json') + '?t=' + Date.now())
       if (!res.ok) throw new Error(`加载数据失败 HTTP ${res.status}`)
       data.value = (await res.json()) as AnalysisData
     } catch (e) {

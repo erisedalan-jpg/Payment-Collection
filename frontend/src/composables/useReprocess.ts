@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { apiUrl } from '@/lib/baseUrl'
 
 export function useReprocess(opts: { onDone?: () => void } = {}) {
   const progress = ref(0)
@@ -8,7 +9,7 @@ export function useReprocess(opts: { onDone?: () => void } = {}) {
   async function start() {
     running.value = true; progress.value = 0
     try {
-      const res = await fetch('/api/reprocess')
+      const res = await fetch(apiUrl('/api/reprocess'))
       if (!res.ok) { message.value = `更新失败 (${res.status})`; return }
       const reader = res.body?.getReader()
       if (!reader) { message.value = '无响应体'; return }
