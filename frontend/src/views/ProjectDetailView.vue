@@ -110,9 +110,11 @@ const pmisPaySummary = computed(() => {
 })
 const PMIS_NODE_COLS: DataColumn[] = [
   { key: 'stage', label: '回款阶段' },
+  { key: 'category', label: '回款类型', formatter: (v) => (v ? String(v) : '-') },
   { key: 'planDate', label: '计划日期', formatter: (v) => fmtDateCell(v) },
   { key: 'actualDate', label: '实际日期', formatter: (v) => fmtDateCell(v) },
   { key: 'payRatio', label: '计划比例', formatter: (v) => fmtRatio(v) },
+  { key: 'actualRatio', label: '实际比例', formatter: (v) => fmtRatio(v) },
   { key: 'expectedPayment', label: '计划回款(万)', formatter: (v) => fmtWan(v as number) },
   { key: 'receivedAmount', label: '已收(万)', formatter: (v) => fmtWan(v as number) },
   { key: 'unpaidAmount', label: '未收(万)', formatter: (v) => fmtWan(v as number) },

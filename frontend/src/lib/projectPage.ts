@@ -26,17 +26,20 @@ export function buildProjectPage(
   }
 }
 
-// 风险明细列裁剪（真实表头 43 列 → 10 列；键名以 项目风险数据.xlsx 实际表头为准）
-export const RISK_COLUMNS: { key: string; label: string; width?: number; date?: boolean }[] = [
+// 风险明细列裁剪（真实表头 43 列 → 13 列；键名以 项目风险数据.xlsx 实际表头为准）
+export const RISK_COLUMNS: { key: string; label: string; width?: number; date?: boolean; wrap?: boolean }[] = [
   { key: '风险编码', label: '编码', width: 110 },
   { key: '风险名称', label: '风险名称' },
+  { key: '风险描述', label: '风险描述', width: 280, wrap: true },
   { key: '风险等级', label: '等级', width: 70 },
   { key: '风险状态', label: '状态', width: 90 },
   { key: '风险大类', label: '大类', width: 110 },
+  { key: '风险小类', label: '小类', width: 160 },
   { key: '识别日期', label: '识别日期', width: 100, date: true },
   { key: '计划应对完成日期', label: '计划应对', width: 100, date: true },
   { key: '实际应对完成日期', label: '实际应对', width: 100, date: true },
   { key: '是否超期', label: '超期', width: 70 },
+  { key: '待办任务', label: '待办任务', width: 240, wrap: true },
   { key: '责任人', label: '责任人', width: 90 },
 ]
 
