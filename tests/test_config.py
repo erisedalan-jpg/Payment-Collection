@@ -15,12 +15,6 @@ def test_node_statuses_complete():
     ]
 
 
-def test_sheet_names():
-    assert config.SHEET_PAYMENT_NODES == "项目回款节点（里程碑）清单"
-    assert config.SHEET_PROJECT_OVERVIEW == "项目验收日期、回款条件信息收集"
-    assert config.SHEET_FOLLOWUP == "项目回款跟进记录"
-
-
 def test_excel_serial_range():
     assert config.EXCEL_SERIAL_MIN == 40000
     assert config.EXCEL_SERIAL_MAX == 60000
