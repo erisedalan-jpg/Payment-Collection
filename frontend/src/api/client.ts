@@ -1,4 +1,6 @@
 // 统一 API 客户端：消费后端 {success, code, message} 错误约定（见 server.py _error_payload）
+import { apiUrl } from '@/lib/baseUrl'
+
 export class ApiRequestError extends Error {
   code: string
   constructor(code: string, message: string) {
@@ -9,7 +11,7 @@ export class ApiRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init)
+  const res = await fetch(apiUrl(path), init)
   let data: any = null
   try {
     data = await res.json()

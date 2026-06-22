@@ -1,3 +1,5 @@
+import { apiUrl } from '@/lib/baseUrl'
+
 export interface AuthUser {
   account: string
   displayName: string
@@ -15,7 +17,7 @@ export interface AuthResult {
 /** 登录:POST /api/login。成功带回 user(含权限集);失败带 message。 */
 export async function authenticate(account: string, password: string): Promise<AuthResult> {
   try {
-    const res = await fetch('/api/login', {
+    const res = await fetch(apiUrl('/api/login'), {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -32,7 +34,7 @@ export async function authenticate(account: string, password: string): Promise<A
 /** 取当前登录用户(GET /api/auth/me,带 cookie);未登录或异常→null。 */
 export async function fetchMe(): Promise<AuthUser | null> {
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
+    const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'same-origin' })
     if (!res.ok) return null
     const data = await res.json().catch(() => ({}))
     return data.success ? (data.user as AuthUser) : null
@@ -44,7 +46,7 @@ export async function fetchMe(): Promise<AuthUser | null> {
 /** 登出(POST /api/logout,清服务端会话与 cookie)。 */
 export async function logoutApi(): Promise<void> {
   try {
-    await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+    await fetch(apiUrl('/api/logout'), { method: 'POST', credentials: 'same-origin' })
   } catch {
     // 登出失败不阻断前端清态
   }

@@ -1,3 +1,5 @@
+import { apiUrl } from '@/lib/baseUrl'
+
 export interface AdminAccount {
   account: string
   displayName: string
@@ -7,7 +9,7 @@ export interface AdminAccount {
 }
 
 async function postJson(url: string, body: unknown): Promise<void> {
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
@@ -18,7 +20,7 @@ async function postJson(url: string, body: unknown): Promise<void> {
 }
 
 export async function listAccounts(): Promise<AdminAccount[]> {
-  const res = await fetch('/api/admin/accounts', { credentials: 'same-origin' })
+  const res = await fetch(apiUrl('/api/admin/accounts'), { credentials: 'same-origin' })
   const data = await res.json().catch(() => ({}))
   if (!res.ok || !data.success) throw new Error(data.message || '获取账号列表失败')
   return data.accounts as AdminAccount[]
