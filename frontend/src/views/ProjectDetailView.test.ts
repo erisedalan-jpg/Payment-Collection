@@ -329,6 +329,8 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('延期')
     expect(w.text()).toContain('收款条件')          // 列表头
     expect(w.text()).toContain('到货后20天内付款70%') // 收款条件全文显示
+    expect(w.text()).toContain('回款类型')           // S7 新增列表头
+    expect(w.text()).toContain('实际比例')           // S7 新增列表头
   })
 
   it('渲染项目标签块，显示已挂标签(2C)', async () => {
