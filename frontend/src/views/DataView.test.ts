@@ -14,20 +14,10 @@ vi.mock('@/lib/manualApi', () => ({
   },
 }))
 
-const DEFAULTS = {
-  回款数据: 'https://yundocs.qianxin-inc.cn/weboffice/l/sRs8GgCmE2ygb',
-  '项目状态信息数据.xlsx': 'https://pmis.example/status0',
-  '项目状态信息数据-已关闭.xlsx': 'https://pmis.example/status1',
-  '项目风险数据.xlsx': 'https://pmis.example/risk',
-}
-
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     const u = String(url)
-    if (u.includes('/api/pmis/links')) {
-      return { ok: true, json: async () => ({ links: { ...DEFAULTS }, defaults: { ...DEFAULTS } }) } as any
-    }
     if (u.includes('/api/files/status')) {
       return { ok: true, json: async () => ({ files: { '项目状态信息数据.xlsx': '2026-06-12 14:09', '项目中心.xlsx': null, 'payment_records.csv': '2026-06-12 14:46' } }) } as any
     }
@@ -43,63 +33,74 @@ async function mountView() {
   return w
 }
 
-describe('DataView(R3 重排)', () => {
-  it('五卡结构与时间行', async () => {
+describe('DataView(两条来源重构)', () => {
+  it('顶部时间行渲染', async () => {
     const w = await mountView()
-    const heads = w.findAll('.dv-card-head').map((n) => n.text())
-    expect(heads.some((t) => t.includes('回款数据'))).toBe(true)
-    expect(heads.some((t) => t.includes('PMIS'))).toBe(true)
-    expect(heads.some((t) => t.includes('项目域文件'))).toBe(true)
-    expect(heads.some((t) => t.includes('更新数据'))).toBe(true)
-    expect(heads.some((t) => t.includes('设置'))).toBe(true)
     expect(w.text()).toContain('2026-06-12 16:40')
   })
 
-  it('WPS 默认链接预填+重置按钮', async () => {
+  it('数据来源说明卡存在且含两种方式说明', async () => {
     const w = await mountView()
-    const input = w.find('[data-test="wps-input"]').element as HTMLInputElement
-    expect(input.value).toContain('yundocs.qianxin-inc.cn')
-    expect(w.find('[data-test="wps-reset"]').exists()).toBe(true)
+    const heads = w.findAll('.dv-card-head').map((n) => n.text())
+    expect(heads.some((t) => t.includes('数据来源'))).toBe(true)
+    expect(w.text()).toContain('页面导入')
+    expect(w.text()).toContain('本地放置')
   })
 
-  it('PMIS 九行:直链项有输入+重置,无直链项有徽章,行内时间', async () => {
+  it('数据文件清单卡存在，含 PMIS 九表与项目域文件分区', async () => {
+    const w = await mountView()
+    const heads = w.findAll('.dv-card-head').map((n) => n.text())
+    expect(heads.some((t) => t.includes('数据文件清单'))).toBe(true)
+    expect(w.text()).toContain('PMIS 九表')
+    expect(w.text()).toContain('项目域文件')
+  })
+
+  it('PMIS 九行渲染', async () => {
     const w = await mountView()
     const rows = w.findAll('[data-test="pmis-row"]')
     expect(rows).toHaveLength(9)
-    const statusRow = rows.find((r) => r.text().includes('项目状态信息数据.xlsx'))!
-    expect((statusRow.find('input').element as HTMLInputElement).value).toContain('pmis.example/status0')
-    expect(statusRow.text()).toContain('2026-06-12 14:09')
-    const centerRow = rows.find((r) => r.text().includes('项目中心.xlsx'))!
-    expect(centerRow.find('input').exists()).toBe(false)
-    expect(centerRow.text()).toContain('需手动导出上传')
-    expect(centerRow.text()).toContain('-')   // 无文件时间
     const msRow = rows.find((r) => r.text().includes('在建项目里程碑计划数据'))
     expect(msRow).toBeTruthy()
   })
 
-  it('重置把链接恢复为默认值', async () => {
+  it('数据文件清单展示核心回款源 collection_stages.csv', async () => {
     const w = await mountView()
-    const statusRow = w.findAll('[data-test="pmis-row"]').find((r) => r.text().includes('项目状态信息数据.xlsx'))!
-    const input = statusRow.find('input')
-    await input.setValue('http://changed')
-    await statusRow.find('[data-test="link-reset"]').trigger('click')
-    expect((input.element as HTMLInputElement).value).toBe('https://pmis.example/status0')
+    expect(w.find('[data-test="files-card"]').text()).toContain('collection_stages.csv')
   })
 
-  it('项目域文件卡列出 7 文件与时间', async () => {
+  it('项目域文件区含 组织架构.xlsx 与 payment_records.csv', async () => {
     const w = await mountView()
-    const card = w.find('[data-test="inputs-card"]')
+    const card = w.find('[data-test="files-card"]')
     expect(card.text()).toContain('组织架构.xlsx')
     expect(card.text()).toContain('payment_records.csv')
     expect(card.text()).toContain('budget_data.csv')
     expect(card.text()).toContain('2026-06-12 14:46')
   })
 
-  it('挂载即拉 links 与 files/status', async () => {
+  it('无 WPS/云同步/在线下载/离线导入入口', async () => {
+    const w = await mountView()
+    const heads = w.findAll('.dv-card-head').map((n) => n.text())
+    expect(heads.some((t) => t.includes('WPS') || t.includes('云文档'))).toBe(false)
+    expect(w.find('[data-test="wps-input"]').exists()).toBe(false)
+    expect(w.find('[data-test="wps-reset"]').exists()).toBe(false)
+    expect(w.find('[data-test="link-reset"]').exists()).toBe(false)
+    expect(w.text()).not.toContain('在线下载')
+    expect(w.text()).not.toContain('云同步')
+    expect(w.text()).not.toContain('离线导入')
+  })
+
+  it('挂载仅拉 files/status，不再拉 pmis/links', async () => {
     await mountView()
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
-    expect(calls.some((u: string) => u.includes('/api/pmis/links'))).toBe(true)
     expect(calls.some((u: string) => u.includes('/api/files/status'))).toBe(true)
+    expect(calls.some((u: string) => u.includes('/api/pmis/links'))).toBe(false)
+  })
+
+  it('更新数据卡与设置卡保留', async () => {
+    const w = await mountView()
+    const heads = w.findAll('.dv-card-head').map((n) => n.text())
+    expect(heads.some((t) => t.includes('更新数据'))).toBe(true)
+    expect(heads.some((t) => t.includes('设置'))).toBe(true)
   })
 
   it('渲染「人工数据导入 / 回滚」卡', async () => {
@@ -129,7 +130,6 @@ describe('DataView(R3 重排)', () => {
     await flushPromises()
     expect(w.text()).toContain('项目标签')
     expect(w.text()).toContain('按标签排除')
-    // tag 名称渲染在 input[value] 属性上，用 html() 检查
     expect(w.html()).toContain('BH项目')
   })
 })
