@@ -258,9 +258,6 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
 .dv-fname { width: 230px; flex-shrink: 0; color: var(--txt); word-break: break-all; }
 .dv-ftime { margin-left: auto; color: var(--mut); font-size: var(--fs-1); flex-shrink: 0; }
 .dv-label { width: 70px; flex-shrink: 0; color: var(--sub); font-weight: 600; font-size: var(--fs-1); }
-.dv-link { flex: 1; min-width: 200px; border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-1); color: var(--txt); outline: none; }
-.dv-link:focus { border-color: var(--accent); }
-.dv-badge { font-size: var(--fs-1); padding: 1px var(--sp-2); border-radius: var(--r-full); background: var(--warn-bg); color: var(--warn-text); white-space: nowrap; }
 .dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); cursor: pointer; color: var(--txt); }
 .dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .dv-btn.ghost { color: var(--sub); }
@@ -272,11 +269,7 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
 .dv-progress { padding: 0 var(--sp-4) var(--sp-3); }
 .dv-bar { height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .dv-bar-fill { height: 100%; background: var(--accent); transition: width var(--dur-2) var(--ease); }
-.dv-bar-fill.done { background: var(--ok); }
-.dv-bar-fill.error { background: var(--danger); }
 .dv-msg { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-2); }
-.dv-msg.done { color: var(--ok-text); }
-.dv-msg.error { color: var(--danger-text); }
 .dv-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
 @media (max-width: 768px) { .dv-grid2 { grid-template-columns: 1fr; } }
 .dv-tags-mgr { flex-wrap: wrap; gap: var(--sp-2); }
