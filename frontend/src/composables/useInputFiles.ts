@@ -1,6 +1,7 @@
 export const INPUT_FILE_NAMES = [
   '组织架构.xlsx', 'A.xlsx', 'delivery_analysis.csv', 'delivery_analysis.xlsx',
   'payment_records.csv', 'profit_loss_direct.csv', 'profit_loss_bridge.csv', 'budget_data.csv',
+  'collection_stages.csv',
 ]
 
 /** 项目主域三输入文件上传(组织架构/项目映射/预算核算)。白名单外文件跳过。 */
