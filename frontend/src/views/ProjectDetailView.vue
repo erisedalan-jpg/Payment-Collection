@@ -174,9 +174,9 @@ const profit = computed(() =>
 const profitSummary = computed(() => {
   const s = (profit.value?.summary ?? {}) as Record<string, number | null>
   return [
-    { k: '预算收入(万)', v: fmtWan(s.预算收入) },
-    { k: '实际成本(万)', v: fmtWan(s.实际成本) },
-    { k: '预算毛利(万)', v: fmtWan(s.预算毛利) },
+    { k: '预算收入(元)', v: fmtYuan(s.预算收入) },
+    { k: '实际成本(元)', v: fmtYuan(s.实际成本) },
+    { k: '预算毛利(元)', v: fmtYuan(s.预算毛利) },
     { k: '预算毛利率', v: fmtRatio(s.预算毛利率) },
   ]
 })
@@ -184,9 +184,9 @@ const bridge = computed(() => profit.value?.bridge ?? null)
 const bridgeSummary = computed(() => {
   const s = (bridge.value?.summary ?? {}) as Record<string, number | null>
   return [
-    { k: '预算收入(万)', v: fmtWan(s.预算收入) },
-    { k: '预算成本(万)', v: fmtWan(s.预算成本) },
-    { k: '实际成本(万)', v: fmtWan(s.实际成本) },
+    { k: '预算收入(元)', v: fmtYuan(s.预算收入) },
+    { k: '预算成本(元)', v: fmtYuan(s.预算成本) },
+    { k: '实际成本(元)', v: fmtYuan(s.实际成本) },
     { k: '预算毛利率', v: fmtRatio(s.预算毛利率) },
   ]
 })
@@ -223,7 +223,9 @@ const COST_COLS: DataColumn[] = [
   { key: '剩余预算', label: '剩余预算(元)', formatter: (v) => fmtYuan(v as number) },
   { key: '消耗率', label: '消耗率', formatter: (v) => fmtRatio(v) },
 ]
-const costRows = computed(() => (p.value?.deliveryCosts ?? []) as Record<string, any>[])
+// 去掉「项目直接成本」行:直接成本已拆分到 差旅费/业务招待费/本地交通及通讯费/其他费用 四项,避免与子项重复
+const costRows = computed(() =>
+  ((p.value?.deliveryCosts ?? []) as Record<string, any>[]).filter((c) => c.类别 !== '项目直接成本'))
 
 const teamInfo = computed(() => [
   { k: '项目经理', v: m.value.team?.项目经理 || '-' },
