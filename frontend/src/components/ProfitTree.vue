@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import type { ProfitRow } from '@/types/analysis'
 import { DEFAULT_OPEN, hasChildren, visibleRows, isRateRow } from '@/lib/profitTree'
-import { fmtWan, fmtRatio } from '@/lib/format'
+import { fmtYuan, fmtRatio } from '@/lib/format'
 
 // 预算核算科目树(R2 spec §3):列=预算/概算/核算(budget_data)/实际发生/剩余/消耗率;毛利率行按比率格式化
 const props = defineProps<{ rows: ProfitRow[] }>()
@@ -13,13 +13,13 @@ function toggle(code: string) {
   else s.add(code)
   open.value = s
 }
-const money = (r: ProfitRow, v: number | null | undefined) => (isRateRow(r) ? fmtRatio(v) : fmtWan(v))
+const money = (r: ProfitRow, v: number | null | undefined) => (isRateRow(r) ? fmtRatio(v) : fmtYuan(v))
 </script>
 
 <template>
   <table class="pt-table">
     <thead>
-      <tr><th>科目</th><th>预算(万)</th><th>概算(万)</th><th>核算(万)</th><th>实际发生(万)</th><th>剩余(万)</th><th>消耗率</th></tr>
+      <tr><th>科目</th><th>预算(元)</th><th>概算(元)</th><th>核算(元)</th><th>实际发生(元)</th><th>剩余(元)</th><th>消耗率</th></tr>
     </thead>
     <tbody>
       <tr v-for="r in visibleRows(props.rows, open)" :key="r.code + r.name" :class="`pt-l${r.level ?? 1}`">

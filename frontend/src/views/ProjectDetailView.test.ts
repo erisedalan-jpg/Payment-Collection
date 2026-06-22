@@ -160,7 +160,7 @@ describe('ProjectDetailView', () => {
     seed()
     const w = await mountAt('/project/P-1')
     await w.findAll('.pd-tab').find((b) => b.text() === '预算核算')!.trigger('click')
-    expect(w.text()).toContain('预算收入(万)')
+    expect(w.text()).toContain('预算收入(元)')
     expect(w.text()).toContain('交付部门人工成本')      // 2.3.2 默认可见
     expect(w.text()).not.toContain('自有产品成本')       // 2.1.1 默认折叠
     expect(w.text()).toContain('概算')
