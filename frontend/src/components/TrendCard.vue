@@ -22,7 +22,7 @@ const series = computed(() =>
 <template>
   <div class="trend-card">
     <div class="tc-head">
-      <h3 class="tc-title">待回款趋势</h3>
+      <h3 class="tc-title">待回款金额</h3>
       <SegToggle v-model="period" :options="PERIOD_OPTS" />
     </div>
     <PendingBarChart :categories="series.categories" :series="series.series" />
