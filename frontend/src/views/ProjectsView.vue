@@ -54,12 +54,13 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'paymentRatio', label: '回款完成率', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'projectStatus', label: '项目状态', width: 100 },
   { key: 'health', label: '健康度', width: 96 },
+  { key: 'riskReasons', label: '关注原因', width: 220 },
   { key: 'paymentStatus', label: '回款状态', width: 100 },
   { key: 'tags', label: '标签', width: 160, formatter: (v) => (Array.isArray(v) && v.length ? v.join('、') : '') },
   { key: 'action', label: '操作', width: 80, fixed: 'right' },
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
-const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'action']
+const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
 const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health'])
 
 const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
@@ -170,6 +171,18 @@ async function doExport() {
         <template #cell-health="{ row }">
           <HealthBadge :overall="row.health" />
         </template>
+        <template #cell-riskReasons="{ row }">
+          <span v-if="!row.riskReasons || !row.riskReasons.length" class="rr-none">-</span>
+          <span v-else class="rr-pills">
+            <span
+              v-for="r in row.riskReasons"
+              :key="r.category"
+              class="rr-pill"
+              :class="`rr-pill--${r.tone}`"
+              :title="r.detail"
+            >{{ r.category }}</span>
+          </span>
+        </template>
         <template #cell-tags="{ value }">
           <span v-for="t in (value || [])" :key="t" class="lst-tag">{{ t }}</span>
         </template>
@@ -219,4 +232,11 @@ async function doExport() {
 .lst-tag { display: inline-block; padding: 1px 6px; margin: 1px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
 .pv-fu-btn { font-size: var(--fs-1); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 8px; cursor: pointer; }
 .pv-export-btn { font-size: var(--fs-1); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 10px; cursor: pointer; }
+/* 关注原因列 pill 样式 */
+.rr-none { color: var(--mut); font-size: var(--fs-1); }
+.rr-pills { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.rr-pill { display: inline-block; padding: 1px var(--sp-2); border-radius: var(--r-full); font-size: var(--fs-1); font-weight: 600; line-height: var(--lh-base); cursor: default; }
+.rr-pill--warn { background: var(--warn-bg); color: var(--warn-text); }
+.rr-pill--danger { background: var(--danger-bg); color: var(--danger-text); }
+.rr-pill--mut { background: var(--card2); color: var(--sub); }
 </style>
