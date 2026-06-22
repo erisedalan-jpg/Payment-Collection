@@ -77,13 +77,7 @@ function toggleCategory(cat: string) {
             </span>
             <span v-for="[key, label] in DIM_LABELS" :key="key" class="ov-dim">{{ label }}异常 <b class="u-num">{{ health.dims[key] }}</b></span>
           </div>
-          <div v-if="health.riskProjects.length" class="ov-risk-list">
-            <button v-for="p in health.riskProjects" :key="p.projectId" class="ov-risk-card" @click="router.push(`/project/${p.projectId}`)">
-              <span class="ov-risk-name">{{ p.projectName || p.projectId }}</span>
-              <HealthBadge overall="风险" />
-            </button>
-          </div>
-          <!-- 6 类风险分类 -->
+          <!-- 6 类风险分类（已去掉冗余的单项目风险卡片列表，健康度卡仅留汇总+分类，单项目经下钻清单查看） -->
           <div class="ov-risk-cats">
             <div v-for="entry in classEntries" :key="entry.category" class="ov-rcat">
               <div class="ov-rcat-head" :class="`ov-rcat-head--${entry.tone}`" @click="toggleCategory(entry.category)">
@@ -179,10 +173,6 @@ function toggleCategory(cat: string) {
 .ov-health-chip :deep(.health-badge) { font-size: var(--fs-2); }
 .ov-dim { font-size: var(--fs-1); color: var(--sub); }
 .ov-dim b { color: var(--txt); }
-.ov-risk-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-.ov-risk-card { display: inline-flex; align-items: center; gap: var(--sp-2); border: 1px solid var(--line); background: var(--card2); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-2); color: var(--txt); cursor: pointer; }
-.ov-risk-card:hover { background: var(--hover-tint); }
-.ov-risk-name { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-pay { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .ov-pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--sp-3); }
 .ov-pay-block { display: block; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-3) var(--sp-3); text-decoration: none; }
