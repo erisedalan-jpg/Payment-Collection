@@ -5,7 +5,7 @@ import json
 import sys
 import os
 import re
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 import config
 import schema
 import pmis
