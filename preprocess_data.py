@@ -326,7 +326,7 @@ def _followup_records_from_local(records):
 
 def run_snapshot_pipeline(final_data, output_dir, today=None):
     """9d. 快照/diff/事件/周期对比(Phase P3, spec 3.3)。
-    返回 (events_embed 新在前最多100条, period_compare dict)。
+    返回 (events_embed 新在前全部保留(≤cap), period_compare dict)。
     时序: 先 diff 既有最新快照(含同日早前一次) → 算周期对比 → 再覆盖写当日快照。"""
     today = today or datetime.now().strftime("%Y-%m-%d")
     snap_dir = os.path.join(output_dir, "snapshots")
@@ -353,7 +353,7 @@ def run_snapshot_pipeline(final_data, output_dir, today=None):
         period[key] = snapshots_mod.compute_period_compare_entry(ds, base, cur) if base else None
 
     snapshots_mod.save_snapshot(snap_dir, cur, today=today, keep_days=90)
-    return list(reversed(all_events[-100:])), period
+    return list(reversed(all_events)), period
 
 
 def backfill_final_acceptance(project_pmis, project_milestones):
