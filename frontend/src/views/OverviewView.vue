@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
@@ -9,6 +9,8 @@ import { useFilterStore } from '@/stores/filter'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import HealthBadge from '@/components/HealthBadge.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
+import { buildProjectRows } from '@/lib/projectList'
+import { classifyProjects } from '@/lib/riskClassify'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -40,6 +42,13 @@ const kpiCards = computed(() => [
 const HEALTH_KEYS = ['健康', '关注', '风险'] as const
 const DIM_LABELS = [['progress', '进度'], ['risk', '风险'], ['cost', '成本'], ['payment', '回款']] as const
 const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.value.yearActual / band.value.yearExpected, 1) : 0))
+
+const rows = computed(() => buildProjectRows(projects.value, pmisMap.value))
+const classEntries = computed(() => classifyProjects(rows.value))
+const expandedCategory = ref<string | null>(null)
+function toggleCategory(cat: string) {
+  expandedCategory.value = expandedCategory.value === cat ? null : cat
+}
 </script>
 
 <template>
@@ -60,9 +69,9 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
         <section class="ov-card">
           <div class="ov-card-head">项目健康度</div>
           <div class="ov-health-row">
-            <span v-for="k in HEALTH_KEYS" :key="k" class="ov-health-chip">
+            <RouterLink v-for="k in HEALTH_KEYS" :key="k" class="ov-health-chip ov-health-chip--link" :to="`/projects?health=${k}`">
               <HealthBadge :overall="k" /><b class="u-num">{{ health.counts[k] }}</b>
-            </span>
+            </RouterLink>
             <span v-if="health.counts.无数据" class="ov-health-chip">
               <HealthBadge overall="无数据" /><b class="u-num">{{ health.counts.无数据 }}</b>
             </span>
@@ -73,6 +82,37 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
               <span class="ov-risk-name">{{ p.projectName || p.projectId }}</span>
               <HealthBadge overall="风险" />
             </button>
+          </div>
+          <!-- 6 类风险分类 -->
+          <div class="ov-risk-cats">
+            <div v-for="entry in classEntries" :key="entry.category" class="ov-rcat">
+              <div class="ov-rcat-head" :class="`ov-rcat-head--${entry.tone}`" @click="toggleCategory(entry.category)">
+                <span class="ov-rcat-label">{{ entry.category }}</span>
+                <span class="ov-rcat-count u-num">{{ entry.count }}</span>
+                <RouterLink
+                  v-if="entry.count > 0"
+                  class="ov-rcat-link"
+                  :to="`/projects?riskCategory=${encodeURIComponent(entry.category)}`"
+                  @click.stop
+                >查看清单</RouterLink>
+                <span class="ov-rcat-arrow" :class="{ 'ov-rcat-arrow--open': expandedCategory === entry.category }">▾</span>
+              </div>
+              <div v-if="expandedCategory === entry.category && entry.projects.length" class="ov-rcat-body">
+                <button
+                  v-for="p in entry.projects"
+                  :key="p.projectId"
+                  class="ov-rcat-item"
+                  @click="router.push(`/project/${p.projectId}`)"
+                >
+                  <span class="ov-rcat-item-name">{{ p.projectName || p.projectId }}</span>
+                  <span class="ov-rcat-item-detail">{{ p.detail }}</span>
+                </button>
+                <div v-if="!entry.projects.length" class="ov-empty-mini">无命中项目</div>
+              </div>
+              <div v-if="expandedCategory === entry.category && !entry.projects.length" class="ov-rcat-body">
+                <div class="ov-empty-mini">无命中项目</div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -164,4 +204,27 @@ const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.valu
 .ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); }
 .ov-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 @media (max-width: 1200px) { .ov-body { grid-template-columns: 1fr; } }
+
+/* 健康度 chip 可点击 */
+.ov-health-chip--link { text-decoration: none; cursor: pointer; }
+.ov-health-chip--link:hover { opacity: 0.8; }
+
+/* 风险分类区 */
+.ov-risk-cats { margin-top: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+.ov-rcat { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.ov-rcat-head { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); cursor: pointer; user-select: none; }
+.ov-rcat-head--warn { background: var(--warn-bg); color: var(--warn-text); }
+.ov-rcat-head--danger { background: var(--danger-bg); color: var(--danger-text); }
+.ov-rcat-head--mut { background: var(--card2); color: var(--sub); }
+.ov-rcat-label { font-size: var(--fs-2); font-weight: 600; flex: 1; }
+.ov-rcat-count { font-size: var(--fs-2); font-weight: 700; min-width: 28px; text-align: right; }
+.ov-rcat-link { font-size: var(--fs-1); text-decoration: none; opacity: 0.85; padding: 0 var(--sp-2); border-radius: var(--r-sm); border: 1px solid currentColor; }
+.ov-rcat-link:hover { opacity: 1; }
+.ov-rcat-arrow { font-size: var(--fs-1); transition: transform var(--dur-2) var(--ease); display: inline-block; }
+.ov-rcat-arrow--open { transform: rotate(180deg); }
+.ov-rcat-body { background: var(--card2); padding: var(--sp-2) var(--sp-3); display: flex; flex-direction: column; gap: 2px; }
+.ov-rcat-item { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); border: none; background: none; padding: 3px 0; font-size: var(--fs-1); color: var(--txt); cursor: pointer; text-align: left; width: 100%; }
+.ov-rcat-item:hover { color: var(--accent); }
+.ov-rcat-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-rcat-item-detail { color: var(--sub); font-size: var(--fs-1); white-space: nowrap; }
 </style>

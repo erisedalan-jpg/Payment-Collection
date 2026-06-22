@@ -34,7 +34,7 @@ const rows = computed(() =>
   buildProjectRows((data.data?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.assignments))
 
 // 工具栏特殊筛选(非列枚举)
-const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', tags: [] })
+const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' })
 // 先表头列枚举(crossFilter) → 再特殊项
 const filtered = computed(() => filterProjectRows(applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as ProjectRow[], sp))
 
@@ -92,6 +92,7 @@ for (const key of FILTERABLE) {
   const presale = qval(route.query.presale); if (presale) sp.presale = presale
   const paused = qval(route.query.paused); if (paused) sp.paused = paused
   const overspend = qval(route.query.overspend); if (overspend) sp.overspend = overspend
+  const riskCategory = qval(route.query.riskCategory); if (riskCategory) sp.riskCategory = riskCategory
 }
 
 const pageSize = ref(50)
