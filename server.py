@@ -19,7 +19,6 @@ import os
 import subprocess
 import threading
 import time
-import functools
 import logging
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -1303,7 +1302,7 @@ def classify_progress_line(line):
 
 
 def run_reprocess():
-    """仅运行 preprocess_data.py(读 yundocs_data + input/pmis 重算 analysis_data)。
+    """仅运行 preprocess_data.py(读 input/ 与 input/pmis/ 全部数据文件重算 analysis_data)。
     不抓取、不下载。供"更新数据"按钮调用。"""
     global reprocess_state
     try:
