@@ -152,9 +152,10 @@ async function doExport() {
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
-    <div v-if="sp.paused === 'yes' || sp.overspend === 'yes'" class="pv-tags">
+    <div v-if="sp.paused === 'yes' || sp.overspend === 'yes' || sp.riskCategory" class="pv-tags">
       <span v-if="sp.paused === 'yes'" class="pv-tag">已暂停项目 <button @click="sp.paused = ''">✕</button></span>
       <span v-if="sp.overspend === 'yes'" class="pv-tag">超支项目 <button @click="sp.overspend = ''">✕</button></span>
+      <span v-if="sp.riskCategory" class="pv-tag">风险分类: {{ sp.riskCategory }} <button @click="sp.riskCategory = ''">✕</button></span>
     </div>
 
     <div v-if="!rows.length" class="pv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
