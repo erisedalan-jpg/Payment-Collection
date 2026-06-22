@@ -36,7 +36,7 @@ declare module 'vue-router' {
 }
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/login', name: 'login', component: LoginView, meta: { title: '登录', fullscreen: true } },
     { path: '/projects', name: 'projects', component: ProjectsView, meta: { title: '在建项目', hideFilter: true, pageKey: 'projects' } },
