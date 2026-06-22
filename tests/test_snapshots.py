@@ -267,6 +267,21 @@ class TestDiffNodes:
         types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
         assert {"回款节点新增", "回款节点移除"} <= types
 
+    def test_node_removal_suppressed_when_project_closed(self):
+        # 项目 P-1 关闭(从 cur 消失),其节点随之消失 → 只记"关闭项目",不重复记"回款节点移除"
+        prev = _snap("2026-06-10", {"P-1": _proj()}, {"P-1|款#0": _node(node="款")})
+        cur = _snap("2026-06-11", {}, {})
+        types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
+        assert "关闭项目" in types
+        assert "回款节点移除" not in types
+
+    def test_node_removal_still_fires_when_project_alive(self):
+        # 项目仍在、仅某节点消失 → 仍如实记"回款节点移除"(回归保护)
+        prev = _snap("2026-06-10", {"P-1": _proj()}, {"P-1|旧#0": _node(node="旧")})
+        cur = _snap("2026-06-11", {"P-1": _proj()}, {})
+        types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
+        assert "回款节点移除" in types
+
 
 class TestAppendEvents:
     def test_append_and_cap(self, tmp_path):
