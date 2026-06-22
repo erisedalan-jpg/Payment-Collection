@@ -86,15 +86,14 @@ describe('OverviewView', () => {
     expect(kpis.find('a[href="/payment"]').exists()).toBe(true)   // 回款达成率
   })
 
-  it('健康度总览:三档计数+四维+风险卡点击跳详情', async () => {
+  it('健康度总览:三档计数+四维+6类风险分类(去掉单项目风险卡)', async () => {
     seed()
     const w = await mountView()
-    const push = vi.spyOn(router, 'push')
     expect(w.text()).toContain('进度异常')
-    const card = w.find('.ov-risk-card')
-    expect(card.text()).toContain('风险甲')
-    await card.trigger('click')
-    expect(push).toHaveBeenCalledWith('/project/P-1')
+    // 已去掉冗余的单项目风险卡片扁平列
+    expect(w.find('.ov-risk-card').exists()).toBe(false)
+    // 保留 6 类风险分类汇总
+    expect(w.find('.ov-risk-cats').exists()).toBe(true)
   })
 
   it('回款重点带:年度进度/本月待回/7天临期/延期Top', async () => {
