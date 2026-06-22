@@ -80,6 +80,12 @@ describe('payDashSummary', () => {
     expect(s.totalProjects).toBe(1)           // 只有 P1 有活动(节点 planDate 2026-02-01 在区间内)
   })
 
+  it('区间口径分母(S8): 选了日期区间时分母只算区间内有活动项目的合同', () => {
+    // 区间 2026-01-01~2026-06-30: 仅 P1 有活动(节点/流水均在区间); P2(节点 2026-08-01、流水 2026-08-05)无区间活动→其合同不计入分母
+    const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '2026-01-01', '2026-06-30')
+    expect(s.rate).toBeCloseTo(700 / 1200)    // 分子=P1 区间流水 700, 分母=P1 合同 1200(不含 P2 的 1000)
+  })
+
   it('全部口径不变式: start=end="" 时 totalActual=Σ全流水(inScope)', () => {
     const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '', '')
     expect(s.totalActual).toBe(900)

@@ -45,7 +45,12 @@ export function payDashSummary(
 ): PayDashSummary {
   const inScope = filterProjects(projects, opts)
   const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, start, end), 0)
-  const totalContract = inScope.reduce((s, p) => s + (p.paymentPmis?.contract ?? 0), 0)
+  // 完成率分母:选了日期区间时只算区间内有回款活动的项目合同(与分子同范围,避免窄区间下分母不缩、完成率被压低);
+  // 全部(start=end='')时保持 Σ全 inScope 合同不变(基线不动)。
+  const dateActive = !!(start || end)
+  const totalContract = inScope
+    .filter((p) => !dateActive || hasActivityInRange(paymentNodes?.[p.projectId], paymentRecords?.[p.projectId]?.records, start, end))
+    .reduce((s, p) => s + (p.paymentPmis?.contract ?? 0), 0)
   const totalExpected = rows.reduce((s, r) => s + r.expectedPayment, 0)
   const totalRemaining = rows.reduce((s, r) => s + r.unpaidAmount, 0)
   const delayedPids = new Set(rows.filter((r) => r.status === '延期').map((r) => r.projectId))
