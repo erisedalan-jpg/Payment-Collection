@@ -4,6 +4,7 @@ import { useDataStore } from '@/stores/data'
 import type { Event, PeriodCompare, PeriodCompareEntry } from '@/types/analysis'
 import { filterEvents, distinctEventTypes, type ActivityFilters } from '@/lib/activity'
 import { fmtWan } from '@/lib/format'
+import { exportRows } from '@/lib/exportXlsx'
 import SegToggle from '@/components/SegToggle.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
 
@@ -49,6 +50,17 @@ const pidL4 = computed<Record<string, string>>(() => {
   return map
 })
 
+// projectId → 展示信息（项目经理/L4/超支金额），供动态条识别度增强
+const pidInfo = computed<Record<string, { projectManager?: string; orgL4?: string; overspendAmount?: number | null }>>(() => {
+  const map: Record<string, { projectManager?: string; orgL4?: string; overspendAmount?: number | null }> = {}
+  const ps = data.data?.projects ?? []
+  const cs = (data.data as any)?.closedProjects ?? []
+  for (const p of [...ps, ...cs] as any[]) {
+    if (p.projectId) map[p.projectId] = { projectManager: p.projectManager, orgL4: p.orgL4, overspendAmount: p.overspendAmount }
+  }
+  return map
+})
+
 // L4 选项（去重、去空、排序；下拉含"全部"）
 const l4Options = computed<Array<{ value: string; label: string }>>(() => {
   const set = new Set<string>()
@@ -85,6 +97,24 @@ const pagedEvents = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return filtered.value.slice(start, start + PAGE_SIZE)
 })
+
+// 导出当前筛选后的全部动态为表格(xlsx)
+function doExportEvents() {
+  const rows = filtered.value.map((e) => {
+    const info = e.projectId ? pidInfo.value[e.projectId] : undefined
+    return {
+      日期: e.date,
+      类型: e.type,
+      项目编号: e.projectId ?? '',
+      项目名称: e.projectName ?? '',
+      项目经理: info?.projectManager ?? '',
+      L4组织: info?.orgL4 ?? '',
+      超支金额: (info?.overspendAmount ?? 0) > 0 ? (info!.overspendAmount as number) : '',
+      摘要: e.summary ?? '',
+    }
+  })
+  exportRows('项目动态.xlsx', rows)
+}
 </script>
 
 <template>
@@ -130,9 +160,10 @@ const pagedEvents = computed(() => {
         <el-option v-for="opt in l4Options" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
       <el-input v-model="filters.query" size="small" placeholder="搜索 项目/摘要/类型" clearable style="width: 220px" />
+      <button class="av-export" @click="doExportEvents">导出表格</button>
     </div>
 
-    <EventTimeline :events="pagedEvents" empty-text="首次同步，暂无变化记录" />
+    <EventTimeline :events="pagedEvents" :pid-info="pidInfo" empty-text="首次同步，暂无变化记录" />
 
     <div v-if="filtered.length > PAGE_SIZE" class="av-pagination">
       <el-pagination
@@ -160,4 +191,6 @@ const pagedEvents = computed(() => {
 .av-insufficient { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-2) 0; opacity: var(--disabled-opacity); }
 .av-toolbar { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); flex-wrap: wrap; }
 .av-pagination { display: flex; justify-content: center; padding: var(--sp-3) 0 var(--sp-2); }
+.av-export { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); color: var(--txt); cursor: pointer; }
+.av-export:hover { background: var(--hover-tint); }
 </style>
