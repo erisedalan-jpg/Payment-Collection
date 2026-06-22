@@ -4,8 +4,6 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
 import { api } from '@/api/client'
-import { useCloudSync } from '@/composables/useCloudSync'
-import { useExcelImport } from '@/composables/useExcelImport'
 import { usePmisSync } from '@/composables/usePmisSync'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
@@ -21,26 +19,10 @@ const filter = useFilterStore()
 const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 const lastPmis = computed(() => (data.data as any)?.dataQuality?.summary?.lastPmisUpdate || '-')
 
-const WPS_KEY = '回款数据'
-const { links: pmisLinks, defaults: linkDefaults, progress: pmisProgress, message: pmisMessage,
-        running: pmisRunning, loadLinks: pmisLoadLinks, saveLinks: pmisSaveLinks,
-        download: pmisDownload, upload: pmisUpload, PMIS_FILE_NAMES } = usePmisSync()
+const { upload: pmisUpload, PMIS_FILE_NAMES } = usePmisSync()
 const { files: fileStatus, load: loadFileStatus } = useFileStatus()
 
 const ftime = (name: string) => fileStatus.value[name] || '-'
-const hasDefault = (name: string) => !!linkDefaults.value[name]
-function resetLink(name: string) { pmisLinks.value[name] = linkDefaults.value[name] || '' }
-
-// —— 回款数据(WPS 云同步 + 离线导入) ——
-const { phase: syncPhase, progress: syncProgress, message: syncMessage, start: startCloudSync, stop: stopCloudSync } = useCloudSync()
-function onSync() {
-  pmisSaveLinks()   // 链接修改随同步动作持久化
-  startCloudSync(pmisLinks.value[WPS_KEY] || '')
-}
-const importInput = ref<HTMLInputElement | null>(null)
-const { phase: importPhase, progress: importProgress, message: importMessage, importFile, stop: stopExcelImport } = useExcelImport()
-function onPickImport() { const f = importInput.value?.files?.[0]; if (f) importFile(f) }
-const importing = computed(() => ['reading', 'uploading', 'processing'].includes(importPhase.value))
 
 // —— PMIS 九表 ——
 const pmisInput = ref<HTMLInputElement | null>(null)
@@ -51,10 +33,6 @@ async function onPmisUpload() {
   const ok = await pmisUpload(files)
   pmisUploadMsg.value = `已上传 ${ok}/${files.length} 个 PMIS 文件,请点[更新数据]生效`
   if (pmisInput.value) pmisInput.value.value = ''
-  loadFileStatus()
-}
-async function onPmisDownload() {
-  await pmisDownload()
   loadFileStatus()
 }
 
@@ -140,7 +118,7 @@ function onDisable(name: string, on: boolean) { projectTags.disableTag(name, on)
 const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => filter.setExclude(v, filter.excludeTags) })
 const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
 
-onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load() })
+onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load() })
 </script>
 
 <template>
@@ -151,56 +129,38 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
     </div>
 
     <div class="dv-card">
-      <div class="dv-card-head">回款数据（WPS 云文档）</div>
-      <div class="dv-row">
-        <span class="dv-label">下载链接</span>
-        <input v-model="pmisLinks[WPS_KEY]" data-test="wps-input" type="text" class="dv-link" placeholder="WPS 云文档网址" />
-        <button v-if="hasDefault(WPS_KEY)" class="dv-btn ghost" data-test="wps-reset" @click="resetLink(WPS_KEY)">重置</button>
-        <button class="dv-btn primary" :disabled="syncPhase === 'syncing'" @click="onSync">云同步</button>
-        <button v-if="syncPhase === 'syncing'" class="dv-btn" @click="stopCloudSync">停止</button>
+      <div class="dv-card-head">数据来源（两种方式）</div>
+      <div class="dv-row dv-hint">
+        ① 页面导入：在下方「数据文件清单」逐类上传。
+        ② 本地放置：把文件放到服务器目录后点「更新数据」生效——
+        PMIS 九表放 <b>input/pmis/</b>，其余 CSV/xlsx（含核心回款源 collection_stages.csv）放 <b>input/</b> 根；
+        服务器定时任务投放后，凭下方各文件「最近修改时间」核对是否到位。
       </div>
-      <div v-if="syncPhase !== 'idle'" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :class="syncPhase" :style="{ width: syncProgress + '%' }"></div></div><div class="dv-msg" :class="syncPhase">{{ syncMessage }}</div></div>
-      <div class="dv-row">
-        <span class="dv-label">离线导入</span>
-        <input ref="importInput" type="file" accept=".xlsx,.xls" class="dv-file" />
-        <button class="dv-btn" :disabled="importing" @click="onPickImport">导入</button>
-        <button v-if="importing" class="dv-btn" @click="stopExcelImport">停止</button>
-        <span class="dv-hint">需含 Sheet「项目回款节点（里程碑）清单」</span>
-      </div>
-      <div v-if="importPhase !== 'idle'" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :class="importPhase" :style="{ width: importProgress + '%' }"></div></div><div class="dv-msg" :class="importPhase">{{ importMessage }}</div></div>
     </div>
 
-    <div class="dv-card">
-      <div class="dv-card-head">PMIS 数据（九表 · 有直链可在线下载，其余从 PMIS 手动导出后上传）</div>
+    <div class="dv-card" data-test="files-card">
+      <div class="dv-card-head">数据文件清单与状态</div>
+      <div class="dv-sub-head">PMIS 九表（input/pmis/）</div>
       <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-frow" data-test="pmis-row">
         <span class="dv-fname">{{ name }}</span>
-        <template v-if="hasDefault(name)">
-          <input v-model="pmisLinks[name]" type="text" class="dv-link" placeholder="下载链接" />
-          <button class="dv-btn ghost" data-test="link-reset" @click="resetLink(name)">重置</button>
-        </template>
-        <span v-else class="dv-badge">无直链 · 需手动导出上传</span>
         <span class="dv-ftime u-num">{{ ftime(name) }}</span>
       </div>
       <div class="dv-row dv-actions">
-        <button class="dv-btn primary" :disabled="pmisRunning" @click="onPmisDownload()">在线下载（有链接项）</button>
         <input ref="pmisInput" type="file" accept=".xlsx" multiple class="dv-file" />
-        <button class="dv-btn" @click="onPmisUpload">离线上传</button>
+        <button class="dv-btn" @click="onPmisUpload">上传 PMIS 文件</button>
+        <span v-if="pmisUploadMsg" class="dv-hint">{{ pmisUploadMsg }}</span>
       </div>
-      <div v-if="pmisRunning || pmisProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: pmisProgress + '%' }"></div></div><div class="dv-msg">{{ pmisMessage || '处理中...' }}</div></div>
-      <div v-if="pmisUploadMsg" class="dv-row dv-hint">{{ pmisUploadMsg }}</div>
-    </div>
 
-    <div class="dv-card" data-test="inputs-card">
-      <div class="dv-card-head">项目域文件（input/ 根 · 手动导出后上传）</div>
+      <div class="dv-sub-head">项目域文件（input/ 根）</div>
       <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-frow">
         <span class="dv-fname">{{ name }}</span>
         <span class="dv-ftime u-num">{{ ftime(name) }}</span>
       </div>
       <div class="dv-row dv-actions">
         <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-        <button class="dv-btn" @click="onUploadInputs">多选上传</button>
+        <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
+        <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
       </div>
-      <div v-if="inputsUploadMsg" class="dv-row dv-hint">{{ inputsUploadMsg }}</div>
     </div>
 
     <div class="dv-grid2">
@@ -290,6 +250,7 @@ onMounted(() => { if (!data.data) data.load(); pmisLoadLinks(); loadFileStatus()
 .dv-times b { color: var(--txt); }
 .dv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1); }
 .dv-card-head { font-weight: 700; font-size: var(--fs-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--txt); }
+.dv-sub-head { font-size: var(--fs-1); font-weight: 700; color: var(--sub); padding: var(--sp-2) var(--sp-4) 0; }
 .dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-2); flex-wrap: wrap; }
 .dv-actions { border-top: 1px solid var(--line); }
 .dv-frow { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); font-size: var(--fs-2); border-bottom: 1px dashed var(--line); }

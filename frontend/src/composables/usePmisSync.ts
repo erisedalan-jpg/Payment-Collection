@@ -6,52 +6,7 @@ export const PMIS_FILE_NAMES = [
   '在建项目里程碑计划数据.xlsx', '已结项里程碑计划数据.xlsx',
 ]
 
-export function usePmisSync(opts: { onDone?: () => void } = {}) {
-  const links = ref<Record<string, string>>({})
-  const defaults = ref<Record<string, string>>({})
-  const progress = ref(0)
-  const message = ref('')
-  const running = ref(false)
-
-  async function loadLinks() {
-    const res = await fetch('/api/pmis/links')
-    if (res.ok) {
-      const data = await res.json()
-      links.value = data.links ?? {}
-      defaults.value = data.defaults ?? {}
-    }
-  }
-  async function saveLinks() {
-    await fetch('/api/pmis/links', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ links: links.value }),
-    })
-  }
-  async function download() {
-    running.value = true; progress.value = 0
-    try {
-      await saveLinks()
-      const res = await fetch('/api/pmis/download')
-      if (!res.ok) { message.value = `下载失败 (${res.status})`; return }
-      const reader = res.body?.getReader()
-      if (!reader) { message.value = '无响应体'; return }
-      const dec = new TextDecoder()
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        for (const line of dec.decode(value).split('\n')) {
-          const t = line.startsWith('data:') ? line.slice(5).trim() : ''
-          if (!t) continue
-          try {
-            const s = JSON.parse(t)
-            progress.value = s.progress; message.value = s.message; running.value = s.running
-          } catch { /* 跳过半包 */ }
-        }
-      }
-    } finally {
-      running.value = false
-    }
-  }
+export function usePmisSync() {
   async function upload(files: File[]): Promise<number> {
     let ok = 0
     for (const f of files) {
@@ -64,5 +19,5 @@ export function usePmisSync(opts: { onDone?: () => void } = {}) {
     }
     return ok
   }
-  return { links, defaults, progress, message, running, loadLinks, saveLinks, download, upload, PMIS_FILE_NAMES }
+  return { upload, PMIS_FILE_NAMES }
 }

@@ -1,11 +1,15 @@
 import * as XLSX from 'xlsx'
-import { toStringMatrix } from './excelImport'
 
 export interface ParsedWb { SheetNames: string[]; sheetRows: (name: string) => any[][] }
 
 const MANUAL_SHEETS = ['项目标签', '跟进记录'] as const
 
-/** 读 xlsx ArrayBuffer → workbook（复用 useExcelImport 同款 SheetJS 读法）。 */
+/** 二维数组单元格转字符串（null/undefined→''）。 */
+function toStringMatrix(rows: any[][]): string[][] {
+  return rows.map((row) => row.map((cell) => (cell !== null && cell !== undefined ? String(cell) : '')))
+}
+
+/** 读 xlsx ArrayBuffer → workbook。 */
 export function readWorkbook(buf: ArrayBuffer): ParsedWb {
   const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
   return {
