@@ -794,6 +794,12 @@ def _collection_nodes_for(pid, rid, collection_stages):
     return collection_stages.get(pid) or (collection_stages.get(rid) if rid else None) or []
 
 
+def _pay_projects_from_collection(collection_stages):
+    """回款项目清单换源:取收款阶段台账(collection_stages.csv)的项目号。
+    取代旧的 yundocs project_overview 派生,语义=回款项目即收款台账里的项目。"""
+    return [{"projectId": pid, "projectName": ""} for pid in collection_stages]
+
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -847,12 +853,16 @@ def main():
     else:
         print("  [WARN] 未提供 A.xlsx 项目映射,售前服务项目将标记待映射")
 
+    # 提前加载收款阶段台账(系统核心回款源),供 pay_projects 换源与 9f 复用
+    _today = datetime.now().strftime("%Y-%m-%d")
+    collection_stages = collection_mod.load_collection_stages(
+        os.path.join(BASE_DIR, "input"), _today)
+
     # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
     print("[INFO] 摄取 PMIS 项目域数据...")
     pmis_dir = os.path.join(BASE_DIR, "input", config.PMIS_DIRNAME)
-    # 换源:pay_projects 改由 project_overview 取,不再遍历 all_nodes
-    pay_projects = [{"projectId": p.get("projectId", ""), "projectName": p.get("projectName", "")}
-                    for p in project_overview]
+    # 换源:pay_projects 取收款阶段台账项目号(原 yundocs project_overview 已下线)
+    pay_projects = _pay_projects_from_collection(collection_stages)
     # dirty 延迟到 payment_nodes 建好后填充(见 9f 循环之后),此处先传空列表
     project_pmis, data_quality = pmis.load_project_pmis(
         pmis_dir, pay_projects, dirty=[], extra_closed_ids=extra_closed)
@@ -910,9 +920,7 @@ def main():
     # === 9f. 系统核心口径回款(3A):收款阶段台账 collection_stages.csv;售前回退原项目 ===
     def _pmis_contract(_pid):
         return ((project_pmis.get(_pid) or {}).get("customer") or {}).get("合同总额")
-    _today = datetime.now().strftime("%Y-%m-%d")
-    collection_stages = collection_mod.load_collection_stages(
-        os.path.join(BASE_DIR, "input"), _today)
+    # _today / collection_stages 已在 9b 前加载,此处直接复用
     payment_nodes = {}
     for p in dept_projects:
         _pid = p["projectId"]
