@@ -206,9 +206,9 @@ const riskRows = computed(() => (m.value.riskRecords ?? []) as Record<string, an
 
 // —— 预算核算 ——
 const costSummary = computed(() => [
-  { k: '总预算(万)', v: fmtWan(m.value.cost?.总预算) },
-  { k: '核算(万)', v: fmtWan(m.value.cost?.核算) },
-  { k: '剩余预算(万)', v: fmtWan(m.value.cost?.剩余预算) },
+  { k: '总预算(元)', v: fmtYuan(m.value.cost?.总预算) },
+  { k: '核算(元)', v: fmtYuan(m.value.cost?.核算) },
+  { k: '剩余预算(元)', v: fmtYuan(m.value.cost?.剩余预算) },
   { k: '消耗比', v: fmtRatio(m.value.cost?.消耗比) },
   { k: '成本状态', v: m.value.cost?.成本状态 || '-' },
   { k: '项目超支', v: m.value.cost?.项目超支 === true ? '是' : '否' },
@@ -216,9 +216,9 @@ const costSummary = computed(() => [
 ])
 const COST_COLS: DataColumn[] = [
   { key: '类别', label: '类别' },
-  { key: '预算金额', label: '预算金额(万)', formatter: (v) => fmtWan(v as number) },
-  { key: '实际发生', label: '实际发生(万)', formatter: (v) => fmtWan(v as number) },
-  { key: '剩余预算', label: '剩余预算(万)', formatter: (v) => fmtWan(v as number) },
+  { key: '预算金额', label: '预算金额(元)', formatter: (v) => fmtYuan(v as number) },
+  { key: '实际发生', label: '实际发生(元)', formatter: (v) => fmtYuan(v as number) },
+  { key: '剩余预算', label: '剩余预算(元)', formatter: (v) => fmtYuan(v as number) },
   { key: '消耗率', label: '消耗率', formatter: (v) => fmtRatio(v) },
 ]
 const costRows = computed(() => (p.value?.deliveryCosts ?? []) as Record<string, any>[])
