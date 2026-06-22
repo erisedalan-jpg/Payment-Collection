@@ -74,8 +74,8 @@ describe('buildProjectRows', () => {
   })
 })
 
-// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags）
-const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', tags: [] }
+// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags/riskCategory）
+const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -118,6 +118,46 @@ describe('isAnomalous 标记', () => {
     ], {})
     expect(rows.find((r) => r.projectId === 'A')!.isAnomalous).toBe(false)
     expect(rows.find((r) => r.projectId === 'X')!.isAnomalous).toBe(true)
+  })
+})
+
+describe('riskCategory 过滤', () => {
+  // 构建测试行（直接 cast，不走 buildProjectRows 避免 PMIS 依赖）
+  const makeRow = (id: string, health: string, categories: string[]): any => ({
+    projectId: id, projectName: id, customer: '-', contractAmount: null,
+    projectLevel: '-', projectType: '-', projectManager: '-', orgL4: '组1',
+    stage: '-', progress: null, projectStatus: '-', riskLevel: '-', openRisks: 0,
+    costRatio: null, paymentRatio: null, paymentStatus: '-',
+    health, isPresale: false, hasClosed: false, paused: false, overspend: false,
+    tags: [], isAnomalous: false,
+    riskReasons: categories.map(cat => ({ category: cat, detail: `${cat}详情`, tone: 'warn' as const })),
+  })
+
+  const rows = [
+    makeRow('A', '健康', ['回款延期']),
+    makeRow('B', '关注', ['里程碑滞后', '成本超支']),
+    makeRow('C', '风险', []),
+    makeRow('D', '健康', []),
+  ]
+
+  it('riskCategory="" → 不过滤，返回全部', () => {
+    expect(filterProjectRows(rows, { ...F0, riskCategory: '' })).toHaveLength(4)
+  })
+  it('riskCategory="回款延期" → 只含 riskReasons 含此类的行', () => {
+    const res = filterProjectRows(rows, { ...F0, riskCategory: '回款延期' })
+    expect(res.map(r => r.projectId)).toEqual(['A'])
+  })
+  it('riskCategory="成本超支" → 只含命中行', () => {
+    const res = filterProjectRows(rows, { ...F0, riskCategory: '成本超支' })
+    expect(res.map(r => r.projectId)).toEqual(['B'])
+  })
+  it('riskCategory="健康度低" → health∈{关注,风险}', () => {
+    const res = filterProjectRows(rows, { ...F0, riskCategory: '健康度低' })
+    expect(res.map(r => r.projectId).sort()).toEqual(['B', 'C'])
+  })
+  it('riskCategory="数据异常" → 无命中时返回空', () => {
+    const res = filterProjectRows(rows, { ...F0, riskCategory: '数据异常' })
+    expect(res).toHaveLength(0)
   })
 })
 
