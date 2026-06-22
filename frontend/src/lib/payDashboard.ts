@@ -121,6 +121,8 @@ export function payOrgRanking(
   end: string,
   sortBy: 'actualTotal' | 'achievementRate',
 ): OrgRank[] {
+  // 达成率分母:选了日期区间时只算区间内有回款活动的项目合同(与分子同范围);全部时含全部合同(基线不变)。对齐 payDashSummary(S8)。
+  const dateActive = !!(start || end)
   const m: Record<string, OrgRank> = {}
   for (const p of projects) {
     const org = (p.orgL4 ?? '').trim() || '未指定'
@@ -129,7 +131,9 @@ export function payOrgRanking(
       if (inRange(n.planDate || '', start, end)) m[org].expectedTotal += Number(n.expectedPayment ?? 0)
     }
     m[org].actualTotal += actualInRange(paymentRecords?.[p.projectId]?.records, start, end)
-    m[org].contractTotal += p.paymentPmis?.contract ?? 0
+    if (!dateActive || hasActivityInRange(paymentNodes?.[p.projectId], paymentRecords?.[p.projectId]?.records, start, end)) {
+      m[org].contractTotal += p.paymentPmis?.contract ?? 0
+    }
   }
   return Object.values(m)
     .map((o) => ({ ...o, achievementRate: o.contractTotal > 0 ? o.actualTotal / o.contractTotal : 0, actualTotalWan: o.actualTotal / 10000 }))
