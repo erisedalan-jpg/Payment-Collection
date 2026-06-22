@@ -4,10 +4,10 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.15.0**
-- 最近更新：2026-06-19（回款口径修正：① 修 preprocess 售前收款阶段节点取数——本项目号优先、缺回退原项目号（找回被丢的售前计划节点，售前 Σ计划 0→21211 万）；② 全站「回款达成率/完成率」口径统一为 Σ流水净额(含负)/Σ合同总额（分母 计划→合同，修复 103% 失真，回落至合理区间）；③ 售前详情「回款数据」流水本项目优先缺回退原项目）
-- 上一版本：V1.14.0（2026-06-19，SP5 /payment/board 多维看板重做：维度集改 L4部门/项目级别/行业/项目阶段/标签，指标改 项目数/合同总额/计划回款/完成率/延期节点；排名表去独立排序控件改 DataTable 表头排序；柱状图加数字；标签多值炸开分组；交叉/透视维度同步。**大需求 5 子项目收官**）
-- 上上版本：V1.13.0（2026-06-19，SP4 /panalysis 五页拆分：拆为 /payment/{board,projects,nodes,plan,risk} 五条独立路由，去 tab 栏、组件归位 views/、删 PayAnalysisView；维度控件仅留回款节点页；侧栏「回款」展开 8 项；旧路径兼容 redirect）
+- 当前版本：**V1.16.2**
+- 最近更新：2026-06-22（数据管理界面调整：彻底移除 WPS + 双数据来源。拆除 WPS 同步/离线导入/PMIS 在线下载全部在线抓取入口与脚本、Playwright 依赖；数据来源收敛为两条：页面上传/本地放置后点「更新数据」；collection_stages.csv 纳入页面上传白名单+文件状态展示；yundocs 数据源下线，删死键 projectOverview/naguanMap/naguanExclude；pay_projects 换源到 collection_stages）
+- 上一版本：V1.15.0（2026-06-19，回款口径修正：① 修 preprocess 售前收款阶段节点取数——本项目号优先、缺回退原项目号（找回被丢的售前计划节点，售前 Σ计划 0→21211 万）；② 全站「回款达成率/完成率」口径统一为 Σ流水净额(含负)/Σ合同总额（分母 计划→合同，修复 103% 失真，回落至合理区间）；③ 售前详情「回款数据」流水本项目优先缺回退原项目）
+- 上上版本：V1.14.0（2026-06-19，SP5 /payment/board 多维看板重做：维度集改 L4部门/项目级别/行业/项目阶段/标签，指标改 项目数/合同总额/计划回款/完成率/延期节点；排名表去独立排序控件改 DataTable 表头排序；柱状图加数字；标签多值炸开分组；交叉/透视维度同步。**大需求 5 子项目收官**）
 - 维护语言：简体中文
 
 ---
@@ -16,6 +16,12 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.16.2（2026-06-22）数据管理界面调整：彻底移除 WPS + 双数据来源
+  - 拆除 WPS 同步/离线导入/PMIS 在线下载 全部在线抓取入口与脚本（fetch_yundocs_full.py、pmis_download.py）、Playwright 依赖。
+  - 数据来源收敛为两条：页面上传 / 本地放置（cron 投放 input/ 与 input/pmis/ 后点「更新数据」）。
+  - 核心回款源 collection_stages.csv 纳入页面上传白名单 + 文件状态展示。
+  - 数据血缘清理：yundocs 数据源下线，删 projectOverview/naguanMap/naguanExclude（schema+类型）；pay_projects 换源到 collection_stages；followupRecords 改只读本地 json 重建（不写回）；tagSeed 置空。
+  - 设计/计划：docs/superpowers/specs/2026-06-22-data-management-wps-removal-design.md、docs/superpowers/plans/2026-06-22-data-management-wps-removal.md。
 - V1.15.0 回款口径修正（2026-06-19）：**A 售前节点取数**——新增 `preprocess._collection_nodes_for`(本项目号优先、缺回退原项目号、皆缺[])，9f 节点 lookup 改用它（`_eff`/合同来源/`_rec` 不动）；修复"售前收款阶段台账挂在本项目号下、却按原项目号查"导致售前 ~19429 万计划节点被丢（售前 Σ计划 0→21211 万）。**B 全站达成率/完成率口径**——统一 Σ流水净额(含负)/Σ合同总额：后端 `aggregate_payment_pmis.paymentRatio`→None、9f 用 `payment_ratio_from_records(流水,合同)` 覆盖项目级；前端 11 比率点分母 计划→合同（paymentRange/computeKpis/summaryByDim/progressBuckets/paymentBoard buildGroup/payDashSummary/payOrgRanking/ledgerRows/ledgerSummary/groupInsight/InsightDrillModal），分子流水不变；null 策略 number|null 点→null、纯number聚合+ledgerRows→:0；deriveProgress/rateColorPmis 阈值不动。修复回款达成率 103% 失真（回落 ~51% 量级）。**C 售前详情流水回退**——`ProjectDetailView.payRec` 本项目优先、缺回退 relatedClosedId。终审 opus With fixes（deriveProgress 注释口径一行已修）；遗留技术债：/insight 回款完成率口径(节点已收/PMIS合同)与主口径不同源，记 backlog。合并 SHA: d6302de
 - V1.14.0 SP5 /payment/board 多维看板重做（2026-06-19，**大需求 5 子项目收官**）：维度集 6→5（dept『L4部门』/projectLevel『项目级别』/industry『行业』/stage『项目阶段』/tag『标签』multi；移除 项目经理/金额档/进度态），指标 7→5（项目数/合同总额/计划回款/完成率/延期节点，去已回款/待回款）；`paymentBoard.groupPayBoard` 改笛卡尔积多值炸开（含 tag 维一项目计入它每个标签组、组间重复计数、空标签『无标签』；非 tag 维零回归）；`PayBoardRow` 加 projectLevel/tags、buildPayBoardRows 追加 tagAssignments 参；排名模式去独立「排序」控件改 `DataTable` 表头排序（列 维度名+5指标、行下钻、无已回/待回列）；柱状图 已回(绿)/待回(黄) label inside + 透明总计 series 柱顶(已回+待回) 整数万、按计划回款降序 Top15；BoardView 接入 projectTags store(assignments 第7参)、deep-link orgL4→dept 别名；交叉/透视复用 groupPayBoard 自动获 tag 炸开。遗留维字段 manager/tier/progress 按需保留(BoardDrilldownModal 仍读)并加注释。纯前端零口径变更。合并 SHA: b690de3
 - V1.13.0 SP4 /panalysis 五页拆分（2026-06-19）：旧 `/panalysis/:tab?` 单页（PayAnalysisView 内 tab 切换 5 组件）拆为 `/payment/{board,projects,nodes,plan,risk}` 五条独立平铺路由（name pay-*，不 hideFilter），去顶部 tab 栏；四 facet 组件 git mv 归位 `views/`(PayProjectsView/PayNodesView/PayPlanView/PayRiskView，保 rename 历史)、删 PayAnalysisView 宿主；维度控件仅留回款节点页（plan/risk/projects 删声明未用的死 dim prop、不加控件）；侧栏「回款」单入口展开 8 项；旧 `/panalysis/:tab?`(缺省→board)、`/board`、`/analysis/:tab` 兼容 redirect（保 query）、goBoard→/payment/board。纯前端纯结构搬迁，不动回款口径/数据层。合并 SHA: 19c0a36
@@ -45,6 +51,7 @@
 
 ## 进行中
 
+- [ ] **/insight 项目分析中心整合（2026-06-19 设计已通过用户确认，待下次对话执行；目标 V1.16.0）**：把同事「项目数据运营工具」系统的里程碑管理、成本分析两看板整合进本平台，并把 `/insight` 重构为「项目分析」主入口下挂 5 子页——/insight 项目多维分析(现状默认)、/insight/milestone 里程碑管理(新)、/insight/costdetail 成本分析(新)、/insight/board 回款多维分析(迁自 /payment/board)、/insight/calendar 回款日历(迁自 /calendar)。数据全取自现有源、配色字体架构全遵循当前系统。**已拍板**：成本页忠实复刻对方「预算超支预警」(剩余预算±5000三档、不照搬"已剔除老OA迁移项目3个"无依据文案)；里程碑状态直接用现成 `progress.里程碑进度状态`(空归未发布)；拆 3 子项目顺序做(SP-A 路由/导航重构含 board/calendar 迁移+redirect → SP-B 里程碑页 → SP-C 成本页)。数据可得性已核实全部具备(里程碑状态/节点 805 项目13类、成本超支 621 非空、损益毛利 621 全覆盖本期不接入)。**完整设计(含逐页数据映射、迁移锚点、源系统分析结论)见 `docs/superpowers/specs/2026-06-19-insight-analysis-hub-integration-design.md`**。下一步：对 SP-A 调 writing-plans → subagent-driven-development(已授权多代理)。
 - [x] **Phase P 项目主域整体看板**：P1-P6、P8 已合并 master（V7.0.0-V7.6.0，P8 合并提交 59ad935），P7 暂停取消出排期（回款子域待全量重设计立项）。spec：2026-06-10-project-domain-dashboard-design.md + 2026-06-12-P8-governance-tools-design.md。
 - [x] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md）：R1-R4 四期全部合并（V7.7.0→V1.0.0；a11aceb / 1a0a39b / 997fe15 / 55a5aba），**Phase R 收官**。
 - [x] **S1 反馈修缮批次**（spec：2026-06-12-S1-feedback-fixes-design.md，V1.0.1）：动态事件规则与 tone 染色/清单分页多选/科目树全量/回款完成率迁流水口径/分析配色，已合并 master（eb810b2）。
