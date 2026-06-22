@@ -51,6 +51,8 @@
 
 ## 进行中
 
+- [x] **S9 图表增强：数据标签 + ChartTypeSelector + 图表类型多选（2026-06-22，V1.16.2+Z）**：新增 `lib/chartOptions.ts`（纯函数 `buildRankingOption`/`valueKindForPie`，TDD 17测试全绿）和 `components/ChartTypeSelector.vue`（多选 pill，TDD 6测试全绿）；InsightView 排名模式接入图表类型多选（bar/line/pie，ratio 类不含 pie，切换后自动移除）；BoardView 单维排名接入图表类型多选（bar 保持堆叠图、line 用已回/待回两条折线、pie 用合同总额占比）；BoardView 交叉图补 `label: { show: true, position: 'inside' }` 数据标签。verify.sh 全绿（Python 333 通过 + 前端 710 通过）。
+
 - [ ] **/insight 项目分析中心整合（2026-06-19 设计已通过用户确认，待下次对话执行；目标 V1.16.0）**：把同事「项目数据运营工具」系统的里程碑管理、成本分析两看板整合进本平台，并把 `/insight` 重构为「项目分析」主入口下挂 5 子页——/insight 项目多维分析(现状默认)、/insight/milestone 里程碑管理(新)、/insight/costdetail 成本分析(新)、/insight/board 回款多维分析(迁自 /payment/board)、/insight/calendar 回款日历(迁自 /calendar)。数据全取自现有源、配色字体架构全遵循当前系统。**已拍板**：成本页忠实复刻对方「预算超支预警」(剩余预算±5000三档、不照搬"已剔除老OA迁移项目3个"无依据文案)；里程碑状态直接用现成 `progress.里程碑进度状态`(空归未发布)；拆 3 子项目顺序做(SP-A 路由/导航重构含 board/calendar 迁移+redirect → SP-B 里程碑页 → SP-C 成本页)。数据可得性已核实全部具备(里程碑状态/节点 805 项目13类、成本超支 621 非空、损益毛利 621 全覆盖本期不接入)。**完整设计(含逐页数据映射、迁移锚点、源系统分析结论)见 `docs/superpowers/specs/2026-06-19-insight-analysis-hub-integration-design.md`**。下一步：对 SP-A 调 writing-plans → subagent-driven-development(已授权多代理)。
 - [x] **Phase P 项目主域整体看板**：P1-P6、P8 已合并 master（V7.0.0-V7.6.0，P8 合并提交 59ad935），P7 暂停取消出排期（回款子域待全量重设计立项）。spec：2026-06-10-project-domain-dashboard-design.md + 2026-06-12-P8-governance-tools-design.md。
 - [x] **Phase R 数据源扩展批次**（spec：2026-06-12-R-batch-data-expansion-design.md）：R1-R4 四期全部合并（V7.7.0→V1.0.0；a11aceb / 1a0a39b / 997fe15 / 55a5aba），**Phase R 收官**。

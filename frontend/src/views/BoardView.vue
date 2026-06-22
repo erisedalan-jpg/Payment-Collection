@@ -12,8 +12,10 @@ import {
 } from '@/lib/paymentBoard'
 import { filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio, pct } from '@/lib/format'
+import { buildRankingOption } from '@/lib/chartOptions'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
+import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
 import DimPicker from '@/components/DimPicker.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import BoardMatrix from '@/components/BoardMatrix.vue'
@@ -83,9 +85,12 @@ const tableColumns = computed<DataColumn[]>(() => [
   { key: 'delayedNodeSum', label: '延期节点', sortable: true, num: true },
 ])
 
-// 柱状图：按计划回款降序 Top15，整数万；已回/待回柱内 + 总计柱顶
+// 图表类型多选（单维排名模式）；available 始终含 bar/line/pie（contractSum 是金额）
+const chartTypes = ref<string[]>(['bar'])
+
+// 柱状图（bar）：按计划回款降序 Top15，已回/待回堆叠柱 + 总计柱顶
 const chartTop = computed(() => [...groups.value].sort((a, b) => b.expectedSum - a.expectedSum).slice(0, 15))
-const chartOption = computed(() => {
+const stackedBarOption = computed(() => {
   const sc = settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT
   const t = chartTop.value
   const paid = t.map((g) => Math.round(g.actualSum / 10000))
@@ -106,6 +111,44 @@ const chartOption = computed(() => {
     ],
   }
 })
+
+// 折线图（line）：已回款 & 待回款两条折线 + 标签
+const lineChartOption = computed(() => {
+  const sc = settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT
+  const t = chartTop.value
+  const paid = t.map((g) => Math.round(g.actualSum / 10000))
+  const pending = t.map((g) => Math.round(g.pendingSum / 10000))
+  const labelStyle = { show: true, position: 'top' as const }
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['已回款', '待回款'], top: 0 },
+    grid: { left: 60, right: 20, top: 40, bottom: 60 },
+    xAxis: { type: 'category', data: t.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
+    yAxis: { type: 'value', name: '金额(万)' },
+    series: [
+      { name: '已回款', type: 'line', data: paid, itemStyle: { color: sc.ok }, symbol: 'circle', symbolSize: 6, label: labelStyle },
+      { name: '待回款', type: 'line', data: pending, itemStyle: { color: sc.warn }, symbol: 'circle', symbolSize: 6, label: labelStyle },
+    ],
+  }
+})
+
+// 饼图（pie）：contractSum 合同总额占比
+const pieChartOption = computed(() => {
+  const t = chartTop.value
+  return buildRankingOption('pie', {
+    categories: t.map((g) => g.key),
+    values: t.map((g) => g.contractSum),
+    metricLabel: '合同总额',
+    valueKind: 'amount',
+  })
+})
+
+// 按选中图表类型输出对应 option
+function chartOptionForType(type: string) {
+  if (type === 'line') return lineChartOption.value
+  if (type === 'pie') return pieChartOption.value
+  return stackedBarOption.value
+}
 
 // ---- 共用指标格式 ----
 const metricKind = computed(() => METRIC_BY_KEY[metricKey.value].kind)
@@ -139,6 +182,7 @@ const crossChartOption = computed(() => {
         const g = m.index[rv]?.[cv]
         return g ? +((g[metricKey.value] as number) / div).toFixed(2) : 0
       }),
+      label: { show: true, position: 'inside' as const },
     })),
   }
 })
@@ -183,6 +227,10 @@ defineExpose({ drillOpen, dimKey })
             <span class="bv-ctl-label">维度</span>
             <SegToggle v-model="dimKey" :options="DIM_OPTS" />
           </div>
+          <div class="bv-ctl">
+            <span class="bv-ctl-label">图表类型</span>
+            <ChartTypeSelector v-model="chartTypes" :available="['bar', 'line', 'pie']" />
+          </div>
         </template>
 
         <template v-else-if="mode === 'cross'">
@@ -218,10 +266,20 @@ defineExpose({ drillOpen, dimKey })
 
       <!-- 单维 -->
       <template v-if="mode === 'single'">
-        <section class="bv-card">
-          <h3 class="bv-title">已回款 / 待回款对比（Top {{ chartTop.length }}）</h3>
-          <ChartBox :option="chartOption" height="320px" />
-        </section>
+        <div class="bv-charts-row">
+          <section
+            v-for="type in chartTypes"
+            :key="type"
+            class="bv-card bv-chart-item"
+          >
+            <h3 class="bv-title">
+              <template v-if="type === 'bar'">已回款 / 待回款对比（Top {{ chartTop.length }}）</template>
+              <template v-else-if="type === 'line'">已回款 / 待回款折线（Top {{ chartTop.length }}）</template>
+              <template v-else>合同总额占比（Top {{ chartTop.length }}）</template>
+            </h3>
+            <ChartBox :option="chartOptionForType(type)" height="320px" />
+          </section>
+        </div>
         <section class="bv-card">
           <h3 class="bv-title">分组排名（点击行下钻该组项目）</h3>
           <DataTable :columns="tableColumns" :rows="groups" clickable @row-click="(r) => openDrill(r as PayBoardGroup)">
@@ -279,7 +337,9 @@ defineExpose({ drillOpen, dimKey })
 .bv-toolbar { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 12px; }
 .bv-ctl { display: flex; align-items: center; gap: 8px; }
 .bv-ctl-label { font-size: var(--fs-1); color: var(--mut); }
+.bv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: 12px; }
 .bv-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.bv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
 .bv-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
 .bv-danger { color: var(--danger); font-weight: 700; }
 .bv-empty { color: var(--mut); padding: 16px; text-align: center; }
