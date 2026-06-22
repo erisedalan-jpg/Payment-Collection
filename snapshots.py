@@ -221,8 +221,12 @@ def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
             evs.append(_ev(d, "计划回款日变更", "payment", pid, pname,
                            f"「{node}」计划日 {a.get('planDate') or '-'} → {b.get('planDate') or '-'}",
                            prev=a.get("planDate"), curr=b.get("planDate")))
+    # 因项目关闭(从主域移出)而连带消失的节点不单独记"回款节点移除",避免与"关闭项目"事件重复刷屏
+    closed_pids = {pid for pid in pp if pid not in cp}
     for key, a in pn.items():
         if key not in cn:
+            if (a.get("pid") or "") in closed_pids:
+                continue
             evs.append(_ev(d, "回款节点移除", "payment", a.get("pid") or "",
                            a.get("pname") or "", f"节点「{a.get('node') or ''}」移除"))
     return evs
