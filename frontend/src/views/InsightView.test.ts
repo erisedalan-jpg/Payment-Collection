@@ -22,8 +22,8 @@ beforeEach(() => {
 function seed() {
   const ds = useDataStore()
   ds.data = {
-    meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, events: [],
+    meta: {}, dashboard: {}, summary: {}, rawNodes: [],
+    displayColumns: {}, followupRecords: {}, events: [],
     projects: [
       { projectId: 'P-1', projectName: '甲', projectManager: '何平', orgL4: '交付一组',
         payment: { relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, remainingTotal: 400, paymentRatio: 0.6, delayedCount: 1 },
@@ -91,7 +91,7 @@ describe('InsightView', () => {
 
   it('空项目空态', async () => {
     const ds = useDataStore()
-    ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], projectOverview: { projects: [], columns: [] }, naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, events: [] } as any
+    ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, events: [] } as any
     const w = await mountView()
     expect(w.text()).toContain('暂无项目主域数据')
   })

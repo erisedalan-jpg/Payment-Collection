@@ -24,11 +24,6 @@ class Meta(_Base):
     totalPaymentNodes: int
 
 
-class ProjectOverview(_Base):
-    projects: List[Dict[str, Any]] = []
-    columns: List[Dict[str, Any]] = []
-
-
 class PmisCost(_Base):
     总预算: Optional[float] = None
     核算: Optional[float] = None
@@ -319,9 +314,6 @@ class PeriodCompare(_Base):
 
 class AnalysisData(_Base):
     meta: Meta
-    projectOverview: ProjectOverview
-    naguanMap: Dict[str, bool] = {}
-    naguanExclude: Dict[str, bool] = {}
     followupRecords: Dict[str, Any] = {}
     projectPmis: Dict[str, ProjectPmis] = {}
     dataQuality: Optional[DataQuality] = None

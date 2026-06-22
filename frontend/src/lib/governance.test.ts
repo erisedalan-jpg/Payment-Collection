@@ -5,7 +5,7 @@ import type { AnalysisData } from '@/types/analysis'
 function makeData(over: Record<string, any> = {}): AnalysisData {
   return {
     meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
-    dashboard: {}, summary: {}, projectOverview: {},
+    dashboard: {}, summary: {},
     projects: [{ projectId: 'P-1', orgL4: '交付一组' }],
     rawNodes: [{ projectId: 'P-1', tier: '100万以上', isPaymentRelated: true }],
     dataQuality: {

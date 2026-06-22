@@ -28,8 +28,8 @@ const inDays = (n: number) => iso(new Date(now.getTime() + n * 86400000))
 function seed() {
   const ds = useDataStore()
   ds.data = {
-    meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] },
-    naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+    meta: {}, dashboard: {}, summary: {},
+    displayColumns: {}, followupRecords: {},
     projects: [
       { projectId: 'P-1', projectName: '风险甲', orgL4: 'A组', payment: { relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, remainingTotal: 400, paymentRatio: 0.6, delayedCount: 1 }, deliveryCosts: [],
         paymentPmis: { contract: 1000 },
@@ -125,7 +125,7 @@ describe('OverviewView', () => {
 
   it('无数据空态不崩(零项目零事件)', async () => {
     const ds = useDataStore()
-    ds.data = { meta: {}, dashboard: {}, summary: {}, projectOverview: { projects: [], columns: [] }, naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, rawNodes: [], events: [] } as any
+    ds.data = { meta: {}, dashboard: {}, summary: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, rawNodes: [], events: [] } as any
     const w = await mountView()
     expect(w.text()).toContain('首次同步，暂无变化记录')
     expect(w.text()).toContain('在管项目')

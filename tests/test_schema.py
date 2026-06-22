@@ -7,8 +7,6 @@ import schema
 def _minimal_valid():
     return {
         "meta": {"lastUpdate": "2026-06-03 10:00", "totalProjects": 1, "totalPaymentNodes": 1},
-        "projectOverview": {"projects": [], "columns": []},
-        "naguanMap": {}, "naguanExclude": {},
         "followupRecords": {},
     }
 
@@ -21,7 +19,7 @@ def test_valid_data_parses():
 
 def test_missing_top_level_key_fails():
     bad = _minimal_valid()
-    del bad["projectOverview"]
+    del bad["meta"]
     with pytest.raises(ValidationError):
         schema.AnalysisData.model_validate(bad)
 
@@ -36,7 +34,6 @@ def test_wrong_type_on_core_field_fails():
 def _minimal_analysis():
     return {
         "meta": {"lastUpdate": "2026-06-09 10:00", "totalProjects": 1, "totalPaymentNodes": 1},
-        "projectOverview": {"projects": [], "columns": []},
     }
 
 
@@ -147,7 +144,6 @@ class TestProjectsContract:
 def _minimal_analysis_data():
     return {
         "meta": {"lastUpdate": "2026-06-11 10:00", "totalProjects": 1, "totalPaymentNodes": 1},
-        "projectOverview": {"projects": [], "columns": []},
     }
 
 
@@ -213,7 +209,6 @@ class TestR1DataSourcesContract:
 def test_closed_projects_schema():
     import schema
     base = {"meta": {"lastUpdate": "2026-06-18 10:00", "totalProjects": 1, "totalClosed": 1, "totalPaymentNodes": 0},
-            "projectOverview": {"projects": [], "columns": []},
             "closedProjects": [{
                 "projectId": "C-1", "projectName": "甲", "projectManager": "张三",
                 "orgL4": "安全A组", "orgL3_1": "三部一组", "合同编号": "HT-1",
@@ -240,7 +235,6 @@ def test_closed_projects_schema():
 
 def test_closed_projects_default_empty():
     import schema
-    base = {"meta": {"lastUpdate": "x", "totalProjects": 0, "totalPaymentNodes": 0},
-            "projectOverview": {"projects": [], "columns": []}}
+    base = {"meta": {"lastUpdate": "x", "totalProjects": 0, "totalPaymentNodes": 0}}
     m = schema.AnalysisData.model_validate(base)
     assert m.closedProjects == []   # 默认空(不传不报错)

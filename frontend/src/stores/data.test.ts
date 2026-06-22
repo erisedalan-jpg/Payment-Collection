@@ -4,8 +4,7 @@ import { useDataStore } from './data'
 
 const SAMPLE = {
   meta: { lastUpdate: '2026-06-03 10:00', totalProjects: 2, totalPaymentNodes: 3 },
-  projectOverview: { projects: [], columns: [] },
-  naguanMap: {}, naguanExclude: {}, displayColumns: {}, followupRecords: {},
+  displayColumns: {}, followupRecords: {},
 }
 
 beforeEach(() => setActivePinia(createPinia()))
@@ -39,20 +38,16 @@ describe('data store', () => {
 })
 
 describe('useDataStore.clearBusinessData', () => {
-  it('清空业务数据，保留平台配置', () => {
+  it('清空 projects 列表，保留 meta', () => {
     const s = useDataStore()
     s.data = {
       meta: { lastUpdate: 'x', totalProjects: 1, totalPaymentNodes: 1 },
-      projectOverview: { projects: [{ projectId: 'P1' }], columns: [{ key: 'projectId' }] },
-      naguanMap: {},
-      naguanExclude: {},
-      displayColumns: { '100万以上': [{ key: 'projectId' }] },
+      projects: [{ projectId: 'P1' }],
       followupRecords: {},
     } as any
     s.clearBusinessData()
-    expect((s.data!.projectOverview as any).projects).toEqual([])
-    expect(s.data!.displayColumns).toBeTruthy()
-    expect((s.data!.projectOverview as any).columns).toHaveLength(1)
+    expect((s.data!.projects as any[]).length).toBe(0)
+    expect(s.data!.meta.lastUpdate).toBe('x')
   })
   it('data 为空时安全', () => {
     const s = useDataStore()
@@ -63,7 +58,7 @@ describe('useDataStore.clearBusinessData', () => {
 describe('useDataStore.reload', () => {
   it('强制重拉并更新 data', async () => {
     const s = useDataStore()
-    const fresh = { meta: { lastUpdate: 'new' }, projectOverview: { projects: [] } }
+    const fresh = { meta: { lastUpdate: 'new' }, projects: [] }
     const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({ ok: true, json: async () => fresh } as any)
     await s.reload()
     expect((s.data as any).meta.lastUpdate).toBe('new')

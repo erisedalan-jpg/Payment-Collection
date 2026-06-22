@@ -17,13 +17,6 @@ def _fixture():
         "paymentRecords": {"P1": {}, "P2": {}},
         "followupRecords": {"P1": {}, "P2": {}},
         "tagSeed": {"P1": ["t"], "P2": ["t"]},
-        "projectOverview": {
-            "columns": ["项目编号", "项目名称"],
-            "projects": [
-                {"projectId": "P1", "orgL4": "D1", "项目名称": "项目一"},
-                {"projectId": "P2", "orgL4": "D2", "项目名称": "项目二"},
-            ],
-        },
         "events": [{"projectId": "P1"}, {"projectId": "P2"}, {"projectId": "C9"}],
         "dataQuality": {"summary": {"matchRate": 0.9}},
         "periodCompare": {"lastSync": {}},
@@ -63,9 +56,6 @@ def test_filter_by_l4():
     assert out["periodCompare"] == f["periodCompare"]
     # tagSeed 按 projectId 裁切
     assert set(out["tagSeed"].keys()) == {"P1"}
-    # projectOverview.projects 裁切，columns 保留
-    assert [r["projectId"] for r in out["projectOverview"]["projects"]] == ["P1"]
-    assert out["projectOverview"]["columns"] == f["projectOverview"]["columns"]
     # 不改入参
     assert len(f["projects"]) == 4
 

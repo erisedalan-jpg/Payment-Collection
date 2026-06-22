@@ -13,7 +13,7 @@ function seed(over: Record<string, any> = {}) {
   const ds = useDataStore()
   ds.data = {
     meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
-    dashboard: {}, summary: {}, projectOverview: {},
+    dashboard: {}, summary: {},
     // yundocsOk 换 projects.length>0(3E-2):非空主域 → 云文档主数据已就绪
     projects: [{ projectId: 'P-1', orgL4: 'A组' }],
     rawNodes: [{ projectId: 'P-1', tier: 't', isPaymentRelated: true }],

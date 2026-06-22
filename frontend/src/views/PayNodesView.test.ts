@@ -16,7 +16,6 @@ function seed() {
       { stage: '终验', planDate: '2026-03-01', actualDate: '', payRatio: 0.3, expectedPayment: 600_000, reached: false, status: '延期' },
     ] },
     projectPmis: { A: { progress: { 项目阶段: '实施' } } },
-    naguanExclude: {},
   } as any
 }
 
@@ -48,7 +47,7 @@ describe('PayNodesView', () => {
 
   it('空数据不崩', () => {
     const data = useDataStore()
-    data.data = { projects: [], paymentNodes: {}, projectPmis: {}, naguanExclude: {} } as any
+    data.data = { projects: [], paymentNodes: {}, projectPmis: {} } as any
     expect(mount(PayNodesView, { global: { plugins: [ElementPlus] } }).exists()).toBe(true)
   })
 
@@ -60,8 +59,7 @@ describe('PayNodesView', () => {
         stage: '到货', planDate: '2026-01-01', actualDate: '2026-01-05', payRatio: 0.1, expectedPayment: 1000, reached: true, status: '已回款',
       })) },
       projectPmis: { A: { progress: { 项目阶段: '实施' } } },
-      naguanExclude: {},
-    } as any
+      } as any
     const w = mount(PayNodesView, { global: { plugins: [ElementPlus] } })
     expect((w.findComponent(DataTable).props('rows') as any[]).length).toBe(50)
     expect(w.text()).toContain('节点总数')

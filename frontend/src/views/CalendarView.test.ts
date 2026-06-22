@@ -19,9 +19,6 @@ function seed() {
     dashboard: {},
     summary: {},
     rawNodes: [],
-    projectOverview: { projects: [], columns: [] },
-    naguanMap: {},
-    naguanExclude: {},
     displayColumns: {},
     followupRecords: {},
     projects: [

@@ -4,8 +4,7 @@ from __future__ import annotations
 # projectId 键控的业务 dict(按 keep 集裁键)
 _PID_KEYED = (
     'projectPmis', 'paymentNodes', 'projectMilestones', 'paymentRecords',
-    'projectProfit', 'naguanMap', 'naguanExclude', 'followupRecords',
-    'tagSeed',
+    'projectProfit', 'followupRecords', 'tagSeed',
 )
 
 
@@ -51,13 +50,6 @@ def filter_analysis_data(data: dict, allowed_l4: list) -> dict:
         d = data.get(key)
         if isinstance(d, dict):
             out[key] = {k: v for k, v in d.items() if k in keep}
-
-    ov = data.get('projectOverview')
-    if isinstance(ov, dict):
-        new_ov = dict(ov)
-        new_ov['projects'] = [p for p in (ov.get('projects') or [])
-                              if isinstance(p, dict) and p.get('projectId') in keep]
-        out['projectOverview'] = new_ov
 
     events = data.get('events')
     if isinstance(events, list):

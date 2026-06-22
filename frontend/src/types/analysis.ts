@@ -9,12 +9,6 @@ export type Lastupdate = string;
 export type Totalprojects = number;
 export type Totalclosed = number;
 export type Totalpaymentnodes = number;
-export type Projects = {
-  [k: string]: unknown;
-}[];
-export type Columns = {
-  [k: string]: unknown;
-}[];
 export type Matched = boolean;
 export type Source = string;
 export type NoName = number | null;
@@ -114,7 +108,7 @@ export type Riskabnormal = boolean;
 export type Costabnormal = boolean;
 export type Paymentabnormal = boolean;
 export type Overall = string;
-export type Projects1 = Project[];
+export type Projects = Project[];
 export type Projectid1 = string;
 export type Projectname1 = string;
 export type Projectmanager1 = string;
@@ -210,13 +204,10 @@ export type Paymentratiochange = number | null;
 
 export interface AnalysisData {
   meta: Meta;
-  projectOverview: ProjectOverview;
-  naguanMap?: Naguanmap;
-  naguanExclude?: Naguanexclude;
   followupRecords?: Followuprecords;
   projectPmis?: Projectpmis;
   dataQuality?: DataQuality | null;
-  projects?: Projects1;
+  projects?: Projects;
   closedProjects?: Closedprojects;
   projectsQuality?: ProjectsQuality | null;
   projectMilestones?: Projectmilestones;
@@ -234,17 +225,6 @@ export interface Meta {
   totalClosed?: Totalclosed;
   totalPaymentNodes: Totalpaymentnodes;
   [k: string]: unknown;
-}
-export interface ProjectOverview {
-  projects?: Projects;
-  columns?: Columns;
-  [k: string]: unknown;
-}
-export interface Naguanmap {
-  [k: string]: boolean;
-}
-export interface Naguanexclude {
-  [k: string]: boolean;
 }
 export interface Followuprecords {
   [k: string]: unknown;
