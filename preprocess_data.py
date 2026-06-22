@@ -6,7 +6,6 @@ import sys
 import os
 import re
 from datetime import datetime, date, timedelta
-from collections import defaultdict
 import config
 import schema
 import pmis
