@@ -10,6 +10,9 @@ const props = withDefaults(defineProps<{ events: Event[]; emptyText?: string; pi
 })
 const groups = computed(() => groupEventsByDate(props.events))
 function meta(pid?: string): PidInfo | undefined { return pid ? props.pidInfo?.[pid] : undefined }
+function overItems(pid?: string) { return meta(pid)?.overspendItems ?? [] }
+// 超支金额只在「交付费用超支」事件上按分项展示,避免在每条事件重复
+function isOverspendEvent(type?: string): boolean { return type === '交付费用超支' }
 </script>
 
 <template>
@@ -20,12 +23,14 @@ function meta(pid?: string): PidInfo | undefined { return pid ? props.pidInfo?.[
       <div v-for="(e, i) in g.items" :key="`${g.date}-${i}`" class="ev-item">
         <span class="ev-type" :class="e.tone ? `tone-${e.tone}` : (e.domain === 'payment' ? 'pay' : 'proj')">{{ e.type }}</span>
         <RouterLink v-if="e.projectId" class="ev-proj" :to="`/project/${e.projectId}`">{{ e.projectName || e.projectId }}</RouterLink>
-        <span v-if="meta(e.projectId)" class="ev-meta">
-          <span v-if="meta(e.projectId)!.projectManager" class="ev-meta-i">{{ meta(e.projectId)!.projectManager }}</span>
-          <span v-if="meta(e.projectId)!.orgL4" class="ev-meta-i">{{ meta(e.projectId)!.orgL4 }}</span>
-          <span v-for="(it, k) in (meta(e.projectId)!.overspendItems ?? [])" :key="`os-${k}`" class="ev-meta-i ev-meta-over">{{ it.label }} 超支 {{ fmtYuan(it.amount) }} 元</span>
+        <span v-if="meta(e.projectId)?.projectManager || meta(e.projectId)?.orgL4" class="ev-meta">
+          <span v-if="meta(e.projectId)?.projectManager" class="ev-meta-i">{{ meta(e.projectId)!.projectManager }}</span>
+          <span v-if="meta(e.projectId)?.orgL4" class="ev-meta-i">{{ meta(e.projectId)!.orgL4 }}</span>
         </span>
-        <span class="ev-summary">{{ e.summary }}</span>
+        <template v-if="isOverspendEvent(e.type) && overItems(e.projectId).length">
+          <span v-for="(it, k) in overItems(e.projectId)" :key="`os-${k}`" class="ev-over">{{ it.label }} 超支 {{ fmtYuan(it.amount) }} 元</span>
+        </template>
+        <span v-else class="ev-summary">{{ e.summary }}</span>
       </div>
     </div>
   </div>
@@ -46,6 +51,6 @@ function meta(pid?: string): PidInfo | undefined { return pid ? props.pidInfo?.[
 .ev-proj:hover { text-decoration: underline; }
 .ev-meta { display: inline-flex; gap: var(--sp-1); flex-wrap: wrap; flex-shrink: 0; }
 .ev-meta-i { font-size: var(--fs-1); color: var(--mut); padding: 0 var(--sp-1); border: 1px solid var(--line); border-radius: var(--r-sm); line-height: 1.7; }
-.ev-meta-over { color: var(--danger-text); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.ev-over { flex-shrink: 0; font-size: var(--fs-1); color: var(--danger-text); background: var(--danger-bg); padding: 0 var(--sp-2); border-radius: var(--r-sm); line-height: 1.7; }
 .ev-summary { color: var(--txt); min-width: 0; overflow-wrap: anywhere; }
 </style>
