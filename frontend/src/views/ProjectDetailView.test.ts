@@ -165,7 +165,7 @@ describe('ProjectDetailView', () => {
     expect(w.text()).not.toContain('自有产品成本')       // 2.1.1 默认折叠
     expect(w.text()).toContain('概算')
     expect(w.text()).toContain('内部人员成本')           // delivery 明细保留
-    expect(w.text()).toContain('总预算(万)')             // PMIS 汇总保留
+    expect(w.text()).toContain('总预算(元)')             // PMIS 汇总保留
   })
 
   it('售前项目预算核算 tab:桥接原项目块(R2)', async () => {
@@ -199,7 +199,7 @@ describe('ProjectDetailView', () => {
     const w = await mountAt('/project/P-1')
     await w.findAll('.pd-tab').find((b) => b.text() === '预算核算')!.trigger('click')
     expect(w.text()).toContain('内部人员成本')
-    expect(w.text()).toContain('总预算(万)')
+    expect(w.text()).toContain('总预算(元)')
   })
 
   it('售前整合项目：原项目 tab 展示已关闭信息(3E-2 原项目回款节点表已下线)', async () => {
