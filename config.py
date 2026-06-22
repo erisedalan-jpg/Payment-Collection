@@ -1,11 +1,6 @@
 # config.py
 """集中配置常量：消除散落在 preprocess_data.py 各处的硬编码。"""
 
-# ── 云文档 Sheet 名 ──
-SHEET_PAYMENT_NODES = "项目回款节点（里程碑）清单"
-SHEET_PROJECT_OVERVIEW = "项目验收日期、回款条件信息收集"
-SHEET_FOLLOWUP = "项目回款跟进记录"
-
 # ── 收款阶段台账（系统核心口径回款源，位于 input/）──
 COLLECTION_STAGES_FILE = "collection_stages.csv"
 
@@ -65,15 +60,6 @@ PAYMENT_RECORDS_FILE = "payment_records.csv"
 PMIS_ALL_FILENAMES = (list(PMIS_FILES_ACTIVE.values()) + list(PMIS_FILES_CLOSED.values())
                       + [MILESTONE_FILE_ACTIVE, MILESTONE_FILE_CLOSED])
 
-# 默认下载直链(Phase R3,用户 2026-06-12 提供;blob 类无直链文件不入此表,入口标注手动导出上传)
-WPS_LINK_KEY = "回款数据"  # 非 PMIS 文件名键,pmis_download.plan_downloads 按九表名单过滤不受影响
-DEFAULT_LINKS = {
-    WPS_LINK_KEY: "https://yundocs.qianxin-inc.cn/weboffice/l/sRs8GgCmE2ygb",
-    "项目状态信息数据.xlsx": "https://pmis.qianxin-inc.cn/design/cache/cacheProjectsStatus/exportProjectStatusExcel.pd?params=null&projSearch=&isArchive=0&isMyProject=0&projectType=&parentWbsId=&deptId=&advancedQueryArray=",
-    "项目状态信息数据-已关闭.xlsx": "https://pmis.qianxin-inc.cn/design/cache/cacheProjectsStatus/exportProjectStatusExcel.pd?params=null&projSearch=&isArchive=1&isMyProject=0&projectType=&parentWbsId=&deptId=&advancedQueryArray=",
-    "项目风险数据.xlsx": "https://pmis.qianxin-inc.cn/design/risk/projRisklibrary/exportProjExcel.pd?params=null&searchValue=&deleteFlag=0&riskLevel=&realm=&projStage=&status=&projIdType=1&parentWbsId=&deptId=&projId=&advancedQueryArray=",
-}
-
 # ── 项目主域输入文件(Phase P,位于 input/ 根) ──
 ORG_FILE = "组织架构.xlsx"
 MAPPING_FILE = "A.xlsx"
@@ -94,6 +80,5 @@ DELIVERY_COST_CATEGORIES = [
 # 项目阶段推进顺序(周期对比"阶段推进"判定;真实取值域: 启动/规划/执行/收尾)
 STAGE_ORDER = ("项目启动", "项目规划", "项目执行", "项目收尾")
 
-# 2C 项目标签：从云文档截图列播种的种子标签白名单（用户钦定）与扫描列
+# 2C 项目标签：种子标签白名单（用户钦定）
 TAG_SEED_WHITELIST = ["BH项目", "框架合同", "退换货项目", "项目已关闭", "SM项目", "0元订单项目", "佳杰"]
-TAG_SEED_COLUMNS = ["合同验收回款时间节点截图", "合同付款条件截图"]

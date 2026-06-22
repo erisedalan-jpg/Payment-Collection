@@ -4,19 +4,6 @@ import config
 import server as S
 
 
-class TestMergedPmisLinks:
-    def test_default_fills_absent_keys_only(self):
-        saved = {"项目状态信息数据.xlsx": "http://custom", "项目中心.xlsx": ""}
-        m = S.merged_pmis_links(saved)
-        assert m["项目状态信息数据.xlsx"] == "http://custom"          # 保存值胜出
-        assert m["项目中心.xlsx"] == ""                               # 显式空串保留
-        assert m["项目风险数据.xlsx"] == config.DEFAULT_LINKS["项目风险数据.xlsx"]  # 缺省键补默认
-        assert m[config.WPS_LINK_KEY] == config.DEFAULT_LINKS[config.WPS_LINK_KEY]
-
-    def test_none_saved(self):
-        assert S.merged_pmis_links(None) == config.DEFAULT_LINKS
-
-
 class TestCollectFileStatus:
     def test_known_files_mtime_and_missing_none(self, tmp_path):
         pmis_dir = tmp_path / "input" / config.PMIS_DIRNAME

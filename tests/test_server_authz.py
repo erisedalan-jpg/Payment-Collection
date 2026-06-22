@@ -74,7 +74,6 @@ def test_nonsuper_blocked_from_raw_data_and_ops(tmp_path, monkeypatch):
         assert _status(conn, "GET", "/api/stop", ck) == 403
         assert _status(conn, "GET", "/api/files/status", ck) == 403
         assert _status(conn, "GET", "/api/data-history", ck) == 403
-        assert _status(conn, "POST", "/api/import", ck, body="") == 403
         assert _status(conn, "POST", "/api/inputs/upload", ck, body="") == 403
         assert _status(conn, "POST", "/api/manual/rollback", ck, body="{}") == 403
     finally:

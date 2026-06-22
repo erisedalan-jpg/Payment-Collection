@@ -14,7 +14,6 @@ try:
     if sys.stderr is not None: sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 except Exception:
     pass
-import csv
 import json
 import os
 import subprocess
@@ -50,11 +49,6 @@ def is_valid_input_name(name: str) -> bool:
     return bool(name) and name in _INPUT_UPLOAD_NAMES
 
 
-def merged_pmis_links(saved):
-    """链接读取:默认直链兜底——仅补未保存的键,已保存键(含显式空串)胜出。"""
-    return {**config.DEFAULT_LINKS, **(saved or {})}
-
-
 def _mtime_str(path: str):
     try:
         return datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d %H:%M')
@@ -72,22 +66,6 @@ def collect_file_status(base_dir: str):
         out[name] = _mtime_str(os.path.join(base_dir, 'input', name))
     return out
 
-
-# ── Playwright 依赖预导入（确保 PyInstaller 打包时追踪完整依赖链） ──
-if getattr(sys, 'frozen', False):
-    # 打包模式：playwright 必须存在，否则同步功能无法使用
-    from playwright.sync_api import sync_playwright  # noqa: F401
-else:
-    # 开发模式：未安装时忽略，不影响启动
-    try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
-    except ImportError:
-        pass
-
-# ── 打包模式下 Playwright 环境配置 ──
-if getattr(sys, 'frozen', False):
-    # 使用系统已安装的 Chrome，不需要 Playwright 自带 Chromium
-    os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', '0')
 
 PORT = 8080
 HOST = "127.0.0.1"  # 仅绑定本地回环，避免局域网无认证访问
@@ -135,17 +113,10 @@ if sys.stdout:
     console_handler.setFormatter(file_formatter)
     logger.addHandler(console_handler)
 
-# 同步状态
-sync_state = {"running": False, "progress": 0, "message": ""}
-sync_url = ""
-# 导入状态（与同步互斥）
-import_state = {"running": False, "progress": 0, "message": ""}
-# PMIS 下载状态
-pmis_state = {"running": False, "progress": 0, "message": ""}
 # 重新预处理状态（独立更新数据，不抓取）
 reprocess_state = {"running": False, "progress": 0, "message": ""}
 
-# 子进程引用（用于停止同步/导入时终止）
+# 子进程引用（用于停止更新时终止）
 active_process = None
 
 # ── 跟进记录相关 ──
@@ -177,11 +148,11 @@ def _path_needs_auth(path):
 # 仅超管可访问的写/运维端点(数据更新/导入/清空/回滚/停服/原始文件下载/数据历史/文件状态等);
 # 内容端点(followup/tags)与状态轮询(sync-status/import-status)不在此列,普通管理员可用。
 _SUPER_ONLY_PATHS = frozenset({
-    '/api/sync', '/api/clear-data', '/api/reprocess',
-    '/api/stop', '/api/stop-sync', '/api/stop-import',
+    '/api/clear-data', '/api/reprocess',
+    '/api/stop',
     '/api/data-history', '/api/manual/backups',
-    '/api/files/status', '/api/pmis/links', '/api/pmis/download',
-    '/api/import', '/api/pmis/upload', '/api/inputs/upload',
+    '/api/files/status',
+    '/api/pmis/upload', '/api/inputs/upload',
     '/api/data-history/rollback', '/api/data-history/undo-rollback',
     '/api/manual/import', '/api/manual/rollback',
 })
@@ -381,20 +352,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._serve_static_with_charset()
             return
         
-        if parsed.path == '/api/sync':
-            self.handle_sync()
-        elif parsed.path == '/api/sync-status':
-            self.handle_sync_status()
-        elif parsed.path == '/api/clear-data':
+        if parsed.path == '/api/clear-data':
             self.handle_clear_data()
         elif parsed.path == '/api/data-history':
             self.handle_data_history()
-        elif parsed.path == '/api/stop-sync':
-            self.handle_stop_sync()
-        elif parsed.path == '/api/stop-import':
-            self.handle_stop_import()
-        elif parsed.path == '/api/import-status':
-            self.handle_import_status()
         elif parsed.path == '/api/stop':
             self.handle_stop_server()
         elif parsed.path.startswith('/api/followup/list'):
@@ -407,12 +368,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_manual_backups()
         elif parsed.path == '/api/tags':
             self.handle_tags_get()
-        elif parsed.path == '/api/pmis/links':
-            self.handle_pmis_links_get()
         elif parsed.path == '/api/files/status':
             self.handle_files_status()
-        elif parsed.path == '/api/pmis/download':
-            self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
             self.handle_reprocess()
         elif parsed.path == '/api/auth/me':
@@ -486,9 +443,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not self._authz_gate():
             return
 
-        if parsed.path == '/api/import':
-            self.handle_import()
-        elif parsed.path == '/api/followup/add':
+        if parsed.path == '/api/followup/add':
             self.handle_followup_add()
         elif parsed.path == '/api/followup/delete':
             self.handle_followup_delete()
@@ -496,8 +451,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_update()
         elif parsed.path == '/api/tags':
             self.handle_tags_save()
-        elif parsed.path == '/api/pmis/links':
-            self.handle_pmis_links_post()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -523,55 +476,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
-    
-    def handle_sync(self):
-        global sync_state, sync_url
-        # Parse URL parameter from query string
-        qs = self.parse_path()
-        url_vals = qs.get('url', [])
-        sync_url = url_vals[0] if url_vals else ''
-        # 互斥检查：回滚/导入进行中时禁止同步
-        if history_state.get("running"):
-            self._json_response({"running": False, "progress": 0, "message": "数据回滚进行中，请稍后再同步"})
-            return
-        if import_state["running"]:
-            self._json_response({"running": False, "progress": 0, "message": "导入正在进行中，请等待完成或停止导入后再同步"})
-            return
-        if sync_state["running"]:
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/event-stream')
-            self.send_header('Cache-Control', 'no-cache')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(f"data: {json.dumps(sync_state)}\n\n".encode('utf-8'))
-            return
-        
-        # Start sync in background thread
-        sync_state = {"running": True, "progress": 0, "message": "启动同步..."}
-        sync_thread = threading.Thread(target=run_sync, daemon=True)
-        sync_thread.start()
-        
-        # SSE stream
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
-        self.send_header('Cache-Control', 'no-cache')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        
-        while True:
-            data = json.dumps(sync_state)
-            self.wfile.write(f"data: {data}\n\n".encode('utf-8'))
-            self.wfile.flush()
-            if sync_state["progress"] >= 100 or not sync_state["running"]:
-                break
-            time.sleep(0.5)
-    
-    def handle_sync_status(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps(sync_state).encode('utf-8'))
     
     def handle_clear_data(self):
         """删除业务数据文件 data/analysis_data.json 及原始提取数据目录 yundocs_data/"""
@@ -623,59 +527,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Max-Age', '86400')
         self.end_headers()
 
-    def handle_import(self):
-        """POST /api/import - 接收前端上传的Excel JSON数据"""
-        global import_state
-        # 互斥检查
-        if history_state.get("running"):
-            self._json_response(_error_payload(ERR_BUSY, "数据回滚进行中，请稍后再导入"))
-            return
-        if sync_state["running"]:
-            self._json_response(_error_payload(ERR_BUSY, "同步正在进行中，请等待完成或停止同步后再导入"))
-            return
-        if import_state["running"]:
-            self._json_response(_error_payload(ERR_BUSY, "导入正在进行中，请等待完成或停止上传"))
-            return
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode('utf-8'))
-        except Exception as e:
-            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
-            return
-        # 启动导入线程
-        import_state = {"running": True, "progress": 5, "message": "正在保存数据..."}
-        import_thread = threading.Thread(target=run_import, args=(data,), daemon=True)
-        import_thread.start()
-        self._json_response({"success": True, "message": "导入已开始"})
-    
-    def handle_stop_sync(self):
-        """GET /api/stop-sync - 停止同步"""
-        global sync_state, active_process
-        if not sync_state["running"]:
-            self._json_response({"success": True, "message": "同步未在运行"})
-            return
-        sync_state = {"running": False, "progress": 0, "message": "同步已停止"}
-        logger.info("用户停止同步")
-        # 终止子进程
-        _terminate_active_process()
-        self._json_response({"success": True, "message": "同步已停止"})
-    
-    def handle_stop_import(self):
-        """GET /api/stop-import - 停止导入"""
-        global import_state, active_process
-        if not import_state["running"]:
-            self._json_response({"success": True, "message": "导入未在运行"})
-            return
-        import_state = {"running": False, "progress": 0, "message": "导入已停止"}
-        logger.info("用户停止导入")
-        _terminate_active_process()
-        self._json_response({"success": True, "message": "导入已停止"})
-    
-    def handle_import_status(self):
-        """GET /api/import-status - 查询导入状态"""
-        self._json_response(import_state)
-    
     def handle_stop_server(self):
         """GET /api/stop - 停止服务（前端页面停止按钮调用）"""
         logger.info("收到停止服务请求，正在关闭服务...")
@@ -981,28 +832,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"保存标签失败: {e}"))
 
-    def _pmis_links_path(self):
-        """返回 pmis_links.json 的绝对路径"""
-        return os.path.join(BASE_DIR, 'data', 'pmis_links.json')
-
-    def handle_pmis_links_get(self):
-        """GET /api/pmis/links - 读取已保存的 PMIS 链接"""
-        path = self._pmis_links_path()
-        links = {}
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    links = json.load(f).get('links', {})
-            except Exception:
-                links = {}
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps({"links": merged_pmis_links(links),
-                                     "defaults": config.DEFAULT_LINKS},
-                                    ensure_ascii=False).encode('utf-8'))
-
     def handle_files_status(self):
         """GET /api/files/status - 已知数据文件的最近修改时间(数据管理页行内展示)"""
         self.send_response(200)
@@ -1011,22 +840,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({"files": collect_file_status(BASE_DIR)},
                                     ensure_ascii=False).encode('utf-8'))
-
-    def handle_pmis_links_post(self):
-        """POST /api/pmis/links - 保存 PMIS 链接配置"""
-        length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length) if length else b'{}'
-        try:
-            payload = json.loads(body.decode('utf-8'))
-            links = payload.get('links', {})
-        except Exception as e:
-            # 解析失败：返回错误，不覆盖已有配置文件（与 handle_followup_add 一致）
-            self._json_response(_error_payload(ERR_PARSE, f"请求数据解析失败: {str(e)}"))
-            return
-        os.makedirs(os.path.join(BASE_DIR, 'data'), exist_ok=True)
-        with open(self._pmis_links_path(), 'w', encoding='utf-8') as f:
-            json.dump({"links": links}, f, ensure_ascii=False, indent=2)
-        self._json_response({"ok": True})
 
     def handle_pmis_upload(self):
         """POST /api/pmis/upload?name=<文件名> - 接收原始字节，写入 input/pmis/"""
@@ -1090,34 +903,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({"ok": True, "name": name, "bytes": len(body)}, ensure_ascii=False).encode('utf-8'))
 
-    def handle_pmis_download(self):
-        """GET /api/pmis/download - 启动 PMIS 下载，SSE 流式返回进度"""
-        global pmis_state
-        if history_state.get("running"):
-            self._json_response({"running": False, "progress": 0, "message": "数据回滚进行中，请稍后再下载"})
-            return
-        if pmis_state.get("running"):
-            self._json_response(pmis_state)
-            return
-        pmis_state = {"running": True, "progress": 0, "message": "启动 PMIS 下载..."}
-        threading.Thread(target=run_pmis_download, daemon=True).start()
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
-        self.send_header('Cache-Control', 'no-cache')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        while True:
-            self.wfile.write(f"data: {json.dumps(pmis_state)}\n\n".encode('utf-8'))
-            self.wfile.flush()
-            if pmis_state["progress"] >= 100 or not pmis_state["running"]:
-                break
-            time.sleep(0.5)
-
     def handle_reprocess(self):
         """GET /api/reprocess - 仅重跑预处理，不抓取/下载，SSE 流式返回进度"""
         global reprocess_state
-        if (sync_state.get("running") or import_state.get("running")
-                or pmis_state.get("running") or history_state.get("running")):
+        if history_state.get("running"):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
             return
         if reprocess_state.get("running"):
@@ -1138,8 +927,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             time.sleep(0.5)
 
     def _history_busy(self):
-        return (sync_state.get("running") or import_state.get("running")
-                or pmis_state.get("running") or reprocess_state.get("running"))
+        return reprocess_state.get("running") or history_state.get("running")
 
     def handle_data_history(self):
         """GET /api/data-history - 列出历史版本与 _pre_rollback。"""
@@ -1448,11 +1236,10 @@ def _find_script(name):
 
 def _run_script_direct(module_path, module_name, cwd=None):
     """在进程内模式直接调用并执行脚本模块（而非subprocess调用），
-    将脚本的 _output_lines 和 stdout/stderr 输出捕获合并返回
-    
+    将脚本的 _output_lines 输出捕获返回。用于 frozen 模式运行 preprocess_data。
+
     注：先加载模块（确保stdout/stderr可用），再运行main()。
-    不再重定向stdout/stderr，以避免 playwright 等依赖库的 import 初始化
-    在重定向环境下静默失败导致 sync_playwright 未定义 NameError。
+    不重定向stdout/stderr，避免模块初始化静默失败。
     """
     import importlib.util
     import io
@@ -1466,21 +1253,20 @@ def _run_script_direct(module_path, module_name, cwd=None):
             sys.stdout = io.StringIO()
         if sys.stderr is None:
             sys.stderr = io.StringIO()
-        
-        # 加载并执行模块（不重定向stdout/stderr，确保 playwright import 正常）
+
+        # 加载并执行模块（不重定向stdout/stderr）
         spec = importlib.util.spec_from_file_location(module_name, module_path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        
-        # 直接运行 main()，不再重定向 stdout/stderr
-        # 之前重定向会导致 playwright 初始化静默失败（NameError: sync_playwright not defined）
+
+        # 直接运行 main()
         if hasattr(mod, 'main'):
             mod.main()
     finally:
         os.chdir(old_cwd)
         # 收集输出：优先使用脚本的 _output_lines 缓冲区，其次使用捕获的 stdout
         output_parts = []
-        # 尝试获取脚本的 _output_lines（fetch_yundocs_full.py 中定义的安全输出缓冲区）
+        # 尝试获取脚本的 _output_lines（脚本内定义的安全输出缓冲区）
         if mod and hasattr(mod, '_output_lines') and mod._output_lines:
             output_parts.extend(mod._output_lines)
         # 注意：不再重定向stdout/stderr，输出直接写入日志和标准流
@@ -1581,187 +1367,6 @@ def run_reprocess():
         reprocess_state["running"] = False
 
 
-def run_sync():
-    """执行数据同步：仅抓取 WPS 云文档到 yundocs_data(不预处理,处理由"更新数据"触发)"""
-    global sync_state, sync_url
-    
-    try:
-        # Step 0: 预检查浏览器可用性（打包模式下 Playwright 需要 Chrome 或 Edge）
-        if getattr(sys, 'frozen', False):
-            browser_ok, browser_name = _check_browser_available()
-            if not browser_ok:
-                sync_state = {"running": False, "progress": 0, "message": "同步失败：未检测到Chrome浏览器，请安装Google Chrome或确认Microsoft Edge可用后重试"}
-                logger.error("同步失败：未检测到可用浏览器（Chrome/Edge），中止同步")
-                return
-            logger.info(f"浏览器预检查通过: {browser_name}")
-        
-        # Step 1: Run data extraction (Playwright)
-        sync_state = {"running": True, "progress": 5, "message": "正在启动浏览器..."}
-        logger.info("同步开始：启动浏览器")
-        time.sleep(1)
-        
-        sync_state = {"running": True, "progress": 10, "message": "正在连接WPS云文档..."}
-        logger.info("同步：连接WPS云文档")
-        
-        # 查找提取脚本
-        fetch_script, fetch_cwd = _find_script("fetch_yundocs_full.py")
-        if not fetch_script:
-            sync_state = {"running": True, "progress": 15, "message": "提取脚本不存在，使用缓存数据..."}
-            logger.warning("提取脚本不存在，使用缓存数据")
-            time.sleep(1)
-        else:
-            sync_state = {"running": True, "progress": 15, "message": "正在提取数据..."}
-            logger.info(f"开始提取数据，脚本: {fetch_script}")
-            
-            if getattr(sys, 'frozen', False):
-                # ── 打包模式：直接导入运行（目标机器无Python，无法subprocess） ──
-                sync_state = {"running": True, "progress": 20, "message": "正在提取数据（直接模式）..."}
-                fetch_output = ''
-                try:
-                    # 传递URL参数：临时修改sys.argv
-                    old_argv = sys.argv[:]
-                    sys.argv = [fetch_script]
-                    if sync_url:
-                        sys.argv.append(sync_url)
-                    fetch_output = _run_script_direct(fetch_script, 'fetch_yundocs_full', fetch_cwd)
-                    sync_state = {"running": True, "progress": 75, "message": "数据提取完成，开始预处理..."}
-                    logger.info("数据提取完成（直接模式），开始预处理")
-                except SystemExit as e:
-                    # fetch脚本中sys.exit()会被捕获
-                    if e.code and e.code != 0:
-                        # 检测浏览器相关错误，给出友好提示
-                        _browser_keywords = ['not found', 'no executable', 'install chromium',
-                                             "executable doesn't exist", '浏览器未安装', '未找到可用浏览器']
-                        output_lower = (fetch_output or '').lower()
-                        if any(kw.lower() in output_lower for kw in _browser_keywords):
-                            sync_state = {"running": False, "progress": 0,
-                                          "message": "同步失败：未检测到Chrome浏览器，请安装Google Chrome或确认Microsoft Edge可用后重试"}
-                            logger.error(f"数据提取失败（浏览器不可用），退出码: {e.code}，中止同步")
-                            return
-                        # 其他提取错误
-                        err_lines = [l for l in (fetch_output or '').splitlines()
-                                     if '[ERROR]' in l or 'Error' in l or 'Exception' in l]
-                        err_summary = err_lines[-3:] if err_lines else [f"退出码: {e.code}"]
-                        sync_state = {"running": False, "progress": 0,
-                                      "message": f"数据提取失败: {'; '.join(err_summary)}"}
-                        logger.error(f"数据提取失败，退出码: {e.code}，中止同步")
-                        return
-                    else:
-                        sync_state = {"running": True, "progress": 75, "message": "数据提取完成，开始预处理..."}
-                except Exception as e:
-                    # 检测浏览器相关异常
-                    err_str = str(e).lower()
-                    _browser_keywords = ['not found', 'no executable', '浏览器', 'browser']
-                    if any(kw in err_str for kw in _browser_keywords):
-                        sync_state = {"running": False, "progress": 0,
-                                      "message": "同步失败：未检测到Chrome浏览器，请安装Google Chrome或确认Microsoft Edge可用后重试"}
-                        logger.error(f"数据提取异常（浏览器相关）: {e}，中止同步")
-                        return
-                    sync_state = {"running": False, "progress": 0,
-                                  "message": f"数据提取异常: {str(e)[:100]}"}
-                    logger.error(f"数据提取异常: {e}", exc_info=True)
-                    return
-                finally:
-                    sys.argv = old_argv
-            else:
-                # ── 开发模式：使用subprocess运行（可解析进度输出） ──
-                cmd = [sys.executable, '-u', fetch_script]
-                if sync_url:
-                    cmd.append(sync_url)
-                
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    cwd=fetch_cwd, encoding='utf-8', errors='replace'
-                )
-                
-                sheet_count = 0
-                error_lines = []
-                for raw_line in process.stdout:
-                    parsed = classify_progress_line(raw_line)
-                    if parsed is None:
-                        continue
-                    level, text = parsed
-                    full = raw_line.strip()
-                    if level == 'ok':
-                        sheet_count += 1
-                        progress = 15 + int(sheet_count / 9 * 60)
-                        sync_state = {"running": True, "progress": min(progress, 75), "message": f"提取Sheet数据 ({sheet_count}/9)..."}
-                        logger.info(f"[fetch] {full}")
-                    elif level == 'info':
-                        sync_state = {"running": True, "progress": sync_state["progress"], "message": text}
-                        logger.info(f"[fetch] {full}")
-                    elif level == 'warn':
-                        logger.warning(f"[fetch] {full}")
-                        error_lines.append(text)
-                    elif level == 'error':
-                        logger.error(f"[fetch] {full}")
-                        error_lines.append(text)
-                    else:
-                        logger.debug(f"[fetch] {full}")
-                        if any(kw in full for kw in ['Error', 'Exception', 'Traceback', 'error', 'exception', 'traceback', 'Failed', 'failed']):
-                            error_lines.append(full)
-                
-                process.wait()
-                if process.returncode != 0:
-                    err_summary = error_lines[-3:] if error_lines else ["详见日志"]
-                    sync_state = {"running": True, "progress": 75, "message": f"数据提取有错误: {'; '.join(err_summary)}"}
-                    logger.warning(f"数据提取完成但有错误，返回码: {process.returncode}，错误: {error_lines}")
-                else:
-                    sync_state = {"running": True, "progress": 75, "message": "数据提取完成，开始预处理..."}
-                    logger.info("数据提取完成，开始预处理")
-        
-        time.sleep(0.5)
-
-        # 同步只负责抓取到 yundocs_data;处理由"更新数据"按钮触发
-        sync_state = {"running": True, "progress": 100, "message": "云同步完成,请点[更新数据]生效"}
-        logger.info("云同步(仅抓取)完成")
-        
-    except Exception as e:
-        sync_state = {"running": False, "progress": 0, "message": f"同步失败: {str(e)}"}
-        logger.error(f"同步失败: {str(e)}", exc_info=True)
-    finally:
-        # Keep the completion state for a few seconds
-        time.sleep(3)
-        sync_state["running"] = False
-
-def run_pmis_download():
-    """执行 PMIS 数据下载到 input/pmis/(不预处理,处理由"更新数据"触发)。
-    frozen/dev 双路径：打包模式进程内直接执行，开发模式 subprocess 解析进度。
-    """
-    global pmis_state, active_process
-    try:
-        pmis_state = {"running": True, "progress": 10, "message": "开始下载 PMIS 数据..."}
-        script, cwd = _find_script("pmis_download.py")
-        if not script:
-            pmis_state = {"running": False, "progress": 0, "message": "pmis_download.py 不存在"}
-            return
-        if getattr(sys, 'frozen', False):
-            # 打包模式：进程内直接执行
-            _run_script_direct(script, 'pmis_download', cwd)
-        else:
-            # 开发模式：子进程，注册到 active_process 使其可被 _terminate_active_process 中断
-            active_process = subprocess.Popen([sys.executable, script], cwd=cwd,
-                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                              text=True, encoding='utf-8', errors='replace')
-            for line in active_process.stdout:
-                parsed = classify_progress_line(line)
-                if parsed:
-                    _level, text = parsed
-                    pmis_state = {"running": True,
-                                  "progress": min(pmis_state["progress"] + 10, 90),
-                                  "message": text}
-            active_process.wait()
-        pmis_state = {"running": False, "progress": 100, "message": "PMIS 下载完成,请点[更新数据]生效"}
-    except Exception as e:
-        logger.error(f"PMIS 下载失败: {e}")
-        pmis_state = {"running": False, "progress": 0, "message": f"下载失败: {e}"}
-    finally:
-        active_process = None
-        time.sleep(3)
-        pmis_state["running"] = False
-
-
 def _terminate_active_process():
     """终止当前活跃的子进程"""
     global active_process
@@ -1773,64 +1378,6 @@ def _terminate_active_process():
         except Exception as e:
             logger.warning(f"终止子进程失败: {e}")
             active_process = None
-
-def run_import(data):
-    """执行离线导入：仅保存上传的 sheets 到 yundocs_data(不预处理,处理由"更新数据"触发)"""
-    global import_state, active_process
-    
-    try:
-        yundocs_dir = os.path.join(BASE_DIR, 'yundocs_data')
-        os.makedirs(yundocs_dir, exist_ok=True)
-        
-        import_state = {"running": True, "progress": 10, "message": "正在保存导入数据..."}
-        logger.info("离线导入开始：保存数据")
-        
-        # 保存 all_sheets_data.json
-        all_data = data.get('allSheets', {})
-        with open(os.path.join(yundocs_dir, 'all_sheets_data.json'), 'w', encoding='utf-8') as f:
-            json.dump(all_data, f, ensure_ascii=False, indent=2)
-        
-        # 保存 sheet_list.json 和分Sheet文件
-        sheet_list = []
-        for sheet_name, sheet_rows in all_data.items():
-            col_count = len(sheet_rows[0]) if sheet_rows else 0
-            sheet_list.append({"index": len(sheet_list) + 1, "name": sheet_name})
-            # 保存分Sheet JSON（与 fetch_yundocs_full.py 格式一致）
-            safe_name = "".join(c if c.isalnum() or c in "._- " else "_" for c in sheet_name)
-            sheet_data = {
-                "name": sheet_name,
-                "startRow": 1, "startCol": 1,
-                "rowCount": len(sheet_rows), "colCount": col_count,
-                "extractedRows": len(sheet_rows),
-                "extractedCols": col_count,
-                "data": sheet_rows
-            }
-            with open(os.path.join(yundocs_dir, f'sheet_{safe_name}.json'), 'w', encoding='utf-8') as f:
-                json.dump(sheet_data, f, ensure_ascii=False, indent=2)
-            # 保存CSV（使用标准逗号分隔符，csv.writer自动处理含逗号/换行/引号的字段 quoting）
-            with open(os.path.join(yundocs_dir, f'sheet_{safe_name}.csv'), 'w', encoding='utf-8-sig', newline='') as f:
-                writer = csv.writer(f, delimiter=',', quoting=csv.QUOTE_MINIMAL)
-                for row in sheet_rows:
-                    # null/undefined 输入：空值统一转为空字符串；换行符替换为空格避免行拆分
-                    cleaned = [str(c).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ') if c is not None else '' for c in row]
-                    writer.writerow(cleaned)
-        
-        sheet_list_data = {"count": len(sheet_list), "sheets": sheet_list}
-        with open(os.path.join(yundocs_dir, 'sheet_list.json'), 'w', encoding='utf-8') as f:
-            json.dump(sheet_list_data, f, ensure_ascii=False, indent=2)
-        
-        # 导入只负责落地 yundocs_data;处理由"更新数据"按钮触发
-        import_state = {"running": False, "progress": 100, "message": f"已导入 {len(sheet_list)} 个Sheet,请点[更新数据]生效"}
-        logger.info("离线导入(仅落地)完成")
-        return
-        
-    except Exception as e:
-        import_state = {"running": False, "progress": 0, "message": f"导入失败: {str(e)}"}
-        logger.error(f"离线导入失败: {str(e)}", exc_info=True)
-    finally:
-        active_process = None
-        time.sleep(3)
-        import_state["running"] = False
 
 def _kill_port_process(port, exclude_self=True):
     """自动清理占用指定端口的进程（Windows）
@@ -1973,8 +1520,7 @@ def main():
     logger.info(f"目录: {BASE_DIR}")
     logger.info(f"日志: {os.path.join(LOG_DIR, 'server.log')}")
     logger.info(f"访问: http://localhost:{PORT}")
-    logger.info(f"同步API: http://localhost:{PORT}/api/sync")
-    
+
     # 首次启动：账号种子（仅文件不存在时生成两个超管）
     auth.seed_default_accounts()
     # 首次启动创建桌面快捷方式
