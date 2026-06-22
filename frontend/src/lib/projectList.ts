@@ -1,5 +1,6 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
+import { riskReasons, type RiskReason } from './riskReasons'
 
 // 项目清单行：projects[](P1 主域) join projectPmis[id] 的扁平展示模型
 export interface ProjectRow {
@@ -26,6 +27,7 @@ export interface ProjectRow {
   overspend: boolean
   tags?: string[]
   isAnomalous: boolean
+  riskReasons: RiskReason[]
 }
 
 // 收窄后只保留特殊项筛选（列枚举筛选已迁至 crossFilter 表头）
@@ -79,6 +81,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       overspend: cost.项目超支 === true,
       tags: assignments?.[p.projectId] ?? [],
       isAnomalous: isAnomalous(p),
+      riskReasons: riskReasons(p, pmisMap[p.projectId]),
     }
   })
 }
