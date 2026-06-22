@@ -8,7 +8,9 @@ import {
   type InsightGroup, type InsightMetricKey,
 } from '@/lib/projectPivot'
 import { fmtWan, pct } from '@/lib/format'
+import { buildRankingOption, valueKindForPie, type ValueKind } from '@/lib/chartOptions'
 import SegToggle from '@/components/SegToggle.vue'
+import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
 import DimPicker from '@/components/DimPicker.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -53,17 +55,45 @@ const groups = computed(() => {
   return [...gs].sort((a, b) => ((b[k] ?? 0) as number) - ((a[k] ?? 0) as number))
 })
 const top = computed(() => groups.value.slice(0, 15))
-const chartOption = computed(() => {
+
+// 图表类型多选（排名模式）
+const chartTypes = ref<string[]>(['bar'])
+
+// 当前指标的 valueKind（chartOptions 的类型）
+const currentValueKind = computed((): ValueKind => {
   const kind = INSIGHT_METRIC_BY_KEY[metricKey.value].kind
-  const div = kind === 'money' ? 10000 : 1
-  const label = INSIGHT_METRIC_BY_KEY[metricKey.value].label
-  return {
-    tooltip: { trigger: 'axis' },
-    grid: { left: 60, right: 20, top: 30, bottom: 60 },
-    xAxis: { type: 'category', data: top.value.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
-    yAxis: { type: 'value', name: kind === 'money' ? `${label}(万)` : label },
-    series: [{ name: label, type: 'bar', colorBy: 'data', data: top.value.map((g) => +(((g[metricKey.value] ?? 0) as number) / div).toFixed(4)) }],
+  if (kind === 'money') return 'amount'
+  if (kind === 'rate') return 'ratio'
+  return 'count'
+})
+
+// available：ratio 类指标不含 pie
+const availableChartTypes = computed<string[]>(() =>
+  valueKindForPie(currentValueKind.value) ? ['bar', 'line', 'pie'] : ['bar', 'line'],
+)
+
+// 指标切换时若 chartTypes 含 pie 但新指标不支持 pie，自动移除
+watch(metricKey, () => {
+  if (!valueKindForPie(currentValueKind.value) && chartTypes.value.includes('pie')) {
+    const next = chartTypes.value.filter((t) => t !== 'pie')
+    chartTypes.value = next.length ? next : ['bar']
   }
+})
+
+// 按选中图表类型构造各 option（排名，Top15）
+const rankingChartOptions = computed(() => {
+  const cats = top.value.map((g) => g.key)
+  // amount 类型 buildRankingOption 会自行除万；ratio/count 不除
+  const vals = top.value.map((g) => (g[metricKey.value] ?? 0) as number)
+  const label = INSIGHT_METRIC_BY_KEY[metricKey.value].label
+  return chartTypes.value.map((t) =>
+    buildRankingOption(t as 'bar' | 'line' | 'pie', {
+      categories: cats,
+      values: vals,
+      metricLabel: label,
+      valueKind: currentValueKind.value,
+    }),
+  )
 })
 const RANK_COLS = computed<DataColumn[]>(() => [
   { key: 'key', label: INSIGHT_DIM_BY_KEY[dimKey.value]?.label ?? '维度' },
@@ -136,7 +166,19 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
 
     <template v-else>
       <template v-if="mode === 'rank'">
-        <div class="iv-card"><ChartBox :option="chartOption" height="300px" /></div>
+        <div class="iv-rank-controls">
+          <span class="iv-dims-label">图表类型</span>
+          <ChartTypeSelector v-model="chartTypes" :available="availableChartTypes" />
+        </div>
+        <div class="iv-charts-row">
+          <div
+            v-for="(opt, idx) in rankingChartOptions"
+            :key="chartTypes[idx]"
+            class="iv-card iv-chart-item"
+          >
+            <ChartBox :option="opt" height="300px" />
+          </div>
+        </div>
         <DataTable :columns="RANK_COLS" :rows="groups" clickable @row-click="onRankRow" />
       </template>
 
@@ -164,7 +206,10 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
 .iv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-dims { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-dims-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
+.iv-rank-controls { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.iv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
 .iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
+.iv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
 .iv-hint { font-size: var(--fs-2); color: var(--mut); padding: var(--sp-5) 0; text-align: center; }
 .iv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 </style>
