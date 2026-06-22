@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import type { Event } from '@/types/analysis'
 import { groupEventsByDate } from '@/lib/activity'
-import { fmtWan } from '@/lib/format'
+import { fmtYuan } from '@/lib/format'
 
-interface PidInfo { projectManager?: string; orgL4?: string; overspendAmount?: number | null }
+interface PidInfo { projectManager?: string; orgL4?: string; overspendItems?: { label: string; amount: number }[] }
 const props = withDefaults(defineProps<{ events: Event[]; emptyText?: string; pidInfo?: Record<string, PidInfo> }>(), {
   emptyText: '暂无动态',
 })
@@ -23,7 +23,7 @@ function meta(pid?: string): PidInfo | undefined { return pid ? props.pidInfo?.[
         <span v-if="meta(e.projectId)" class="ev-meta">
           <span v-if="meta(e.projectId)!.projectManager" class="ev-meta-i">{{ meta(e.projectId)!.projectManager }}</span>
           <span v-if="meta(e.projectId)!.orgL4" class="ev-meta-i">{{ meta(e.projectId)!.orgL4 }}</span>
-          <span v-if="(meta(e.projectId)!.overspendAmount ?? 0) > 0" class="ev-meta-i ev-meta-over">超支 {{ fmtWan(meta(e.projectId)!.overspendAmount) }} 万</span>
+          <span v-for="(it, k) in (meta(e.projectId)!.overspendItems ?? [])" :key="`os-${k}`" class="ev-meta-i ev-meta-over">{{ it.label }} 超支 {{ fmtYuan(it.amount) }} 元</span>
         </span>
         <span class="ev-summary">{{ e.summary }}</span>
       </div>

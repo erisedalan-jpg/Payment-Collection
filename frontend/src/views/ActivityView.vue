@@ -50,13 +50,26 @@ const pidL4 = computed<Record<string, string>>(() => {
   return map
 })
 
-// projectId → 展示信息（项目经理/L4/超支金额），供动态条识别度增强
-const pidInfo = computed<Record<string, { projectManager?: string; orgL4?: string; overspendAmount?: number | null }>>(() => {
-  const map: Record<string, { projectManager?: string; orgL4?: string; overspendAmount?: number | null }> = {}
+// projectId → 展示信息（项目经理/L4/超支明细），供动态条识别度增强。
+// 超支明细=交付成本各分项中 实际发生>预算金额 的项(单位:元),按项拆分;去掉「项目直接成本」(已拆分到四子项,避免重复)。
+interface PidInfo {
+  projectManager?: string
+  orgL4?: string
+  overspendItems: { label: string; amount: number }[]
+}
+const pidInfo = computed<Record<string, PidInfo>>(() => {
+  const map: Record<string, PidInfo> = {}
   const ps = data.data?.projects ?? []
   const cs = (data.data as any)?.closedProjects ?? []
   for (const p of [...ps, ...cs] as any[]) {
-    if (p.projectId) map[p.projectId] = { projectManager: p.projectManager, orgL4: p.orgL4, overspendAmount: p.overspendAmount }
+    if (!p.projectId) continue
+    const overspendItems: { label: string; amount: number }[] = []
+    for (const c of (p.deliveryCosts ?? [])) {
+      if (c.类别 === '项目直接成本') continue
+      const over = Number(c.实际发生 ?? 0) - Number(c.预算金额 ?? 0)
+      if (over > 0) overspendItems.push({ label: String(c.类别), amount: over })
+    }
+    map[p.projectId] = { projectManager: p.projectManager, orgL4: p.orgL4, overspendItems }
   }
   return map
 })
@@ -109,7 +122,7 @@ function doExportEvents() {
       项目名称: e.projectName ?? '',
       项目经理: info?.projectManager ?? '',
       L4组织: info?.orgL4 ?? '',
-      超支金额: (info?.overspendAmount ?? 0) > 0 ? (info!.overspendAmount as number) : '',
+      超支明细: (info?.overspendItems ?? []).map((it) => `${it.label} 超支 ${it.amount.toFixed(2)} 元`).join('; '),
       摘要: e.summary ?? '',
     }
   })
