@@ -46,7 +46,9 @@ describe('AdminView', () => {
   it('非超管未改密行显示「首次须改密」徽标', async () => {
     const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
     await flushPromises()
-    expect(wrapper.text()).toContain('首次须改密')
+    const badge = wrapper.find('.pw-must')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('首次须改密')
   })
 
   it('提交新建调用 createAccount 并重拉', async () => {
