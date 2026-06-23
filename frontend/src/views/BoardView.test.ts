@@ -74,16 +74,21 @@ describe('BoardView', () => {
     expect(w.text()).not.toContain('进度态')
   })
 
-  it('排名表列：含五指标列、无已回款/待回款列、无独立「排序」控件', async () => {
+  it('排名表列含五指标 + 新增「排序」选项卡(默认项目数),切合同金额重排', async () => {
     seed()
     const w = mount(BoardView, opts)
     await flushPromises()
     const cols = (w.findComponent(DataTable).props('columns') as Array<{ key: string }>).map((c) => c.key)
     expect(cols).toEqual(['key', 'projectCount', 'contractSum', 'expectedSum', 'rate', 'delayedNodeSum'])
-    // 旧排序控件(已回款/延期节点数排序按钮)不存在
-    expect(w.find('[data-test="seg-actualSum"]').exists()).toBe(false)
-    // 数字列可排序：5 个可排序列渲染 caret-wrapper
-    expect(w.findAll('.caret-wrapper').length).toBe(5)
+    // 新增排序选项卡(四项)
+    expect(w.find('[data-test="seg-projectCount"]').exists()).toBe(true)
+    expect(w.find('[data-test="seg-contractSum"]').exists()).toBe(true)
+    expect(w.find('[data-test="seg-rate"]').exists()).toBe(true)
+    expect(w.find('[data-test="seg-delayedNodeSum"]').exists()).toBe(true)
+    // 默认按项目数:北京/上海各 1 个项目,顺序稳定;切到合同金额后按 contractSum 降序(北京 200万 > 上海 30万)
+    await w.get('[data-test="seg-contractSum"]').trigger('click')
+    const rows = w.findComponent(DataTable).props('rows') as Array<Record<string, any>>
+    expect(rows[0].key).toBe('北京')
   })
 
   it('单维点击行打开下钻', async () => {
