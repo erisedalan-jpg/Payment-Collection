@@ -70,6 +70,15 @@ describe('LoginView', () => {
     await w.vm.$nextTick()
     expect(pushSpy).toHaveBeenCalledWith('/')
   })
+  it('登录成功且须改密→跳转 /change-password', async () => {
+    authMock.mockResolvedValueOnce({ ok: true, user: { account: 'b', displayName: 'b', isSuper: false, allowedPages: ['data'], allowedL4: [], mustChangePassword: true } } as any)
+    const w = mountLV()
+    await w.find('input[autocomplete="username"]').setValue('b')
+    await w.find('input[autocomplete="current-password"]').setValue('temp123')
+    await w.find('form').trigger('submit')
+    await w.vm.$nextTick(); await w.vm.$nextTick()
+    expect(pushSpy).toHaveBeenCalledWith('/change-password')
+  })
   it('失败提交后重新聚焦账号→清除错误提示', async () => {
     const w = mountLV()
     await w.find('input[autocomplete="username"]').setValue('admin')
