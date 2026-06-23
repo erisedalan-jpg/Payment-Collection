@@ -4,9 +4,9 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.17.1**
-- 最近更新：2026-06-23（生产两 bug 修复：① 跨账号缓存数据泄漏——登出/登录后 useDataStore 未失效，新低权限账号复用超管全量内存数据（onMounted `if(!data.data)` 守卫跳过重拉）；修法=auth 在 login 成功与 logout 时调 data.reset()，身份一变即清内存、下个页面按新会话重拉后端切过的数据。② 回款日历「待回款=0」异常——collection_stages.py 直接信任 CSV「未收金额」列，PMIS 导出对 44/1457 个阶段该列缺值留 0；修法=unpaidAmount 改派生 round(回款−已收,2)，原样复现正确行含超收负值、修好缺值行，不参与官方达成率口径。纯代码+dist 轻量更新）
-- 上一版本：V1.17.0（2026-06-23，普通管理员首次登录强制改密）
+- 当前版本：**V1.18.0**
+- 最近更新：2026-06-23（新增风险看板 /insight/risk：4 卡片+排名+项目概览；/insight 去评级维、加项目级别维；/insight/board 排名支持排序）
+- 上一版本：V1.17.1（2026-06-23，生产两 bug 修复：跨账号缓存数据泄漏 + 回款日历待回款=0 异常）
 - 更上版本：V1.16.4（2026-06-22，页面调整跟进批次：/activity 动态条加 项目经理/L4/超支明细（交付成本分项,以元;仅在「交付费用超支」事件按分项展示,去每条重复）+ 导出表格；/project/:id 预算核算全部区块统一以元（profit/bridge/科目树）+ 去掉项目直接成本行；首页健康度卡去掉冗余单项目风险卡片列，仅留三档汇总+6类分类）
 - 上上版本：V1.16.3（2026-06-22，页面调整批次 S1-S10：/activity 翻页筛选 / /projects 关注原因列 / 预算核算改元 / /payment 完成率分母对齐 / /insight 图表多选 / 首页6类风险分类）
 - 维护语言：简体中文
@@ -17,6 +17,10 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.18.0（2026-06-23）风险看板（feat/insight-risk-board，TDD + verify 全绿）
+  - 新增 /insight/risk 风险看板页：4 张风险指标卡片（延期率/超支率/暂停率/高风险占比）+ 风险维度排名 + 项目概览表。
+  - /insight 项目多维分析：去掉"评级"维度、新增"项目级别"维度（现 11 维）。
+  - /insight/board 回款多维排名：支持表头排序。
 - V1.17.1（2026-06-23）生产两 bug 修复（fix/session-data-isolation-and-unpaid-derive，TDD + verify 全绿）
   - **跨账号缓存数据泄漏（安全）**：登出超管再登低权限账号仍见全量数据。根因=`stores/auth.ts` 的 logout 只清 user.value，`useDataStore` 的 data.value 不清；各页 `onMounted(() => { if(!data.data) data.load() })` 守卫见旧数据非空即跳过重拉，复用前一个用户的全量内存数据，后端 L4 切数据（`server.py` handle_data_json + `data_scope.filter_analysis_data`，每请求都切）压根不被触发。修法=`stores/data.ts` 加 `reset()`，`stores/auth.ts` 在 login 成功与 logout 时调 `useDataStore().reset()`；身份切换即清内存，下个页面守卫触发按新会话重拉。filter store 全为 data.data 派生 computed，连带清空。
   - **回款日历「待回款=0」异常（数据）**：日历大量待回款显 0 但实有应收。根因=`collection_stages.py:_row_to_node` 的 `unpaidAmount` 直读 CSV「未收金额」列；逐行核对 input/collection_stages.csv（1457 行）发现该列对 44 行 已收=0 的新阶段缺值留 0（应=回款金额），另 1 行仅 0.01 舍入差，其余 1412 行恒等于 回款−已收（含 4 行超收负值）。修法=改派生 `round(回款金额−已收金额,2)`，复现全部正确行（含负值）、修好 44 缺值行、纠 1 舍入。该字段不参与官方达成率口径（=Σ流水÷Σ合同），仅修「待回款」展示。需点「更新数据」重跑 preprocess 才落地到 analysis_data.json。
