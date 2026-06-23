@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { authenticate, fetchMe as apiFetchMe, logoutApi, changePassword as apiChangePassword, type AuthUser, type AuthResult } from '@/lib/auth'
 import { canAccess as pageCanAccess, type PageKey } from '@/lib/pageAccess'
 import { PROJECT_LINKS, ANALYSIS_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
+import { useDataStore } from './data'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -12,7 +13,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(account: string, password: string): Promise<AuthResult> {
     const res = await authenticate(account, password)
-    if (res.ok && res.user) user.value = res.user
+    if (res.ok && res.user) {
+      user.value = res.user
+      useDataStore().reset()  // 新身份:丢弃上一个用户的内存业务数据,强制下个页面按新会话重拉(后端按 L4 切数据)
+    }
     return res
   }
   async function fetchMe(): Promise<void> {
@@ -21,6 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout(): Promise<void> {
     await logoutApi()
     user.value = null
+    useDataStore().reset()  // 登出即清业务数据,杜绝下个低权限账号复用全量缓存
   }
   async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
     const res = await apiChangePassword(oldPassword, newPassword)
