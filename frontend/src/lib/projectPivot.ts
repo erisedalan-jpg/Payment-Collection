@@ -16,7 +16,7 @@ export interface InsightRow {
   signType: string
   health: string
   orgL4: string
-  rating: string
+  projectLevel: string
   overspend: string // '是' | '否'(维度用字符串值)
   paused: string    // '是' | '否'
   contractAmount: number
@@ -54,7 +54,7 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       signType: v(cust.签约单位),
       health: v(p.health?.overall, '无数据'),
       orgL4: v(p.orgL4),
-      rating: v(st.评级, '无'),
+      projectLevel: v(st.项目级别),
       overspend: cost.项目超支 === true ? '是' : '否',
       paused: st.是否暂停 === true ? '是' : '否',
       contractAmount: Number(cust.合同总额 ?? 0),
@@ -69,7 +69,7 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
 }
 
 export interface InsightDimDef {
-  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'industry' | 'signType' | 'health' | 'rating' | 'overspend' | 'paused'
+  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'projectLevel' | 'industry' | 'signType' | 'health' | 'overspend' | 'paused'
   label: string
 }
 
@@ -81,10 +81,10 @@ export const INSIGHT_DIMENSIONS: InsightDimDef[] = [
   { key: 'riskLevel', label: '风险等级' },
   { key: 'manager', label: '项目经理' },
   { key: 'orgL4', label: '服务组' },
+  { key: 'projectLevel', label: '项目级别' },
   { key: 'industry', label: '行业' },
   { key: 'signType', label: '签约单位' },
   { key: 'health', label: '健康度' },
-  { key: 'rating', label: '评级' },
   { key: 'overspend', label: '超支' },
   { key: 'paused', label: '暂停' },
 ]
