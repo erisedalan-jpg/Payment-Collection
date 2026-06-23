@@ -53,6 +53,7 @@ describe('stores/auth', () => {
     expect(s.mustChangePassword).toBe(true)
     ;(changePassword as any).mockResolvedValue({ ok: true, user: { ...U, mustChangePassword: false } })
     const r = await s.changePassword('temp123', 'newpass456')
+    expect(changePassword).toHaveBeenCalledWith('temp123', 'newpass456')
     expect(r.ok).toBe(true)
     expect(s.mustChangePassword).toBe(false)
   })
