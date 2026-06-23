@@ -6,6 +6,7 @@ export interface AuthUser {
   isSuper: boolean
   allowedPages: string[]
   allowedL4: string[]
+  mustChangePassword?: boolean
 }
 
 export interface AuthResult {
@@ -49,5 +50,22 @@ export async function logoutApi(): Promise<void> {
     await fetch(apiUrl('/api/logout'), { method: 'POST', credentials: 'same-origin' })
   } catch {
     // 登出失败不阻断前端清态
+  }
+}
+
+/** 自助改密:POST /api/account/change-password。成功带回更新后的 user(mustChangePassword 已清)。 */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
+  try {
+    const res = await fetch(apiUrl('/api/account/change-password'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok && data.success) return { ok: true, user: data.user as AuthUser }
+    return { ok: false, message: data.message || '修改失败' }
+  } catch {
+    return { ok: false, message: '网络错误,无法连接服务' }
   }
 }
