@@ -26,7 +26,10 @@ async function onSubmit() {
   error.value = ''
   if (!account.value || !password.value) { error.value = '请输入账号和密码'; return }
   const res = await auth.login(account.value, password.value)
-  if (res.ok) { router.push('/') }
+  if (res.ok) {
+    if (res.user?.mustChangePassword) router.push('/change-password')
+    else router.push('/')
+  }
   else { mood.value = 'fail'; error.value = res.message || '登录失败' }
 }
 </script>
