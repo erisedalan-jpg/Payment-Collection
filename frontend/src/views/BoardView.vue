@@ -9,6 +9,7 @@ import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import {
   PAY_BOARD_DIMENSIONS as DIMENSIONS, PAY_BOARD_METRICS as METRICS, PAY_BOARD_METRIC_BY_KEY as METRIC_BY_KEY,
   buildPayBoardRows, groupPayBoard, payBoardCross, payBoardPivot, type PayBoardGroup,
+  sortPayBoardGroups, PAY_BOARD_SORTS, type PayBoardSortKey,
 } from '@/lib/paymentBoard'
 import { filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio, pct } from '@/lib/format'
@@ -48,6 +49,9 @@ const metricKey = ref<(typeof METRICS)[number]['key']>('contractSum')
 const rowDims = ref<string[]>([initDim])
 const colDims = ref<string[]>([])
 
+const sortKey = ref<PayBoardSortKey>('projectCount')
+const SORT_OPTS = PAY_BOARD_SORTS.map((s) => ({ value: s.key, label: s.label }))
+
 const boardRows = computed(() =>
   buildPayBoardRows(
     filterProjects(data.data?.projects ?? [], {
@@ -74,6 +78,7 @@ watch(dimKey, () => {
 
 // ---- 单维 ----
 const groups = computed<PayBoardGroup[]>(() => groupPayBoard(boardRows.value, [dimKey.value]))
+const sortedGroups = computed(() => sortPayBoardGroups(groups.value, sortKey.value))
 
 const dimLabel = computed(() => DIM_OPTS.find((d) => d.value === dimKey.value)?.label ?? '维度')
 const tableColumns = computed<DataColumn[]>(() => [
@@ -88,8 +93,8 @@ const tableColumns = computed<DataColumn[]>(() => [
 // 图表类型多选（单维排名模式）；available 始终含 bar/line/pie（contractSum 是金额）
 const chartTypes = ref<string[]>(['bar'])
 
-// 柱状图（bar）：按计划回款降序 Top15，已回/待回堆叠柱 + 总计柱顶
-const chartTop = computed(() => [...groups.value].sort((a, b) => b.expectedSum - a.expectedSum).slice(0, 15))
+// 柱状图（bar）：按当前排序键降序 Top15，已回/待回堆叠柱 + 总计柱顶
+const chartTop = computed(() => sortedGroups.value.slice(0, 15))
 const stackedBarOption = computed(() => {
   const sc = settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT
   const t = chartTop.value
@@ -228,6 +233,10 @@ defineExpose({ drillOpen, dimKey })
             <SegToggle v-model="dimKey" :options="DIM_OPTS" />
           </div>
           <div class="bv-ctl">
+            <span class="bv-ctl-label">排序</span>
+            <SegToggle v-model="sortKey" :options="SORT_OPTS" />
+          </div>
+          <div class="bv-ctl">
             <span class="bv-ctl-label">图表类型</span>
             <ChartTypeSelector v-model="chartTypes" :available="['bar', 'line', 'pie']" />
           </div>
@@ -282,7 +291,7 @@ defineExpose({ drillOpen, dimKey })
         </div>
         <section class="bv-card">
           <h3 class="bv-title">分组排名（点击行下钻该组项目）</h3>
-          <DataTable :columns="tableColumns" :rows="groups" clickable @row-click="(r) => openDrill(r as PayBoardGroup)">
+          <DataTable :columns="tableColumns" :rows="sortedGroups" clickable @row-click="(r) => openDrill(r as PayBoardGroup)">
             <template #cell-rate="{ value }">
               <span class="u-num" :style="{ color: rateColorPmis(value) }">{{ fmtRatio(value) }}</span>
             </template>
