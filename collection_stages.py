@@ -69,15 +69,19 @@ def _row_to_node(row: Dict[str, str], today: str) -> Dict[str, Any]:
     category = (row.get("回款类型") or "").strip()
     plan = _ms_to_date(row.get("计划回款时间"))
     ar = _num(row.get("实际比例"))
+    expected = _num(row.get("回款金额"))
+    received = _num(row.get("已收金额"))
     return {
         "stage": (row.get("阶段名称") or "").strip(),
         "category": category,
         "planDate": plan,
         "actualDate": _ms_to_date(row.get("实际回款时间")),
         "payRatio": _pct(row.get("回款比例")),
-        "expectedPayment": _num(row.get("回款金额")),
-        "receivedAmount": _num(row.get("已收金额")),
-        "unpaidAmount": _num(row.get("未收金额")),
+        "expectedPayment": expected,
+        "receivedAmount": received,
+        # 未收金额=回款−已收 派生,不读 CSV"未收金额"列:PMIS 导出对部分阶段该列缺值留 0
+        # (44/1457 行 已收=0 却未收=0),致"待回款"误显 0。派生原样复现正确行(含超收负值)、修好缺值行。
+        "unpaidAmount": round(expected - received, 2),
         "actualRatio": round(ar, 4),
         "termDays": _int(row.get("关联日期")),
         "payTerm": (row.get("收款条件") or "").strip(),

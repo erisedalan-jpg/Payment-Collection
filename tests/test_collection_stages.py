@@ -83,5 +83,21 @@ def test_load_groups_sorts_and_maps(tmp_path):
     assert pre["payTerm"] == ""   # 预付款行未填收款条件 → 空串
 
 
+def test_unpaid_derived_not_from_csv_column():
+    """unpaidAmount 派生自 回款−已收,不信任 CSV"未收金额"列。
+    根因:PMIS 导出对部分阶段"未收金额"缺值留 0(44/1457 行 已收=0 却未收=0),
+    致"待回款"误显 0。派生须:修好缺值行、原样复现正确行(含负值)。"""
+    today = "2026-06-16"
+    # 缺值异常行:CSV 未收=0,但 已收=0、回款>0 → 应派生为回款金额
+    n = CS._row_to_node({"回款金额": "151200", "已收金额": "0", "未收金额": "0"}, today)
+    assert n["unpaidAmount"] == 151200.0
+    # 混合小数行:不取 CSV 的 48780.73,派生为 48780.72
+    n2 = CS._row_to_node({"回款金额": "48785.4", "已收金额": "4.68", "未收金额": "48780.73"}, today)
+    assert n2["unpaidAmount"] == 48780.72
+    # 已收>回款(超收)行:忠实派生为负值(与正确 CSV 行一致)
+    n3 = CS._row_to_node({"回款金额": "53175", "已收金额": "141175", "未收金额": "-88000"}, today)
+    assert n3["unpaidAmount"] == -88000.0
+
+
 def test_load_missing_file_returns_empty(tmp_path):
     assert CS.load_collection_stages(str(tmp_path), "2026-06-16") == {}
