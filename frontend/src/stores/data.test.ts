@@ -66,6 +66,18 @@ describe('useDataStore.reload', () => {
   })
 })
 
+describe('useDataStore.reset', () => {
+  it('重置 data/error/loading 到初始态(跨账号防泄漏)', () => {
+    const s = useDataStore()
+    s.data = { meta: { lastUpdate: 'x' }, projects: [{ projectId: 'P1' }] } as any
+    s.error = '出错了'
+    s.reset()
+    expect(s.data).toBeNull()
+    expect(s.error).toBeNull()
+    expect(s.loading).toBe(false)
+  })
+})
+
 describe('useDataStore load 防缓存', () => {
   it('load() 拉取 URL 带防缓存参数 ?t=', async () => {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }))

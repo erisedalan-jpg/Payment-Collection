@@ -30,6 +30,14 @@ export const useDataStore = defineStore('data', () => {
     data.value = { ...data.value, projects: [] }
   }
 
+  /** 重置为初始态(登录/登出时调用)。杜绝身份切换后复用上一个用户已按 L4 切过的内存数据→
+   *  下个页面 onMounted 的 `if(!data.data)` 守卫即触发重拉,后端按新会话切数据。 */
+  function reset() {
+    data.value = null
+    error.value = null
+    loading.value = false
+  }
+
   /** 强制重拉 analysis_data.json（绕过 loading 守卫 + 时间戳防缓存）。忠实移植 reloadData 的数据热更新。 */
   async function reload() {
     error.value = null
@@ -42,5 +50,5 @@ export const useDataStore = defineStore('data', () => {
     }
   }
 
-  return { data, loading, error, load, clearBusinessData, reload }
+  return { data, loading, error, load, clearBusinessData, reload, reset }
 })
