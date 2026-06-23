@@ -54,4 +54,20 @@ describe('router 守卫', () => {
     expect(router.currentRoute.value.path).not.toBe('/admin')
     expect(router.currentRoute.value.path).toBe('/projects')
   })
+
+  it('未改密用户访问受控页→重定向 /change-password', async () => {
+    setUser({ account: 'b', displayName: 'b', isSuper: false, allowedPages: ['projects'], allowedL4: [], mustChangePassword: true })
+    await router.push('/projects')
+    expect(router.currentRoute.value.path).toBe('/change-password')
+  })
+  it('未改密用户访问 /change-password 自身→放行', async () => {
+    setUser({ account: 'b', displayName: 'b', isSuper: false, allowedPages: ['projects'], allowedL4: [], mustChangePassword: true })
+    await router.push('/change-password')
+    expect(router.currentRoute.value.path).toBe('/change-password')
+  })
+  it('已改密用户不被改密页拦截', async () => {
+    setUser({ account: 'b', displayName: 'b', isSuper: false, allowedPages: ['projects'], allowedL4: [], mustChangePassword: false })
+    await router.push('/projects')
+    expect(router.currentRoute.value.path).toBe('/projects')
+  })
 })

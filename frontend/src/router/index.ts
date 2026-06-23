@@ -23,6 +23,7 @@ import CostDetailView from '@/views/CostDetailView.vue'
 import ClosedProjectsView from '@/views/ClosedProjectsView.vue'
 import ClosedProjectDetailView from '@/views/ClosedProjectDetailView.vue'
 import AdminView from '@/views/AdminView.vue'
+import ChangePasswordView from '@/views/ChangePasswordView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -39,6 +40,7 @@ export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/login', name: 'login', component: LoginView, meta: { title: '登录', fullscreen: true } },
+    { path: '/change-password', name: 'change-password', component: ChangePasswordView, meta: { title: '修改密码', fullscreen: true } },
     { path: '/projects', name: 'projects', component: ProjectsView, meta: { title: '在建项目', hideFilter: true, pageKey: 'projects' } },
     { path: '/project/:id', name: 'project-detail', component: ProjectDetailView, meta: { title: '项目详情', hideFilter: true, pageKey: 'projects' } },
     { path: '/projects/closed', name: 'closed-projects', component: ClosedProjectsView, meta: { title: '已关闭项目', hideFilter: true, pageKey: 'projects-closed' } },
@@ -80,6 +82,7 @@ router.beforeEach(async (to) => {
   if (to.path === '/login') return true
   await auth.ensureReady()
   if (!auth.isLoggedIn) return { path: '/login' }
+  if (auth.user?.mustChangePassword && to.path !== '/change-password') return { path: '/change-password' }
   if (to.meta.requiresSuper && !auth.isSuper) return { path: auth.firstAllowedPath() }
   const key = to.meta.pageKey
   if (auth.isSuper || !key || auth.canAccess(key)) return true
