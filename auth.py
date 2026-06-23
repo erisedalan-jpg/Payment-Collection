@@ -299,3 +299,38 @@ def remove_account(account: str) -> None:
         data = delete_account(data, account)
         save_accounts(data)
     destroy_sessions_for_account(account)
+
+
+def change_own_password_dict(accounts: dict, account: str, old_password: str,
+                             new_password: str) -> dict:
+    """自助改密(纯函数):验旧密码→校验新密码(1-256 且≠旧)→换 salt/hash 并清 mustChangePassword。
+    账号不存在抛 KeyError;原密码错抛 ValueError('原密码错误');新密码非法/同旧抛 ValueError。不改入参。"""
+    if not isinstance(account, str):
+        raise ValueError('账号名须为字符串')
+    users = accounts.get('users', {})
+    if account not in users:
+        raise KeyError(account)
+    rec = users[account]
+    if not verify_password(old_password, rec.get('salt', ''), rec.get('hash', '')):
+        raise ValueError('原密码错误')
+    _validate_password(new_password)
+    if new_password == old_password:
+        raise ValueError('新密码不能与原密码相同')
+    salt = secrets.token_hex(16)
+    new_rec = dict(rec)
+    new_rec['salt'] = salt
+    new_rec['hash'] = hash_password(new_password, salt)
+    new_rec['mustChangePassword'] = False
+    new_users = dict(users)
+    new_users[account] = new_rec
+    out = dict(accounts)
+    out['users'] = new_users
+    return out
+
+
+def change_own_password(account: str, old_password: str, new_password: str) -> dict:
+    with _accounts_mutate_lock:
+        data = load_accounts()
+        data = change_own_password_dict(data, account, old_password, new_password)
+        save_accounts(data)
+        return public_user(account, data['users'][account])
