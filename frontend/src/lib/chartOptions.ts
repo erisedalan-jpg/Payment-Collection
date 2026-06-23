@@ -17,6 +17,7 @@ export interface RankingOptionParams {
   values: number[]
   metricLabel: string
   valueKind: ValueKind
+  legendCounts?: number[]
 }
 
 /** 根据 valueKind 返回 ECharts label formatter 函数 */
@@ -53,9 +54,15 @@ export function buildRankingOption(
 
   if (type === 'pie') {
     const pieData = categories.map((name, i) => ({ name, value: values[i] }))
+    const legend: Record<string, any> = { type: 'scroll', orient: 'vertical', right: 10, top: 'middle' }
+    if (params.legendCounts) {
+      const countByName: Record<string, number> = {}
+      categories.forEach((name, i) => { countByName[name] = params.legendCounts![i] })
+      legend.formatter = (name: string) => `${name} (${countByName[name] ?? 0})`
+    }
     return {
       tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
-      legend: { type: 'scroll', orient: 'vertical', right: 10, top: 'middle' },
+      legend,
       color: CHART_LIGHT,
       series: [
         {

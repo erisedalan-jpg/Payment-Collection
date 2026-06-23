@@ -105,3 +105,21 @@ describe('valueKindForPie', () => {
     expect(valueKindForPie('ratio')).toBe(false)
   })
 })
+
+describe('buildRankingOption pie legendCounts', () => {
+  it('传 legendCounts → legend.formatter 显 名称(数量)', () => {
+    const opt = buildRankingOption('pie', {
+      categories: ['一组', '二组'], values: [10, 20], metricLabel: '合同总额',
+      valueKind: 'amount', legendCounts: [3, 5],
+    })
+    expect(typeof (opt.legend as any).formatter).toBe('function')
+    expect((opt.legend as any).formatter('一组')).toBe('一组 (3)')
+    expect((opt.legend as any).formatter('二组')).toBe('二组 (5)')
+  })
+  it('不传 legendCounts → 无 formatter(回归)', () => {
+    const opt = buildRankingOption('pie', {
+      categories: ['一组'], values: [10], metricLabel: '项目数', valueKind: 'count',
+    })
+    expect((opt.legend as any).formatter).toBeUndefined()
+  })
+})
