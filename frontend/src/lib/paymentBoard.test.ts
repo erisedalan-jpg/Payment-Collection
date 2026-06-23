@@ -248,3 +248,32 @@ describe('groupPayBoard 标签多值炸开', () => {
     expect(m.cols).toContain('BH项目')
   })
 })
+
+import { sortPayBoardGroups, PAY_BOARD_SORTS } from './paymentBoard'
+
+const G = (key: string, p: number, c: number, rate: number | null, d: number) =>
+  ({ key, values: [key], rows: [], projectCount: p, contractSum: c, actualSum: 0, expectedSum: 0, pendingSum: 0, rate, delayedNodeSum: d }) as any
+
+describe('sortPayBoardGroups', () => {
+  const gs = [G('A', 1, 300, 0.5, 2), G('B', 3, 100, null, 0), G('C', 2, 200, 0.9, 5)]
+  it('PAY_BOARD_SORTS 四项', () => {
+    expect(PAY_BOARD_SORTS.map((s) => s.key)).toEqual(['projectCount', 'contractSum', 'rate', 'delayedNodeSum'])
+  })
+  it('按项目数降序', () => {
+    expect(sortPayBoardGroups(gs, 'projectCount').map((g) => g.key)).toEqual(['B', 'C', 'A'])
+  })
+  it('按合同金额降序', () => {
+    expect(sortPayBoardGroups(gs, 'contractSum').map((g) => g.key)).toEqual(['A', 'C', 'B'])
+  })
+  it('按完成率降序,null 排末', () => {
+    expect(sortPayBoardGroups(gs, 'rate').map((g) => g.key)).toEqual(['C', 'A', 'B'])
+  })
+  it('按延期节点降序', () => {
+    expect(sortPayBoardGroups(gs, 'delayedNodeSum').map((g) => g.key)).toEqual(['C', 'A', 'B'])
+  })
+  it('不改入参(返回副本)', () => {
+    const copy = [...gs]
+    sortPayBoardGroups(gs, 'rate')
+    expect(gs).toEqual(copy)
+  })
+})

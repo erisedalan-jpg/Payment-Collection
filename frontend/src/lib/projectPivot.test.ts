@@ -113,9 +113,20 @@ describe('insightCross / insightPivot', () => {
   })
 })
 
+describe('buildInsightRows', () => {
+  it('含 projectLevel 维度,不再有 rating', () => {
+    const pmis = { 'P-1': { status: { 项目级别: 'A级' } } } as unknown as Record<string, ProjectPmis>
+    const projects = [{ projectId: 'P-1', projectName: '甲', orgL4: '交付一组', payment: { ...PAY0 }, health: {} }] as unknown as Project[]
+    const r = buildInsightRows(projects, pmis)[0] as unknown as Record<string, unknown>
+    expect(r.projectLevel).toBe('A级')
+    expect('rating' in r).toBe(false)
+  })
+})
+
 describe('契约面', () => {
-  it('7 维度 6 指标', () => {
-    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '行业', '签约单位', '健康度', '评级', '超支', '暂停'])
+  it('维度去评级加项目级别;6 指标', () => {
+    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '项目级别', '行业', '签约单位', '健康度', '超支', '暂停'])
+    expect(INSIGHT_DIMENSIONS.map((d) => d.key)).not.toContain('rating')
     expect(INSIGHT_METRICS.map((m) => m.key)).toEqual(['projectCount', 'contractAmount', 'avgProgress', 'avgCostRatio', 'paymentRatio', 'delayedProjects'])
   })
 })
