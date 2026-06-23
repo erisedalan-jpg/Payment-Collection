@@ -20,8 +20,8 @@ describe('AdminView', () => {
     setActivePinia(createPinia())
     vi.restoreAllMocks()
     vi.mocked(adminApi.listAccounts).mockResolvedValue([
-      { account: 'boss', displayName: '超管', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] },
-      { account: 'liu', displayName: '老刘', isSuper: false, allowedPages: ['projects'], allowedL4: ['北京'] },
+      { account: 'boss', displayName: '超管', isSuper: true, allowedPages: ['*'], allowedL4: ['*'], mustChangePassword: false },
+      { account: 'liu', displayName: '老刘', isSuper: false, allowedPages: ['projects'], allowedL4: ['北京'], mustChangePassword: true },
     ])
   })
 
@@ -41,6 +41,12 @@ describe('AdminView', () => {
     await btn.trigger('click')
     await flushPromises()
     expect((wrapper.vm as any).dialogVisible).toBe(true)
+  })
+
+  it('非超管未改密行显示「首次须改密」徽标', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('首次须改密')
   })
 
   it('提交新建调用 createAccount 并重拉', async () => {

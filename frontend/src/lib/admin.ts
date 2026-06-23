@@ -6,6 +6,7 @@ export interface AdminAccount {
   isSuper: boolean
   allowedPages: string[]
   allowedL4: string[]
+  mustChangePassword?: boolean
 }
 
 async function postJson(url: string, body: unknown): Promise<void> {
