@@ -145,7 +145,8 @@ def test_list_public_accounts_strips_secrets(tmp_path, monkeypatch):
     assert accounts == sorted(accounts)
     for a in lst:
         assert 'salt' not in a and 'hash' not in a
-        assert set(a.keys()) == {'account', 'displayName', 'isSuper', 'allowedPages', 'allowedL4'}
+        assert set(a.keys()) == {'account', 'displayName', 'isSuper',
+                                 'allowedPages', 'allowedL4', 'mustChangePassword'}
 
 
 def test_add_edit_remove_roundtrip(tmp_path, monkeypatch):
@@ -182,3 +183,39 @@ def test_update_delete_non_string_account_raise():
         auth.update_account(acc, 'liu', display_name={'x': 1})
     with pytest.raises(ValueError):
         auth.delete_account(acc, ['liu'])
+
+
+def test_make_user_must_change_default_false():
+    u = auth._make_user('p', '名', is_super=True)
+    assert u['mustChangePassword'] is False
+    u2 = auth._make_user('p', '名', is_super=False, pages=['projects'], l4=['北京'], must_change=True)
+    assert u2['mustChangePassword'] is True
+
+
+def test_create_account_sets_must_change_true():
+    acc = _fresh_accounts()
+    out = auth.create_account(acc, 'newbie', 'pw123', '新人', ['projects'], ['上海'])
+    assert out['users']['newbie']['mustChangePassword'] is True
+
+
+def test_seed_supers_not_must_change(tmp_path, monkeypatch):
+    f = tmp_path / 'accounts.json'
+    monkeypatch.setattr(auth, 'ACCOUNTS_FILE', str(f))
+    auth.seed_default_accounts()
+    users = auth.load_accounts()['users']
+    for acc in users.values():
+        assert acc['mustChangePassword'] is False
+
+
+def test_public_user_exposes_must_change():
+    rec = auth._make_user('p', '名', is_super=False, pages=['projects'], l4=['北京'], must_change=True)
+    pub = auth.public_user('liu', rec)
+    assert pub['mustChangePassword'] is True
+
+
+def test_update_account_keeps_must_change():
+    acc = _fresh_accounts()
+    acc = auth.create_account(acc, 'newbie', 'pw123', '新人', ['projects'], ['上海'])
+    assert acc['users']['newbie']['mustChangePassword'] is True
+    out = auth.update_account(acc, 'newbie', password='reset999')
+    assert out['users']['newbie']['mustChangePassword'] is True  # 重置不强制再改

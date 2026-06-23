@@ -134,6 +134,16 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
       <el-table-column label="可见 L4" min-width="160">
         <template #default="{ row }">{{ row ? l4Labels(row.allowedL4) : '' }}</template>
       </el-table-column>
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }">
+          <template v-if="row && !row.isSuper">
+            <span class="pw-tag" :class="row.mustChangePassword ? 'pw-must' : 'pw-done'">
+              {{ row.mustChangePassword ? '首次须改密' : '已改密' }}
+            </span>
+          </template>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="160">
         <template #default="{ row }">
           <template v-if="row">
@@ -152,6 +162,7 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
         <el-form-item :label="editing ? '重置密码' : '密码'">
           <el-input v-model="form.password" type="password" show-password
             :placeholder="editing ? '留空表示不修改' : '设置初始密码'" />
+          <span v-if="!editing" class="admin-hint">新账号首次登录须修改密码</span>
         </el-form-item>
         <el-form-item label="显示名">
           <el-input v-model="form.displayName" placeholder="展示用名称" />
@@ -185,4 +196,8 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
 .role-tag { display: inline-block; padding: 2px var(--sp-2); border-radius: var(--r-sm); font-size: var(--fs-1); }
 .role-super { background: var(--card2); color: var(--accent); }
 .role-normal { background: var(--ok-bg); color: var(--ok-text); }
+.pw-tag { display: inline-block; padding: 2px var(--sp-2); border-radius: var(--r-sm); font-size: var(--fs-1); }
+.pw-must { background: var(--warn-bg); color: var(--warn-text); }
+.pw-done { background: var(--ok-bg); color: var(--ok-text); }
+.admin-hint { display: block; margin-top: var(--sp-1); font-size: var(--fs-1); color: var(--mut); }
 </style>

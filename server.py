@@ -472,6 +472,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_admin_account_update()
         elif parsed.path == '/api/admin/accounts/delete':
             self.handle_admin_account_delete()
+        elif parsed.path == '/api/account/change-password':
+            self.handle_account_change_password()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1164,6 +1166,32 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         auth.destroy_session(token)
         self._send_json(200, {"success": True},
                         [('Set-Cookie', auth.build_clear_cookie())])
+
+    def handle_account_change_password(self):
+        """自助改密:任意登录用户改自己的密码(供"首次登录强制改密"流程)。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        old_pw = data.get('oldPassword') or ''
+        new_pw = data.get('newPassword') or ''
+        try:
+            user = auth.change_own_password(account, old_pw, new_pw)
+        except KeyError:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, f"账号不存在: {account}"))
+            return
+        except ValueError as e:
+            if str(e) == '原密码错误':
+                self._send_json(401, _error_payload(ERR_AUTH, str(e)))
+            else:
+                self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._send_json(200, {"success": True, "user": user})
 
     def handle_auth_me(self):
         token = auth.parse_cookie_token(self.headers.get('Cookie'))

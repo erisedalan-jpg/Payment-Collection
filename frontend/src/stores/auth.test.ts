@@ -5,8 +5,9 @@ vi.mock('@/lib/auth', () => ({
   authenticate: vi.fn(),
   fetchMe: vi.fn(),
   logoutApi: vi.fn(async () => {}),
+  changePassword: vi.fn(),
 }))
-import { authenticate, fetchMe, logoutApi } from '@/lib/auth'
+import { authenticate, fetchMe, logoutApi, changePassword } from '@/lib/auth'
 import { useAuthStore } from './auth'
 
 beforeEach(() => setActivePinia(createPinia()))
@@ -44,6 +45,26 @@ describe('stores/auth', () => {
     await s.logout()
     expect(logoutApi).toHaveBeenCalled()
     expect(s.user).toBeNull()
+  })
+  it('changePassword 成功:更新 user 且 mustChangePassword 清零', async () => {
+    ;(fetchMe as any).mockResolvedValue({ ...U, mustChangePassword: true })
+    const s = useAuthStore()
+    await s.fetchMe()
+    expect(s.mustChangePassword).toBe(true)
+    ;(changePassword as any).mockResolvedValue({ ok: true, user: { ...U, mustChangePassword: false } })
+    const r = await s.changePassword('temp123', 'newpass456')
+    expect(changePassword).toHaveBeenCalledWith('temp123', 'newpass456')
+    expect(r.ok).toBe(true)
+    expect(s.mustChangePassword).toBe(false)
+  })
+  it('changePassword 失败:不动 user', async () => {
+    ;(fetchMe as any).mockResolvedValue({ ...U, mustChangePassword: true })
+    const s = useAuthStore()
+    await s.fetchMe()
+    ;(changePassword as any).mockResolvedValue({ ok: false, message: '原密码错误' })
+    const r = await s.changePassword('bad', 'newpass456')
+    expect(r.ok).toBe(false)
+    expect(s.mustChangePassword).toBe(true)
   })
 })
 

@@ -34,4 +34,24 @@ describe('lib/auth', () => {
     await logoutApi()
     expect(f).toHaveBeenCalledWith('/api/logout', expect.objectContaining({ method: 'POST' }))
   })
+  it('changePassword 成功映射 user(flag 清)', async () => {
+    const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, user: { ...U, mustChangePassword: false } }) })
+    vi.stubGlobal('fetch', f)
+    const { changePassword } = await import('./auth')
+    const r = await changePassword('temp123', 'newpass456')
+    expect(r.ok).toBe(true)
+    expect(r.user?.mustChangePassword).toBe(false)
+    expect(f).toHaveBeenCalledWith('/api/account/change-password', expect.objectContaining({
+      method: 'POST',
+      credentials: 'same-origin',
+      body: JSON.stringify({ oldPassword: 'temp123', newPassword: 'newpass456' }),
+    }))
+  })
+  it('changePassword 失败映射 message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({ success: false, message: '原密码错误' }) }))
+    const { changePassword } = await import('./auth')
+    const r = await changePassword('bad', 'newpass456')
+    expect(r.ok).toBe(false)
+    expect(r.message).toBe('原密码错误')
+  })
 })
