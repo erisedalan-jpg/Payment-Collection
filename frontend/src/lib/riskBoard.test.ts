@@ -89,7 +89,7 @@ describe('风险契约面/聚合', () => {
     expect(g1).toMatchObject({ projectCount: 2, hasRiskCount: 1, openRiskSum: 2, contractAmount: 300 })
   })
   it('riskOverview 四类计数 + total + healthPct, 按 total 降序', () => {
-    const ov = groupRisk.length && riskOverview(RR, 'orgL4')
+    const ov = riskOverview(RR, 'orgL4')
     expect(ov.map((r) => r.key)).toEqual(['一组', '二组'])
     const o1 = ov.find((r) => r.key === '一组')!
     expect(o1).toMatchObject({ 高: 1, 中: 0, 低: 0, 无风险: 1, total: 2 })
