@@ -9,6 +9,7 @@ vi.mock('@/lib/auth', () => ({
 }))
 import { authenticate, fetchMe, logoutApi, changePassword } from '@/lib/auth'
 import { useAuthStore } from './auth'
+import { useDataStore } from './data'
 
 beforeEach(() => setActivePinia(createPinia()))
 afterEach(() => vi.clearAllMocks())
@@ -45,6 +46,23 @@ describe('stores/auth', () => {
     await s.logout()
     expect(logoutApi).toHaveBeenCalled()
     expect(s.user).toBeNull()
+  })
+  it('login 成功后重置 data store(杜绝跨账号复用上一个用户全量数据)', async () => {
+    ;(authenticate as any).mockResolvedValue({ ok: true, user: U })
+    const data = useDataStore()
+    data.data = { meta: { lastUpdate: 'stale' }, projects: [{ projectId: 'P1' }] } as any
+    const s = useAuthStore()
+    await s.login('admin', 'wxtnb')
+    expect(data.data).toBeNull()
+  })
+  it('logout 后重置 data store(防下个低权限账号见全量缓存)', async () => {
+    ;(fetchMe as any).mockResolvedValue(U)
+    const data = useDataStore()
+    data.data = { meta: { lastUpdate: 'stale' }, projects: [{ projectId: 'P1' }] } as any
+    const s = useAuthStore()
+    await s.fetchMe()
+    await s.logout()
+    expect(data.data).toBeNull()
   })
   it('changePassword 成功:更新 user 且 mustChangePassword 清零', async () => {
     ;(fetchMe as any).mockResolvedValue({ ...U, mustChangePassword: true })
