@@ -23,6 +23,14 @@ describe('ChangePasswordView', () => {
     expect(spy).not.toHaveBeenCalled()
     expect(w.find('[data-test="cpw-error"]').text()).toContain('不一致')
   })
+  it('字段为空→提示,不调 store', async () => {
+    const s = useAuthStore()
+    const spy = vi.spyOn(s, 'changePassword')
+    const w = mountCPW()
+    await w.find('form').trigger('submit')
+    expect(spy).not.toHaveBeenCalled()
+    expect(w.find('[data-test="cpw-error"]').text()).toContain('请填写')
+  })
   it('合法提交→调 store.changePassword,成功跳转 firstAllowedPath', async () => {
     const s = useAuthStore()
     vi.spyOn(s, 'changePassword').mockResolvedValue({ ok: true, user: { account: 'b', displayName: 'b', isSuper: false, allowedPages: ['data'], allowedL4: [], mustChangePassword: false } } as any)
