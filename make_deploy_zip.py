@@ -1,12 +1,29 @@
 """打包服务器部署 zip:含运行所需全部代码 + frontend/dist(/pm 构建) + 全部数据文件(data/、input/)。
 排除 node_modules/.git/.venv/__pycache__/build/docs/log/tests 等无关项。
 用法: python make_deploy_zip.py
-产物: pmplatform-deploy-V1.16.4.zip(解压出 pmplatform/ 顶层目录)。"""
+产物: pmplatform-deploy-<版本>.zip(版本取自 frontend/src/version.ts;解压出 pmplatform/ 顶层目录)。"""
 import os
+import re
 import zipfile
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(ROOT, "pmplatform-deploy-V1.16.4.zip")
+
+
+def _app_version() -> str:
+    """从前端单一来源 frontend/src/version.ts 读 APP_VERSION,避免文件名版本漂移。读不到则回退 unknown。"""
+    vt = os.path.join(ROOT, "frontend", "src", "version.ts")
+    try:
+        with open(vt, "r", encoding="utf-8") as f:
+            m = re.search(r"APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]", f.read())
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    return "unknown"
+
+
+VERSION = _app_version()
+OUT = os.path.join(ROOT, f"pmplatform-deploy-{VERSION}.zip")
 TOP = "pmplatform"  # 解压后顶层目录名
 
 # 顶层要打包的文件(运行/部署所需 + 参考)
