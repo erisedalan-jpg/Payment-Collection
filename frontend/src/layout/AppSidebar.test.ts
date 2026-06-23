@@ -17,6 +17,7 @@ function makeRouter() {
       { path: '/insight', component: { template: '<div/>' } },
       { path: '/insight/milestone', component: { template: '<div/>' } },
       { path: '/insight/costdetail', component: { template: '<div/>' } },
+      { path: '/insight/risk', component: { template: '<div/>' } },
       { path: '/insight/board', component: { template: '<div/>' } },
       { path: '/insight/calendar', component: { template: '<div/>' } },
       { path: '/payment', component: { template: '<div/>' } },
@@ -56,6 +57,7 @@ describe('AppSidebar', () => {
     expect(text).toContain('项目多维分析')    // 项目分析组：现 InsightView
     expect(text).toContain('里程碑管理')      // 项目分析组：SP-B 新页
     expect(text).toContain('成本分析')        // 项目分析组：SP-C 新页
+    expect(text).toContain('风险看板')        // 项目分析组：V1.18.0 新增
     expect(text).toContain('回款多维分析')    // 项目分析组：迁自 /payment/board
     expect(text).toContain('回款日历')        // 项目分析组：迁自 /calendar
     expect(text).toContain('回款总览')        // 回款组
@@ -68,8 +70,8 @@ describe('AppSidebar', () => {
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
-    // 项目分析(5) + 回款子域(6) 均为 .nav-sub 二级呈现 = 11
-    expect(wrapper.findAll('.nav-sub').length).toBe(11)
+    // 项目分析(6) + 回款子域(6) 均为 .nav-sub 二级呈现 = 12
+    expect(wrapper.findAll('.nav-sub').length).toBe(12)
   })
 
   it('toggle button flips uiStore collapsed', async () => {

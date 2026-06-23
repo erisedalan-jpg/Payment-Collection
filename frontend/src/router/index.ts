@@ -20,6 +20,7 @@ import OverviewView from '@/views/OverviewView.vue'
 import InsightView from '@/views/InsightView.vue'
 import MilestoneView from '@/views/MilestoneView.vue'
 import CostDetailView from '@/views/CostDetailView.vue'
+import RiskBoardView from '@/views/RiskBoardView.vue'
 import ClosedProjectsView from '@/views/ClosedProjectsView.vue'
 import ClosedProjectDetailView from '@/views/ClosedProjectDetailView.vue'
 import AdminView from '@/views/AdminView.vue'
@@ -51,6 +52,7 @@ export const router = createRouter({
     // 均为精确路径,勿引入 /insight/:param 通配,否则会遮蔽 /insight 的 InsightView。
     { path: '/insight/milestone', name: 'insight-milestone', component: MilestoneView, meta: { title: '里程碑管理', hideFilter: true, pageKey: 'insight-milestone' } },
     { path: '/insight/costdetail', name: 'insight-costdetail', component: CostDetailView, meta: { title: '成本分析', hideFilter: true, pageKey: 'insight-costdetail' } },
+    { path: '/insight/risk', name: 'insight-risk', component: RiskBoardView, meta: { title: '风险看板', hideFilter: true, pageKey: 'insight-risk' } },
     { path: '/insight/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析', pageKey: 'insight-board' } },
     { path: '/insight/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历', pageKey: 'insight-calendar' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账', pageKey: 'ledger' } },

@@ -16,7 +16,7 @@ export interface InsightRow {
   signType: string
   health: string
   orgL4: string
-  rating: string
+  projectLevel: string
   overspend: string // '是' | '否'(维度用字符串值)
   paused: string    // '是' | '否'
   contractAmount: number
@@ -54,7 +54,7 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       signType: v(cust.签约单位),
       health: v(p.health?.overall, '无数据'),
       orgL4: v(p.orgL4),
-      rating: v(st.评级, '无'),
+      projectLevel: v(st.项目级别),
       overspend: cost.项目超支 === true ? '是' : '否',
       paused: st.是否暂停 === true ? '是' : '否',
       contractAmount: Number(cust.合同总额 ?? 0),
@@ -69,22 +69,21 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
 }
 
 export interface InsightDimDef {
-  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'industry' | 'signType' | 'health' | 'rating' | 'overspend' | 'paused'
+  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'projectLevel' | 'industry' | 'signType' | 'health' | 'overspend' | 'paused'
   label: string
 }
 
-// P5.5 用户反馈增 4 维(服务组/评级/超支/暂停,数据已在前端零后端成本);
-// 需后端增列的候选(项目级别/项目类型/省份/营销一级部门等)见 PROGRESS backlog,待用户选定
+// 当前 11 维:含服务组/项目级别/超支/暂停等前端直取维,已去掉"评级"维。
 export const INSIGHT_DIMENSIONS: InsightDimDef[] = [
   { key: 'stage', label: '阶段' },
   { key: 'projectStatus', label: '项目状态' },
   { key: 'riskLevel', label: '风险等级' },
   { key: 'manager', label: '项目经理' },
   { key: 'orgL4', label: '服务组' },
+  { key: 'projectLevel', label: '项目级别' },
   { key: 'industry', label: '行业' },
   { key: 'signType', label: '签约单位' },
   { key: 'health', label: '健康度' },
-  { key: 'rating', label: '评级' },
   { key: 'overspend', label: '超支' },
   { key: 'paused', label: '暂停' },
 ]
