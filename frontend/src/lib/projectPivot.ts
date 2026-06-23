@@ -73,8 +73,7 @@ export interface InsightDimDef {
   label: string
 }
 
-// P5.5 用户反馈增 4 维(服务组/评级/超支/暂停,数据已在前端零后端成本);
-// 需后端增列的候选(项目级别/项目类型/省份/营销一级部门等)见 PROGRESS backlog,待用户选定
+// 当前 11 维:含服务组/项目级别/超支/暂停等前端直取维,已去掉"评级"维。
 export const INSIGHT_DIMENSIONS: InsightDimDef[] = [
   { key: 'stage', label: '阶段' },
   { key: 'projectStatus', label: '项目状态' },

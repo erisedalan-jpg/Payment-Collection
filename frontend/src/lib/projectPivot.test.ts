@@ -117,7 +117,7 @@ describe('buildInsightRows', () => {
   it('含 projectLevel 维度,不再有 rating', () => {
     const pmis = { 'P-1': { status: { 项目级别: 'A级' } } } as unknown as Record<string, ProjectPmis>
     const projects = [{ projectId: 'P-1', projectName: '甲', orgL4: '交付一组', payment: { ...PAY0 }, health: {} }] as unknown as Project[]
-    const r = buildInsightRows(projects, pmis)[0] as Record<string, unknown>
+    const r = buildInsightRows(projects, pmis)[0] as unknown as Record<string, unknown>
     expect(r.projectLevel).toBe('A级')
     expect('rating' in r).toBe(false)
   })

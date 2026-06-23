@@ -30,6 +30,7 @@ export const ANALYSIS_LINKS: NavLink[] = [
   { label: '项目多维分析', to: '/insight', key: 'insight' },
   { label: '里程碑管理', to: '/insight/milestone', key: 'insight-milestone' },
   { label: '成本分析', to: '/insight/costdetail', key: 'insight-costdetail' },
+  { label: '风险看板', to: '/insight/risk', key: 'insight-risk' },
   { label: '回款多维分析', to: '/insight/board', key: 'insight-board' },
   { label: '回款日历', to: '/insight/calendar', key: 'insight-calendar' },
 ]
