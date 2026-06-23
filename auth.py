@@ -67,7 +67,8 @@ def save_accounts(data: dict) -> None:
 
 
 def _make_user(password: str, display_name: str, is_super: bool = True,
-               pages: list | None = None, l4: list | None = None) -> dict:
+               pages: list | None = None, l4: list | None = None,
+               must_change: bool = False) -> dict:
     salt = secrets.token_hex(16)
     return {
         'salt': salt,
@@ -76,6 +77,7 @@ def _make_user(password: str, display_name: str, is_super: bool = True,
         'allowedPages': pages if pages is not None else ['*'],
         'allowedL4': l4 if l4 is not None else ['*'],
         'displayName': display_name,
+        'mustChangePassword': bool(must_change),
     }
 
 
@@ -101,6 +103,7 @@ def public_user(account: str, rec: dict) -> dict:
         'isSuper': bool(rec.get('isSuper', False)),
         'allowedPages': rec.get('allowedPages', []),
         'allowedL4': rec.get('allowedL4', []),
+        'mustChangePassword': bool(rec.get('mustChangePassword', False)),
     }
 
 
@@ -210,7 +213,8 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
     l4 = _validate_str_list(l4, 'allowedL4')
     new_users = dict(users)
     new_users[name] = _make_user(password, (display_name or name)[:64],
-                                 is_super=False, pages=pages, l4=l4)
+                                 is_super=False, pages=pages, l4=l4,
+                                 must_change=True)
     out = dict(accounts)
     out['users'] = new_users
     return out
