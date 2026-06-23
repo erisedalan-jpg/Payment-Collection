@@ -30,7 +30,7 @@ def test_change_own_password_wrong_old_raises():
 
 def test_change_own_password_same_as_old_raises():
     acc = _flagged_user_dict()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='新密码不能与原密码相同'):
         auth.change_own_password_dict(acc, 'liu', 'temp123', 'temp123')
 
 
