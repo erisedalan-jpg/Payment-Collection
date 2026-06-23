@@ -251,3 +251,20 @@ export function payBoardPivot(
     index,
   }
 }
+
+export type PayBoardSortKey = 'projectCount' | 'contractSum' | 'rate' | 'delayedNodeSum'
+export const PAY_BOARD_SORTS: { key: PayBoardSortKey; label: string }[] = [
+  { key: 'projectCount', label: '项目数' },
+  { key: 'contractSum', label: '合同金额' },
+  { key: 'rate', label: '完成率' },
+  { key: 'delayedNodeSum', label: '延期节点' },
+]
+
+/** 按 key 降序排序分组副本;rate 为 null 视作 -Infinity(排末尾)。不改入参。 */
+export function sortPayBoardGroups(groups: PayBoardGroup[], key: PayBoardSortKey): PayBoardGroup[] {
+  const val = (g: PayBoardGroup): number => {
+    const x = g[key]
+    return x == null ? -Infinity : (x as number)
+  }
+  return [...groups].sort((a, b) => val(b) - val(a))
+}
