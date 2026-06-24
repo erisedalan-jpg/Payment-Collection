@@ -63,6 +63,28 @@ describe('buildRiskRows', () => {
     expect(b.top1000).toBe('否')
     expect(b.quadrant).toBe('未指定')
   })
+
+  it('新增项目维度 + 风险大类/小类(仅未关闭,无风险→[无风险])', () => {
+    const rec = (lvl: string, status: string, major: string, minor: string) => ({ 风险等级: lvl, 风险状态: status, 风险大类: major, 风险小类: minor })
+    const projects = [
+      { projectId: 'A', projectName: 'a', orgL4: '组', projectManager: '甲', health: { overall: '风险' } },
+      { projectId: 'B', projectName: 'b', orgL4: '组', projectManager: '乙' },
+    ] as unknown as Project[]
+    const pmisMap = {
+      A: { status: { 项目级别: 'P1', 项目状态: '实施中' }, progress: { 项目阶段: '执行' }, customer: {},
+           riskRecords: [rec('高', '已识别', '客户侧风险', '其它'), rec('中', '已识别', '成本超支风险', ''), rec('低', '已关闭', '质量风险', 'x')] },
+      B: { status: {}, progress: {}, customer: {}, riskRecords: [] },
+    } as unknown as Record<string, ProjectPmis>
+    const [a, b] = buildRiskRows(projects, pmisMap)
+    expect(a.projectStatus).toBe('实施中')
+    expect(a.stage).toBe('执行')
+    expect(a.health).toBe('风险')
+    expect([...a.riskMajorCats].sort()).toEqual(['客户侧风险', '成本超支风险'])  // 已关闭的质量风险被排除
+    expect(a.riskMinorCats).toEqual(['其它'])                                   // 仅非空去重(成本超支的小类空被滤)
+    expect(b.health).toBe('无数据')
+    expect(b.riskMajorCats).toEqual(['无风险'])  // 无未关闭风险
+    expect(b.riskMinorCats).toEqual(['无风险'])
+  })
 })
 
 describe('riskSummary', () => {
