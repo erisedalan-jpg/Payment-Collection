@@ -4,13 +4,21 @@ import { useRouter } from 'vue-router'
 import type { MilestoneProject } from '@/lib/milestoneAnalytics'
 import { buildReminderRows, reminderRange, reminderStat, type ReminderPreset, type ReminderRow } from '@/lib/milestoneDetailRows'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { useCrossFilterStore } from '@/stores/crossFilter'
+import { applyColumnFilters } from '@/lib/crossFilter'
+import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from './DataTable.vue'
 import StatusBadge from './StatusBadge.vue'
+import ColumnFilter from './ColumnFilter.vue'
+import ColumnPicker from './ColumnPicker.vue'
 
 const props = defineProps<{ projects: MilestoneProject[]; now: Date }>()
 const router = useRouter()
 
 const TABLE_ID = 'milestone-reminder'
+
+const cf = useCrossFilterStore()
+cf.clearAll(TABLE_ID)
 
 // 时间段:默认未来1个月;快捷档写 rangeModel;清空=全部
 const m1 = reminderRange(props.now, 'm1')
@@ -19,8 +27,13 @@ const range = computed(() => (rangeModel.value ? { start: rangeModel.value[0], e
 function preset(p: ReminderPreset) { const r = reminderRange(props.now, p); rangeModel.value = [r.start, r.end] }
 
 const winRows = computed(() => buildReminderRows(props.projects, props.now, range.value))
-// Task 3 会把 filtered 改成 列筛选+关键词链;此处先 = winRows
-const filtered = computed<ReminderRow[]>(() => winRows.value)
+
+const filtered = computed<ReminderRow[]>(() => {
+  const afterCols = applyColumnFilters(winRows.value, cf.tableFilters(TABLE_ID)) as ReminderRow[]
+  const kw = fKw.value.trim()
+  return kw ? afterCols.filter((r) => r.projectId.includes(kw) || r.projectName.includes(kw)) : afterCols
+})
+
 const stat = computed(() => reminderStat(filtered.value))
 
 const PR_TONE: Record<string, string> = { high: 'danger', mid: 'warn', low: 'mut' }
@@ -48,12 +61,31 @@ const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 
+const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
+const FILTERABLE = new Set(['projectType', 'manager', 'orgL3', 'orgL4', 'node', 'done', 'linked', 'priorityLabel'])
+
+function onToggle(key: string) {
+  if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
+  prefs.toggle(key)
+}
+
+const fKw = ref('')
+
 const pageSize = ref(50)
 const currentPage = ref(1)
 const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
 watch(filtered, () => { currentPage.value = 1 })
 
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
+
+function onExport() {
+  exportRows(`里程碑到期提醒_${filtered.value.length}条.xlsx`, filtered.value.map((r) => ({
+    项目编号: r.projectId, 项目名称: r.projectName, '项目金额(万)': r.contract ? r.contract / 10000 : 0,
+    项目类型: r.projectType, 项目经理: r.manager, L3部门: r.orgL3, L4部门: r.orgL4,
+    到期节点: r.node, 计划时间: r.planDate, 实际完成时间: r.actualDate, 是否完成: r.done,
+    回款阶段: r.payStage, 是否关联回款: r.linked, 处置优先级: r.priorityLabel,
+  })))
+}
 
 defineExpose({ rangeModel, filtered })
 </script>
@@ -66,6 +98,11 @@ defineExpose({ rangeModel, filtered })
       <button class="mrt-btn" data-test="rng-d7" @click="preset('d7')">未来7天</button>
       <button class="mrt-btn" data-test="rng-m1" @click="preset('m1')">未来1个月</button>
       <button class="mrt-btn" data-test="rng-quarter" @click="preset('quarter')">本季度</button>
+      <el-input v-model="fKw" size="small" placeholder="编号/名称" clearable style="width: 150px" data-test="mrt-kw" />
+      <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
+        @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
+      <button class="mrt-btn" data-test="mrt-export" @click="onExport">导出Excel</button>
+      <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
     <div class="mrt-stats">
       <div class="mrt-card"><div class="mrt-k">到期节点总数</div><div class="mrt-v u-num">{{ stat.total }}</div></div>
@@ -75,6 +112,10 @@ defineExpose({ rangeModel, filtered })
     </div>
     <div class="mrt-scroll">
       <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
+        <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
+          <span class="mrt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="winRows" /></span>
+        </template>
+        <!-- 以下 cell 插槽保持 Task 2 不变 -->
         <template #cell-projectId="{ value }"><span class="mrt-link">{{ value }}</span></template>
         <template #cell-planDate="{ row, value }"><span :class="['u-num', row.urgency ? 'mrt-date-' + row.urgency : '']">{{ value }}</span></template>
         <template #cell-done="{ value }"><StatusBadge :label="value" :tone="value === '是' ? 'ok' : 'mut'" /></template>
@@ -103,4 +144,5 @@ defineExpose({ rangeModel, filtered })
 .mrt-date-urgent { color: var(--danger); font-weight: 600; }
 .mrt-date-warn { color: var(--warn-text); font-weight: 600; }
 .mrt-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.mrt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 </style>

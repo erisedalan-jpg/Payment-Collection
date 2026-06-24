@@ -4,6 +4,8 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import MilestoneReminderTab from './MilestoneReminderTab.vue'
 import DataTable from './DataTable.vue'
+import ColumnPicker from './ColumnPicker.vue'
+import * as xlsx from '@/lib/exportXlsx'
 
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
@@ -47,5 +49,33 @@ describe('MilestoneReminderTab 核心', () => {
     const w = mountTab()
     await w.findComponent(DataTable).vm.$emit('row-click', { projectId: 'A' })
     expect(push).toHaveBeenCalledWith('/project/A')
+  })
+})
+
+describe('MilestoneReminderTab 表格栈', () => {
+  it('ColumnPicker 存在且含全部14列可选', () => {
+    const w = mountTab()
+    const cp = w.findComponent(ColumnPicker)
+    expect(cp.exists()).toBe(true)
+    expect((cp.props('columns') as any[]).length).toBe(14)
+  })
+  it('关键词搜索 编号/名称 收窄 filtered', async () => {
+    const w = mountTab()
+    const vm = w.vm as any
+    const before = vm.filtered.length
+    await w.get('[data-test="mrt-kw"]').setValue('不存在的编号zzz')
+    expect((w.vm as any).filtered.length).toBe(0)
+    expect(before).toBeGreaterThan(0)
+  })
+  it('按筛选导出调用 exportRows(条数与列键)', async () => {
+    const spy = vi.spyOn(xlsx, 'exportRows').mockImplementation(() => {})
+    const w = mountTab()
+    await w.get('[data-test="mrt-export"]').trigger('click')
+    expect(spy).toHaveBeenCalledTimes(1)
+    const [, rowsArg] = spy.mock.calls[0]
+    expect((rowsArg as any[]).length).toBe((w.vm as any).filtered.length)
+    expect(Object.keys((rowsArg as any[])[0])).toContain('项目金额(万)')
+    expect(Object.keys((rowsArg as any[])[0])).toContain('是否完成')
+    spy.mockRestore()
   })
 })
