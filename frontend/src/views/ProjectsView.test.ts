@@ -261,6 +261,32 @@ describe('ProjectsView', () => {
     expect(w.find('.pv-scroll').exists()).toBe(true)
   })
 
+  it('TOP1000/象限 列默认隐藏(不在默认表头)', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const headers = w.findAll('th').map((n) => n.text().trim())
+    expect(headers.some((t) => t.includes('TOP1000'))).toBe(false)
+    expect(headers.some((t) => t === '象限')).toBe(false)
+  })
+
+  it('启用后 TOP1000/象限 列渲染且带筛选器(可筛)', async () => {
+    seed()
+    localStorage.setItem('colprefs:projects-active',
+      JSON.stringify(['projectName', 'top1000', 'quadrant', 'action']))
+    const w = mountView()
+    await flushPromises()
+    const ths = w.findAll('th')
+    const topTh = ths.find((n) => n.text().includes('TOP1000'))
+    const quadTh = ths.find((n) => n.text().includes('象限'))
+    expect(topTh).toBeTruthy()
+    expect(quadTh).toBeTruthy()
+    // FILTERABLE → 表头含 ColumnFilter 触发器 .cf-icon
+    expect(topTh!.find('.cf-icon').exists()).toBe(true)
+    expect(quadTh!.find('.cf-icon').exists()).toBe(true)
+    localStorage.clear()
+  })
+
   it('orgL4 空项目渲染「数据异常」标记，正常项目不渲染', async () => {
     const ds = useDataStore()
     ds.data = {
