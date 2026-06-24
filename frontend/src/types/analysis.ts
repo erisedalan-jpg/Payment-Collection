@@ -108,6 +108,8 @@ export type Riskabnormal = boolean;
 export type Costabnormal = boolean;
 export type Paymentabnormal = boolean;
 export type Overall = string;
+export type Top1000 = string;
+export type Quadrant = string;
 export type Projects = Project[];
 export type Projectid1 = string;
 export type Projectname1 = string;
@@ -332,6 +334,8 @@ export interface Project {
   overspendAmount?: Overspendamount;
   paymentPmis?: ProjectPaymentPmis | null;
   health?: ProjectHealth;
+  top1000?: Top1000;
+  quadrant?: Quadrant;
   [k: string]: unknown;
 }
 export interface ProjectPayment {

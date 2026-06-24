@@ -383,3 +383,33 @@ class TestReadTop1000:
 
     def test_missing_file_degrades_to_empty(self, tmp_path):
         assert P.read_top1000(str(tmp_path / "无.xlsx")) == {}
+
+
+class TestBuildProjectsTop1000:
+    def _ppm(self, final_customer):
+        pm = _pm_active("项目甲", "佘海龙")
+        pm["customer"]["最终客户"] = final_customer
+        return {"SS-1": pm}
+
+    def test_matched_top1000_level_yes_with_quadrant(self):
+        m = {"辽宁省公安厅": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+        out = P.build_projects(self._ppm("辽宁省公安厅"), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "是"
+        assert out[0]["quadrant"] == "M1 战略核心区"
+
+    def test_matched_non_top1000_level_is_no_but_quadrant_kept(self):
+        m = {"某客户": {"level": "TOP1001大客户", "quad": "M2 现金牛/打猎区"}}
+        out = P.build_projects(self._ppm("某客户"), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == "M2 现金牛/打猎区"
+
+    def test_unmatched_is_no_empty_quadrant(self):
+        m = {"辽宁省公安厅": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+        out = P.build_projects(self._ppm("不在表里"), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == ""
+
+    def test_no_map_degrades_to_no(self):
+        out = P.build_projects(self._ppm("辽宁省公安厅"), {"佘海龙"}, set(), [], [])
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == ""
