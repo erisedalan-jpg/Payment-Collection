@@ -1054,6 +1054,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_VALIDATION, "ids 须为数组"))
             return
         account, rec = self._session_account_rec()
+        rec = rec or {}
         try:
             store = _load_opportunities()
             _opp.apply_delete(store, data['ids'])
