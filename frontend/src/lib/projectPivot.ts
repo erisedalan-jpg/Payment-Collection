@@ -19,6 +19,8 @@ export interface InsightRow {
   projectLevel: string
   overspend: string // '是' | '否'(维度用字符串值)
   paused: string    // '是' | '否'
+  top1000: string   // '是' | '否'
+  quadrant: string  // 象限 M1/M2/M3/M4 或 '未指定'
   contractAmount: number
   progress: number | null
   costRatio: number | null
@@ -57,6 +59,8 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       projectLevel: v(st.项目级别),
       overspend: cost.项目超支 === true ? '是' : '否',
       paused: st.是否暂停 === true ? '是' : '否',
+      top1000: v(p.top1000, '否'),
+      quadrant: v(p.quadrant),
       contractAmount: Number(cust.合同总额 ?? 0),
       progress: typeof prog.完工进展 === 'number' ? prog.完工进展 : null,
       costRatio: typeof cost.消耗比 === 'number' ? cost.消耗比 : null,
@@ -69,11 +73,11 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
 }
 
 export interface InsightDimDef {
-  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'projectLevel' | 'industry' | 'signType' | 'health' | 'overspend' | 'paused'
+  key: 'stage' | 'projectStatus' | 'riskLevel' | 'manager' | 'orgL4' | 'projectLevel' | 'industry' | 'signType' | 'health' | 'overspend' | 'paused' | 'top1000' | 'quadrant'
   label: string
 }
 
-// 当前 11 维:含服务组/项目级别/超支/暂停等前端直取维,已去掉"评级"维。
+// 当前 13 维:含服务组/项目级别/超支/暂停/TOP1000/象限等前端直取维,已去掉"评级"维。
 export const INSIGHT_DIMENSIONS: InsightDimDef[] = [
   { key: 'stage', label: '阶段' },
   { key: 'projectStatus', label: '项目状态' },
@@ -86,6 +90,8 @@ export const INSIGHT_DIMENSIONS: InsightDimDef[] = [
   { key: 'health', label: '健康度' },
   { key: 'overspend', label: '超支' },
   { key: 'paused', label: '暂停' },
+  { key: 'top1000', label: 'TOP1000' },
+  { key: 'quadrant', label: '象限' },
 ]
 
 export const INSIGHT_DIM_BY_KEY: Record<string, InsightDimDef> = Object.fromEntries(
