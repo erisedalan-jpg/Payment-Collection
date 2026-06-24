@@ -177,6 +177,8 @@ class Project(_Base):
     overspendAmount: Optional[float] = None   # S2:整体超支金额(元,同源 profit.overspend_amount,可为负=未超支)
     paymentPmis: Optional[ProjectPaymentPmis] = None   # 2A:PMIS 核心回款摘要(售前回退原项目)
     health: ProjectHealth = ProjectHealth()
+    top1000: str = "否"        # TOP1000.xlsx:是否 TOP1000 大客户(按最终客户匹配)
+    quadrant: str = ""         # TOP1000.xlsx:客户象限(M1/M2/M3/M4),未匹配为空
 
 
 class ClosedProjectCloseInfo(_Base):
