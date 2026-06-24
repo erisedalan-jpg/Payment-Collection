@@ -16,7 +16,11 @@ function order(v: string): number {
 const hasGroups = computed(() => props.options.some((o) => o.group))
 const groups = computed(() => {
   const m = new Map<string, DimOption[]>()
-  for (const o of props.options) (m.get(o.group ?? '') ?? m.set(o.group ?? '', []).get(o.group ?? '')!).push(o)
+  for (const o of props.options) {
+    const k = o.group ?? ''
+    if (!m.has(k)) m.set(k, [])
+    m.get(k)!.push(o)
+  }
   return [...m.entries()].map(([name, opts]) => ({ name, opts }))
 })
 </script>
@@ -25,7 +29,7 @@ const groups = computed(() => {
   <div class="dp">
     <template v-if="hasGroups">
       <div v-for="g in groups" :key="g.name" class="dp-group">
-        <span class="dp-group-label">{{ g.name }}</span>
+        <span v-if="g.name" class="dp-group-label">{{ g.name }}</span>
         <button v-for="o in g.opts" :key="o.value" type="button" class="dp-chip"
           :class="{ on: modelValue.includes(o.value) }" :data-test="`dim-${o.value}`" @click="toggle(o.value)">
           <span v-if="order(o.value)" class="dp-ord">{{ order(o.value) }}</span>{{ o.label }}
