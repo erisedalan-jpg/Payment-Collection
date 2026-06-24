@@ -41,4 +41,14 @@ describe('DimPicker', () => {
     expect(w.findAll('.dp-group-label').length).toBe(0)
     expect(w.findAll('.dp-chip').length).toBe(1)
   })
+
+  it('混用有/无 group 项:无 group 项不产生空标题', () => {
+    const w = mount(DimPicker, { props: { modelValue: [], options: [
+      { value: 'a', label: 'A', group: '风险维度' },
+      { value: 'b', label: 'B' },
+    ] } })
+    // 只有 1 个非空分组标题(风险维度);'' 桶不渲染标签
+    expect(w.findAll('.dp-group-label').length).toBe(1)
+    expect(w.findAll('.dp-chip').length).toBe(2)  // A,B 两 chip 都在
+  })
 })
