@@ -1,47 +1,85 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { PROJECT_LINKS, ANALYSIS_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 const auth = useAuthStore()
+const route = useRoute()
 const projectLinks = computed(() => PROJECT_LINKS.filter((l) => auth.canAccess(l.key)))
 const analysisLinks = computed(() => ANALYSIS_LINKS.filter((l) => auth.canAccess(l.key)))
 const paymentLinks = computed(() => PAYMENT_LINKS.filter((l) => auth.canAccess(l.key)))
 const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key)))
+
+const activeSectionKey = computed(() => {
+  const p = route.path
+  if (p.startsWith('/insight')) return 'analysis'
+  if (p.startsWith('/payment') || p.startsWith('/ledger')) return 'payment'
+  if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
+  if (p.startsWith('/admin')) return 'admin'
+  return 'project'
+})
+function expanded(key: string): boolean {
+  const v = ui.sectionExpanded[key]
+  return v === undefined ? key === activeSectionKey.value : v
+}
+function onToggle(key: string) {
+  ui.setSection(key, !expanded(key))
+}
 </script>
 
 <template>
   <aside class="sidebar" :class="{ collapsed: ui.sidebarCollapsed }">
     <nav class="sidebar-nav">
-      <div v-if="projectLinks.length" class="section">
-        <div class="section-label">项目</div>
-        <RouterLink v-for="link in projectLinks" :key="link.to" :to="link.to"
-          class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+      <div v-if="projectLinks.length" class="section" :class="{ collapsed: !expanded('project') }">
+        <button type="button" class="section-label" @click="onToggle('project')">
+          <span class="section-caret">{{ expanded('project') ? '▾' : '▸' }}</span>项目
+        </button>
+        <div v-show="expanded('project')" class="section-links">
+          <RouterLink v-for="link in projectLinks" :key="link.to" :to="link.to"
+            class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+        </div>
       </div>
 
-      <div v-if="analysisLinks.length" class="section">
-        <div class="section-label">项目分析</div>
-        <RouterLink v-for="link in analysisLinks" :key="link.to" :to="link.to"
-          class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+      <div v-if="analysisLinks.length" class="section" :class="{ collapsed: !expanded('analysis') }">
+        <button type="button" class="section-label" @click="onToggle('analysis')">
+          <span class="section-caret">{{ expanded('analysis') ? '▾' : '▸' }}</span>项目分析
+        </button>
+        <div v-show="expanded('analysis')" class="section-links">
+          <RouterLink v-for="link in analysisLinks" :key="link.to" :to="link.to"
+            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+        </div>
       </div>
 
-      <div v-if="paymentLinks.length" class="section">
-        <div class="section-label">回款<span class="section-tag">重点子域</span></div>
-        <RouterLink v-for="link in paymentLinks" :key="link.to" :to="link.to"
-          class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+      <div v-if="paymentLinks.length" class="section" :class="{ collapsed: !expanded('payment') }">
+        <button type="button" class="section-label" @click="onToggle('payment')">
+          <span class="section-caret">{{ expanded('payment') ? '▾' : '▸' }}</span>回款<span class="section-tag">重点子域</span>
+        </button>
+        <div v-show="expanded('payment')" class="section-links">
+          <RouterLink v-for="link in paymentLinks" :key="link.to" :to="link.to"
+            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+        </div>
       </div>
 
-      <div v-if="toolLinks.length" class="section">
-        <div class="section-label">工具</div>
-        <RouterLink v-for="link in toolLinks" :key="link.to" :to="link.to"
-          class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+      <div v-if="toolLinks.length" class="section" :class="{ collapsed: !expanded('tools') }">
+        <button type="button" class="section-label" @click="onToggle('tools')">
+          <span class="section-caret">{{ expanded('tools') ? '▾' : '▸' }}</span>工具
+        </button>
+        <div v-show="expanded('tools')" class="section-links">
+          <RouterLink v-for="link in toolLinks" :key="link.to" :to="link.to"
+            class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+        </div>
       </div>
 
-      <div v-if="auth.isSuper" class="section">
-        <div class="section-label">系统管理</div>
-        <RouterLink to="/admin" class="nav-item" active-class="active">账号管理</RouterLink>
+      <div v-if="auth.isSuper" class="section" :class="{ collapsed: !expanded('admin') }">
+        <button type="button" class="section-label" @click="onToggle('admin')">
+          <span class="section-caret">{{ expanded('admin') ? '▾' : '▸' }}</span>系统管理
+        </button>
+        <div v-show="expanded('admin')" class="section-links">
+          <RouterLink to="/admin" class="nav-item" active-class="active">账号管理</RouterLink>
+        </div>
       </div>
     </nav>
   </aside>
@@ -55,7 +93,11 @@ const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key))
 .sidebar.collapsed { width: 0; border-right: none; }
 .sidebar-nav { flex: 1; overflow-y: auto; padding: var(--sp-3) 0; }
 .section { margin-bottom: var(--sp-4); }
-.section-label { font-size: var(--fs-1); color: var(--mut); padding: var(--sp-1) var(--sp-4); font-weight: 600; }
+.section-label { display: flex; align-items: center; width: 100%; background: none; border: 0;
+  font-family: inherit; font-size: var(--fs-1); color: var(--mut); padding: var(--sp-1) var(--sp-4);
+  font-weight: 600; text-align: left; cursor: pointer; }
+.section-label:hover { background: var(--hover-tint); }
+.section-caret { display: inline-block; width: 12px; margin-right: var(--sp-2); color: var(--mut); font-size: var(--fs-1); }
 .group-label { font-size: var(--fs-1); color: var(--sub); padding: var(--sp-2) var(--sp-4) 2px; }
 .nav-item, .nav-sub { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4);
   font-size: var(--fs-2); color: var(--txt); text-decoration: none; }
