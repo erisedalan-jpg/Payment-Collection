@@ -29,6 +29,7 @@ import data_history
 import data_scope
 import manual_import
 import manual_history
+import opportunities as _opp
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -155,6 +156,8 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/data-history/rollback', '/api/data-history/undo-rollback',
     '/api/manual/import', '/api/manual/rollback',
     '/api/progress/archive',
+    '/api/opportunities/create', '/api/opportunities/update',
+    '/api/opportunities/delete', '/api/opportunities/import',
 })
 
 
@@ -305,6 +308,46 @@ def _progress_apply_archive(store, rows, now):
     store['current'] = {}
 
 
+# ── 商机管理(V2.0.0) ──
+OPPORTUNITIES_FILE = os.path.join(BASE_DIR, 'data', 'opportunities.json')
+OPP_INPUT_NAMES = ('opportunities.xlsx', 'opportunitites.xlsx')  # 后者兼容用户原文笔误
+_opp_lock = threading.Lock()
+
+
+def _load_opportunities():
+    """有 json → load;否则从 input xlsx seed(两种文件名都试),建 store 并落盘。"""
+    if os.path.exists(OPPORTUNITIES_FILE):
+        try:
+            with open(OPPORTUNITIES_FILE, 'r', encoding='utf-8') as f:
+                store = json.load(f)
+            if isinstance(store, dict):
+                store.setdefault('version', 1)
+                store.setdefault('seq', len(store.get('rows', [])))
+                store.setdefault('rows', [])
+                return store
+        except Exception:
+            pass
+    # seed from input xlsx
+    rows = []
+    for name in OPP_INPUT_NAMES:
+        p = os.path.join(BASE_DIR, 'input', name)
+        if os.path.exists(p):
+            rows = _opp.read_opportunities_xlsx(p)
+            break
+    store = {"version": 1, "seq": len(rows), "rows": rows}
+    _save_opportunities(store)
+    return store
+
+
+def _save_opportunities(store):
+    with _opp_lock:
+        os.makedirs(os.path.dirname(OPPORTUNITIES_FILE), exist_ok=True)
+        tmp = OPPORTUNITIES_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, OPPORTUNITIES_FILE)
+
+
 def _valid_project_ids():
     """从 analysis_data.json 读取有效项目编号集合（供人工导入校验）。"""
     try:
@@ -417,6 +460,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_tags_get()
         elif parsed.path == '/api/progress':
             self.handle_progress_get()
+        elif parsed.path == '/api/opportunities':
+            self.handle_opportunities_get()
         elif parsed.path == '/api/files/status':
             self.handle_files_status()
         elif parsed.path == '/api/reprocess':
@@ -504,6 +549,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_progress_update()
         elif parsed.path == '/api/progress/archive':
             self.handle_progress_archive()
+        elif parsed.path == '/api/opportunities/create':
+            self.handle_opportunities_create()
+        elif parsed.path == '/api/opportunities/update':
+            self.handle_opportunities_update()
+        elif parsed.path == '/api/opportunities/delete':
+            self.handle_opportunities_delete()
+        elif parsed.path == '/api/opportunities/import':
+            self.handle_opportunities_import()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -937,6 +990,111 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    # ── 商机管理处理器(V2.0.0) ──
+
+    def _session_account_rec(self):
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        return account, rec
+
+    def _opp_now(self):
+        n = datetime.now()
+        return n.strftime('%Y-%m-%d'), n.strftime('%Y-%m-%d %H:%M')
+
+    def handle_opportunities_get(self):
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_opportunities()
+            rows = _opp.filter_for_account(store.get('rows', []), rec.get('allowedL4', []), bool(rec.get('isSuper')))
+            self._json_response({"rows": rows})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取商机失败: {e}"))
+
+    def handle_opportunities_create(self):  # 超管(由 _authz_gate 拦)
+        try:
+            store = _load_opportunities()
+            now_date, _ = self._opp_now()
+            row = _opp.apply_create(store, now_date)
+            _save_opportunities(store)
+            self._json_response({"row": row})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"新增商机失败: {e}"))
+
+    def handle_opportunities_update(self):  # 超管
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        rid = str(data.get('id') or '').strip()
+        fields = data.get('fields') or {}
+        if not rid or not isinstance(fields, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "id 必填、fields 须为对象"))
+            return
+        account, _ = self._session_account_rec()
+        try:
+            store = _load_opportunities()
+            now_date, now_dt = self._opp_now()
+            row = _opp.apply_update(store, rid, fields, account, now_date, now_dt)
+            if row is None:
+                self._send_json(404, _error_payload(ERR_NOT_FOUND, f"商机不存在: {rid}"))
+                return
+            _save_opportunities(store)
+            self._json_response({"row": row})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存商机失败: {e}"))
+
+    def handle_opportunities_delete(self):  # 超管
+        data = self._read_json_body()
+        if data is None or not isinstance(data.get('ids'), list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "ids 须为数组"))
+            return
+        account, rec = self._session_account_rec()
+        try:
+            store = _load_opportunities()
+            _opp.apply_delete(store, data['ids'])
+            _save_opportunities(store)
+            rows = _opp.filter_for_account(store.get('rows', []), rec.get('allowedL4', []), bool(rec.get('isSuper')))
+            self._json_response({"rows": rows})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"删除商机失败: {e}"))
+
+    def handle_opportunities_import(self):  # 超管:裸 xlsx 字节 → 整表替换(先备份)
+        length = int(self.headers.get('Content-Length', 0))
+        if length <= 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "缺少文件内容"))
+            return
+        body = self.rfile.read(length)
+        # 替换前备份旧表
+        if os.path.exists(OPPORTUNITIES_FILE):
+            try:
+                bak = OPPORTUNITIES_FILE.replace('.json', '.backup-%s.json' % datetime.now().strftime('%Y%m%d%H%M%S'))
+                with open(OPPORTUNITIES_FILE, 'rb') as src, open(bak, 'wb') as dst:
+                    dst.write(src.read())
+            except Exception:
+                pass
+        import tempfile
+        fd, tmp = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        try:
+            with open(tmp, 'wb') as f:
+                f.write(body)
+            rows = _opp.read_opportunities_xlsx(tmp)
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        try:
+            store = {"version": 1, "seq": len(rows), "rows": rows}
+            _save_opportunities(store)
+            self._json_response({"rows": rows, "count": len(rows)})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"导入失败: {e}"))
 
     def handle_files_status(self):
         """GET /api/files/status - 已知数据文件的最近修改时间(数据管理页行内展示)"""
