@@ -10,7 +10,7 @@ beforeEach(() => setActivePinia(createPinia()))
 function mountModal() {
   return mount(ProgressEditModal, {
     props: { modelValue: true, projectId: 'P1', projectName: '甲', field: 'weekProgress', initial: '旧内容' },
-    global: { plugins: [ElementPlus], stubs: { Modal: { template: '<div><slot/></div>' } } },
+    global: { plugins: [ElementPlus], stubs: { Modal: { template: '<div><span class="modal-title">{{ title }}</span><slot/></div>', props: ['title'] } } },
   })
 }
 
