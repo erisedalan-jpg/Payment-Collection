@@ -1,5 +1,5 @@
 import type { MilestoneProject, MilestoneStatus } from './milestoneAnalytics'
-import { ymd, reminderBounds, addDays } from './milestoneAnalytics'
+import { ymd, reminderBounds } from './milestoneAnalytics'
 
 export const NODE_TYPES = [
   '项目启动', '到货', '服务进场', '交付完工', '初验', '项目完工（服务离场）',
@@ -43,25 +43,35 @@ export function buildDelayedRows(ps: MilestoneProject[], now: Date): DelayedRow[
 
 export { dayDiff }
 
-export type ReminderWin = '7d' | '30d' | 'quarter'
+export type ReminderPreset = 'd7' | 'm1' | 'quarter'
+
+/** 时间段快捷档:start 一律今日(向后看);d7=今+7、m1=今+1月、quarter=本季度边界。 */
+export function reminderRange(now: Date, preset: ReminderPreset): { start: string; end: string } {
+  const b = reminderBounds(now)
+  if (preset === 'd7') return { start: b.today, end: b.d7 }
+  if (preset === 'quarter') return { start: b.qs, end: b.qe }
+  return { start: b.today, end: ymd(new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())) }
+}
+
 export interface ReminderRow {
   projectId: string; projectName: string; projectType: string; manager: string
   orgL3: string; orgL4: string; node: string; planDate: string; payStage: string
   linked: '是' | '否'; priority: string; priorityLabel: string; urgency: 'urgent' | 'warn' | ''
+  contract: number; actualDate: string; done: '是' | '否'; overdue: boolean
 }
 
 const PR_LABEL: Record<string, string> = { high: '高', mid: '中', low: '低' }
 
-/** 到期提醒(节点级):窗口内未完成节点逐条成行。 */
-export function buildReminderRows(ps: MilestoneProject[], now: Date, win: ReminderWin): ReminderRow[] {
-  const b = reminderBounds(now)
-  const [start, end] = win === '7d' ? [b.today, b.d7] : win === '30d' ? [b.today, b.d30] : [b.qs, b.qe]
+/** 到期清单(节点级,含已完成):planDate∈range 的节点逐条成行;range=null 取全部。 */
+export function buildReminderRows(ps: MilestoneProject[], now: Date, range: { start: string; end: string } | null): ReminderRow[] {
+  const today = ymd(now)
   const out: ReminderRow[] = []
   for (const p of ps) {
     for (const n of p.nodes) {
-      if ((n.actualDate ?? '').trim()) continue
       const pd = (n.planDate ?? '').slice(0, 10)
-      if (!pd || pd < start || pd > end) continue
+      if (!pd) continue
+      if (range && (pd < range.start || pd > range.end)) continue
+      const actual = (n.actualDate ?? '').slice(0, 10)
       const diff = dayDiff(pd, now)
       const pr = ((n as any).priority === 'high' || (n as any).priority === 'mid') ? (n as any).priority : 'low'
       const payStage = ((n as any).payStage ?? '').trim()
@@ -69,27 +79,23 @@ export function buildReminderRows(ps: MilestoneProject[], now: Date, win: Remind
         projectId: p.projectId, projectName: p.projectName, projectType: p.projectType, manager: p.manager,
         orgL3: p.orgL3, orgL4: p.orgL4, node: n.name ?? '', planDate: pd, payStage,
         linked: payStage ? '是' : '否', priority: pr, priorityLabel: PR_LABEL[pr],
-        urgency: diff <= 3 ? 'urgent' : diff <= 7 ? 'warn' : '',
+        contract: p.contract, actualDate: actual, done: actual ? '是' : '否',
+        overdue: !actual && pd < today,
+        urgency: actual ? '' : (diff <= 3 ? 'urgent' : diff <= 7 ? 'warn' : ''),
       })
     }
   }
   return out
 }
 
-export interface ReminderStat { projectCount: number; nodeCount: number; within7: number; withinWeek: number }
-export function reminderStat(rows: ReminderRow[], now: Date): ReminderStat {
-  const today = reminderBounds(now).today
-  const d7 = addDays(now, 7)
-  const we = addDays(now, 7 - now.getDay()) // 本周末(下个周日)
-  const pids = new Set<string>()
-  let within7 = 0, withinWeek = 0
+export interface ReminderStat { total: number; done: number; undone: number; overdue: number }
+export function reminderStat(rows: ReminderRow[]): ReminderStat {
+  let done = 0, overdue = 0
   for (const r of rows) {
-    pids.add(r.projectId)
-    const pd = r.planDate.slice(0, 10)
-    if (pd >= today && pd <= d7) within7++
-    if (pd >= today && pd <= we) withinWeek++
+    if (r.done === '是') done++
+    if (r.overdue) overdue++
   }
-  return { projectCount: pids.size, nodeCount: rows.length, within7, withinWeek }
+  return { total: rows.length, done, undone: rows.length - done, overdue }
 }
 
 export interface PlanRow extends Record<string, string | number> {
