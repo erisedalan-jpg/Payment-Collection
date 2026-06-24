@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
-  buildRiskRows, riskSummary, groupRisk, riskOverview,
+  buildRiskRows, riskSummary, groupRisk, riskPivot,
   RISK_DIMENSIONS, RISK_METRICS, type RiskMetricKey, type RiskDimDef, type RiskRow,
 } from '@/lib/riskBoard'
 import { fmtWan, pct } from '@/lib/format'
@@ -13,6 +13,8 @@ import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import RiskDrillModal from '@/components/RiskDrillModal.vue'
+import DimPicker from '@/components/DimPicker.vue'
+import PivotTable from '@/components/PivotTable.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
@@ -102,19 +104,22 @@ const RANK_COLS = computed<DataColumn[]>(() => [
   { key: 'contractAmount', label: '合同总额(万)', width: 120, sortable: true, num: true, formatter: (v) => fmtWan(v as number) },
 ])
 
-// ---- 风险概览(透视表) ----
-const OVERVIEW_DIM_OPTS = RISK_DIMENSIONS.filter((d) => d.key !== 'riskLevel').map((d) => ({ value: d.key, label: d.label }))
-const overviewDim = ref<RiskDimDef['key']>('orgL4')
-const overviewRows = computed(() => riskOverview(rows.value, overviewDim.value))
-const OVERVIEW_COLS = computed<DataColumn[]>(() => [
-  { key: 'key', label: RISK_DIMENSIONS.find((d) => d.key === overviewDim.value)?.label ?? '维度' },
-  { key: '高', label: '高', width: 70, sortable: true, num: true },
-  { key: '中', label: '中', width: 70, sortable: true, num: true },
-  { key: '低', label: '低', width: 70, sortable: true, num: true },
-  { key: '无风险', label: '无风险', width: 80, sortable: true, num: true },
-  { key: 'total', label: '合计', width: 80, sortable: true, num: true },
-  { key: 'healthPct', label: '健康度%', width: 90, num: true, formatter: (v) => (v == null ? '-' : pct(v as number)) },
-])
+// ---- 风险概览(透视) ----
+const PIVOT_DIM_OPTS = RISK_DIMENSIONS.map((d) => ({ value: d.key, label: d.label, group: d.category === 'risk' ? '风险维度' : '项目维度' }))
+const OVERVIEW_METRIC_OPTS = RISK_METRICS.map((m) => ({ value: m.key, label: m.label }))
+const rowDims = ref<string[]>(['orgL4'])
+const colDims = ref<string[]>(['riskLevel'])
+const ovMetric = ref<RiskMetricKey>('projectCount')
+const ovMetricDef = computed(() => RISK_METRICS.find((m) => m.key === ovMetric.value)!)
+const pivot = computed(() => riskPivot(rows.value, rowDims.value, colDims.value, ovMetric.value))
+function fmtPivot(v: number): string {
+  if (Number.isNaN(v)) return '-'
+  return ovMetricDef.value.kind === 'money' ? fmtWan(v) : String(v)
+}
+function onPivotCell(p: { rowKey: string; colKey: string }) {
+  const g = pivot.value.index[p.rowKey]?.[p.colKey]
+  if (g) openDrill(`${p.rowKey}${p.colKey ? ' / ' + p.colKey : ''}`, g.rows)
+}
 </script>
 
 <template>
@@ -152,9 +157,11 @@ const OVERVIEW_COLS = computed<DataColumn[]>(() => [
 
       <h3 class="rv-h3">风险概览</h3>
       <div class="rv-toolbar">
-        <span class="rv-label">行维度</span><SegToggle v-model="overviewDim" :options="OVERVIEW_DIM_OPTS" />
+        <span class="rv-label">行维度</span><DimPicker v-model="rowDims" :options="PIVOT_DIM_OPTS" />
+        <span class="rv-label">列维度</span><DimPicker v-model="colDims" :options="PIVOT_DIM_OPTS" />
+        <span class="rv-label">指标</span><SegToggle v-model="ovMetric" :options="OVERVIEW_METRIC_OPTS" />
       </div>
-      <DataTable :columns="OVERVIEW_COLS" :rows="overviewRows" />
+      <PivotTable :pivot="pivot" :format="fmtPivot" @cell-click="onPivotCell" />
 
       <RiskDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
     </template>

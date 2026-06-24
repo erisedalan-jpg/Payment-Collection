@@ -238,28 +238,3 @@ export function riskPivot(
   }
 }
 
-export interface RiskOverviewRow {
-  key: string
-  高: number
-  中: number
-  低: number
-  无风险: number
-  total: number
-  healthPct: number | null
-}
-
-export function riskOverview(rows: RiskRow[], dimKey: RiskDimDef['key']): RiskOverviewRow[] {
-  const buckets: Record<string, RiskRow[]> = {}
-  for (const r of rows) {
-    const key = String(r[dimKey])
-    ;(buckets[key] ||= []).push(r)
-  }
-  return Object.entries(buckets)
-    .map(([key, grows]) => {
-      const c = { 高: 0, 中: 0, 低: 0, 无风险: 0 }
-      for (const r of grows) c[r.riskLevel]++
-      const total = grows.length
-      return { key, 高: c.高, 中: c.中, 低: c.低, 无风险: c.无风险, total, healthPct: total > 0 ? c.无风险 / total : null }
-    })
-    .sort((a, b) => b.total - a.total)
-}
