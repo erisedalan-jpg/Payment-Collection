@@ -413,3 +413,10 @@ class TestBuildProjectsTop1000:
         out = P.build_projects(self._ppm("辽宁省公安厅"), {"佘海龙"}, set(), [], [])
         assert out[0]["top1000"] == "否"
         assert out[0]["quadrant"] == ""
+
+    def test_empty_final_customer_never_matches_even_if_map_has_empty_key(self):
+        # 纵深防御:最终客户为空时,即便 map 意外含空键 "" 也不得命中
+        m = {"": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+        out = P.build_projects(self._ppm(""), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == ""

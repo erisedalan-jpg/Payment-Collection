@@ -231,7 +231,7 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
                         "paymentAbnormal": False, "overall": "无数据"})
         customer = pm.get("customer") or {}
         final_customer = str(customer.get("最终客户") or "").strip()
-        t1 = top1000_map.get(final_customer)
+        t1 = top1000_map.get(final_customer) if final_customer else None
         top1000 = "是" if (t1 and t1.get("level") == config.TOP1000_LEVEL) else "否"
         quadrant = (t1.get("quad") if t1 else "") or ""
         out.append({
