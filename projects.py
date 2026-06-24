@@ -98,6 +98,23 @@ def read_delivery(path: str) -> List[Dict[str, Any]]:
     return _read_header_sheet(path, "项目编号")
 
 
+def read_top1000(path: str) -> Dict[str, Dict[str, str]]:
+    """TOP1000.xlsx → {客户名称: {"level": 客户级别, "quad": 象限}}。
+    复用 _read_header_sheet(找含"客户名称"表头的 sheet);缺文件/无表头 → {}(降级)。
+    客户名称为空的行跳过;级别/象限 strip。"""
+    rows = _read_header_sheet(path, "客户名称")
+    out: Dict[str, Dict[str, str]] = {}
+    for r in rows:
+        name = str(r.get("客户名称") or "").strip()
+        if not name:
+            continue
+        out[name] = {
+            "level": str(r.get("客户级别") or "").strip(),
+            "quad": str(r.get("象限") or "").strip(),
+        }
+    return out
+
+
 def delivery_costs_for(row: Dict[str, Any]) -> List[Dict[str, Any]]:
     """delivery_analysis 一行 → 7 类目成本四元组(缺列降 None)。"""
     out = []
@@ -182,10 +199,12 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
 
 
 def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
-                   mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/成本/健康度。
+                   mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
+                   top1000_map: Optional[Dict[str, Dict[str, str]]] = None) -> List[Dict[str, Any]]:
+    """项目主表:PMIS 在建 → 筛三部(空人员清单=不过滤,降级) → 挂映射/成本/健康度/TOP1000。
     payment 字段由 preprocess 9f 循环用 aggregate_payment_pmis 填入。
     matched=False 守卫为防御性分支(现行 _assemble 恒 matched=True),供未来非 PMIS 来源项目使用。"""
+    top1000_map = top1000_map or {}
     delivery_by_pid: Dict[str, Dict[str, Any]] = {}
     for r in delivery_rows:
         pid = str(r.get("项目编号") or "").strip()
@@ -210,17 +229,24 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
         health = (compute_health(pm, 0) if pm.get("matched")
                   else {"progressAbnormal": False, "riskAbnormal": False, "costAbnormal": False,
                         "paymentAbnormal": False, "overall": "无数据"})
+        customer = pm.get("customer") or {}
+        final_customer = str(customer.get("最终客户") or "").strip()
+        t1 = top1000_map.get(final_customer) if final_customer else None
+        top1000 = "是" if (t1 and t1.get("level") == config.TOP1000_LEVEL) else "否"
+        quadrant = (t1.get("quad") if t1 else "") or ""
         out.append({
             "projectId": pid,
             "projectName": name,
             "projectManager": manager,
             "orgL4": str(team.get("L4部门") or "").strip(),
             "orgL3_1": str(team.get("L3_1部门") or "").strip(),
-            "合同编号": str((pm.get("customer") or {}).get("合同编号") or "").strip(),
+            "合同编号": str(customer.get("合同编号") or "").strip(),
             "isPresale": ((pm.get("status") or {}).get("项目类型") == config.PRESALE_PROJECT_TYPE),
             "relatedClosedId": (m["closed"] if m else ""),
             "deliveryCosts": delivery_costs_for(drow) if drow else [],
             "health": health,
+            "top1000": top1000,
+            "quadrant": quadrant,
         })
     out.sort(key=lambda p: p["projectId"])
     return out
@@ -289,7 +315,8 @@ def load_dept_projects(input_dir: str, project_pmis: Dict[str, Dict[str, Any]],
         mapping = []
     names, l4s, org_rows = read_org_names(os.path.join(input_dir, config.ORG_FILE))
     delivery = read_delivery(os.path.join(input_dir, config.DELIVERY_FILE))
-    projects = build_projects(project_pmis, names, l4s, mapping, delivery)
+    top1000 = read_top1000(os.path.join(input_dir, config.TOP1000_FILE))
+    projects = build_projects(project_pmis, names, l4s, mapping, delivery, top1000)
     quality = compute_projects_quality(projects, project_pmis, names, l4s, org_rows,
                                        mapping, delivery)
     quality["closedDeptCount"] = count_closed_dept(

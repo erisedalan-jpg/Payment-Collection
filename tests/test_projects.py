@@ -355,3 +355,68 @@ def test_aggregate_payment_pmis_ratio_is_none():
     import projects
     nodes = [{'expectedPayment': 100, 'receivedAmount': 50, 'unpaidAmount': 50, 'status': '部分回款', 'reached': False}]
     assert projects.aggregate_payment_pmis(nodes)['paymentRatio'] is None
+
+
+class TestReadTop1000:
+    def test_parses_name_level_quadrant_and_strips(self, tmp_path):
+        path = _make_xlsx(tmp_path, "TOP1000.xlsx", [
+            ("Sheet1", [
+                ("客户编码", "客户名称", "客户级别", "象限"),
+                ("C001", "辽宁省公安厅", "TOP1000大客户", "M1 战略核心区"),
+                ("C002", " 北京能源集团 ", "TOP1000大客户", " M1 战略核心区 "),
+            ]),
+        ])
+        m = P.read_top1000(path)
+        assert m["辽宁省公安厅"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区"}
+        assert m["北京能源集团"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区"}
+
+    def test_skips_empty_name_rows(self, tmp_path):
+        path = _make_xlsx(tmp_path, "TOP1000.xlsx", [
+            ("Sheet1", [
+                ("客户编码", "客户名称", "客户级别", "象限"),
+                ("C001", None, "TOP1000大客户", "M1 战略核心区"),
+                ("C002", "有名客户", "TOP1000大客户", "M2 现金牛/打猎区"),
+            ]),
+        ])
+        m = P.read_top1000(path)
+        assert list(m.keys()) == ["有名客户"]
+
+    def test_missing_file_degrades_to_empty(self, tmp_path):
+        assert P.read_top1000(str(tmp_path / "无.xlsx")) == {}
+
+
+class TestBuildProjectsTop1000:
+    def _ppm(self, final_customer):
+        pm = _pm_active("项目甲", "佘海龙")
+        pm["customer"]["最终客户"] = final_customer
+        return {"SS-1": pm}
+
+    def test_matched_top1000_level_yes_with_quadrant(self):
+        m = {"辽宁省公安厅": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+        out = P.build_projects(self._ppm("辽宁省公安厅"), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "是"
+        assert out[0]["quadrant"] == "M1 战略核心区"
+
+    def test_matched_non_top1000_level_is_no_but_quadrant_kept(self):
+        m = {"某客户": {"level": "TOP1001大客户", "quad": "M2 现金牛/打猎区"}}
+        out = P.build_projects(self._ppm("某客户"), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == "M2 现金牛/打猎区"
+
+    def test_unmatched_is_no_empty_quadrant(self):
+        m = {"辽宁省公安厅": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+        out = P.build_projects(self._ppm("不在表里"), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == ""
+
+    def test_no_map_degrades_to_no(self):
+        out = P.build_projects(self._ppm("辽宁省公安厅"), {"佘海龙"}, set(), [], [])
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == ""
+
+    def test_empty_final_customer_never_matches_even_if_map_has_empty_key(self):
+        # 纵深防御:最终客户为空时,即便 map 意外含空键 "" 也不得命中
+        m = {"": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+        out = P.build_projects(self._ppm(""), {"佘海龙"}, set(), [], [], m)
+        assert out[0]["top1000"] == "否"
+        assert out[0]["quadrant"] == ""

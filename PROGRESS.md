@@ -4,11 +4,11 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V1.18.0**
-- 最近更新：2026-06-23（新增风险看板 /insight/risk：4 卡片+排名+项目概览；/insight 去评级维、加项目级别维；/insight/board 排名支持排序）
-- 上一版本：V1.17.1（2026-06-23，生产两 bug 修复：跨账号缓存数据泄漏 + 回款日历待回款=0 异常）
-- 更上版本：V1.16.4（2026-06-22，页面调整跟进批次：/activity 动态条加 项目经理/L4/超支明细（交付成本分项,以元;仅在「交付费用超支」事件按分项展示,去每条重复）+ 导出表格；/project/:id 预算核算全部区块统一以元（profit/bridge/科目树）+ 去掉项目直接成本行；首页健康度卡去掉冗余单项目风险卡片列，仅留三档汇总+6类分类）
-- 上上版本：V1.16.3（2026-06-22，页面调整批次 S1-S10：/activity 翻页筛选 / /projects 关注原因列 / 预算核算改元 / /payment 完成率分母对齐 / /insight 图表多选 / 首页6类风险分类）
+- 当前版本：**V1.19.0**
+- 最近更新：2026-06-24（新增 TOP1000.xlsx 客户清单数据源：top1000/quadrant 派生到项目主域；/data 上传、/projects 两列、/project/:id 详情、/insight·/board·/risk 三维度）
+- 上一版本：V1.18.0（2026-06-23，新增风险看板 /insight/risk：4 卡片+排名+项目概览；/insight 去评级维、加项目级别维；/insight/board 排名支持排序）
+- 更上版本：V1.17.1（2026-06-23，生产两 bug 修复：跨账号缓存数据泄漏 + 回款日历待回款=0 异常）
+- 上上版本：V1.16.4（2026-06-22，页面调整跟进批次：/activity 动态条加 项目经理/L4/超支明细（交付成本分项,以元;仅在「交付费用超支」事件按分项展示,去每条重复）+ 导出表格；/project/:id 预算核算全部区块统一以元（profit/bridge/科目树）+ 去掉项目直接成本行；首页健康度卡去掉冗余单项目风险卡片列，仅留三档汇总+6类分类）
 - 维护语言：简体中文
 
 ---
@@ -17,6 +17,8 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- V1.19.0（2026-06-24）TOP1000 客户属性接入（feat/top1000-customer-attribute，逐任务 TDD + verify 全绿）
+  - 新增 TOP1000.xlsx 客户清单数据源。按最终客户匹配派生 top1000(是/否)/quadrant(象限) 到项目主域(schema 显式字段)；/data 可上传、更新数据同步；/projects 加两列(默认隐藏可筛选)；/project/:id 客户与签约单位间展示；/insight、/insight/board、/insight/risk 维度各加 TOP1000/象限。preprocess_data.py 未改。
 - V1.18.0（2026-06-23）风险看板（feat/insight-risk-board，TDD + verify 全绿）
   - 新增 /insight/risk 风险看板页：4 张风险指标卡片（延期率/超支率/暂停率/高风险占比）+ 风险维度排名 + 项目概览表。
   - /insight 项目多维分析：去掉"评级"维度、新增"项目级别"维度（现 11 维）。
@@ -103,6 +105,7 @@
 - [x] **SP1-followup（2026-06-19，SP2 复核关闭）**：异常项目(orgL4 空)硬排除仅施于 `filterProjects`/`paymentNodeRows`；`overview.ts computeKpis` 已在 `!isAnomalous` 守卫下计算回款达成率，`buildInsightRows` 对异常项目回款字段置 0，口径安全，复核关闭。
 - [ ] **L-25** 数据治理「未匹配」指标口径已位移（2026-06-22 V1.16.2 终审记录）：现为 collection_stages 项目号 vs PMIS（原为 WPS overview 项目 vs PMIS），属预期改善，记录供后续对账人参考。
 - [ ] **L-26** V1.16.2 移除 WPS 后旧 followup 自动重置逻辑随 yundocs followup sheet 一并下线（2026-06-22 V1.16.2 终审记录）：该字段(节点动作完成时间)本就来自已删 sheet、/api/followup 本地记录无此字段，无害。
+- [ ] **L-27** V1.19.0 TOP1000 接入终审记录：`projects.py build_projects` 的 `top1000` 判定用 `t1.get("level") == config.TOP1000_LEVEL`（"TOP1000大客户"）精确等值（已 strip），字面强耦合 CRM 导出列 `客户级别`。若 CRM 改取值（含空格/全角/大小写变体）会静默全部判否而无告警——日后 TOP1000 列异常排查先核对 TOP1000.xlsx 的 `客户级别` 取值与该常量。属设计取舍（plan 钦定精确等值、无模糊）。
 
 ### 🔴 严重（小改动、高收益，建议优先）
 - [x] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。（A2 完成：ThreadingHTTPServer + create_server）

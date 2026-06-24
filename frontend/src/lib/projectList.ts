@@ -21,6 +21,8 @@ export interface ProjectRow {
   paymentRatio: number | null
   paymentStatus: string
   health: string
+  top1000: string
+  quadrant: string
   isPresale: boolean
   hasClosed: boolean
   paused: boolean
@@ -76,6 +78,8 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       paymentRatio: p.payment?.paymentRatio ?? null,
       paymentStatus: paymentStatusOf(p),
       health: p.health?.overall || '无数据',
+      top1000: p.top1000 || '否',
+      quadrant: p.quadrant || '',
       isPresale: !!p.isPresale,
       hasClosed: !!p.relatedClosedId,
       paused: status.是否暂停 === true,

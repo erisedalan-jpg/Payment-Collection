@@ -25,6 +25,8 @@ export interface PayBoardRow {
   tier: string
   progress: string
   projectLevel: string
+  top1000: string
+  quadrant: string
   tags: string[]
   contract: number
   actualTotal: number
@@ -72,6 +74,8 @@ export function buildPayBoardRows(
       tier: deriveTier(rp.contract),
       progress,
       projectLevel: v(stat['项目级别']),
+      top1000: v(p.top1000, '否'),
+      quadrant: v(p.quadrant),
       tags: tagAssignments?.[p.projectId] ?? [],
       contract: rp.contract,
       actualTotal: rp.actualTotal,
@@ -86,7 +90,7 @@ export function buildPayBoardRows(
 }
 
 export interface PayBoardDimDef {
-  key: 'dept' | 'projectLevel' | 'industry' | 'stage' | 'tag'
+  key: 'dept' | 'projectLevel' | 'industry' | 'stage' | 'tag' | 'top1000' | 'quadrant'
   label: string
   multi?: boolean   // tag 为 true：分组时按标签炸开
 }
@@ -96,6 +100,8 @@ export const PAY_BOARD_DIMENSIONS: PayBoardDimDef[] = [
   { key: 'industry', label: '行业' },
   { key: 'stage', label: '项目阶段' },
   { key: 'tag', label: '标签', multi: true },
+  { key: 'top1000', label: 'TOP1000' },
+  { key: 'quadrant', label: '象限' },
 ]
 export const PAY_BOARD_DIM_BY_KEY: Record<string, PayBoardDimDef> = Object.fromEntries(
   PAY_BOARD_DIMENSIONS.map((d) => [d.key, d]),
