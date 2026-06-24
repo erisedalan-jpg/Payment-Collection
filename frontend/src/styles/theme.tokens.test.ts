@@ -104,8 +104,8 @@ describe('theme.css 令牌契约 · :root(浅色)', () => {
 
 describe('theme.css 令牌契约 · html.dark(深色覆盖)', () => {
   it('结构色提亮', () => {
-    expect(dark).toContain('--bg: #0d1117')
-    expect(dark).toContain('--card: #121212')
+    expect(dark).toContain('--bg: #1c1a18')
+    expect(dark).toContain('--card: #1a1d24')
     expect(dark).toContain('--txt: #fbfbfd')
     expect(dark).toContain('--accent: #7891ac')
     expect(dark).toContain('--accent2: #7e95d2')
