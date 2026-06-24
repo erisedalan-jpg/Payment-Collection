@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import ProgressEditModal from './ProgressEditModal.vue'
@@ -26,6 +26,7 @@ describe('ProgressEditModal', () => {
     const w = mountModal()
     await w.find('textarea').setValue('新内容')
     await w.find('.pem-save').trigger('click')
+    await flushPromises()
     expect(spy).toHaveBeenCalledWith('P1', 'weekProgress', '新内容')
     expect(w.emitted('update:modelValue')?.at(-1)).toEqual([false])
   })
