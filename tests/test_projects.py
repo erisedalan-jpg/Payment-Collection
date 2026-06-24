@@ -355,3 +355,31 @@ def test_aggregate_payment_pmis_ratio_is_none():
     import projects
     nodes = [{'expectedPayment': 100, 'receivedAmount': 50, 'unpaidAmount': 50, 'status': '部分回款', 'reached': False}]
     assert projects.aggregate_payment_pmis(nodes)['paymentRatio'] is None
+
+
+class TestReadTop1000:
+    def test_parses_name_level_quadrant_and_strips(self, tmp_path):
+        path = _make_xlsx(tmp_path, "TOP1000.xlsx", [
+            ("Sheet1", [
+                ("客户编码", "客户名称", "客户级别", "象限"),
+                ("C001", "辽宁省公安厅", "TOP1000大客户", "M1 战略核心区"),
+                ("C002", " 北京能源集团 ", "TOP1000大客户", " M1 战略核心区 "),
+            ]),
+        ])
+        m = P.read_top1000(path)
+        assert m["辽宁省公安厅"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区"}
+        assert m["北京能源集团"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区"}
+
+    def test_skips_empty_name_rows(self, tmp_path):
+        path = _make_xlsx(tmp_path, "TOP1000.xlsx", [
+            ("Sheet1", [
+                ("客户编码", "客户名称", "客户级别", "象限"),
+                ("C001", None, "TOP1000大客户", "M1 战略核心区"),
+                ("C002", "有名客户", "TOP1000大客户", "M2 现金牛/打猎区"),
+            ]),
+        ])
+        m = P.read_top1000(path)
+        assert list(m.keys()) == ["有名客户"]
+
+    def test_missing_file_degrades_to_empty(self, tmp_path):
+        assert P.read_top1000(str(tmp_path / "无.xlsx")) == {}
