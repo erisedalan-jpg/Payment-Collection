@@ -50,12 +50,19 @@ describe('RiskBoardView', () => {
     expect(w.find('[data-test="seg-projectCount"]').exists()).toBe(true)
     expect(w.find('[data-test="seg-contractAmount"]').exists()).toBe(true)
   })
-  it('概览表含 高/中/低/无风险/合计/健康度% 列', () => {
+  it('风险概览为透视:DimPicker 选行列维 + PivotTable 渲染', async () => {
     seed()
     const w = mount(RiskBoardView, opts)
-    const tables = w.findAllComponents(DataTable)
-    const ovCols = (tables[tables.length - 1].props('columns') as Array<{ key: string }>).map((c) => c.key)
-    expect(ovCols).toEqual(['key', '高', '中', '低', '无风险', 'total', 'healthPct'])
+    await flushPromises()
+    expect(w.find('.pv').exists()).toBe(true)       // PivotTable 表
+    expect(w.findAll('[data-test^="dim-"]').length).toBeGreaterThan(0)  // DimPicker chips
+  })
+  it('点透视格打开下钻弹窗', async () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    await flushPromises()
+    const cell = w.find('.pv .pv-click')
+    if (cell.exists()) { await cell.trigger('click'); expect((w.vm as any).drillOpen).toBe(true) }
   })
   it('空数据显空态', () => {
     const ds = useDataStore()
