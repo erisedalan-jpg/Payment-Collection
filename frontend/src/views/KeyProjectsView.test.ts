@@ -51,6 +51,7 @@ describe('KeyProjectsView', () => {
     expect(w.text()).not.toContain('非重点')
     expect(w.text()).toContain('AR张')
     expect(w.text()).toContain('200')   // 合同 200 万
+    expect(w.text()).toContain('中(2)') // 风险列 riskLevel(openRisks)
   })
   it('超管见更新/导出按钮', async () => {
     seed(true); const w = await mountView()

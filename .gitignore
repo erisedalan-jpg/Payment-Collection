@@ -36,6 +36,8 @@ data/manual_backups/
 data/followup_records.json
 # 项目标签库（运行时用户数据，2C）
 data/project_tags.json
+# 重点项目进展数据（运行时用户数据，SP-2）
+data/project_progress.json
 # 本地账号库(含密码哈希,敏感,运行时生成,SP-2)
 data/accounts.json
 data/accounts.json.tmp
