@@ -30,7 +30,8 @@ TOP = "pmplatform"  # 解压后顶层目录名
 TOP_FILES = [
     "server.py", "auth.py", "schema.py", "preprocess_data.py", "config.py",
     "pmis.py", "projects.py", "collection_stages.py", "milestones.py", "profit.py",
-    "snapshots.py", "data_history.py", "data_scope.py", "manual_history.py",
+    "snapshots.py", "data_history.py", "data_scope.py", "opportunities.py",
+    "manual_history.py",
     "manual_import.py", "reset_super_password.py", "compare_payment_sources.py",
     "conftest.py", "requirements.txt", "requirements-dev.txt", "ruff.toml",
     "verify.sh", "schema.json", "feature_list.json", "CLAUDE.md", "PROGRESS.md",
