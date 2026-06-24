@@ -1,5 +1,7 @@
 # ── 部署打包产物(大体积二进制+含数据,不入库) ──
 pmplatform-deploy-*.zip
+# 升级/更新包构建产物（含 dist，本机生成，不入库）
+release/
 
 # ── Python ──
 __pycache__/
