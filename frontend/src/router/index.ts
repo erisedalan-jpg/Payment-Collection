@@ -25,6 +25,7 @@ import ClosedProjectsView from '@/views/ClosedProjectsView.vue'
 import ClosedProjectDetailView from '@/views/ClosedProjectDetailView.vue'
 import AdminView from '@/views/AdminView.vue'
 import ChangePasswordView from '@/views/ChangePasswordView.vue'
+import KeyProjectsView from '@/views/KeyProjectsView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -55,6 +56,7 @@ export const router = createRouter({
     { path: '/insight/risk', name: 'insight-risk', component: RiskBoardView, meta: { title: '风险看板', hideFilter: true, pageKey: 'insight-risk' } },
     { path: '/insight/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析', pageKey: 'insight-board' } },
     { path: '/insight/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历', pageKey: 'insight-calendar' } },
+    { path: '/projects/key', name: 'projects-key', component: KeyProjectsView, meta: { title: '重点项目进展', hideFilter: true, pageKey: 'projects-key' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账', pageKey: 'ledger' } },
     // 回款分析五页:由旧 /panalysis 单页拆为 /payment/* 平铺独立路由(SP4);均依赖 FilterBar(不 hideFilter)
     // /payment(精确)与 /payment/*(精确子路径)均为精确路由、互不遮蔽，定义顺序不影响解析；

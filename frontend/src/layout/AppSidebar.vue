@@ -3,18 +3,20 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { PROJECT_LINKS, ANALYSIS_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
+import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 const auth = useAuthStore()
 const route = useRoute()
 const projectLinks = computed(() => PROJECT_LINKS.filter((l) => auth.canAccess(l.key)))
 const analysisLinks = computed(() => ANALYSIS_LINKS.filter((l) => auth.canAccess(l.key)))
+const keyFollowupLinks = computed(() => KEY_FOLLOWUP_LINKS.filter((l) => auth.canAccess(l.key)))
 const paymentLinks = computed(() => PAYMENT_LINKS.filter((l) => auth.canAccess(l.key)))
 const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key)))
 
 const activeSectionKey = computed(() => {
   const p = route.path
+  if (p.startsWith('/projects/key')) return 'keyfollowup'
   if (p.startsWith('/insight')) return 'analysis'
   if (p.startsWith('/payment') || p.startsWith('/ledger')) return 'payment'
   if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
@@ -49,6 +51,16 @@ function onToggle(key: string) {
         </button>
         <div v-show="expanded('analysis')" class="section-links">
           <RouterLink v-for="link in analysisLinks" :key="link.to" :to="link.to"
+            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+        </div>
+      </div>
+
+      <div v-if="keyFollowupLinks.length" class="section" :class="{ collapsed: !expanded('keyfollowup') }">
+        <button type="button" class="section-label" @click="onToggle('keyfollowup')">
+          <span class="section-caret">{{ expanded('keyfollowup') ? '▾' : '▸' }}</span>重点跟进
+        </button>
+        <div v-show="expanded('keyfollowup')" class="section-links">
+          <RouterLink v-for="link in keyFollowupLinks" :key="link.to" :to="link.to"
             class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
         </div>
       </div>
