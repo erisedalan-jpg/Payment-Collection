@@ -26,6 +26,10 @@ describe('isKeyProject', () => {
   it('top1000=否 即便合同大 → 不入选', () => {
     expect(isKeyProject(proj({ top1000: '否', paymentPmis: { contract: 9_000_000 } as any }), pmis())).toBe(false)
   })
+  it('pmis 缺项(undefined):合同>100万 仍入选;合同<=100万 不入选(读不到P1)', () => {
+    expect(isKeyProject(proj({ top1000: '是', paymentPmis: { contract: 1_000_001 } as any }), undefined)).toBe(true)
+    expect(isKeyProject(proj({ top1000: '是', paymentPmis: { contract: 1_000_000 } as any }), undefined)).toBe(false)
+  })
 })
 
 describe('buildKeyProjectRows', () => {
