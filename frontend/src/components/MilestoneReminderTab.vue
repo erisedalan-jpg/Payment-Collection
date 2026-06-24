@@ -28,6 +28,7 @@ function preset(p: ReminderPreset) { const r = reminderRange(props.now, p); rang
 
 const winRows = computed(() => buildReminderRows(props.projects, props.now, range.value))
 
+const fKw = ref('')
 const filtered = computed<ReminderRow[]>(() => {
   const afterCols = applyColumnFilters(winRows.value, cf.tableFilters(TABLE_ID)) as ReminderRow[]
   const kw = fKw.value.trim()
@@ -68,8 +69,6 @@ function onToggle(key: string) {
   if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
   prefs.toggle(key)
 }
-
-const fKw = ref('')
 
 const pageSize = ref(50)
 const currentPage = ref(1)

@@ -45,7 +45,7 @@ export { dayDiff }
 
 export type ReminderPreset = 'd7' | 'm1' | 'quarter'
 
-/** 时间段快捷档:start 一律今日(向后看);d7=今+7、m1=今+1月、quarter=本季度边界。 */
+/** 时间段快捷档:d7=[今,今+7]、m1=[今,今+1月] 向后看;quarter=本季度边界(季初→季末)。 */
 export function reminderRange(now: Date, preset: ReminderPreset): { start: string; end: string } {
   const b = reminderBounds(now)
   if (preset === 'd7') return { start: b.today, end: b.d7 }
