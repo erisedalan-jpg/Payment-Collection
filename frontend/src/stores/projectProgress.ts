@@ -23,5 +23,10 @@ export const useProjectProgressStore = defineStore('projectProgress', () => {
     archives.value = r.archives ?? []
     current.value = {}
   }
-  return { current, archives, loaded, load, update, archive }
+  function reset() {
+    current.value = {}
+    archives.value = []
+    loaded.value = false
+  }
+  return { current, archives, loaded, load, update, archive, reset }
 })

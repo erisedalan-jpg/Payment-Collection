@@ -63,7 +63,7 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'orgL4', label: 'L4组织', width: 110 },
   { key: 'contractWan', label: '合同金额(万)', width: 110, sortable: true, num: true,
     formatter: (v) => (v == null ? '-' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
-  { key: 'risk', label: '风险', width: 96, formatter: (_v, r) => (r.openRisks ? `${r.riskLevel}(${r.openRisks})` : r.riskLevel) },
+  { key: 'riskLevel', label: '风险', width: 96, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
   { key: 'weekProgress', label: '本周工作进展', width: 240, wrap: true },
   { key: 'nextPlan', label: '后续工作计划', width: 240, wrap: true },
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
@@ -71,7 +71,7 @@ const ALL_COLUMNS: DataColumn[] = [
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ALL_KEYS
-const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'risk', 'followBy', 'followDate'])
+const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate'])
 const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c),
@@ -135,7 +135,7 @@ function doExport() {
         ? currentRows.value
         : ((progress.archives[Number(sel.slice(1))]?.rows ?? []) as KeyProjectRow[])
     const fr = applyColumnFilters(src, cf.tableFilters(TABLE_ID)) as KeyProjectRow[]
-    return { name: opt?.label ?? sel, rows: fr.map(exportRow) }
+    return { name: (opt?.label ?? sel).replace(/[:\\/?\*\[\]]/g, '-'), rows: fr.map(exportRow) }
   })
   exportSheets(`重点项目进展_${exportSel.value.length}集.xlsx`, sheets)
   exportOpen.value = false

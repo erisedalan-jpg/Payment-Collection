@@ -111,4 +111,9 @@ describe('stores/auth 访问控制', () => {
     s.user = { account: 'c', displayName: 'c', isSuper: false, allowedPages: [], allowedL4: [] }
     expect(s.firstAllowedPath()).toBe('/login')
   })
+  it('firstAllowedPath:普通账号仅 projects-key 权限→/projects/key', () => {
+    const s = useAuthStore()
+    s.user = { account: 'k', displayName: 'k', isSuper: false, allowedPages: ['projects-key'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/projects/key')
+  })
 })

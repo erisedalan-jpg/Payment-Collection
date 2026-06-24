@@ -35,4 +35,14 @@ describe('projectProgress store', () => {
     expect(s.archives).toHaveLength(1)
     expect(s.current).toEqual({})
   })
+  it('reset 清空 current/archives/loaded', () => {
+    const s = useProjectProgressStore()
+    s.current = { P1: { weekProgress: 'x' } }
+    s.archives = [{ archiveTime: 't', rows: [] }]
+    s.loaded = true
+    s.reset()
+    expect(s.current).toEqual({})
+    expect(s.archives).toHaveLength(0)
+    expect(s.loaded).toBe(false)
+  })
 })
