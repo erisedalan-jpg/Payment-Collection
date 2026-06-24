@@ -85,6 +85,17 @@ describe('buildRiskRows', () => {
     expect(b.riskMajorCats).toEqual(['无风险'])  // 无未关闭风险
     expect(b.riskMinorCats).toEqual(['无风险'])
   })
+
+  it('有未关闭风险但大类/小类全空 → [未分类]', () => {
+    const projects = [{ projectId: 'C', projectName: 'c', orgL4: '组', projectManager: '甲' }] as unknown as Project[]
+    const pmisMap = {
+      C: { status: {}, progress: {}, customer: {},
+           riskRecords: [{ 风险等级: '中', 风险状态: '已识别', 风险大类: '', 风险小类: '  ' }] },
+    } as unknown as Record<string, ProjectPmis>
+    const [c] = buildRiskRows(projects, pmisMap)
+    expect(c.riskMajorCats).toEqual(['未分类'])
+    expect(c.riskMinorCats).toEqual(['未分类'])
+  })
 })
 
 describe('riskSummary', () => {
