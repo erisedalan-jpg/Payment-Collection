@@ -16,7 +16,7 @@ _DATE_FIELDS = ('expectedDate', 'bidDate')
 HEADER_TO_FIELD = {
     'L4组织': 'l4', '销售负责人': 'salesOwner', '客户名称': 'customer', '行业归属': 'industry',
     '是否TOP1000客户': 'top1000', '商机状态': 'status', '主观预测': 'forecast',
-    '商机名称/项目名称': 'name', '预估金额（万元）': 'amountWan', '预估落单时间': 'expectedDate',
+    '商机名称/项目名称': 'name', '预估金额（万元）': 'amountWan', '预估金额(万元)': 'amountWan', '预估落单时间': 'expectedDate',
     '产品大类': 'productCategory', '主要涉及产品': 'mainProducts', '是否含外包外采': 'outsource',
     'FR负责人': 'frOwner', 'FR能力是否匹配': 'frMatch', '交付资源是否匹配': 'deliveryMatch',
     '是否需要外区域支持': 'crossRegion', '是否重点商机': 'keyOpp', '是否提前介入': 'earlyIntervene',

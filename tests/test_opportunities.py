@@ -84,3 +84,17 @@ def test_read_xlsx_maps_headers(tmp_path):
 
 def test_read_xlsx_missing_file():
     assert opp.read_opportunities_xlsx("nonexistent.xlsx") == []
+
+
+def test_read_xlsx_halfwidth_amount_header(tmp_path):
+    """M3: 前端导出用半角括号表头 '预估金额(万元)'，导入时 amountWan 须被正确解析（非空）。"""
+    p = tmp_path / "opp_halfwidth.xlsx"
+    wb = openpyxl.Workbook(); ws = wb.active
+    ws.append(["客户名称", "L4组织", "商机状态", "预估金额(万元)"])  # 半角括号
+    ws.append(["乙公司", "大金融服务组", "需求挖掘", 580])
+    wb.save(p)
+    rows = opp.read_opportunities_xlsx(str(p))
+    assert len(rows) == 1
+    assert rows[0]["amountWan"] == 580.0, (
+        f"半角括号表头的金额列被静默丢弃，amountWan={rows[0]['amountWan']!r}"
+    )
