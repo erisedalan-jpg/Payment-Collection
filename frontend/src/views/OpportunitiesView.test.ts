@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useOpportunitiesStore } from '@/stores/opportunities'
 import * as oppApi from '@/lib/opportunitiesApi'
 import { DEFAULT_VISIBLE } from '@/lib/opportunityColumns'
+import * as exportXlsxMod from '@/lib/exportXlsx'
 
 let router: Router
 
@@ -131,5 +132,84 @@ describe('OpportunitiesView', () => {
     expect(vm.visibleColumns).toBeDefined()
     expect(vm.fKw).toBeDefined()
     expect(vm.sortState).toBeDefined()
+  })
+
+  // ---------- Task 7 新增测试 ----------
+
+  it('(T7-a) 超管见四个写操作按钮及操作列"编辑"；普通管理员都不见', async () => {
+    // 超管
+    const ws = await mountView(true)
+    const htmlS = ws.html()
+    expect(ws.find('[data-test="opp-add"]').exists()).toBe(true)
+    expect(ws.find('[data-test="opp-del"]').exists()).toBe(true)
+    expect(ws.find('[data-test="opp-import"]').exists()).toBe(true)
+    expect(ws.find('[data-test="opp-export"]').exists()).toBe(true)
+    // 操作列"编辑"按钮
+    expect(htmlS).toContain('编辑')
+    // file input 存在
+    expect(ws.find('input[type="file"]').exists()).toBe(true)
+
+    // 普通管理员
+    const wn = await mountView(false)
+    expect(wn.find('[data-test="opp-add"]').exists()).toBe(false)
+    expect(wn.find('[data-test="opp-del"]').exists()).toBe(false)
+    expect(wn.find('[data-test="opp-import"]').exists()).toBe(false)
+    expect(wn.find('[data-test="opp-export"]').exists()).toBe(false)
+    // 普通管理员无 file input
+    expect(wn.find('input[type="file"]').exists()).toBe(false)
+  })
+
+  it('(T7-b) 点「新增商机」→ store.create 被调 + editOpen=true', async () => {
+    const w = await mountView(true)
+    const store = useOpportunitiesStore()
+    const newRow = { id: 'opp-9', l4: '', salesOwner: '', customer: '', industry: '',
+      top1000: '', status: '', forecast: '', name: '', amountWan: null,
+      expectedDate: '', productCategory: '', mainProducts: '', outsource: '',
+      frOwner: '', frMatch: '', deliveryMatch: '', crossRegion: '', keyOpp: '',
+      earlyIntervene: '', remark: '', bidStatus: '', bidDate: '',
+      firstReg: '', lastUpdate: '' }
+    const createSpy = vi.spyOn(store, 'create').mockResolvedValue(newRow as any)
+
+    await w.find('[data-test="opp-add"]').trigger('click')
+    await flushPromises()
+
+    expect(createSpy).toHaveBeenCalledOnce()
+    expect((w.vm as any).editOpen).toBe(true)
+    expect((w.vm as any).editRow?.id).toBe('opp-9')
+  })
+
+  it('(T7-c) 选中行后 onDelete → ElMessageBox.confirm + store.remove(选中ids)', async () => {
+    const w = await mountView(true)
+    const store = useOpportunitiesStore()
+    const removeSpy = vi.spyOn(store, 'remove').mockResolvedValue(undefined)
+
+    // 模拟 ElMessageBox.confirm resolve（用户点确认）
+    const { ElMessageBox } = await import('element-plus')
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as any)
+
+    // 预置 selectedRows
+    const vm = w.vm as any
+    vm.selectedRows = [ROW_甲, ROW_乙]
+
+    await vm.onDelete()
+    await flushPromises()
+
+    expect(removeSpy).toHaveBeenCalledWith(['r1', 'r2'])
+    // 删除后 selectedRows 清空
+    expect(vm.selectedRows.length).toBe(0)
+  })
+
+  it('(T7-d) onExport → exportRows 被调，文件名含条数', async () => {
+    const exportSpy = vi.spyOn(exportXlsxMod, 'exportRows').mockImplementation(() => {})
+
+    const w = await mountView(true)
+    const vm = w.vm as any
+
+    vm.onExport()
+
+    expect(exportSpy).toHaveBeenCalledOnce()
+    const [filename] = exportSpy.mock.calls[0]
+    expect(filename).toContain('2')  // filtered.length = 2 条
+    expect(filename).toContain('条')
   })
 })

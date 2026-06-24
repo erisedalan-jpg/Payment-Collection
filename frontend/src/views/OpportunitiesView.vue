@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useOpportunitiesStore } from '@/stores/opportunities'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -7,9 +8,12 @@ import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { OPP_COLUMNS, DEFAULT_VISIBLE, FILTERABLE, recentUpdateOf } from '@/lib/opportunityColumns'
 import type { OppColumn } from '@/lib/opportunityColumns'
+import { exportRows } from '@/lib/exportXlsx'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import OpportunityEditDrawer from '@/components/OpportunityEditDrawer.vue'
+import type { OppRow } from '@/lib/opportunitiesApi'
 
 const TABLE_ID = 'opportunities'
 const auth = useAuthStore()
@@ -22,6 +26,10 @@ onMounted(() => {
 })
 
 const now = new Date()
+
+// 编辑抽屉状态
+const editOpen = ref(false)
+const editRow = ref<OppRow | null>(null)
 
 // 选列
 const prefs = useColumnPrefs(TABLE_ID, OPP_COLUMNS.map((c) => c.key), DEFAULT_VISIBLE)
@@ -115,7 +123,63 @@ function fmtCell(col: OppColumn, row: Record<string, any>): string {
   return v ?? '-'
 }
 
-defineExpose({ store, filtered, paged, selectedRows, visibleColumns, fKw, sortState, auth, withDerived })
+// 编辑处理器
+function openEdit(row: OppRow) {
+  editRow.value = row
+  editOpen.value = true
+}
+
+async function onCreate() {
+  const row = await store.create()
+  editRow.value = row
+  editOpen.value = true
+}
+
+async function onDelete() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm(
+      '确认删除选中的 ' + selectedRows.value.length + ' 条商机?',
+      '删除确认',
+      { type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  await store.remove(selectedRows.value.map((r) => r.id))
+  selectedRows.value = []
+  ElMessage.success('已删除')
+}
+
+// 导入：隐藏文件输入
+const fileInput = ref<HTMLInputElement | null>(null)
+
+async function onFilePick(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (!f) return
+  try {
+    const n = await store.importFile(f)
+    ElMessage.success('导入 ' + n + ' 条')
+  } catch {
+    ElMessage.error('导入失败')
+  } finally {
+    (e.target as HTMLInputElement).value = ''
+  }
+}
+
+function onExport() {
+  exportRows(
+    '重点商机进展_' + filtered.value.length + '条.xlsx',
+    filtered.value.map((r) =>
+      Object.fromEntries(OPP_COLUMNS.map((c) => [c.label, (r as any)[c.key] ?? ''])),
+    ),
+  )
+}
+
+defineExpose({
+  store, filtered, paged, selectedRows, visibleColumns, fKw, sortState, auth, withDerived,
+  editOpen, editRow, onCreate, onDelete, onExport,
+})
 </script>
 
 <template>
@@ -140,6 +204,35 @@ defineExpose({ store, filtered, paged, selectedRows, visibleColumns, fKw, sortSt
         @move-down="prefs.moveDown"
         @reset="prefs.reset"
       />
+      <!-- 超管专属写操作按钮 -->
+      <template v-if="auth.isSuper">
+        <el-button size="small" type="primary" data-test="opp-add" @click="onCreate">
+          新增商机
+        </el-button>
+        <el-button
+          size="small"
+          type="danger"
+          data-test="opp-del"
+          :disabled="!selectedRows.length"
+          @click="onDelete"
+        >
+          删除选中
+        </el-button>
+        <el-button size="small" data-test="opp-import" @click="fileInput?.click()">
+          导入
+        </el-button>
+        <el-button size="small" data-test="opp-export" @click="onExport">
+          导出
+        </el-button>
+        <!-- 隐藏文件输入 -->
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".xlsx"
+          style="display: none"
+          @change="onFilePick"
+        />
+      </template>
       <el-button
         v-if="cf.hasFilters(TABLE_ID)"
         size="small"
@@ -193,6 +286,13 @@ defineExpose({ store, filtered, paged, selectedRows, visibleColumns, fKw, sortSt
             </template>
           </template>
         </el-table-column>
+
+        <!-- 操作列：超管专属 -->
+        <el-table-column v-if="auth.isSuper" label="操作" width="80" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" text @click.stop="openEdit(row)">编辑</el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 
@@ -209,6 +309,9 @@ defineExpose({ store, filtered, paged, selectedRows, visibleColumns, fKw, sortSt
         background
       />
     </div>
+
+    <!-- 编辑抽屉 -->
+    <OpportunityEditDrawer v-model="editOpen" :row="editRow" />
   </div>
 </template>
 
