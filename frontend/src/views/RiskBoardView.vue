@@ -3,8 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
-  buildRiskRows, riskSummary, groupRisk, riskOverview,
-  RISK_DIMENSIONS, RISK_METRICS, type RiskMetricKey, type RiskDimDef,
+  buildRiskRows, riskSummary, groupRisk, riskPivot,
+  RISK_DIMENSIONS, RISK_METRICS, type RiskMetricKey, type RiskDimDef, type RiskRow,
 } from '@/lib/riskBoard'
 import { fmtWan, pct } from '@/lib/format'
 import { buildRankingOption, type ValueKind } from '@/lib/chartOptions'
@@ -12,6 +12,9 @@ import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
+import RiskDrillModal from '@/components/RiskDrillModal.vue'
+import DimPicker from '@/components/DimPicker.vue'
+import PivotTable from '@/components/PivotTable.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
@@ -45,8 +48,38 @@ const chartTypes = ref<string[]>(['bar'])
 const metricDef = computed(() => RISK_METRICS.find((m) => m.key === metricKey.value)!)
 const currentValueKind = computed<ValueKind>(() => (metricDef.value.kind === 'money' ? 'amount' : 'count'))
 
+// 风险等级筛选（仅作用风险统计分析块，不影响 cards/summary/概览）
+const LEVELS = ['高', '中', '低', '无风险'] as const
+const levelFilter = ref<string[]>([...LEVELS])
+function toggleLevel(l: string) {
+  levelFilter.value = levelFilter.value.includes(l)
+    ? levelFilter.value.filter((x) => x !== l)
+    : [...levelFilter.value, l]
+}
+const statRows = computed(() => rows.value.filter((r) => levelFilter.value.includes(r.riskLevel)))
+
+// 下钻状态
+const drillOpen = ref(false)
+const drillTitle = ref('')
+const drillRows = ref<RiskRow[]>([])
+function openDrill(title: string, rs: RiskRow[]) {
+  drillTitle.value = title
+  drillRows.value = rs
+  drillOpen.value = true
+}
+
+const rankDimLabel = computed(() => RISK_DIMENSIONS.find((d) => d.key === dimKey.value)?.label ?? '维度')
+
+function onRankRow(row: Record<string, any>) {
+  openDrill(`${rankDimLabel.value}=${row.key}`, row.rows)
+}
+function onChartDrill(name?: string) {
+  const g = groups.value.find((x) => x.key === name)
+  if (g) openDrill(`${rankDimLabel.value}=${g.key}`, g.rows)
+}
+
 const groups = computed(() => {
-  const gs = groupRisk(rows.value, dimKey.value)
+  const gs = groupRisk(statRows.value, dimKey.value)
   const k = metricKey.value
   return [...gs].sort((a, b) => (b[k] as number) - (a[k] as number))
 })
@@ -71,19 +104,22 @@ const RANK_COLS = computed<DataColumn[]>(() => [
   { key: 'contractAmount', label: '合同总额(万)', width: 120, sortable: true, num: true, formatter: (v) => fmtWan(v as number) },
 ])
 
-// ---- 风险概览(透视表) ----
-const OVERVIEW_DIM_OPTS = RISK_DIMENSIONS.filter((d) => d.key !== 'riskLevel').map((d) => ({ value: d.key, label: d.label }))
-const overviewDim = ref<RiskDimDef['key']>('orgL4')
-const overviewRows = computed(() => riskOverview(rows.value, overviewDim.value))
-const OVERVIEW_COLS = computed<DataColumn[]>(() => [
-  { key: 'key', label: RISK_DIMENSIONS.find((d) => d.key === overviewDim.value)?.label ?? '维度' },
-  { key: '高', label: '高', width: 70, sortable: true, num: true },
-  { key: '中', label: '中', width: 70, sortable: true, num: true },
-  { key: '低', label: '低', width: 70, sortable: true, num: true },
-  { key: '无风险', label: '无风险', width: 80, sortable: true, num: true },
-  { key: 'total', label: '合计', width: 80, sortable: true, num: true },
-  { key: 'healthPct', label: '健康度%', width: 90, num: true, formatter: (v) => (v == null ? '-' : pct(v as number)) },
-])
+// ---- 风险概览(透视) ----
+const PIVOT_DIM_OPTS = RISK_DIMENSIONS.map((d) => ({ value: d.key, label: d.label, group: d.category === 'risk' ? '风险维度' : '项目维度' }))
+const OVERVIEW_METRIC_OPTS = RISK_METRICS.map((m) => ({ value: m.key, label: m.label }))
+const rowDims = ref<string[]>(['orgL4'])
+const colDims = ref<string[]>(['riskLevel'])
+const ovMetric = ref<RiskMetricKey>('projectCount')
+const ovMetricDef = computed(() => RISK_METRICS.find((m) => m.key === ovMetric.value)!)
+const pivot = computed(() => riskPivot(rows.value, rowDims.value, colDims.value, ovMetric.value))
+function fmtPivot(v: number): string {
+  if (Number.isNaN(v)) return '-'
+  return ovMetricDef.value.kind === 'money' ? fmtWan(v) : String(v)
+}
+function onPivotCell(p: { rowKey: string; colKey: string }) {
+  const g = pivot.value.index[p.rowKey]?.[p.colKey]
+  if (g) openDrill(`${p.rowKey}${p.colKey ? ' / ' + p.colKey : ''}`, g.rows)
+}
 </script>
 
 <template>
@@ -103,22 +139,31 @@ const OVERVIEW_COLS = computed<DataColumn[]>(() => [
 
       <h3 class="rv-h3">风险统计分析</h3>
       <div class="rv-toolbar">
+        <span class="rv-label">风险等级</span>
+        <span class="rv-levelfilter">
+          <button v-for="l in LEVELS" :key="l" type="button" class="rv-lvl-chip" :class="{ on: levelFilter.includes(l) }"
+            :data-test="`lvl-${l}`" @click="toggleLevel(l)">{{ l }}</button>
+        </span>
         <span class="rv-label">维度</span><SegToggle v-model="dimKey" :options="DIM_OPTS" />
         <span class="rv-label">统计</span><SegToggle v-model="metricKey" :options="METRIC_OPTS" />
         <span class="rv-label">图表类型</span><ChartTypeSelector v-model="chartTypes" :available="['bar', 'pie']" />
       </div>
       <div class="rv-charts-row">
         <div v-for="(opt, idx) in rankingChartOptions" :key="chartTypes[idx]" class="rv-chart-item">
-          <ChartBox :option="opt" height="300px" />
+          <ChartBox :option="opt" height="300px" @datapoint-click="(e: any) => onChartDrill(e?.name)" />
         </div>
       </div>
-      <DataTable :columns="RANK_COLS" :rows="groups" />
+      <DataTable :columns="RANK_COLS" :rows="groups" class="rv-rank-table" clickable @row-click="onRankRow" />
 
       <h3 class="rv-h3">风险概览</h3>
       <div class="rv-toolbar">
-        <span class="rv-label">行维度</span><SegToggle v-model="overviewDim" :options="OVERVIEW_DIM_OPTS" />
+        <span class="rv-label">行维度</span><DimPicker v-model="rowDims" :options="PIVOT_DIM_OPTS" />
+        <span class="rv-label">列维度</span><DimPicker v-model="colDims" :options="PIVOT_DIM_OPTS" />
+        <span class="rv-label">指标</span><SegToggle v-model="ovMetric" :options="OVERVIEW_METRIC_OPTS" />
       </div>
-      <DataTable :columns="OVERVIEW_COLS" :rows="overviewRows" />
+      <PivotTable :pivot="pivot" :format="fmtPivot" @cell-click="onPivotCell" />
+
+      <RiskDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
     </template>
   </div>
 </template>
@@ -144,4 +189,8 @@ const OVERVIEW_COLS = computed<DataColumn[]>(() => [
   border-radius: var(--r-md); padding: var(--sp-3); }
 .rv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card);
   border: 1px solid var(--line); border-radius: var(--r-md); }
+.rv-levelfilter { display: inline-flex; gap: var(--sp-2); }
+.rv-lvl-chip { border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer;
+  font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-md); }
+.rv-lvl-chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }
 </style>
