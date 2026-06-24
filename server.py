@@ -154,6 +154,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/pmis/upload', '/api/inputs/upload',
     '/api/data-history/rollback', '/api/data-history/undo-rollback',
     '/api/manual/import', '/api/manual/rollback',
+    '/api/progress/archive',
 })
 
 
@@ -296,6 +297,12 @@ def _progress_apply_update(store, project_id, field, content, account, now):
     rec[field + 'EditTime'] = now
     rec[field + 'EditBy'] = account
     return rec
+
+
+def _progress_apply_archive(store, rows, now):
+    """纯函数:把当前已构建行冻结为历史快照(archiveTime=now),并清空 current(开始新一期)。"""
+    store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
+    store['current'] = {}
 
 
 def _valid_project_ids():
@@ -495,6 +502,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_tags_save()
         elif parsed.path == '/api/progress/update':
             self.handle_progress_update()
+        elif parsed.path == '/api/progress/archive':
+            self.handle_progress_archive()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -910,6 +919,24 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response({"success": True, "record": rec})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
+
+    def handle_progress_archive(self):
+        """POST /api/progress/archive {rows} — 冻结当前为历史快照并清空 current。超管专属(由 _authz_gate 拦)。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        rows = data.get('rows')
+        if not isinstance(rows, list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
+            return
+        try:
+            store = _load_progress()
+            _progress_apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_progress(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
 
     def handle_files_status(self):
         """GET /api/files/status - 已知数据文件的最近修改时间(数据管理页行内展示)"""

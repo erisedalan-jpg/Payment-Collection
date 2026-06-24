@@ -45,3 +45,20 @@ def test_apply_update_invalid_field_raises():
     with pytest.raises(ValueError):
         server._progress_apply_update({"version": 1, "current": {}, "archives": []},
                                       "P1", "badField", "x", "u", "t")
+
+
+def test_apply_archive_appends_and_clears_current():
+    store = {"version": 1, "current": {"P1": {"weekProgress": "A"}}, "archives": []}
+    rows = [{"projectId": "P1", "weekProgress": "A", "followBy": "u1"}]
+    server._progress_apply_archive(store, rows, "2026-06-24 18:00:00")
+    assert len(store["archives"]) == 1
+    assert store["archives"][0]["archiveTime"] == "2026-06-24 18:00:00"
+    assert store["archives"][0]["rows"] == rows
+    assert store["current"] == {}   # 归档后清空
+
+
+def test_archive_endpoint_is_super_only():
+    assert '/api/progress/archive' in server._SUPER_ONLY_PATHS
+    # update/read 不在超管专属(任意登录可用)
+    assert '/api/progress/update' not in server._SUPER_ONLY_PATHS
+    assert '/api/progress' not in server._SUPER_ONLY_PATHS
