@@ -56,8 +56,8 @@ const paymentRecords = {
 // ---- 维度/指标元数据 ----
 
 describe('PAY_BOARD_DIMENSIONS / PAY_BOARD_METRICS', () => {
-  it('维度 5 项：L4部门/项目级别/行业/项目阶段/标签，标签为多值', () => {
-    expect(PAY_BOARD_DIMENSIONS.map((d) => d.key)).toEqual(['dept', 'projectLevel', 'industry', 'stage', 'tag'])
+  it('维度 7 项：L4部门/项目级别/行业/项目阶段/标签/TOP1000/象限，标签为多值', () => {
+    expect(PAY_BOARD_DIMENSIONS.map((d) => d.key)).toEqual(['dept', 'projectLevel', 'industry', 'stage', 'tag', 'top1000', 'quadrant'])
     expect(PAY_BOARD_DIMENSIONS.find((d) => d.key === 'tag')?.multi).toBe(true)
     expect(PAY_BOARD_DIMENSIONS.find((d) => d.key === 'dept')?.label).toBe('L4部门')
     expect(PAY_BOARD_DIMENSIONS.find((d) => d.key === 'stage')?.label).toBe('项目阶段')
@@ -126,6 +126,16 @@ describe('buildPayBoardRows', () => {
     // 无节点数据时 remainingTotal=0，但 contract 仍来自 paymentPmis.contract
     expect(a.contract).toBe(2_000_000)
     expect(a.remainingTotal).toBe(0)
+  })
+
+  it('映射 top1000/quadrant(缺省→否/未指定)', () => {
+    const withT = [{ ...projects[0], top1000: '是', quadrant: 'M2 现金牛/打猎区' }] as unknown as Project[]
+    const a = buildPayBoardRows(withT, pmisMap, paymentNodes, paymentRecords, '', '')[0]
+    expect(a.top1000).toBe('是')
+    expect(a.quadrant).toBe('M2 现金牛/打猎区')
+    const b = buildPayBoardRows([projects[1]], pmisMap, paymentNodes, paymentRecords, '', '')[0]
+    expect(b.top1000).toBe('否')
+    expect(b.quadrant).toBe('未指定')
   })
 })
 
