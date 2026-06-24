@@ -27,6 +27,7 @@ describe('RiskDrillModal', () => {
     const w = mount(RiskDrillModal, { props: { modelValue: true, title: 't', rows },
       global: { plugins: [ElementPlus, router], stubs: { Modal: { template: '<div><slot/></div>' } } } })
     await w.find('.el-table__row').trigger('click')
+    await flushPromises()
     expect(push).toHaveBeenCalledWith('/project/P1')
     expect(w.emitted('update:modelValue')?.at(-1)).toEqual([false])
   })

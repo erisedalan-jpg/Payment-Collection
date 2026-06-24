@@ -23,7 +23,7 @@ function seed() {
     projectPmis: {
       P1: { status: { 项目级别: 'A级' }, customer: { 行业: '金融', 合同总额: 1000000 }, riskRecords: [rec('高', '未关闭')] },
       P2: { status: { 项目级别: 'B级' }, customer: { 行业: '政务', 合同总额: 500000 }, riskRecords: [rec('中', '处理中')] },
-      P3: { status: { 项目级别: 'A级' }, customer: { 行业: '金融', 合同总额: 300000 }, riskRecords: [rec('高', '已关闭')] },
+      P3: { status: { 项目级别: 'A级' }, customer: { 行业: '金融', 合同总额: 300000 }, riskRecords: [rec('高', '已关闭')] },  // 风险全已关闭 → riskLevel 派生为「无风险」
     },
     displayColumns: {}, followupRecords: {},
   } as any
@@ -62,7 +62,10 @@ describe('RiskBoardView', () => {
     const w = mount(RiskBoardView, opts)
     await flushPromises()
     const cell = w.find('.pv .pv-click')
-    if (cell.exists()) { await cell.trigger('click'); expect((w.vm as any).drillOpen).toBe(true) }
+    expect(cell.exists()).toBe(true)   // 当前 fixture 必有非空透视格;无条件断言避免守卫静默空过
+    await cell.trigger('click')
+    await flushPromises()
+    expect((w.vm as any).drillOpen).toBe(true)
   })
   it('空数据显空态', () => {
     const ds = useDataStore()
