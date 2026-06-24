@@ -105,6 +105,7 @@
 - [x] **SP1-followup（2026-06-19，SP2 复核关闭）**：异常项目(orgL4 空)硬排除仅施于 `filterProjects`/`paymentNodeRows`；`overview.ts computeKpis` 已在 `!isAnomalous` 守卫下计算回款达成率，`buildInsightRows` 对异常项目回款字段置 0，口径安全，复核关闭。
 - [ ] **L-25** 数据治理「未匹配」指标口径已位移（2026-06-22 V1.16.2 终审记录）：现为 collection_stages 项目号 vs PMIS（原为 WPS overview 项目 vs PMIS），属预期改善，记录供后续对账人参考。
 - [ ] **L-26** V1.16.2 移除 WPS 后旧 followup 自动重置逻辑随 yundocs followup sheet 一并下线（2026-06-22 V1.16.2 终审记录）：该字段(节点动作完成时间)本就来自已删 sheet、/api/followup 本地记录无此字段，无害。
+- [ ] **L-27** V1.19.0 TOP1000 接入终审记录：`projects.py build_projects` 的 `top1000` 判定用 `t1.get("level") == config.TOP1000_LEVEL`（"TOP1000大客户"）精确等值（已 strip），字面强耦合 CRM 导出列 `客户级别`。若 CRM 改取值（含空格/全角/大小写变体）会静默全部判否而无告警——日后 TOP1000 列异常排查先核对 TOP1000.xlsx 的 `客户级别` 取值与该常量。属设计取舍（plan 钦定精确等值、无模糊）。
 
 ### 🔴 严重（小改动、高收益，建议优先）
 - [x] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。（A2 完成：ThreadingHTTPServer + create_server）
