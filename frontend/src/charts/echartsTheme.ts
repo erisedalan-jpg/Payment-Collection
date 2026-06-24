@@ -16,7 +16,7 @@ export const CHART_DARK = ['#3e6fa8', '#eb5c20', '#1fa6a8', '#f9d46c', '#d34947'
 
 // 结构色映射:txt=标题/tooltip 文字,sub=轴标签/图例,line=分隔线/tooltip 边,line2=轴线,card=tooltip 底
 export const STRUCT_LIGHT = { txt: '#121212', sub: '#474747', line: '#e4e4e2', line2: '#d4d4d2', card: '#fbfbfd' }
-export const STRUCT_DARK = { txt: '#fbfbfd', sub: '#bcbec1', line: '#272b31', line2: '#343a44', card: '#121212' }
+export const STRUCT_DARK = { txt: '#fbfbfd', sub: '#bcbec1', line: '#272b31', line2: '#343a44', card: '#1a1d24' }
 
 function buildTheme(palette: string[], s: typeof STRUCT_LIGHT) {
   return {

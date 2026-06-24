@@ -73,4 +73,40 @@ describe('KeyProjectsView', () => {
     await w.find('.el-table__row').trigger('click')
     expect(push).toHaveBeenCalledWith('/project/K1')
   })
+
+  // 新增：历史快照下拉 + 导出全选
+  it('默认 mode=current、isCurrent 为真', async () => {
+    seed(); const w = await mountView()
+    expect((w.vm as any).isCurrent).toBe(true)
+    expect((w.vm as any).mode).toBe('current')
+  })
+  it('切历史数据后默认选最新快照', async () => {
+    seed()
+    vi.spyOn(ppApi.projectProgressApi, 'getProgress').mockResolvedValue({
+      success: true,
+      current: {},
+      archives: [
+        { archiveTime: '2026-01-01 10:00', rows: [{ projectId: 'A' }] },
+        { archiveTime: '2026-02-01 10:00', rows: [{ projectId: 'B' }] },
+      ],
+    })
+    const w = await mountView()
+    ;(w.vm as any).mode = 'history'
+    await w.vm.$nextTick()
+    expect((w.vm as any).historyIdx).toBe(1)
+    expect((w.vm as any).isCurrent).toBe(false)
+  })
+  it('全选切换 exportSel', async () => {
+    seed()
+    vi.spyOn(ppApi.projectProgressApi, 'getProgress').mockResolvedValue({
+      success: true,
+      current: {},
+      archives: [{ archiveTime: 't', rows: [] }],
+    })
+    const w = await mountView()
+    ;(w.vm as any).toggleAllExport(true)
+    expect((w.vm as any).exportSel.length).toBe((w.vm as any).datasetOpts.length)
+    ;(w.vm as any).toggleAllExport(false)
+    expect((w.vm as any).exportSel).toEqual([])
+  })
 })

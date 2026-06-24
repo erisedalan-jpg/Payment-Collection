@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
@@ -30,12 +30,25 @@ onMounted(() => {
 })
 
 // 数据集选择:当前数据 | 历史快照
-const dataset = ref('current')
+const mode = ref<'current' | 'history'>('current')
+const historyIdx = ref(0)
+const isCurrent = computed(() => mode.value === 'current')
+
 const datasetOpts = computed(() => [
   { value: 'current', label: '当前数据' },
   ...progress.archives.map((a, i) => ({ value: 'a' + i, label: a.archiveTime })),
 ])
-const isCurrent = computed(() => dataset.value === 'current')
+const historyOpts = computed(() =>
+  progress.archives.map((a, i) => ({ value: i, label: a.archiveTime })),
+)
+
+// 进入历史/archives 变化时，默认指向最新快照
+watch(
+  () => [mode.value, progress.archives.length] as const,
+  () => {
+    if (mode.value === 'history') historyIdx.value = Math.max(0, progress.archives.length - 1)
+  },
+)
 
 const currentRows = computed<KeyProjectRow[]>(() =>
   buildKeyProjectRows(
@@ -45,11 +58,9 @@ const currentRows = computed<KeyProjectRow[]>(() =>
   ),
 )
 
-const rows = computed<KeyProjectRow[]>(() => {
-  if (isCurrent.value) return currentRows.value
-  const i = Number(dataset.value.slice(1))
-  return (progress.archives[i]?.rows ?? []) as KeyProjectRow[]
-})
+const rows = computed<KeyProjectRow[]>(() =>
+  isCurrent.value ? currentRows.value : ((progress.archives[historyIdx.value]?.rows ?? []) as KeyProjectRow[]),
+)
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as KeyProjectRow[])
 
 const ALL_COLUMNS: DataColumn[] = [
@@ -118,7 +129,7 @@ async function doArchive() {
   try {
     await progress.archive(currentRows.value)
     archiveConfirm.value = false
-    dataset.value = 'current'
+    mode.value = 'current'
   } finally {
     archiving.value = false
   }
@@ -127,6 +138,15 @@ async function doArchive() {
 // 导出(超管):多选数据集 → 多 sheet
 const exportOpen = ref(false)
 const exportSel = ref<string[]>(['current'])
+const allSelected = computed(
+  () => exportSel.value.length > 0 && exportSel.value.length === datasetOpts.value.length,
+)
+const exportIndeterminate = computed(
+  () => exportSel.value.length > 0 && exportSel.value.length < datasetOpts.value.length,
+)
+function toggleAllExport(val: boolean) {
+  exportSel.value = val ? datasetOpts.value.map((o) => o.value) : []
+}
 function doExport() {
   const sheets = exportSel.value.map((sel) => {
     const opt = datasetOpts.value.find((o) => o.value === sel)
@@ -160,7 +180,7 @@ function exportRow(r: KeyProjectRow): Record<string, unknown> {
 }
 
 // 暴露供测试
-defineExpose({ editOpen, editCtx, dataset, isCurrent })
+defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSelected, datasetOpts, toggleAllExport })
 </script>
 
 <template>
@@ -168,7 +188,11 @@ defineExpose({ editOpen, editCtx, dataset, isCurrent })
     <h2 class="kp-title">重点项目进展</h2>
     <div class="toolbar">
       <span class="kp-label">数据集</span>
-      <SegToggle v-model="dataset" :options="datasetOpts" />
+      <SegToggle v-model="mode" :options="[{ value: 'current', label: '当前数据' }, { value: 'history', label: '历史数据' }]" />
+      <el-select v-if="mode === 'history'" v-model="historyIdx" size="small" style="width: 200px"
+        :disabled="!progress.archives.length" placeholder="选择历史快照">
+        <el-option v-for="o in historyOpts" :key="o.value" :label="o.label" :value="o.value" />
+      </el-select>
       <ColumnPicker
         :columns="pickerColumns"
         :visible-keys="prefs.visibleKeys.value"
@@ -230,6 +254,8 @@ defineExpose({ editOpen, editCtx, dataset, isCurrent })
     </Modal>
 
     <Modal v-model="exportOpen" title="导出数据集" width="420px">
+      <el-checkbox :model-value="allSelected" :indeterminate="exportIndeterminate"
+        @change="toggleAllExport($event as boolean)">全选</el-checkbox>
       <el-checkbox-group v-model="exportSel">
         <el-checkbox v-for="o in datasetOpts" :key="o.value" :value="o.value">{{ o.label }}</el-checkbox>
       </el-checkbox-group>
