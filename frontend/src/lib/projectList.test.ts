@@ -72,6 +72,16 @@ describe('buildProjectRows', () => {
     expect(r.isPresale).toBe(true)
     expect(r.hasClosed).toBe(true)
   })
+  it('从 Project 取 top1000/quadrant', () => {
+    const [r] = buildProjectRows([proj({ top1000: '是', quadrant: 'M1 战略核心区' } as Partial<Project>)], {})
+    expect(r.top1000).toBe('是')
+    expect(r.quadrant).toBe('M1 战略核心区')
+  })
+  it('缺省 top1000→否 / quadrant→空', () => {
+    const [r] = buildProjectRows([proj({ projectId: 'X9' })], {})
+    expect(r.top1000).toBe('否')
+    expect(r.quadrant).toBe('')
+  })
 })
 
 // Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags/riskCategory）

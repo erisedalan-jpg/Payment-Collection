@@ -261,6 +261,42 @@ describe('ProjectsView', () => {
     expect(w.find('.pv-scroll').exists()).toBe(true)
   })
 
+  it('TOP1000/象限 列存在于 ALL_COLUMNS 但默认隐藏(不在 DEFAULT_VISIBLE)', async () => {
+    seed()
+    // 默认挂载:两列不在表头(未进 DEFAULT_VISIBLE)
+    const w1 = mountView()
+    await flushPromises()
+    const def = w1.findAll('th').map((n) => n.text().trim())
+    expect(def.some((t) => t.includes('TOP1000'))).toBe(false)
+    expect(def.some((t) => t.includes('象限'))).toBe(false)
+    // 启用后两列出现 → 证明它们确实存在于 ALL_COLUMNS(否则永远无法渲染)
+    localStorage.setItem('colprefs:projects-active',
+      JSON.stringify(['projectName', 'top1000', 'quadrant', 'action']))
+    const w2 = mountView()
+    await flushPromises()
+    const on = w2.findAll('th').map((n) => n.text().trim())
+    expect(on.some((t) => t.includes('TOP1000'))).toBe(true)
+    expect(on.some((t) => t.includes('象限'))).toBe(true)
+    localStorage.clear()
+  })
+
+  it('启用后 TOP1000/象限 列渲染且带筛选器(可筛)', async () => {
+    seed()
+    localStorage.setItem('colprefs:projects-active',
+      JSON.stringify(['projectName', 'top1000', 'quadrant', 'action']))
+    const w = mountView()
+    await flushPromises()
+    const ths = w.findAll('th')
+    const topTh = ths.find((n) => n.text().includes('TOP1000'))
+    const quadTh = ths.find((n) => n.text().includes('象限'))
+    expect(topTh).toBeTruthy()
+    expect(quadTh).toBeTruthy()
+    // FILTERABLE → 表头含 ColumnFilter 触发器 .cf-icon
+    expect(topTh!.find('.cf-icon').exists()).toBe(true)
+    expect(quadTh!.find('.cf-icon').exists()).toBe(true)
+    localStorage.clear()
+  })
+
   it('orgL4 空项目渲染「数据异常」标记，正常项目不渲染', async () => {
     const ds = useDataStore()
     ds.data = {

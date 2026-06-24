@@ -8,16 +8,16 @@ function fakeFile(name: string): File {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('useInputFiles', () => {
-  it('包含九个固定文件名(含核心回款源)', () => {
+  it('包含十个固定文件名(含核心回款源/TOP1000)', () => {
     expect(INPUT_FILE_NAMES).toEqual([
       '组织架构.xlsx', 'A.xlsx', 'delivery_analysis.csv', 'delivery_analysis.xlsx',
       'payment_records.csv', 'profit_loss_direct.csv', 'profit_loss_bridge.csv', 'budget_data.csv',
-      'collection_stages.csv',
+      'collection_stages.csv', 'TOP1000.xlsx',
     ])
   })
 
-  it('白名单包含核心回款源 collection_stages.csv', () => {
-    expect(INPUT_FILE_NAMES).toContain('collection_stages.csv')
+  it('白名单包含 TOP1000.xlsx', () => {
+    expect(INPUT_FILE_NAMES).toContain('TOP1000.xlsx')
   })
 
   it('upload 只传白名单文件并按文件名编码到 query', async () => {

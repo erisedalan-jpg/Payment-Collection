@@ -63,12 +63,14 @@ PMIS_ALL_FILENAMES = (list(PMIS_FILES_ACTIVE.values()) + list(PMIS_FILES_CLOSED.
 # ── 项目主域输入文件(Phase P,位于 input/ 根) ──
 ORG_FILE = "组织架构.xlsx"
 MAPPING_FILE = "A.xlsx"
+TOP1000_FILE = "TOP1000.xlsx"           # CRM 大客户清单(客户名称→级别/象限)
+TOP1000_LEVEL = "TOP1000大客户"          # top1000 判定级别
 DELIVERY_FILE = "delivery_analysis.csv"
 DELIVERY_FILE_LEGACY = "delivery_analysis.xlsx"  # csv 缺失时回退(R 批次过渡)
 # 上传白名单含 legacy:R 批次过渡期 csv/xlsx 两式 delivery 均可上传(读侧 read_delivery 同款回退)
 INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY,
                       PAYMENT_RECORDS_FILE, PROFIT_DIRECT_FILE, PROFIT_BRIDGE_FILE, BUDGET_FILE,
-                      COLLECTION_STAGES_FILE]
+                      COLLECTION_STAGES_FILE, TOP1000_FILE]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
 PRESALE_PROJECT_TYPE = "售前服务类"  # 售前判定(取代 name.startswith);与终验时间取列共用

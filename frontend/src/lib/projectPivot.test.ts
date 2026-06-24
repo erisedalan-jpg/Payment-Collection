@@ -125,8 +125,14 @@ describe('buildInsightRows', () => {
 
 describe('契约面', () => {
   it('维度去评级加项目级别;6 指标', () => {
-    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '项目级别', '行业', '签约单位', '健康度', '超支', '暂停'])
+    expect(INSIGHT_DIMENSIONS.map((d) => d.label)).toEqual(['阶段', '项目状态', '风险等级', '项目经理', '服务组', '项目级别', '行业', '签约单位', '健康度', '超支', '暂停', 'TOP1000', '象限'])
     expect(INSIGHT_DIMENSIONS.map((d) => d.key)).not.toContain('rating')
     expect(INSIGHT_METRICS.map((m) => m.key)).toEqual(['projectCount', 'contractAmount', 'avgProgress', 'avgCostRatio', 'paymentRatio', 'delayedProjects'])
+  })
+  it('buildInsightRows 映射 top1000/quadrant', () => {
+    const projects = [{ projectId: 'P-1', projectName: '甲', orgL4: '组', payment: { ...PAY0 }, health: {}, top1000: '是', quadrant: 'M1 战略核心区' }] as unknown as Project[]
+    const r = buildInsightRows(projects, {})[0]
+    expect(r.top1000).toBe('是')
+    expect(r.quadrant).toBe('M1 战略核心区')
   })
 })

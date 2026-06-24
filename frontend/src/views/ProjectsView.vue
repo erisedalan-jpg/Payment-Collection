@@ -57,11 +57,13 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'riskReasons', label: '关注原因', width: 220 },
   { key: 'paymentStatus', label: '回款状态', width: 100 },
   { key: 'tags', label: '标签', width: 160, formatter: (v) => (Array.isArray(v) && v.length ? v.join('、') : '') },
+  { key: 'top1000', label: 'TOP1000', width: 90 },
+  { key: 'quadrant', label: '象限', width: 140 },
   { key: 'action', label: '操作', width: 80, fixed: 'right' },
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
-const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health'])
+const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant'])
 
 const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
