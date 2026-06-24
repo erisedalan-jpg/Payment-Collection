@@ -35,6 +35,11 @@ export const ANALYSIS_LINKS: NavLink[] = [
   { label: '回款日历', to: '/insight/calendar', key: 'insight-calendar' },
 ]
 
+// 重点跟进(SP-2):重点项目进展页
+export const KEY_FOLLOWUP_LINKS: NavLink[] = [
+  { label: '重点项目进展', to: '/projects/key', key: 'projects-key' },
+]
+
 // 回款重点子域（SP4 拆分；V1.16.0 board/calendar 迁出至项目分析中心）
 export const PAYMENT_LINKS: NavLink[] = [
   { label: '回款总览', to: '/payment', key: 'payment' },
