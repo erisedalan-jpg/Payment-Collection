@@ -230,7 +230,15 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
                   else {"progressAbnormal": False, "riskAbnormal": False, "costAbnormal": False,
                         "paymentAbnormal": False, "overall": "无数据"})
         customer = pm.get("customer") or {}
-        final_customer = str(customer.get("最终客户") or "").strip()
+        is_presale = ((pm.get("status") or {}).get("项目类型") == config.PRESALE_PROJECT_TYPE)
+        related_closed = (m["closed"] if m else "")
+        # TOP1000/象限 客户取数:售前服务类按原项目(relatedClosedId)最终客户判定(本项目最终客户对售前无意义,
+        # 实测全为空);无原项目/原项目无客户 → 空 → 否/空(不回退本项目)。非售前用本项目最终客户。
+        if is_presale:
+            orig_customer = (project_pmis.get(related_closed) or {}).get("customer") or {}
+            final_customer = str(orig_customer.get("最终客户") or "").strip()
+        else:
+            final_customer = str(customer.get("最终客户") or "").strip()
         t1 = top1000_map.get(final_customer) if final_customer else None
         top1000 = "是" if (t1 and t1.get("level") == config.TOP1000_LEVEL) else "否"
         quadrant = (t1.get("quad") if t1 else "") or ""
@@ -241,8 +249,8 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
             "orgL4": str(team.get("L4部门") or "").strip(),
             "orgL3_1": str(team.get("L3_1部门") or "").strip(),
             "合同编号": str(customer.get("合同编号") or "").strip(),
-            "isPresale": ((pm.get("status") or {}).get("项目类型") == config.PRESALE_PROJECT_TYPE),
-            "relatedClosedId": (m["closed"] if m else ""),
+            "isPresale": is_presale,
+            "relatedClosedId": related_closed,
             "deliveryCosts": delivery_costs_for(drow) if drow else [],
             "health": health,
             "top1000": top1000,
