@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import RiskBoardView from './RiskBoardView.vue'
@@ -22,7 +23,7 @@ function seed() {
     projectPmis: {
       P1: { status: { 项目级别: 'A级' }, customer: { 行业: '金融', 合同总额: 1000000 }, riskRecords: [rec('高', '未关闭')] },
       P2: { status: { 项目级别: 'B级' }, customer: { 行业: '政务', 合同总额: 500000 }, riskRecords: [rec('中', '处理中')] },
-      P3: { status: { 项目级别: 'A级' }, customer: { 行业: '金融', 合同总额: 300000 }, riskRecords: [rec('高', '已关闭')] },
+      P3: { status: { 项目级别: 'A级' }, customer: { 行业: '金融', 合同总额: 300000 }, riskRecords: [rec('高', '已关闭')] },  // 风险全已关闭 → riskLevel 派生为「无风险」
     },
     displayColumns: {}, followupRecords: {},
   } as any
@@ -49,17 +50,45 @@ describe('RiskBoardView', () => {
     expect(w.find('[data-test="seg-projectCount"]').exists()).toBe(true)
     expect(w.find('[data-test="seg-contractAmount"]').exists()).toBe(true)
   })
-  it('概览表含 高/中/低/无风险/合计/健康度% 列', () => {
+  it('风险概览为透视:DimPicker 选行列维 + PivotTable 渲染', async () => {
     seed()
     const w = mount(RiskBoardView, opts)
-    const tables = w.findAllComponents(DataTable)
-    const ovCols = (tables[tables.length - 1].props('columns') as Array<{ key: string }>).map((c) => c.key)
-    expect(ovCols).toEqual(['key', '高', '中', '低', '无风险', 'total', 'healthPct'])
+    await flushPromises()
+    expect(w.find('.pv').exists()).toBe(true)       // PivotTable 表
+    expect(w.findAll('[data-test^="dim-"]').length).toBeGreaterThan(0)  // DimPicker chips
+  })
+  it('点透视格打开下钻弹窗', async () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    await flushPromises()
+    const cell = w.find('.pv .pv-click')
+    expect(cell.exists()).toBe(true)   // 当前 fixture 必有非空透视格;无条件断言避免守卫静默空过
+    await cell.trigger('click')
+    await flushPromises()
+    expect((w.vm as any).drillOpen).toBe(true)
   })
   it('空数据显空态', () => {
     const ds = useDataStore()
     ds.data = { meta: {}, projects: [], projectPmis: {}, displayColumns: {}, followupRecords: {} } as any
     const w = mount(RiskBoardView, opts)
     expect(w.text()).toContain('暂无项目主域数据')
+  })
+  it('风险等级筛选去勾"无风险"只影响风险统计分析,不影响卡片', async () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    const before = w.find('.rv-card-main').text()
+    // 去勾无风险(data-test=lvl-无风险 的 chip)
+    const chip = w.find('[data-test="lvl-无风险"]')
+    expect(chip.exists()).toBe(true)
+    await chip.trigger('click')
+    // 卡片(顶部第一个 .rv-card-main)不变
+    expect(w.find('.rv-card-main').text()).toBe(before)
+  })
+  it('点风险统计分析表行打开下钻弹窗', async () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    await w.find('.rv-rank-table .el-table__row').trigger('click')
+    await flushPromises()
+    expect((w.vm as any).drillOpen).toBe(true)
   })
 })
