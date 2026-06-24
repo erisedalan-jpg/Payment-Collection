@@ -138,3 +138,44 @@ describe('AppSidebar 系统管理入口', () => {
     expect(links.some((l) => l.attributes('href') === '/admin')).toBe(false)
   })
 })
+
+describe('AppSidebar 分区可折叠', () => {
+  async function mountAt(path: string) {
+    const router = makeRouter()
+    router.push(path)
+    await router.isReady()
+    const a = useAuthStore()
+    a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: [], allowedL4: [] }
+    return mount(AppSidebar, { global: { plugins: [router] } })
+  }
+  const sec = (w: ReturnType<typeof mount>, anchor: string) =>
+    w.findAll('.section').find((s) => s.text().includes(anchor))!
+
+  it('默认仅展开当前页所在分区(route / → project 展开, analysis 收起)', async () => {
+    const w = await mountAt('/')
+    expect(sec(w, '在建项目').classes()).not.toContain('collapsed')      // project 展开
+    expect(sec(w, '项目多维分析').classes()).toContain('collapsed')       // analysis 收起
+  })
+
+  it('route /insight → analysis 展开, project 收起', async () => {
+    const w = await mountAt('/insight')
+    expect(sec(w, '项目多维分析').classes()).not.toContain('collapsed')
+    expect(sec(w, '在建项目').classes()).toContain('collapsed')
+  })
+
+  it('点击分区标题切换展开态并写 ui.sectionExpanded', async () => {
+    const ui = useUiStore()
+    const w = await mountAt('/')
+    const analysis = sec(w, '项目多维分析')
+    expect(analysis.classes()).toContain('collapsed')                    // 默认收起
+    await analysis.find('.section-label').trigger('click')
+    expect(ui.sectionExpanded['analysis']).toBe(true)
+    expect(sec(w, '项目多维分析').classes()).not.toContain('collapsed')   // 点开
+  })
+
+  it('已手动展开的分区在非活动页仍保持展开(覆盖默认)', async () => {
+    localStorage.setItem('sidebar_sections', JSON.stringify({ payment: true }))
+    const w = await mountAt('/')   // 活动分区是 project,但 payment 被手动置 true
+    expect(sec(w, '回款台账').classes()).not.toContain('collapsed')
+  })
+})
