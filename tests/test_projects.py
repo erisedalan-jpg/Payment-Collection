@@ -420,3 +420,64 @@ class TestBuildProjectsTop1000:
         out = P.build_projects(self._ppm(""), {"佘海龙"}, set(), [], [], m)
         assert out[0]["top1000"] == "否"
         assert out[0]["quadrant"] == ""
+
+
+class TestBuildProjectsPresaleTop1000:
+    """售前服务类:TOP1000/象限 按原项目(relatedClosedId)最终客户判定,不用本项目最终客户。
+    售前本项目最终客户实测全为空;无原项目/原项目无客户 → 否/空(不回退本项目)。"""
+    TOPMAP = {"辽宁省公安厅": {"level": "TOP1000大客户", "quad": "M1 战略核心区"}}
+
+    def _ppm(self, own_customer, orig_customer, orig_in_pm=True):
+        sf = _pm_active("售前甲", "佘海龙", project_type="售前服务类")
+        sf["customer"]["最终客户"] = own_customer
+        ppm = {"SF-1": sf}
+        if orig_in_pm:
+            ss = {**_pm_active("原项目甲", "佘海龙"), "source": "已关闭"}
+            ss["customer"]["最终客户"] = orig_customer
+            ppm["SS-99"] = ss
+        return ppm
+
+    def test_presale_judged_by_original_customer(self):
+        # 本项目客户空,原项目客户在清单 → 是 + 原项目象限
+        ppm = self._ppm(own_customer="", orig_customer="辽宁省公安厅")
+        mapping = [{"current": "SF-1", "owner": "x", "closed": "SS-99"}]
+        out = P.build_projects(ppm, {"佘海龙"}, set(), mapping, [], self.TOPMAP)
+        sf = next(p for p in out if p["projectId"] == "SF-1")
+        assert sf["isPresale"] is True
+        assert sf["top1000"] == "是"
+        assert sf["quadrant"] == "M1 战略核心区"
+
+    def test_presale_ignores_own_customer_uses_original(self):
+        # 本项目客户在清单(若用本项目会判是),但原项目客户不在清单 → 否(证明按原项目)
+        ppm = self._ppm(own_customer="辽宁省公安厅", orig_customer="不在表里")
+        mapping = [{"current": "SF-1", "owner": "x", "closed": "SS-99"}]
+        out = P.build_projects(ppm, {"佘海龙"}, set(), mapping, [], self.TOPMAP)
+        sf = next(p for p in out if p["projectId"] == "SF-1")
+        assert sf["top1000"] == "否"
+        assert sf["quadrant"] == ""
+
+    def test_presale_no_mapping_is_no_even_if_own_in_list(self):
+        # 售前无原项目映射:即便本项目客户在清单,也不回退本项目 → 否/空
+        ppm = self._ppm(own_customer="辽宁省公安厅", orig_customer="x", orig_in_pm=False)
+        out = P.build_projects(ppm, {"佘海龙"}, set(), [], [], self.TOPMAP)
+        sf = next(p for p in out if p["projectId"] == "SF-1")
+        assert sf["top1000"] == "否"
+        assert sf["quadrant"] == ""
+
+    def test_presale_original_not_in_pm_is_no(self):
+        # 有映射但原项目不在 projectPmis → 取不到原客户 → 否/空
+        ppm = self._ppm(own_customer="辽宁省公安厅", orig_customer="x", orig_in_pm=False)
+        mapping = [{"current": "SF-1", "owner": "x", "closed": "SS-99"}]
+        out = P.build_projects(ppm, {"佘海龙"}, set(), mapping, [], self.TOPMAP)
+        sf = next(p for p in out if p["projectId"] == "SF-1")
+        assert sf["top1000"] == "否"
+        assert sf["quadrant"] == ""
+
+    def test_non_presale_still_uses_own_customer(self):
+        # 非售前:仍按本项目最终客户(回归保护)
+        p = _pm_active("实施甲", "佘海龙")
+        p["customer"]["最终客户"] = "辽宁省公安厅"
+        out = P.build_projects({"SS-1": p}, {"佘海龙"}, set(), [], [], self.TOPMAP)
+        assert out[0]["isPresale"] is False
+        assert out[0]["top1000"] == "是"
+        assert out[0]["quadrant"] == "M1 战略核心区"
