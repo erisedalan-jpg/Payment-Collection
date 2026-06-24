@@ -4,7 +4,7 @@ import { useDataStore } from '@/stores/data'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
   buildRiskRows, riskSummary, groupRisk, riskOverview,
-  RISK_DIMENSIONS, RISK_METRICS, type RiskMetricKey, type RiskDimDef,
+  RISK_DIMENSIONS, RISK_METRICS, type RiskMetricKey, type RiskDimDef, type RiskRow,
 } from '@/lib/riskBoard'
 import { fmtWan, pct } from '@/lib/format'
 import { buildRankingOption, type ValueKind } from '@/lib/chartOptions'
@@ -12,6 +12,7 @@ import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
+import RiskDrillModal from '@/components/RiskDrillModal.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
@@ -45,8 +46,38 @@ const chartTypes = ref<string[]>(['bar'])
 const metricDef = computed(() => RISK_METRICS.find((m) => m.key === metricKey.value)!)
 const currentValueKind = computed<ValueKind>(() => (metricDef.value.kind === 'money' ? 'amount' : 'count'))
 
+// 风险等级筛选（仅作用风险统计分析块，不影响 cards/summary/概览）
+const LEVELS = ['高', '中', '低', '无风险'] as const
+const levelFilter = ref<string[]>([...LEVELS])
+function toggleLevel(l: string) {
+  levelFilter.value = levelFilter.value.includes(l)
+    ? levelFilter.value.filter((x) => x !== l)
+    : [...levelFilter.value, l]
+}
+const statRows = computed(() => rows.value.filter((r) => levelFilter.value.includes(r.riskLevel)))
+
+// 下钻状态
+const drillOpen = ref(false)
+const drillTitle = ref('')
+const drillRows = ref<RiskRow[]>([])
+function openDrill(title: string, rs: RiskRow[]) {
+  drillTitle.value = title
+  drillRows.value = rs
+  drillOpen.value = true
+}
+
+const rankDimLabel = computed(() => RISK_DIMENSIONS.find((d) => d.key === dimKey.value)?.label ?? '维度')
+
+function onRankRow(row: Record<string, any>) {
+  openDrill(`${rankDimLabel.value}=${row.key}`, row.rows)
+}
+function onChartDrill(name?: string) {
+  const g = groups.value.find((x) => x.key === name)
+  if (g) openDrill(`${rankDimLabel.value}=${g.key}`, g.rows)
+}
+
 const groups = computed(() => {
-  const gs = groupRisk(rows.value, dimKey.value)
+  const gs = groupRisk(statRows.value, dimKey.value)
   const k = metricKey.value
   return [...gs].sort((a, b) => (b[k] as number) - (a[k] as number))
 })
@@ -103,22 +134,29 @@ const OVERVIEW_COLS = computed<DataColumn[]>(() => [
 
       <h3 class="rv-h3">风险统计分析</h3>
       <div class="rv-toolbar">
+        <span class="rv-label">风险等级</span>
+        <span class="rv-levelfilter">
+          <button v-for="l in LEVELS" :key="l" type="button" class="rv-lvl-chip" :class="{ on: levelFilter.includes(l) }"
+            :data-test="`lvl-${l}`" @click="toggleLevel(l)">{{ l }}</button>
+        </span>
         <span class="rv-label">维度</span><SegToggle v-model="dimKey" :options="DIM_OPTS" />
         <span class="rv-label">统计</span><SegToggle v-model="metricKey" :options="METRIC_OPTS" />
         <span class="rv-label">图表类型</span><ChartTypeSelector v-model="chartTypes" :available="['bar', 'pie']" />
       </div>
       <div class="rv-charts-row">
         <div v-for="(opt, idx) in rankingChartOptions" :key="chartTypes[idx]" class="rv-chart-item">
-          <ChartBox :option="opt" height="300px" />
+          <ChartBox :option="opt" height="300px" @datapoint-click="(e: any) => onChartDrill(e?.name)" />
         </div>
       </div>
-      <DataTable :columns="RANK_COLS" :rows="groups" />
+      <DataTable :columns="RANK_COLS" :rows="groups" class="rv-rank-table" clickable @row-click="onRankRow" />
 
       <h3 class="rv-h3">风险概览</h3>
       <div class="rv-toolbar">
         <span class="rv-label">行维度</span><SegToggle v-model="overviewDim" :options="OVERVIEW_DIM_OPTS" />
       </div>
       <DataTable :columns="OVERVIEW_COLS" :rows="overviewRows" />
+
+      <RiskDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
     </template>
   </div>
 </template>
@@ -144,4 +182,8 @@ const OVERVIEW_COLS = computed<DataColumn[]>(() => [
   border-radius: var(--r-md); padding: var(--sp-3); }
 .rv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card);
   border: 1px solid var(--line); border-radius: var(--r-md); }
+.rv-levelfilter { display: inline-flex; gap: var(--sp-2); }
+.rv-lvl-chip { border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer;
+  font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-md); }
+.rv-lvl-chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }
 </style>
