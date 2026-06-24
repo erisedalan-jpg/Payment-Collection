@@ -35,6 +35,8 @@ export interface RiskRow {
   projectLevel: string
   manager: string
   industry: string
+  top1000: string
+  quadrant: string
   riskLevel: RiskLevel
   openRisks: number
   contractAmount: number
@@ -52,6 +54,8 @@ export function buildRiskRows(projects: Project[], pmisMap: Record<string, Proje
       projectLevel: v(st['项目级别']),
       manager: v(p.projectManager),
       industry: v(cust['行业']),
+      top1000: v(p.top1000, '否'),
+      quadrant: v(p.quadrant),
       riskLevel: projectRiskLevel(m),
       openRisks: openRiskCount(m),
       contractAmount: Number(cust['合同总额'] ?? 0),
@@ -82,13 +86,15 @@ export function riskSummary(rows: RiskRow[]): RiskSummary {
   return { total, noRisk, high, mid, low, hasRisk, healthPct: total > 0 ? noRisk / total : null }
 }
 
-export interface RiskDimDef { key: 'riskLevel' | 'orgL4' | 'projectLevel' | 'manager' | 'industry'; label: string }
+export interface RiskDimDef { key: 'riskLevel' | 'orgL4' | 'projectLevel' | 'manager' | 'industry' | 'top1000' | 'quadrant'; label: string }
 export const RISK_DIMENSIONS: RiskDimDef[] = [
   { key: 'riskLevel', label: '风险等级' },
   { key: 'orgL4', label: 'L4组织' },
   { key: 'projectLevel', label: '项目级别' },
   { key: 'manager', label: '项目经理' },
   { key: 'industry', label: '行业' },
+  { key: 'top1000', label: 'TOP1000' },
+  { key: 'quadrant', label: '象限' },
 ]
 
 export type RiskMetricKey = 'projectCount' | 'hasRiskCount' | 'openRiskSum' | 'contractAmount'

@@ -51,6 +51,18 @@ describe('buildRiskRows', () => {
     expect(b).toMatchObject({ projectId: 'P2', orgL4: '未指定', projectLevel: '未指定',
       manager: '未指定', industry: '未指定', riskLevel: '无风险', openRisks: 0, contractAmount: 0 })
   })
+
+  it('映射 top1000/quadrant(缺省→否/未指定)', () => {
+    const ps = [
+      { projectId: 'T1', projectName: 't1', orgL4: '组', projectManager: '甲', top1000: '是', quadrant: 'M1 战略核心区' },
+      { projectId: 'T2', projectName: 't2', orgL4: '组', projectManager: '乙' },
+    ] as unknown as Project[]
+    const [a, b] = buildRiskRows(ps, {})
+    expect(a.top1000).toBe('是')
+    expect(a.quadrant).toBe('M1 战略核心区')
+    expect(b.top1000).toBe('否')
+    expect(b.quadrant).toBe('未指定')
+  })
 })
 
 describe('riskSummary', () => {
@@ -79,7 +91,7 @@ const RR = [
 
 describe('风险契约面/聚合', () => {
   it('维度与统计清单', () => {
-    expect(RISK_DIMENSIONS.map((d) => d.key)).toEqual(['riskLevel', 'orgL4', 'projectLevel', 'manager', 'industry'])
+    expect(RISK_DIMENSIONS.map((d) => d.key)).toEqual(['riskLevel', 'orgL4', 'projectLevel', 'manager', 'industry', 'top1000', 'quadrant'])
     expect(RISK_METRICS.map((m) => m.key)).toEqual(['projectCount', 'hasRiskCount', 'openRiskSum', 'contractAmount'])
   })
   it('groupRisk 按维分桶算统计,默认项目数降序', () => {
