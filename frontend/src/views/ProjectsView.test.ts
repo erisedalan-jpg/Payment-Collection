@@ -261,13 +261,23 @@ describe('ProjectsView', () => {
     expect(w.find('.pv-scroll').exists()).toBe(true)
   })
 
-  it('TOP1000/象限 列默认隐藏(不在默认表头)', async () => {
+  it('TOP1000/象限 列存在于 ALL_COLUMNS 但默认隐藏(不在 DEFAULT_VISIBLE)', async () => {
     seed()
-    const w = mountView()
+    // 默认挂载:两列不在表头(未进 DEFAULT_VISIBLE)
+    const w1 = mountView()
     await flushPromises()
-    const headers = w.findAll('th').map((n) => n.text().trim())
-    expect(headers.some((t) => t.includes('TOP1000'))).toBe(false)
-    expect(headers.some((t) => t === '象限')).toBe(false)
+    const def = w1.findAll('th').map((n) => n.text().trim())
+    expect(def.some((t) => t.includes('TOP1000'))).toBe(false)
+    expect(def.some((t) => t.includes('象限'))).toBe(false)
+    // 启用后两列出现 → 证明它们确实存在于 ALL_COLUMNS(否则永远无法渲染)
+    localStorage.setItem('colprefs:projects-active',
+      JSON.stringify(['projectName', 'top1000', 'quadrant', 'action']))
+    const w2 = mountView()
+    await flushPromises()
+    const on = w2.findAll('th').map((n) => n.text().trim())
+    expect(on.some((t) => t.includes('TOP1000'))).toBe(true)
+    expect(on.some((t) => t.includes('象限'))).toBe(true)
+    localStorage.clear()
   })
 
   it('启用后 TOP1000/象限 列渲染且带筛选器(可筛)', async () => {
