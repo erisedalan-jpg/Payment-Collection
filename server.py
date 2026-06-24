@@ -257,6 +257,47 @@ def _save_project_tags(store):
             json.dump(store, f, ensure_ascii=False, indent=2)
 
 
+# ── 重点项目进展(SP-2,本地 JSON store:current 可编 + archives 只读快照) ──
+PROGRESS_FILE = os.path.join(BASE_DIR, 'data', 'project_progress.json')
+PROGRESS_FIELDS = ('weekProgress', 'nextPlan')
+_progress_lock = threading.Lock()
+
+
+def _load_progress():
+    """加载重点项目进展 store;缺文件/损坏 → 默认空 store(不抛)。"""
+    if os.path.exists(PROGRESS_FILE):
+        try:
+            with open(PROGRESS_FILE, 'r', encoding='utf-8') as f:
+                store = json.load(f)
+            if isinstance(store, dict):
+                store.setdefault('version', 1)
+                store.setdefault('current', {})
+                store.setdefault('archives', [])
+                return store
+        except Exception:
+            pass
+    return {"version": 1, "current": {}, "archives": []}
+
+
+def _save_progress(store):
+    with _progress_lock:
+        os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
+        with open(PROGRESS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
+
+
+def _progress_apply_update(store, project_id, field, content, account, now):
+    """纯函数:把单字段编辑写入 store.current[project_id],盖章时间+账号。
+    field 须 ∈ PROGRESS_FIELDS,否则 ValueError。返回该项目记录。"""
+    if field not in PROGRESS_FIELDS:
+        raise ValueError("invalid field: %s" % field)
+    rec = store.setdefault('current', {}).setdefault(project_id, {})
+    rec[field] = content
+    rec[field + 'EditTime'] = now
+    rec[field + 'EditBy'] = account
+    return rec
+
+
 def _valid_project_ids():
     """从 analysis_data.json 读取有效项目编号集合（供人工导入校验）。"""
     try:
@@ -367,6 +408,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_manual_backups()
         elif parsed.path == '/api/tags':
             self.handle_tags_get()
+        elif parsed.path == '/api/progress':
+            self.handle_progress_get()
         elif parsed.path == '/api/files/status':
             self.handle_files_status()
         elif parsed.path == '/api/reprocess':
@@ -450,6 +493,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_followup_update()
         elif parsed.path == '/api/tags':
             self.handle_tags_save()
+        elif parsed.path == '/api/progress/update':
+            self.handle_progress_update()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -832,6 +877,39 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response({"success": True})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"保存标签失败: {e}"))
+
+    def handle_progress_get(self):
+        """GET /api/progress — 返回重点项目进展 {current, archives}。"""
+        try:
+            store = _load_progress()
+            self._json_response({"success": True, "current": store.get("current", {}),
+                                 "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取进展失败: {e}"))
+
+    def handle_progress_update(self):
+        """POST /api/progress/update {projectId, field, content} — 编辑单格,盖章时间+当前账号。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        pid = str(data.get('projectId') or '').strip()
+        field = data.get('field')
+        if not pid or field not in PROGRESS_FIELDS:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 weekProgress/nextPlan"))
+            return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_progress()
+            rec = _progress_apply_update(store, pid, field, str(data.get('content') or ''),
+                                         account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_progress(store)
+            self._json_response({"success": True, "record": rec})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
 
     def handle_files_status(self):
         """GET /api/files/status - 已知数据文件的最近修改时间(数据管理页行内展示)"""
