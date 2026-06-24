@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import RiskBoardView from './RiskBoardView.vue'
@@ -61,5 +62,23 @@ describe('RiskBoardView', () => {
     ds.data = { meta: {}, projects: [], projectPmis: {}, displayColumns: {}, followupRecords: {} } as any
     const w = mount(RiskBoardView, opts)
     expect(w.text()).toContain('暂无项目主域数据')
+  })
+  it('风险等级筛选去勾"无风险"只影响风险统计分析,不影响卡片', async () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    const before = w.find('.rv-card-main').text()
+    // 去勾无风险(data-test=lvl-无风险 的 chip)
+    const chip = w.find('[data-test="lvl-无风险"]')
+    expect(chip.exists()).toBe(true)
+    await chip.trigger('click')
+    // 卡片(顶部第一个 .rv-card-main)不变
+    expect(w.find('.rv-card-main').text()).toBe(before)
+  })
+  it('点风险统计分析表行打开下钻弹窗', async () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    await w.find('.rv-rank-table .el-table__row').trigger('click')
+    await flushPromises()
+    expect((w.vm as any).drillOpen).toBe(true)
   })
 })
