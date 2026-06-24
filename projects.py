@@ -98,6 +98,23 @@ def read_delivery(path: str) -> List[Dict[str, Any]]:
     return _read_header_sheet(path, "项目编号")
 
 
+def read_top1000(path: str) -> Dict[str, Dict[str, str]]:
+    """TOP1000.xlsx → {客户名称: {"level": 客户级别, "quad": 象限}}。
+    复用 _read_header_sheet(找含"客户名称"表头的 sheet);缺文件/无表头 → {}(降级)。
+    客户名称为空的行跳过;级别/象限 strip。"""
+    rows = _read_header_sheet(path, "客户名称")
+    out: Dict[str, Dict[str, str]] = {}
+    for r in rows:
+        name = str(r.get("客户名称") or "").strip()
+        if not name:
+            continue
+        out[name] = {
+            "level": str(r.get("客户级别") or "").strip(),
+            "quad": str(r.get("象限") or "").strip(),
+        }
+    return out
+
+
 def delivery_costs_for(row: Dict[str, Any]) -> List[Dict[str, Any]]:
     """delivery_analysis 一行 → 7 类目成本四元组(缺列降 None)。"""
     out = []
