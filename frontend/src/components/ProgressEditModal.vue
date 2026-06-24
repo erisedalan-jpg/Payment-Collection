@@ -30,7 +30,6 @@ async function save() {
 <template>
   <Modal :model-value="modelValue" :title="'编辑 ' + FIELD_LABEL[field]" width="480px"
     @update:model-value="emit('update:modelValue', $event)">
-    <div class="pem-title">编辑 {{ FIELD_LABEL[field] }}</div>
     <div class="pem-head">{{ projectName }} / 编号 {{ projectId }}</div>
     <el-input v-model="text" type="textarea" :rows="6" placeholder="输入内容..." />
     <div class="pem-actions">
@@ -47,5 +46,4 @@ async function save() {
   padding: 4px 14px; cursor: pointer; background: var(--card2); color: var(--txt); }
 .pem-save { background: var(--accent); color: #fff; border-color: var(--accent); }
 .pem-save:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
-.pem-title { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
 </style>
