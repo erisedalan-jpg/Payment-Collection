@@ -106,7 +106,7 @@ function openEdit(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan') {
   editCtx.projectId = row.projectId
   editCtx.projectName = row.projectName
   editCtx.field = field
-  editCtx.initial = row[field]
+  editCtx.initial = row[field] ?? ''
   editOpen.value = true
 }
 
