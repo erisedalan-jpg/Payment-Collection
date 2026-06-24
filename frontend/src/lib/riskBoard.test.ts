@@ -114,7 +114,7 @@ describe('riskSummary', () => {
   })
 })
 
-import { RISK_DIMENSIONS, RISK_METRICS, groupRisk, riskOverview } from './riskBoard'
+import { RISK_DIMENSIONS, RISK_METRICS, groupRisk, riskOverview, groupRiskDims, riskPivot } from './riskBoard'
 
 const RR = [
   { orgL4: '一组', riskLevel: '高', openRisks: 2, contractAmount: 100 },
@@ -124,7 +124,10 @@ const RR = [
 
 describe('风险契约面/聚合', () => {
   it('维度与统计清单', () => {
-    expect(RISK_DIMENSIONS.map((d) => d.key)).toEqual(['riskLevel', 'orgL4', 'projectLevel', 'manager', 'industry', 'top1000', 'quadrant'])
+    expect(RISK_DIMENSIONS.map((d) => d.key)).toEqual([
+      'riskLevel', 'riskMajorCats', 'riskMinorCats',
+      'orgL4', 'projectLevel', 'manager', 'industry', 'top1000', 'quadrant', 'projectStatus', 'stage', 'health',
+    ])
     expect(RISK_METRICS.map((m) => m.key)).toEqual(['projectCount', 'hasRiskCount', 'openRiskSum', 'contractAmount'])
   })
   it('groupRisk 按维分桶算统计,默认项目数降序', () => {
@@ -141,5 +144,31 @@ describe('风险契约面/聚合', () => {
     expect(o1.healthPct).toBeCloseTo(0.5)
     const o2 = ov.find((r) => r.key === '二组')!
     expect(o2.healthPct).toBeCloseTo(0)   // 无 无风险
+  })
+})
+
+const MR = [
+  { projectId: 'A', riskLevel: '高', openRisks: 2, contractAmount: 100, orgL4: '一组', riskMajorCats: ['客户侧风险', '成本超支风险'] },
+  { projectId: 'B', riskLevel: '中', openRisks: 1, contractAmount: 200, orgL4: '一组', riskMajorCats: ['客户侧风险'] },
+  { projectId: 'C', riskLevel: '无风险', openRisks: 0, contractAmount: 300, orgL4: '二组', riskMajorCats: ['无风险'] },
+] as any
+
+describe('多值炸开 groupRiskDims / riskPivot', () => {
+  it('多值维 riskMajorCats 炸开:项目跨桶重复,∑>总数', () => {
+    const gs = groupRiskDims(MR, ['riskMajorCats'])
+    const m = Object.fromEntries(gs.map((g) => [g.key, g.projectCount]))
+    expect(m['客户侧风险']).toBe(2)   // A,B
+    expect(m['成本超支风险']).toBe(1) // A
+    expect(m['无风险']).toBe(1)       // C
+    expect(gs.reduce((s, g) => s + g.projectCount, 0)).toBe(4)  // >3 总数
+  })
+  it('单值维 orgL4 零回归:∑=总数', () => {
+    const gs = groupRiskDims(MR, ['orgL4'])
+    expect(gs.reduce((s, g) => s + g.projectCount, 0)).toBe(3)
+  })
+  it('riskPivot 行 orgL4 × 列 riskLevel,index 留桶供下钻', () => {
+    const p = riskPivot(MR, ['orgL4'], ['riskLevel'], 'projectCount')
+    expect(p.rows.map((r) => r.key)).toContain('一组')
+    expect(p.index['一组']?.['高']?.rows.map((r: any) => r.projectId)).toEqual(['A'])
   })
 })
