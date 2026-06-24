@@ -126,9 +126,9 @@
 
 html.dark {
   /* 结构色（深色） */
-  --bg: #0d1117;
-  --card: #121212;
-  --card2: #1b1b20;
+  --bg: #1c1a18;
+  --card: #1a1d24;
+  --card2: #232730;
   --line: #272b31;
   --line2: #343a44;
   --txt: #fbfbfd;
