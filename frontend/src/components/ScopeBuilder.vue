@@ -49,14 +49,16 @@ const OPS_BY_KIND: Record<string, ScopeOp[]> = {
   enum: ['in', 'notIn'], text: ['contains', 'notContains'],
   number: ['between', 'notBetween'], date: ['between', 'notBetween'],
 }
-function stableFieldsOf(group: string): FieldLike[] {
+// 用 computed 缓存而非每次 filter——防止 el-select 选项数组每次渲染换引用导致递归更新
+function stableFieldsOf(group: string | undefined): FieldLike[] {
   if (SINGLE.value) return CATALOG.value
-  return fieldsByGroup.value[group] ?? []
+  return fieldsByGroup.value[group ?? ''] ?? []
 }
 function stableOpsForKind(kind: string): ScopeOp[] {
   return OPS_BY_KIND[kind] ?? OPS_BY_KIND['number']
 }
 
+// candidatesMap 同理：computed 稳定引用，避免枚举选项每轮重建触发 el-select 递归
 const candidatesMap = computed(() => {
   const map: Record<string, string[]> = {}
   for (const f of CATALOG.value) {

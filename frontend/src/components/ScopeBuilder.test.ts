@@ -51,4 +51,18 @@ describe('ScopeBuilder 默认(temp 三子表)行为不回归', () => {
     expect(c.group).toBe('project')
     expect(c.field).toBe('orgL4')
   })
+  it('onSave 触发后 emit save 事件且携带当前 draft', () => {
+    const initial = { combinator: 'AND' as const, groups: [{ combinator: 'AND' as const, conditions: [] }] }
+    const w = mountSB({
+      inputs: [inp({ proj: { orgL4: '银行服务组' } })],
+      initial,
+    })
+    ;(w.vm as any).onSave()
+    const emitted = w.emitted('save')
+    expect(emitted).toBeTruthy()
+    expect(emitted!.length).toBe(1)
+    const payload = emitted![0][0] as any
+    expect(payload.combinator).toBe('AND')
+    expect(Array.isArray(payload.groups)).toBe(true)
+  })
 })
