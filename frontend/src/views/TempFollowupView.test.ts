@@ -1,0 +1,78 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import { createRouter, createMemoryHistory } from 'vue-router'
+import TempFollowupView from './TempFollowupView.vue'
+import { useDataStore } from '@/stores/data'
+import { useAuthStore } from '@/stores/auth'
+import { useTempFollowupStore } from '@/stores/tempFollowup'
+
+vi.mock('@/lib/tempFollowupApi', () => ({
+  tempFollowupApi: {
+    get: vi.fn().mockResolvedValue({ scope: { combinator: 'AND', groups: [
+      { combinator: 'AND', conditions: [{ group: 'project', field: 'orgL4', op: 'in', values: ['银行服务组'] }] },
+    ] }, current: {}, archives: [] }),
+    saveScope: vi.fn(), update: vi.fn(), archive: vi.fn(),
+  },
+}))
+
+const projects = [
+  { projectId: 'P1', projectName: '项目甲', projectManager: '张三', orgL4: '银行服务组', top1000: '是',
+    paymentPmis: { contract: 2_000_000 }, payment: { paymentRatio: 0.4 }, quadrant: 'A' },
+  { projectId: 'P2', projectName: '项目乙', projectManager: '李四', orgL4: '小金融服务组', top1000: '否',
+    paymentPmis: { contract: 500_000 }, payment: { paymentRatio: 0.1 }, quadrant: 'B' },
+]
+const projectPmis = {
+  P1: { status: { 项目级别: 'P1' }, progress: { 里程碑进度状态: '正常' }, risk: {}, cost: {}, customer: { 最终客户: '客甲' }, team: { AR: 'a', SR: 's' } },
+  P2: { status: {}, progress: {}, risk: {}, cost: {}, customer: { 最终客户: '客乙' }, team: {} },
+}
+
+function makeRouter() {
+  return createRouter({ history: createMemoryHistory(), routes: [
+    { path: '/projects/temp', component: TempFollowupView },
+    { path: '/project/:id', component: { template: '<div/>' } },
+  ] })
+}
+
+async function mountAs(isSuper: boolean) {
+  const data = useDataStore()
+  data.data = { projects, projectPmis, paymentNodes: {}, projectMilestones: {} } as any
+  const auth = useAuthStore()
+  auth.user = { account: isSuper ? 'admin' : 'u1', isSuper, allowedPages: ['*'], allowedL4: ['*'] } as any
+  await useTempFollowupStore().load()
+  const router = makeRouter(); router.push('/projects/temp'); await router.isReady()
+  const w = mount(TempFollowupView, { global: { plugins: [ElementPlus, router] } })
+  await flushPromises()
+  return w
+}
+
+describe('TempFollowupView', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('按范围命中只显示符合项目(P1 银行服务组),P2 不在范围', async () => {
+    const w = await mountAs(true)
+    expect(w.text()).toContain('项目甲')
+    expect(w.text()).not.toContain('项目乙')
+  })
+
+  it('超管见 范围设置/更新/导出 入口', async () => {
+    const w = await mountAs(true)
+    expect(w.text()).toContain('范围设置')
+    expect(w.text()).toContain('更新（归档+清空）')
+    expect(w.text()).toContain('导出')
+  })
+
+  it('普通管理员无 范围设置/更新/导出 入口', async () => {
+    const w = await mountAs(false)
+    expect(w.text()).not.toContain('范围设置')
+    expect(w.text()).not.toContain('更新（归档+清空）')
+    expect(w.text()).not.toContain('导出')
+  })
+
+  it('默认列含项目编号,默认隐藏 健康度(额外列)', async () => {
+    const w = await mountAs(true)
+    expect(w.text()).toContain('项目编号')
+    expect(w.text()).not.toContain('健康度')
+  })
+})
