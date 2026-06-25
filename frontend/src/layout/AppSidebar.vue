@@ -17,6 +17,7 @@ const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key))
 const activeSectionKey = computed(() => {
   const p = route.path
   if (p.startsWith('/projects/key')) return 'keyfollowup'
+  if (p.startsWith('/opportunities/key')) return 'keyfollowup'
   if (p.startsWith('/insight')) return 'analysis'
   if (p.startsWith('/payment') || p.startsWith('/ledger')) return 'payment'
   if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
