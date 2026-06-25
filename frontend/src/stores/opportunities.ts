@@ -11,8 +11,8 @@ export const useOpportunitiesStore = defineStore('opportunities', () => {
     rows.value = r.rows ?? []
     loaded.value = true
   }
-  async function create(): Promise<OppRow> {
-    const r = await opportunitiesApi.create()
+  async function create(fields?: Record<string, any>): Promise<OppRow> {
+    const r = await opportunitiesApi.create(fields)
     rows.value = [...rows.value, r.row]
     return r.row
   }

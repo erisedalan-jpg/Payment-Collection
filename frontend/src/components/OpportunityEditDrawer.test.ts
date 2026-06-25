@@ -24,9 +24,9 @@ const STUBS = {
   },
 }
 
-function mountD() {
+function mountD(extra?: Record<string, any>) {
   return mount(OpportunityEditDrawer, {
-    props: { modelValue: true, row },
+    props: { modelValue: true, row, ...extra },
     global: {
       plugins: [ElementPlus],
       stubs: STUBS,
@@ -48,5 +48,36 @@ describe('OpportunityEditDrawer', () => {
     ;(w.vm as any).form.customer = '乙'
     await (w.vm as any).onSave(); await flushPromises()
     expect(spy).toHaveBeenCalledWith('opp-1', expect.objectContaining({ customer: '乙', l4: '小金融服务组' }))
+  })
+})
+
+describe('OpportunityEditDrawer create 模式', () => {
+  it('create 模式保存调 store.create(fields) 而非 update', async () => {
+    const store = useOpportunitiesStore()
+    const createSpy = vi.spyOn(store, 'create').mockResolvedValue({ id: 'opp-9' } as any)
+    const updateSpy = vi.spyOn(store, 'update').mockResolvedValue(undefined as any)
+    const w = mount(OpportunityEditDrawer, {
+      props: { modelValue: true, row: null, mode: 'create' },
+      global: { plugins: [ElementPlus], stubs: STUBS },
+    })
+    ;(w.vm as any).form.customer = '甲'
+    await (w.vm as any).onSave()
+    await flushPromises()
+    expect(createSpy).toHaveBeenCalledOnce()
+    expect(updateSpy).not.toHaveBeenCalled()
+  })
+
+  it('edit 模式保存调 store.update 而非 create', async () => {
+    const store = useOpportunitiesStore()
+    const createSpy = vi.spyOn(store, 'create').mockResolvedValue({ id: 'opp-9' } as any)
+    const updateSpy = vi.spyOn(store, 'update').mockResolvedValue(undefined as any)
+    const w = mount(OpportunityEditDrawer, {
+      props: { modelValue: true, row, mode: 'edit' },
+      global: { plugins: [ElementPlus], stubs: STUBS },
+    })
+    await (w.vm as any).onSave()
+    await flushPromises()
+    expect(updateSpy).toHaveBeenCalledOnce()
+    expect(createSpy).not.toHaveBeenCalled()
   })
 })

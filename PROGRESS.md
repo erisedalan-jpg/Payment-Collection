@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.0.0**（大版本，用户钦定，预计生产交付）
-- 最近更新：2026-06-24（V2.0.0：新增 /opportunities 重点商机进展线上可编辑表格（后端持久化 + 超管专属写 + 普通管理员 L4 只读隔离 + input xlsx 初始数据）；深色底色调亮；/projects/key 历史快照改下拉 + 导出一键全选）
+- 当前版本：**V2.1.0**（整页级调整，新增 /projects/temp 临时重点跟进 + 商机新增改先弹抽屉）
+- 最近更新：2026-06-25（V2.1.0：新增 /projects/temp 临时重点跟进（超管定义可保存动态范围，两级 AND/OR + 子表存在性；普通管理员只编辑进展列）；商机新增改为先弹编辑抽屉保存才加行）
 - 上一版本：V1.20.2（2026-06-24，/insight/milestone 到期提醒表改造：时间段选择 + 含已完成的到期清单 + 照搬 /projects 表格栈）
 - 更上版本：V1.20.1（2026-06-24，/insight/risk 风险看板：风险统计分析加风险等级筛选 + 风险概览升级行列自选透视 + 全页下钻）
 - 上上版本：V1.20.0（2026-06-24，新增「重点跟进」导航分区 + /projects/key 重点项目进展页；进展持久化/编辑/归档/导出）
@@ -17,6 +17,7 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.1.0**（2026-06-25）整页级调整（新增 /projects/temp 临时重点跟进，超管定义可保存动态范围；商机新增改为先弹编辑抽屉保存才加行）
 - **V2.0.0（2026-06-24）大版本（用户钦定，预计生产交付）= 三块需求合一**（两分支 SDD + 终审 opus Ready + verify 全绿 + 真实数据 live 冒烟）
   - **新增 /opportunities 重点商机进展（线上可编辑表格，主体）**：「重点跟进」分区下新页。后端新建领域模块 `opportunities.py`（解析 xlsx/建/改/删/L4 过滤纯函数，pytest）+ server.py 5 端点：`GET /api/opportunities`（任意登录，按账号 `allowedL4` 只读裁剪，super/`*`→全量）、`POST /create /update /delete /import`（均超管专属，入 `_SUPER_ONLY_PATHS`）。本地持久化 `data/opportunities.json`（gitignore），首次无 json 时从 `input/opportunities.xlsx`（兼容笔误名 `opportunitites.xlsx`）seed。25 列（22 可编辑 + firstReg/lastUpdate 后端盖 + recentUpdate 前端派生≤7天）；firstReg 仅首次有内容盖、lastUpdate 每次盖。前端 store/api/列定义单一来源 + `OpportunityEditDrawer`（el-drawer 行编辑）+ `OpportunitiesView`（el-table 选列/逐列筛选/全局排序/关键词/分页/行复选全选[超管]）。超管见新增/删除/导入/导出/编辑；普通管理员只读且仅见本 L4 行（后端裁）。登入/登出 reset 防跨账号残留（沿用 V1.17.1 教训）。导入=整表替换（替换前备份）。真实 input 冒烟：seed 488 行字段映射正确，CRUD + 盖章 + 401 鉴权全通。
   - **深色底色调亮**：`html.dark` 两近黑底色由 #0d1117/#121212 调亮为 柔和黑 #1c1a18（页面底）/ 深灰 #1a1d24（卡片面），派生抬升面 --card2 上调 #232730 保层级；echartsTheme STRUCT_DARK.card 同步（契约测试守）。
