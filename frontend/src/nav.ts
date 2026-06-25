@@ -39,6 +39,7 @@ export const ANALYSIS_LINKS: NavLink[] = [
 // 重点跟进(SP-2):重点项目进展页
 export const KEY_FOLLOWUP_LINKS: NavLink[] = [
   { label: '重点项目进展', to: '/projects/key', key: 'projects-key' },
+  { label: '重点商机跟进', to: '/opportunities/key', key: 'opportunity-followup' },
   { label: '临时重点跟进', to: '/projects/temp', key: 'temp-followup' },
 ]
 
