@@ -85,16 +85,21 @@ INPUT_TARGET="$PMPLATFORM_DIR/input"
 
 替换原硬编码的 `PMIS_TARGET="/opt/pmplatform/input/pmis"`、`INPUT_TARGET="/opt/pmplatform/input"` 两行。其余逻辑（备份、清理、3 步下载、校验、拷贝）不动。
 
-### 4.4 `pmisdata/update_cookie.py`
+### 4.4 Cookie 送达：三条路径（按身份证明方式区分）
 
-新增参数：`--server <url>`、`--account <账号>`、`--password <pw>`（password 缺省则 `getpass` 交互输入）。
+**关键前提**：服务器在 HTTP 层无法判断请求"是否来自可信环境"，只能看请求**是否携带身份凭证**。浏览器自动带会话 cookie，裸脚本默认不带。据此分三路：
 
-- 现有 Playwright 抓 cookie 流程不变，得到 `cookie_string`。
-- 若给了 `--server`：用 stdlib `urllib.request`（不引入新依赖）：
-  1. `POST <url>/api/login` `{account, password}`（字段名以 `server.py handle_login` 为准：`account`/`password`），从响应 `Set-Cookie` 取 pmplatform 会话 token。
-  2. 带该会话 Cookie 头 `POST <url>/api/pmis/cookie` `{cookie: cookie_string}`。
-  3. 打印服务器返回（`[OK] Cookie 已推送到服务器 (SESSION xxxxxxxx)` 或 `[ERROR] ...`）。
-- `--txt`/默认本地写 `config.json` 行为保留；`--server` 与本地写互不排斥（可同时本地存一份）。
+1. **网页粘贴框（主路径、通用、免鉴权）**——见 §5.1。超管在任意能访问 PMIS 的（有界面的）机器抓到 cookie 串（`update_cookie.py --txt` 或浏览器 DevTools→Application→Cookies 复制含 SESSION 的串），粘进 `/data`，靠**超管浏览器会话**授权 `POST /api/pmis/cookie`。无需脚本鉴权，覆盖所有拓扑。
+
+2. **`update_cookie.py` 在服务器本机直跑 → 直写 config.json（免 HTTP/免鉴权）**：保留现有本地写行为，写的就是服务器磁盘上的 `pmisdata/config.json`，服务器从同一文件读取。仅当抓 cookie 与服务器**同机**且服务器有图形界面可完成 Playwright 交互登录时适用。此路径**无需 `--server`**。
+
+3. **`update_cookie.py --server <url>`（可选便捷路径，跨机器用）**：新增参数 `--server <url>`、`--account <超管账号>`、`--password <pw>`（password 缺省 `getpass` 交互输入）。
+   - 现有 Playwright 抓 cookie 流程不变，得到 `cookie_string`。
+   - 用 stdlib `urllib.request`（不引入新依赖）：
+     1. `POST <url>/api/login` `{account, password}`（字段名以 `server.py handle_login` 为准：`account`/`password`），从响应 `Set-Cookie` 取 pmplatform 会话 token。
+     2. 带该会话 Cookie 头 `POST <url>/api/pmis/cookie` `{cookie: cookie_string}`。
+     3. 打印服务器返回（`[OK] Cookie 已推送到服务器 (SESSION xxxxxxxx)` 或 `[ERROR] ...`）。
+   - `--txt`/默认本地写 `config.json` 行为保留；`--server` 与本地写互不排斥。
 
 ### 4.5 互斥与安全
 
@@ -104,8 +109,7 @@ INPUT_TARGET="$PMPLATFORM_DIR/input"
 
 ### 4.6 打包/部署清单（spec 记录，落实施时核对，不在本次扩大代码改动面）
 
-- `make_deploy_zip.py` 需纳入 `pmisdata/`：`run_pmis_pipeline.sh`、`fetch_pmis_tables.py`、`fetch_all_projects.py`、`delivery_analysis.py`、`update_cookie.py`、`config.json`（**cookie 置空**）、桥接 `A.xlsx`、`项目基础信息数据*.xlsx`（脚本依赖）。
-- 仓库内 `pmisdata/config.json` 当前含真实 `SESSION`，建议 gitignore 或置空模板（既有安全隐患，单独处理）。
+- `make_deploy_zip.py` 需纳入 `pmisdata/`：`run_pmis_pipeline.sh`、`fetch_pmis_tables.py`、`fetch_all_projects.py`、`delivery_analysis.py`、`update_cookie.py`、`config.json`（**原样进包，含当前 cookie**——SESSION 定期过期、无安全隐患，无需置空/ignore；首次部署后由「下载数据」或 `--server` 刷新即可）、桥接 `A.xlsx`、`项目基础信息数据*.xlsx`（脚本依赖）。
 - 服务器需有 `bash`、`python3`（含 `requests`、`openpyxl`）；抓 cookie 的机器另需 `playwright` + chromium。
 
 ## 5. 任务1 — 前端：/data 展示压缩 + 下载区
