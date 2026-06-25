@@ -1,17 +1,28 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import {
-  FIELD_CATALOG, projectMatches,
-  type ScopeFilter, type ScopeProjectInput, type ScopeCondition, type FieldDef, type ScopeOp,
-} from '@/lib/tempScope'
+import { FIELD_CATALOG, projectMatches,
+  type ScopeFilter, type ScopeCondition, type FieldDef, type FieldLike } from '@/lib/tempScope'
+import { OP_LABEL, type ScopeOp } from '@/lib/scopeOps'
 
-const props = defineProps<{ modelValue: boolean; inputs: ScopeProjectInput[]; initial: ScopeFilter }>()
+const props = defineProps<{
+  modelValue: boolean
+  inputs: any[]
+  initial: ScopeFilter
+  catalog?: FieldLike[]
+  singleTable?: boolean
+  title?: string
+  matchFn?: (input: any, draft: ScopeFilter) => boolean
+  countUnit?: string
+}>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ScopeFilter] }>()
 
-const GROUP_LABEL: Record<FieldDef['group'], string> = { project: '项目级', paymentNode: '回款节点', milestone: '里程碑明细' }
-const OP_LABEL: Record<string, string> = {
-  in: '属于', notIn: '不属于', between: '区间内', notBetween: '区间外', contains: '包含', notContains: '不包含',
-}
+const CATALOG = computed<FieldLike[]>(() => props.catalog ?? FIELD_CATALOG)
+const SINGLE = computed(() => props.singleTable === true)
+const TITLE = computed(() => props.title ?? '范围设置（临时重点跟进）')
+const UNIT = computed(() => props.countUnit ?? '项目')
+const matchOf = (i: any, d: ScopeFilter) => (props.matchFn ?? projectMatches)(i, d)
+
+const GROUP_LABEL: Record<string, string> = { project: '项目级', paymentNode: '回款节点', milestone: '里程碑明细' }
 
 function clone(s: ScopeFilter): ScopeFilter {
   return JSON.parse(JSON.stringify(s ?? { combinator: 'AND', groups: [] }))
@@ -19,67 +30,72 @@ function clone(s: ScopeFilter): ScopeFilter {
 const draft = ref<ScopeFilter>(clone(props.initial))
 watch(() => props.modelValue, (v) => { if (v) draft.value = clone(props.initial) })
 
-function defFor(c: ScopeCondition): FieldDef | undefined {
-  return FIELD_CATALOG.find((f) => f.group === c.group && f.key === c.field)
+function defFor(c: ScopeCondition): FieldLike | undefined {
+  if (SINGLE.value) return CATALOG.value.find((f) => f.key === c.field)
+  return CATALOG.value.find((f) => f.group === c.group && f.key === c.field)
 }
 function kindOf(c: ScopeCondition): FieldDef['kind'] { return defFor(c)?.kind ?? 'enum' }
 
-// fieldsOf / opsForKind 稳定引用:避免单选 el-select 选项数组每次渲染换引用→递归更新
-const fieldsByGroup = computed<Record<string, FieldDef[]>>(() => {
-  const map: Record<string, FieldDef[]> = {}
-  for (const f of FIELD_CATALOG) {
-    if (!map[f.group]) map[f.group] = []
-    map[f.group].push(f)
+const fieldsByGroup = computed<Record<string, FieldLike[]>>(() => {
+  const map: Record<string, FieldLike[]> = {}
+  for (const f of CATALOG.value) {
+    const g = f.group ?? ''
+    if (!map[g]) map[g] = []
+    map[g].push(f)
   }
   return map
 })
 const OPS_BY_KIND: Record<string, ScopeOp[]> = {
-  enum: ['in', 'notIn'],
-  text: ['contains', 'notContains'],
-  number: ['between', 'notBetween'],
-  date: ['between', 'notBetween'],
+  enum: ['in', 'notIn'], text: ['contains', 'notContains'],
+  number: ['between', 'notBetween'], date: ['between', 'notBetween'],
 }
-function stableFieldsOf(group: string | undefined): FieldDef[] {
-  return fieldsByGroup.value[group ?? ''] ?? []
+function stableFieldsOf(group: string): FieldLike[] {
+  if (SINGLE.value) return CATALOG.value
+  return fieldsByGroup.value[group] ?? []
 }
 function stableOpsForKind(kind: string): ScopeOp[] {
   return OPS_BY_KIND[kind] ?? OPS_BY_KIND['number']
 }
 
-// 枚举候选值:按 (group, field) 预聚合为稳定引用,避免 el-select multiple 选项数组每次渲染换引用→递归更新
 const candidatesMap = computed(() => {
   const map: Record<string, string[]> = {}
-  for (const f of FIELD_CATALOG) {
+  for (const f of CATALOG.value) {
     const set = new Set<string>()
     for (const it of props.inputs) {
-      if (f.group === 'project') {
-        const v = it.proj[f.key]
+      if (SINGLE.value) {
+        const v = (it as any)[f.key]
         if (Array.isArray(v)) v.forEach((x) => x != null && x !== '' && set.add(String(x)))
+        else if (v != null && v !== '') set.add(String(v))
+      } else if (f.group === 'project') {
+        const v = it.proj[f.key]
+        if (Array.isArray(v)) v.forEach((x: any) => x != null && x !== '' && set.add(String(x)))
         else if (v != null && v !== '') set.add(String(v))
       } else {
         const rows = f.group === 'paymentNode' ? it.nodes : it.milestones
-        for (const r of rows ?? []) {
-          const val = r[f.key]
-          if (val != null && val !== '') set.add(String(val))
-        }
+        for (const r of rows ?? []) { const val = r[f.key]; if (val != null && val !== '') set.add(String(val)) }
       }
     }
-    map[f.group + '::' + f.key] = [...set].sort((a, b) => a.localeCompare(b, 'zh'))
+    map[(SINGLE.value ? '' : (f.group ?? '') + '::') + f.key] = [...set].sort((a, b) => a.localeCompare(b, 'zh'))
   }
   return map
 })
 function candidates(c: ScopeCondition): string[] {
-  return candidatesMap.value[c.group + '::' + c.field] ?? []
+  return candidatesMap.value[(SINGLE.value ? '' : (c.group ?? '') + '::') + c.field] ?? []
 }
 
 function addGroup() { draft.value.groups.push({ combinator: 'AND', conditions: [] }) }
 function removeGroup(gi: number) { draft.value.groups.splice(gi, 1) }
 function addCondition(gi: number) {
-  draft.value.groups[gi].conditions.push({ group: 'project', field: 'orgL4', op: 'in', values: [] })
+  if (SINGLE.value) {
+    const first = CATALOG.value[0]
+    draft.value.groups[gi].conditions.push({ field: first?.key ?? '', op: stableOpsForKind(first?.kind ?? 'enum')[0], values: [] })
+  } else {
+    draft.value.groups[gi].conditions.push({ group: 'project', field: 'orgL4', op: 'in', values: [] })
+  }
 }
 function removeCondition(gi: number, ci: number) { draft.value.groups[gi].conditions.splice(ci, 1) }
 function onGroupChange(c: ScopeCondition) {
-  const first = stableFieldsOf(c.group)[0]
+  const first = stableFieldsOf(c.group ?? '')[0]
   c.field = first?.key ?? ''
   c.op = stableOpsForKind(first?.kind ?? 'enum')[0]
   c.values = []; c.min = null; c.max = null
@@ -89,16 +105,16 @@ function onFieldChange(c: ScopeCondition) {
   c.values = []; c.min = null; c.max = null
 }
 
-const matchCount = computed(() => props.inputs.filter((i) => projectMatches(i, draft.value)).length)
+const matchCount = computed(() => props.inputs.filter((i) => matchOf(i, draft.value)).length)
 
 function onSave() { emit('save', clone(draft.value)); emit('update:modelValue', false) }
 function onCancel() { emit('update:modelValue', false) }
 
-defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCondition, onSave, candidates, kindOf })
+defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCondition, onSave, candidates, kindOf, SINGLE })
 </script>
 
 <template>
-  <el-drawer :model-value="modelValue" title="范围设置（临时重点跟进）" direction="rtl" size="640px"
+  <el-drawer :model-value="modelValue" :title="TITLE" direction="rtl" size="640px"
     @update:model-value="emit('update:modelValue', $event)">
     <div class="sb-top">
       <span class="sb-label">组之间</span>
@@ -121,11 +137,11 @@ defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCon
       </div>
 
       <div v-for="(c, ci) in g.conditions" :key="ci" class="sb-cond">
-        <el-select v-model="c.group" size="small" style="width: 110px" @change="onGroupChange(c)">
+        <el-select v-if="!SINGLE" v-model="c.group" size="small" style="width: 110px" @change="onGroupChange(c)">
           <el-option v-for="(lbl, gk) in GROUP_LABEL" :key="gk" :label="lbl" :value="gk" />
         </el-select>
         <el-select v-model="c.field" size="small" style="width: 140px" @change="onFieldChange(c)">
-          <el-option v-for="f in stableFieldsOf(c.group)" :key="f.key" :label="f.label" :value="f.key" />
+          <el-option v-for="f in stableFieldsOf(c.group ?? '')" :key="f.key" :label="f.label" :value="f.key" />
         </el-select>
         <el-select v-model="c.op" size="small" style="width: 100px">
           <el-option v-for="op in stableOpsForKind(kindOf(c))" :key="op" :label="OP_LABEL[op]" :value="op" />
@@ -156,7 +172,7 @@ defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCon
     <div v-if="!draft.groups.length" class="sb-empty">暂无范围条件——「添加组」开始定义；保存空范围则页面无项目。</div>
 
     <template #footer>
-      <span class="sb-count u-num">命中 {{ matchCount }} 个项目</span>
+      <span class="sb-count u-num">命中 {{ matchCount }} 个{{ UNIT }}</span>
       <el-button @click="onCancel">取消</el-button>
       <el-button type="primary" data-test="sb-save" @click="onSave">保存</el-button>
     </template>
