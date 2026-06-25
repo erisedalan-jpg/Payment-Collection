@@ -170,9 +170,11 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
     <div class="dv-card" data-test="files-card">
       <div class="dv-card-head">数据文件清单与状态</div>
       <div class="dv-sub-head">PMIS 九表（input/pmis/）</div>
-      <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-frow" data-test="pmis-row">
-        <span class="dv-fname">{{ name }}</span>
-        <span class="dv-ftime u-num">{{ ftime(name) }}</span>
+      <div class="dv-fgrid">
+        <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-fcell" data-test="pmis-row" :title="name">
+          <span class="dv-fname2">{{ name }}</span>
+          <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+        </div>
       </div>
       <div class="dv-row dv-actions">
         <input ref="pmisInput" type="file" accept=".xlsx" multiple class="dv-file" />
@@ -181,9 +183,11 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
       </div>
 
       <div class="dv-sub-head">项目域文件（input/ 根）</div>
-      <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-frow">
-        <span class="dv-fname">{{ name }}</span>
-        <span class="dv-ftime u-num">{{ ftime(name) }}</span>
+      <div class="dv-fgrid">
+        <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-fcell" :title="name">
+          <span class="dv-fname2">{{ name }}</span>
+          <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+        </div>
       </div>
       <div class="dv-row dv-actions">
         <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
@@ -321,4 +325,9 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
 .dv-cookie-box { flex: 1 1 320px; min-width: 220px; font-size: var(--fs-1); font-family: var(--font-sans);
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--txt);
   padding: var(--sp-2); resize: vertical; }
+.dv-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px var(--sp-4); padding: var(--sp-2) var(--sp-4); }
+.dv-fcell { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); padding: 3px 0; border-bottom: 1px dashed var(--line); min-width: 0; }
+.dv-fname2 { color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-ftime2 { color: var(--mut); font-size: var(--fs-1); flex-shrink: 0; }
+@media (max-width: 768px) { .dv-fgrid { grid-template-columns: 1fr; } }
 </style>
