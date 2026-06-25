@@ -7,6 +7,7 @@ import { useDataStore } from './data'
 import { useProjectProgressStore } from './projectProgress'
 import { useOpportunitiesStore } from './opportunities'
 import { useTempFollowupStore } from './tempFollowup'
+import { useOpportunityFollowupStore } from './opportunityFollowup'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -22,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
       useProjectProgressStore().reset()
       useOpportunitiesStore().reset()
       useTempFollowupStore().reset()
+      useOpportunityFollowupStore().reset()
     }
     return res
   }
@@ -35,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
     useProjectProgressStore().reset()
     useOpportunitiesStore().reset()
     useTempFollowupStore().reset()
+    useOpportunityFollowupStore().reset()
   }
   async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
     const res = await apiChangePassword(oldPassword, newPassword)

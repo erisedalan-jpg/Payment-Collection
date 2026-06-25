@@ -3,12 +3,13 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
-# 22 个可编辑业务字段(白名单;update 只接受其中字段)
+# 23 个可编辑业务字段(白名单;update 只接受其中字段)
 FIELDS = (
     'l4', 'salesOwner', 'customer', 'industry', 'top1000', 'status', 'forecast',
     'name', 'amountWan', 'expectedDate', 'productCategory', 'mainProducts',
     'outsource', 'frOwner', 'frMatch', 'deliveryMatch', 'crossRegion',
     'keyOpp', 'earlyIntervene', 'remark', 'bidStatus', 'bidDate',
+    'opportunityLevel',
 )
 _DATE_FIELDS = ('expectedDate', 'bidDate')
 
@@ -21,6 +22,7 @@ HEADER_TO_FIELD = {
     'FR负责人': 'frOwner', 'FR能力是否匹配': 'frMatch', '交付资源是否匹配': 'deliveryMatch',
     '是否需要外区域支持': 'crossRegion', '是否重点商机': 'keyOpp', '是否提前介入': 'earlyIntervene',
     '当前进展/风险说明/情况备注': 'remark', '实际中标状态': 'bidStatus', '中标日期': 'bidDate',
+    '商机级别': 'opportunityLevel',
     '首次登记日期': 'firstReg', '最后一次更新日期': 'lastUpdate',
 }
 

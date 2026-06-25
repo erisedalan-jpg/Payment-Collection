@@ -115,3 +115,22 @@ def test_apply_create_with_fields_empty_is_blank_row():
     r = opp.apply_create_with_fields(s, None, "admin", "2026-06-25", "2026-06-25 12:00")
     assert r["id"] == "opp-1" and r["customer"] == "" and r["firstReg"] == ""  # 无内容不盖首登
     assert len(s["rows"]) == 1
+
+
+def test_opportunity_level_is_editable_field():
+    assert 'opportunityLevel' in opp.FIELDS
+    r = opp.new_row("opp-1")
+    assert r["opportunityLevel"] == ""
+    s = _store(); opp.apply_create(s, "d")
+    r2 = opp.apply_update(s, "opp-1", {"opportunityLevel": "P2"}, "admin", "d", "t")
+    assert r2["opportunityLevel"] == "P2"
+
+
+def test_read_xlsx_maps_opportunity_level(tmp_path):
+    p = tmp_path / "opp_level.xlsx"
+    wb = openpyxl.Workbook(); ws = wb.active
+    ws.append(["客户名称", "商机级别"])
+    ws.append(["甲公司", "P1"])
+    wb.save(p)
+    rows = opp.read_opportunities_xlsx(str(p))
+    assert rows[0]["opportunityLevel"] == "P1"

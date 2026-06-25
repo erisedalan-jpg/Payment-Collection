@@ -14,6 +14,7 @@ function makeRouter() {
       { path: '/projects', component: { template: '<div/>' } },
       { path: '/projects/key', component: { template: '<div/>' } },
       { path: '/opportunities', component: { template: '<div/>' } },
+      { path: '/opportunities/key', component: { template: '<div/>' } },
       { path: '/projects/temp', component: { template: '<div/>' } },
       { path: '/projects/closed', component: { template: '<div/>' } },
       { path: '/activity', component: { template: '<div/>' } },
@@ -71,7 +72,8 @@ describe('AppSidebar', () => {
     expect(text).toContain('回款台账')
     expect(text).toContain('数据管理')        // 工具组
     expect(text).toContain('重点项目进展')    // 重点跟进分区
-    expect(text).toContain('重点商机进展')    // 重点跟进分区
+    expect(text).toContain('商机清单')        // 已移入「项目」组
+    expect(text).toContain('重点商机跟进')    // 重点跟进分区(新页)
     expect(text).toContain('临时重点跟进')    // 重点跟进分区
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
