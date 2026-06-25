@@ -59,7 +59,7 @@ export const router = createRouter({
     { path: '/insight/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析', pageKey: 'insight-board' } },
     { path: '/insight/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历', pageKey: 'insight-calendar' } },
     { path: '/projects/key', name: 'projects-key', component: KeyProjectsView, meta: { title: '重点项目进展', hideFilter: true, pageKey: 'projects-key' } },
-    { path: '/opportunities', name: 'opportunities', component: OpportunitiesView, meta: { title: '重点商机进展', hideFilter: true, pageKey: 'opportunities-progress' } },
+    { path: '/opportunities', name: 'opportunities', component: OpportunitiesView, meta: { title: '商机清单', hideFilter: true, pageKey: 'opportunities-progress' } },
     { path: '/projects/temp', name: 'temp-followup', component: TempFollowupView, meta: { title: '临时重点跟进', hideFilter: true, pageKey: 'temp-followup' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账', pageKey: 'ledger' } },
     // 回款分析五页:由旧 /panalysis 单页拆为 /payment/* 平铺独立路由(SP4);均依赖 FilterBar(不 hideFilter)
