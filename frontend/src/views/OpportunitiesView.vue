@@ -30,6 +30,7 @@ const now = new Date()
 // 编辑抽屉状态
 const editOpen = ref(false)
 const editRow = ref<OppRow | null>(null)
+const editMode = ref<'create' | 'edit'>('edit')
 
 // 选列
 const prefs = useColumnPrefs(TABLE_ID, OPP_COLUMNS.map((c) => c.key), DEFAULT_VISIBLE)
@@ -126,12 +127,13 @@ function fmtCell(col: OppColumn, row: Record<string, any>): string {
 // 编辑处理器
 function openEdit(row: OppRow) {
   editRow.value = row
+  editMode.value = 'edit'
   editOpen.value = true
 }
 
-async function onCreate() {
-  const row = await store.create()
-  editRow.value = row
+function onCreate() {
+  editRow.value = null
+  editMode.value = 'create'
   editOpen.value = true
 }
 
@@ -178,7 +180,7 @@ function onExport() {
 
 defineExpose({
   store, filtered, paged, selectedRows, visibleColumns, fKw, sortState, auth, withDerived,
-  editOpen, editRow, onCreate, onDelete, onExport,
+  editOpen, editRow, editMode, openEdit, onCreate, onDelete, onExport,
 })
 </script>
 
@@ -311,7 +313,7 @@ defineExpose({
     </div>
 
     <!-- 编辑抽屉 -->
-    <OpportunityEditDrawer v-model="editOpen" :row="editRow" />
+    <OpportunityEditDrawer v-model="editOpen" :row="editRow" :mode="editMode" />
   </div>
 </template>
 
