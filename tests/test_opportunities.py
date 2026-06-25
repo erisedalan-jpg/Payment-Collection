@@ -98,3 +98,20 @@ def test_read_xlsx_halfwidth_amount_header(tmp_path):
     assert rows[0]["amountWan"] == 580.0, (
         f"半角括号表头的金额列被静默丢弃，amountWan={rows[0]['amountWan']!r}"
     )
+
+
+def test_apply_create_with_fields_stamps_content():
+    s = _store()
+    r = opp.apply_create_with_fields(s, {"customer": "丙公司", "amountWan": "88"},
+                                     "admin", "2026-06-25", "2026-06-25 12:00")
+    assert r["id"] == "opp-1" and r["customer"] == "丙公司" and r["amountWan"] == 88.0
+    assert r["firstReg"] == "2026-06-25"          # 有内容 → 盖首登
+    assert r["lastUpdate"] == "2026-06-25 12:00" and r["lastUpdateBy"] == "admin"
+    assert len(s["rows"]) == 1
+
+
+def test_apply_create_with_fields_empty_is_blank_row():
+    s = _store()
+    r = opp.apply_create_with_fields(s, None, "admin", "2026-06-25", "2026-06-25 12:00")
+    assert r["id"] == "opp-1" and r["customer"] == "" and r["firstReg"] == ""  # 无内容不盖首登
+    assert len(s["rows"]) == 1
