@@ -132,4 +132,30 @@ describe('DataView(两条来源重构)', () => {
     expect(w.text()).toContain('按标签排除')
     expect(w.html()).toContain('BH项目')
   })
+
+  it('点下载数据：cookie 非空时先 POST /api/pmis/cookie，再开 /api/pmis/download', async () => {
+    const w = await mountView()
+    await w.find('[data-test="pmis-cookie"]').setValue('x=1; SESSION=abc')
+    await w.find('[data-test="btn-download"]').trigger('click')
+    await flushPromises()
+    const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
+    expect(calls.some((u: string) => u.includes('/api/pmis/cookie'))).toBe(true)
+    expect(calls.some((u: string) => u.includes('/api/pmis/download'))).toBe(true)
+  })
+
+  it('文件清单为多列网格(.dv-fgrid)，PMIS 仍 9 行且保留全名', async () => {
+    const w = await mountView()
+    expect(w.findAll('.dv-fgrid').length).toBeGreaterThanOrEqual(2)  // PMIS + 项目域两组
+    expect(w.findAll('[data-test="pmis-row"]')).toHaveLength(9)
+    expect(w.find('[data-test="files-card"]').text()).toContain('collection_stages.csv')
+  })
+
+  it('下载按钮在更新按钮左侧(DOM 顺序)', async () => {
+    const w = await mountView()
+    const btns = w.findAll('button').map((b) => b.text())
+    const di = btns.findIndex((t) => t.includes('下载数据'))
+    const ui = btns.findIndex((t) => t.includes('更新数据（重新处理）'))
+    expect(di).toBeGreaterThanOrEqual(0)
+    expect(ui).toBeGreaterThan(di)
+  })
 })

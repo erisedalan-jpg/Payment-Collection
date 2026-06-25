@@ -81,6 +81,11 @@ else:
     STATIC_DIR = BASE_DIR
 PARENT_DIR = os.path.dirname(BASE_DIR)
 
+# ── PMIS 在线下载流水线(pmisdata/) ──
+PMISDATA_DIR = os.path.join(BASE_DIR, 'pmisdata')
+PMISDATA_CONFIG = os.path.join(PMISDATA_DIR, 'config.json')
+PMIS_PIPELINE_SCRIPT = os.path.join(PMISDATA_DIR, 'run_pmis_pipeline.sh')
+
 # 前端 Web 根:打包态用内置 dist,开发态用 frontend/dist
 if getattr(sys, 'frozen', False):
     WEB_ROOT = os.path.join(STATIC_DIR, 'dist')
@@ -117,6 +122,9 @@ if sys.stdout:
 
 # 重新预处理状态（独立更新数据，不抓取）
 reprocess_state = {"running": False, "progress": 0, "message": ""}
+
+# PMIS 在线下载流水线状态(独立于 reprocess)
+download_state = {"running": False, "progress": 0, "message": ""}
 
 # 子进程引用（用于停止更新时终止）
 active_process = None
@@ -161,6 +169,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/opportunities/create', '/api/opportunities/update',
     '/api/opportunities/delete', '/api/opportunities/import',
     '/api/temp-followup/scope', '/api/temp-followup/archive',
+    '/api/pmis/cookie', '/api/pmis/download',
 })
 
 
@@ -498,6 +507,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_opportunities_get()
         elif parsed.path == '/api/files/status':
             self.handle_files_status()
+        elif parsed.path == '/api/pmis/cookie':
+            self.handle_pmis_cookie_get()
+        elif parsed.path == '/api/pmis/download':
+            self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
             self.handle_reprocess()
         elif parsed.path == '/api/auth/me':
@@ -597,6 +610,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_opportunities_delete()
         elif parsed.path == '/api/opportunities/import':
             self.handle_opportunities_import()
+        elif parsed.path == '/api/pmis/cookie':
+            self.handle_pmis_cookie_save()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -1286,10 +1301,57 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({"ok": True, "name": name, "bytes": len(body)}, ensure_ascii=False).encode('utf-8'))
 
+    def handle_pmis_cookie_get(self):
+        """GET /api/pmis/cookie - 当前 cookie 状态(SESSION 前 8 位 + 更新时间)。超管专属。"""
+        import pmis_config
+        self._json_response(pmis_config.read_session_status(PMISDATA_CONFIG))
+
+    def handle_pmis_cookie_save(self):
+        """POST /api/pmis/cookie {cookie} - 写 pmisdata/config.json 的 session_cookie。超管专属。"""
+        import pmis_config
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception as e:
+            self._json_response(_error_payload(ERR_PARSE, f"请求体解析失败: {e}"))
+            return
+        try:
+            preview = pmis_config.write_session_cookie(PMISDATA_CONFIG, body.get('cookie') or '')
+        except ValueError as e:
+            self._json_response(_error_payload(ERR_VALIDATION, str(e)))
+            return
+        except OSError as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"写入失败: {e}"))
+            return
+        self._json_response({"success": True, "sessionPreview": preview, "message": "Cookie 已更新"})
+
+    def handle_pmis_download(self):
+        """GET /api/pmis/download - 服务器端跑 PMIS 下载流水线,SSE 流式进度。超管专属。"""
+        global download_state
+        if history_state.get("running") or reprocess_state.get("running"):
+            self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再下载"})
+            return
+        if download_state.get("running"):
+            self._json_response(download_state)
+            return
+        download_state = {"running": True, "progress": 0, "message": "启动下载..."}
+        threading.Thread(target=run_download, daemon=True).start()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        while True:
+            self.wfile.write(f"data: {json.dumps(download_state, ensure_ascii=False)}\n\n".encode('utf-8'))
+            self.wfile.flush()
+            if download_state["progress"] >= 100 or not download_state["running"]:
+                break
+            time.sleep(0.5)
+
     def handle_reprocess(self):
         """GET /api/reprocess - 仅重跑预处理，不抓取/下载，SSE 流式返回进度"""
         global reprocess_state
-        if history_state.get("running"):
+        if history_state.get("running") or download_state.get("running"):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
             return
         if reprocess_state.get("running"):
@@ -1310,7 +1372,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             time.sleep(0.5)
 
     def _history_busy(self):
-        return reprocess_state.get("running") or history_state.get("running")
+        return reprocess_state.get("running") or history_state.get("running") or download_state.get("running")
 
     def handle_data_history(self):
         """GET /api/data-history - 列出历史版本与 _pre_rollback。"""
@@ -1711,6 +1773,30 @@ def classify_progress_line(line):
     return ('other', s)
 
 
+_DOWNLOAD_MARKERS = [
+    ("Step 1/3", 10, "下载 PMIS 报表..."),
+    ("fetch_pmis_tables.py 执行成功", 30, "PMIS 报表已下载"),
+    ("Step 2/3", 35, "下载全量项目损益(耗时较长)..."),
+    ("fetch_all_projects.py 执行成功", 75, "项目损益已下载"),
+    ("Step 3/3", 80, "交付成本分析..."),
+    ("delivery_analysis.py 执行成功", 90, "成本分析完成"),
+    ("拷贝到目标路径", 95, "拷贝到 input/..."),
+    ("流水线完成", 100, "下载完成，请点更新数据生效"),
+]
+
+
+def classify_download_line(line):
+    """解析 run_pmis_pipeline.sh 的一行 → (progress|None, message) 或 None(空行)。
+    命中步骤标记→(进度,提示);其余非空行→(None,原行)只更新消息。"""
+    s = line.strip()
+    if not s:
+        return None
+    for needle, prog, msg in _DOWNLOAD_MARKERS:
+        if needle in s:
+            return (prog, msg)
+    return (None, s)
+
+
 def run_reprocess():
     """仅运行 preprocess_data.py(读 input/ 与 input/pmis/ 全部数据文件重算 analysis_data)。
     不抓取、不下载。供"更新数据"按钮调用。"""
@@ -1774,6 +1860,52 @@ def run_reprocess():
     finally:
         time.sleep(3)
         reprocess_state["running"] = False
+
+
+def run_download():
+    """跑 pmisdata/run_pmis_pipeline.sh:备份→从 PMIS 下载→覆盖 input/。
+    frozen/dev 同走 subprocess(脚本在磁盘 pmisdata/、依赖系统 python3)。不自动 reprocess。"""
+    global download_state
+    if not os.path.exists(PMIS_PIPELINE_SCRIPT):
+        download_state = {"running": False, "progress": 0,
+                          "message": "下载脚本不存在(pmisdata/run_pmis_pipeline.sh)"}
+        return
+    try:
+        download_state = {"running": True, "progress": 5, "message": "启动下载流水线..."}
+        env = {**os.environ, "PMPLATFORM_DIR": BASE_DIR}
+        _flags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+        process = subprocess.Popen(
+            ["bash", PMIS_PIPELINE_SCRIPT],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            cwd=PMISDATA_DIR, env=env, encoding='utf-8', errors='replace',
+            creationflags=_flags)
+        errs = []
+        for raw in process.stdout:
+            if '✗' in raw:
+                errs.append(raw.strip())
+            parsed = classify_download_line(raw)
+            if parsed is None:
+                continue
+            prog, msg = parsed
+            cur = download_state["progress"]
+            if prog is not None and prog > cur:
+                cur = prog
+            download_state = {"running": True, "progress": cur, "message": msg}
+        process.wait()
+        if process.returncode != 0 or errs:
+            tail = '; '.join(errs[-3:]) if errs else f"退出码 {process.returncode}"
+            download_state = {"running": False, "progress": 0, "message": f"下载失败: {tail}"}
+            return
+        download_state = {"running": True, "progress": 100, "message": "下载完成，请点更新数据生效"}
+    except FileNotFoundError:
+        download_state = {"running": False, "progress": 0,
+                          "message": "下载失败: 未找到 bash(需 Linux/含 bash 环境)"}
+    except Exception as e:
+        download_state = {"running": False, "progress": 0, "message": f"下载失败: {str(e)[:100]}"}
+        logger.error(f"download 失败: {e}", exc_info=True)
+    finally:
+        time.sleep(3)
+        download_state["running"] = False
 
 
 def _terminate_active_process():
