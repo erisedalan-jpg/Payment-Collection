@@ -1016,10 +1016,19 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_INTERNAL, f"读取商机失败: {e}"))
 
     def handle_opportunities_create(self):  # 超管(由 _authz_gate 拦)
+        data = self._read_json_body() if int(self.headers.get('Content-Length', 0)) > 0 else {}
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        fields = data.get('fields') if isinstance(data, dict) else None
+        if fields is not None and not isinstance(fields, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "fields 须为对象"))
+            return
+        account, _ = self._session_account_rec()
         try:
             store = _load_opportunities()
-            now_date, _ = self._opp_now()
-            row = _opp.apply_create(store, now_date)
+            now_date, now_dt = self._opp_now()
+            row = _opp.apply_create_with_fields(store, fields, account, now_date, now_dt)
             _save_opportunities(store)
             self._json_response({"row": row})
         except Exception as e:
