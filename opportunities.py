@@ -69,6 +69,16 @@ def apply_create(store: Dict[str, Any], now_date: str) -> Dict[str, Any]:
     return row
 
 
+def apply_create_with_fields(store: Dict[str, Any], fields, account: str, now_date: str, now_dt: str) -> Dict[str, Any]:
+    """建行后立即落字段(复用 apply_update 的白名单/解析/盖章)。fields 空 -> 纯空行。始终返回最终行。"""
+    row = apply_create(store, now_date)
+    if fields:
+        updated = apply_update(store, row['id'], fields, account, now_date, now_dt)
+        if updated is not None:
+            return updated
+    return row
+
+
 def apply_update(store, rid, fields, account, now_date, now_dt) -> Optional[Dict[str, Any]]:
     target = next((r for r in store.get('rows', []) if r.get('id') == rid), None)
     if target is None:

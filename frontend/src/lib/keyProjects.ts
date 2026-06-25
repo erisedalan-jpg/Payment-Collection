@@ -36,6 +36,37 @@ export function followBy(rec: ProgressRecord): string {
   return [...new Set(list)].join('、')
 }
 
+export function buildProgressRowBase(
+  p: Project,
+  pmis: ProjectPmis | undefined,
+  rec: ProgressRecord,
+): KeyProjectRow {
+  const m = (pmis ?? {}) as Record<string, any>
+  const st = m.status ?? {}, risk = m.risk ?? {}, cust = m.customer ?? {}, team = m.team ?? {}
+  const contract = p.paymentPmis?.contract
+  return {
+    projectId: p.projectId,
+    customer: v(cust.最终客户, '-'),
+    projectName: p.projectName || p.projectId,
+    projectLevel: v(st.项目级别, '-'),
+    projectManager: v(p.projectManager, '-'),
+    ar: v(team.AR, '-'),
+    sr: v(team.SR, '-'),
+    orgL4: v(p.orgL4, '-'),
+    contractWan: typeof contract === 'number' ? Math.round(contract / 1000) / 10 : null,
+    riskLevel: v(risk.最高等级, '无'),
+    openRisks: Number(risk.未关闭风险数 ?? 0),
+    weekProgress: v(rec.weekProgress),
+    weekProgressEditTime: v(rec.weekProgressEditTime),
+    weekProgressEditBy: v(rec.weekProgressEditBy),
+    nextPlan: v(rec.nextPlan),
+    nextPlanEditTime: v(rec.nextPlanEditTime),
+    nextPlanEditBy: v(rec.nextPlanEditBy),
+    followDate: followDate(rec),
+    followBy: followBy(rec),
+  }
+}
+
 export function buildKeyProjectRows(
   projects: Project[],
   pmisMap: Record<string, ProjectPmis>,
@@ -43,31 +74,5 @@ export function buildKeyProjectRows(
 ): KeyProjectRow[] {
   return projects
     .filter((p) => isKeyProject(p, pmisMap[p.projectId]))
-    .map((p) => {
-      const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
-      const st = m.status ?? {}, risk = m.risk ?? {}, cust = m.customer ?? {}, team = m.team ?? {}
-      const rec: ProgressRecord = current[p.projectId] ?? {}
-      const contract = p.paymentPmis?.contract
-      return {
-        projectId: p.projectId,
-        customer: v(cust.最终客户, '-'),
-        projectName: p.projectName || p.projectId,
-        projectLevel: v(st.项目级别, '-'),
-        projectManager: v(p.projectManager, '-'),
-        ar: v(team.AR, '-'),
-        sr: v(team.SR, '-'),
-        orgL4: v(p.orgL4, '-'),
-        contractWan: typeof contract === 'number' ? Math.round(contract / 1000) / 10 : null,
-        riskLevel: v(risk.最高等级, '无'),
-        openRisks: Number(risk.未关闭风险数 ?? 0),
-        weekProgress: v(rec.weekProgress),
-        weekProgressEditTime: v(rec.weekProgressEditTime),
-        weekProgressEditBy: v(rec.weekProgressEditBy),
-        nextPlan: v(rec.nextPlan),
-        nextPlanEditTime: v(rec.nextPlanEditTime),
-        nextPlanEditBy: v(rec.nextPlanEditBy),
-        followDate: followDate(rec),
-        followBy: followBy(rec),
-      }
-    })
+    .map((p) => buildProgressRowBase(p, pmisMap[p.projectId], current[p.projectId] ?? {}))
 }

@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import Modal from './Modal.vue'
 import { useProjectProgressStore } from '@/stores/projectProgress'
+import { useTempFollowupStore } from '@/stores/tempFollowup'
 
 const props = defineProps<{
   modelValue: boolean; projectId: string; projectName: string
   field: 'weekProgress' | 'nextPlan'; initial: string
+  store?: 'key' | 'temp'
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 
-const store = useProjectProgressStore()
+const keyStore = useProjectProgressStore()
+const tempStore = useTempFollowupStore()
+const activeStore = computed(() => (props.store === 'temp' ? tempStore : keyStore))
 const text = ref(props.initial)
 const saving = ref(false)
 watch(() => props.modelValue, (v) => { if (v) text.value = props.initial })
@@ -19,12 +23,13 @@ const FIELD_LABEL = { weekProgress: '本周工作进展', nextPlan: '后续工�
 async function save() {
   saving.value = true
   try {
-    await store.update(props.projectId, props.field, text.value)
+    await activeStore.value.update(props.projectId, props.field, text.value)
     emit('update:modelValue', false)
   } finally {
     saving.value = false
   }
 }
+defineExpose({ save, text })
 </script>
 
 <template>

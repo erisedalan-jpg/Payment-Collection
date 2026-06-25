@@ -8,6 +8,7 @@ import type { OppRow } from '@/lib/opportunitiesApi'
 const props = defineProps<{
   modelValue: boolean
   row: OppRow | null
+  mode?: 'create' | 'edit'
 }>()
 
 const emit = defineEmits<{
@@ -40,11 +41,16 @@ rebuildForm(props.row)
 watch(() => props.row, (r) => rebuildForm(r))
 
 async function onSave() {
-  if (!props.row) return
   const fields: Record<string, any> = {}
   OPP_FIELDS.forEach((k) => { fields[k] = form[k] })
-  await store.update(props.row.id, fields)
-  ElMessage.success('已保存')
+  if (props.mode === 'create') {
+    await store.create(fields)
+    ElMessage.success('已新增')
+  } else {
+    if (!props.row) return
+    await store.update(props.row.id, fields)
+    ElMessage.success('已保存')
+  }
   emit('update:modelValue', false)
 }
 
@@ -54,7 +60,7 @@ defineExpose({ form, onSave })
 <template>
   <el-drawer
     :model-value="modelValue"
-    title="编辑商机"
+    :title="mode === 'create' ? '新增商机' : '编辑商机'"
     direction="rtl"
     size="560px"
     @update:model-value="emit('update:modelValue', $event)"
@@ -116,8 +122,8 @@ defineExpose({ form, onSave })
       </el-form-item>
     </el-form>
 
-    <!-- 只读信息区 -->
-    <div v-if="row" class="oed-info">
+    <!-- 只读信息区：create 模式不显示 -->
+    <div v-if="mode !== 'create' && row" class="oed-info">
       <div
         v-for="col in infoCols"
         :key="col.key"

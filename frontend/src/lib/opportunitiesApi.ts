@@ -8,7 +8,8 @@ export interface OppImportResp { rows: OppRow[]; count: number }
 
 export const opportunitiesApi = {
   list: () => api.get<OppListResp>('/api/opportunities'),
-  create: () => api.post<OppRowResp>('/api/opportunities/create', {}),
+  create: (fields?: Record<string, any>) =>
+    api.post<OppRowResp>('/api/opportunities/create', fields ? { fields } : {}),
   update: (id: string, fields: Record<string, any>) => api.post<OppRowResp>('/api/opportunities/update', { id, fields }),
   remove: (ids: string[]) => api.post<OppListResp>('/api/opportunities/delete', { ids }),
   /** 后端按裸字节读(rfile.read)，与 /api/inputs/upload 同构，直接传 File 作 body。
