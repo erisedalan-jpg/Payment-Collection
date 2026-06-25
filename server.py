@@ -1711,6 +1711,30 @@ def classify_progress_line(line):
     return ('other', s)
 
 
+_DOWNLOAD_MARKERS = [
+    ("Step 1/3", 10, "下载 PMIS 报表..."),
+    ("fetch_pmis_tables.py 执行成功", 30, "PMIS 报表已下载"),
+    ("Step 2/3", 35, "下载全量项目损益(耗时较长)..."),
+    ("fetch_all_projects.py 执行成功", 75, "项目损益已下载"),
+    ("Step 3/3", 80, "交付成本分析..."),
+    ("delivery_analysis.py 执行成功", 90, "成本分析完成"),
+    ("拷贝到目标路径", 95, "拷贝到 input/..."),
+    ("流水线完成", 100, "下载完成，请点更新数据生效"),
+]
+
+
+def classify_download_line(line):
+    """解析 run_pmis_pipeline.sh 的一行 → (progress|None, message) 或 None(空行)。
+    命中步骤标记→(进度,提示);其余非空行→(None,原行)只更新消息。"""
+    s = line.strip()
+    if not s:
+        return None
+    for needle, prog, msg in _DOWNLOAD_MARKERS:
+        if needle in s:
+            return (prog, msg)
+    return (None, s)
+
+
 def run_reprocess():
     """仅运行 preprocess_data.py(读 input/ 与 input/pmis/ 全部数据文件重算 analysis_data)。
     不抓取、不下载。供"更新数据"按钮调用。"""
