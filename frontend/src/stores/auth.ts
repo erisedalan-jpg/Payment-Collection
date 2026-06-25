@@ -6,6 +6,7 @@ import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, TOOL_
 import { useDataStore } from './data'
 import { useProjectProgressStore } from './projectProgress'
 import { useOpportunitiesStore } from './opportunities'
+import { useTempFollowupStore } from './tempFollowup'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -20,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
       useDataStore().reset()  // 新身份:丢弃上一个用户的内存业务数据,强制下个页面按新会话重拉(后端按 L4 切数据)
       useProjectProgressStore().reset()
       useOpportunitiesStore().reset()
+      useTempFollowupStore().reset()
     }
     return res
   }
@@ -32,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
     useDataStore().reset()  // 登出即清业务数据,杜绝下个低权限账号复用全量缓存
     useProjectProgressStore().reset()
     useOpportunitiesStore().reset()
+    useTempFollowupStore().reset()
   }
   async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
     const res = await apiChangePassword(oldPassword, newPassword)
