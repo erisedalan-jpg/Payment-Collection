@@ -11,9 +11,12 @@ const inputs: ScopeProjectInput[] = [
 ]
 
 function mountIt(initial: ScopeFilter) {
+  // 不 stub teleport:el-drawer 内置 Teleport 经 VTU teleport-stub 会与 el-select multiple
+  // 产生测试环境特有的递归渲染(真实浏览器无此问题)。本用例只驱动暴露方法 + emitted,不查渲染 DOM,
+  // 故让 teleport 真实渲染(挂到 body)即可,生产仍用 el-drawer(符合「弹窗抽屉优先用 Element Plus」)。
   return mount(ScopeBuilder, {
     props: { modelValue: true, inputs, initial },
-    global: { plugins: [ElementPlus], stubs: { teleport: true } },
+    global: { plugins: [ElementPlus] },
   })
 }
 
