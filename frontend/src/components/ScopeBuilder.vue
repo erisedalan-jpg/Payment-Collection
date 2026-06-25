@@ -98,137 +98,72 @@ defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCon
 </script>
 
 <template>
-  <!-- 自绘抽屉面板:规避 el-drawer 内置 Teleport 与 VTU teleport-stub 的交互导致 El-Select 递归更新 -->
-  <transition name="sb-slide">
-    <div v-if="modelValue" class="sb-overlay" @click.self="onCancel">
-      <div class="sb-panel" role="dialog" aria-modal="true" aria-label="范围设置（临时重点跟进）">
-        <div class="sb-header">
-          <span class="sb-title">范围设置（临时重点跟进）</span>
-          <el-button text size="small" @click="onCancel">✕</el-button>
-        </div>
-
-        <div class="sb-body">
-          <div class="sb-top">
-            <span class="sb-label">组之间</span>
-            <el-radio-group v-model="draft.combinator" size="small">
-              <el-radio-button value="AND">AND（且）</el-radio-button>
-              <el-radio-button value="OR">OR（或）</el-radio-button>
-            </el-radio-group>
-            <el-button size="small" type="primary" plain data-test="sb-add-group" @click="addGroup">添加组</el-button>
-          </div>
-
-          <div v-for="(g, gi) in draft.groups" :key="gi" class="sb-group">
-            <div class="sb-group-head">
-              <span class="sb-label">组 {{ gi + 1 }} · 条件之间</span>
-              <el-radio-group v-model="g.combinator" size="small">
-                <el-radio-button value="AND">AND</el-radio-button>
-                <el-radio-button value="OR">OR</el-radio-button>
-              </el-radio-group>
-              <el-button size="small" text @click="addCondition(gi)">添加条件</el-button>
-              <el-button size="small" text type="danger" @click="removeGroup(gi)">删除组</el-button>
-            </div>
-
-            <div v-for="(c, ci) in g.conditions" :key="ci" class="sb-cond">
-              <el-select v-model="c.group" size="small" style="width: 110px" @change="onGroupChange(c)">
-                <el-option v-for="(lbl, gk) in GROUP_LABEL" :key="gk" :label="lbl" :value="gk" />
-              </el-select>
-              <el-select v-model="c.field" size="small" style="width: 140px" @change="onFieldChange(c)">
-                <el-option v-for="f in stableFieldsOf(c.group)" :key="f.key" :label="f.label" :value="f.key" />
-              </el-select>
-              <el-select v-model="c.op" size="small" style="width: 100px">
-                <el-option v-for="op in stableOpsForKind(kindOf(c))" :key="op" :label="OP_LABEL[op]" :value="op" />
-              </el-select>
-              <!-- 枚举:多选 -->
-              <el-select v-if="kindOf(c) === 'enum'" v-model="c.values" multiple collapse-tags filterable
-                size="small" style="min-width: 180px; flex: 1">
-                <el-option v-for="v in candidates(c)" :key="v" :label="v" :value="v" />
-              </el-select>
-              <!-- 文本:包含词 -->
-              <el-input v-else-if="kindOf(c) === 'text'" :model-value="(c.values && c.values[0]) || ''"
-                size="small" placeholder="包含词" style="flex: 1" @update:model-value="c.values = [$event]" />
-              <!-- 数值:min/max -->
-              <template v-else-if="kindOf(c) === 'number'">
-                <el-input-number v-model="c.min as any" :controls="false" size="small" placeholder="最小" style="width: 100px" />
-                <el-input-number v-model="c.max as any" :controls="false" size="small" placeholder="最大" style="width: 100px" />
-              </template>
-              <!-- 日期:起止 -->
-              <template v-else>
-                <el-date-picker v-model="c.min as any" type="date" value-format="YYYY-MM-DD" size="small" placeholder="起" style="width: 130px" />
-                <el-date-picker v-model="c.max as any" type="date" value-format="YYYY-MM-DD" size="small" placeholder="止" style="width: 130px" />
-              </template>
-              <el-button size="small" text type="danger" @click="removeCondition(gi, ci)">✕</el-button>
-            </div>
-            <div v-if="!g.conditions.length" class="sb-empty">该组暂无条件（空组不命中）。</div>
-          </div>
-
-          <div v-if="!draft.groups.length" class="sb-empty">暂无范围条件——「添加组」开始定义；保存空范围则页面无项目。</div>
-        </div>
-
-        <div class="sb-footer">
-          <span class="sb-count u-num">命中 {{ matchCount }} 个项目</span>
-          <el-button @click="onCancel">取消</el-button>
-          <el-button type="primary" data-test="sb-save" @click="onSave">保存</el-button>
-        </div>
-      </div>
+  <el-drawer :model-value="modelValue" title="范围设置（临时重点跟进）" direction="rtl" size="640px"
+    @update:model-value="emit('update:modelValue', $event)">
+    <div class="sb-top">
+      <span class="sb-label">组之间</span>
+      <el-radio-group v-model="draft.combinator" size="small">
+        <el-radio-button value="AND">AND（且）</el-radio-button>
+        <el-radio-button value="OR">OR（或）</el-radio-button>
+      </el-radio-group>
+      <el-button size="small" type="primary" plain data-test="sb-add-group" @click="addGroup">添加组</el-button>
     </div>
-  </transition>
+
+    <div v-for="(g, gi) in draft.groups" :key="gi" class="sb-group">
+      <div class="sb-group-head">
+        <span class="sb-label">组 {{ gi + 1 }} · 条件之间</span>
+        <el-radio-group v-model="g.combinator" size="small">
+          <el-radio-button value="AND">AND</el-radio-button>
+          <el-radio-button value="OR">OR</el-radio-button>
+        </el-radio-group>
+        <el-button size="small" text @click="addCondition(gi)">添加条件</el-button>
+        <el-button size="small" text type="danger" @click="removeGroup(gi)">删除组</el-button>
+      </div>
+
+      <div v-for="(c, ci) in g.conditions" :key="ci" class="sb-cond">
+        <el-select v-model="c.group" size="small" style="width: 110px" @change="onGroupChange(c)">
+          <el-option v-for="(lbl, gk) in GROUP_LABEL" :key="gk" :label="lbl" :value="gk" />
+        </el-select>
+        <el-select v-model="c.field" size="small" style="width: 140px" @change="onFieldChange(c)">
+          <el-option v-for="f in stableFieldsOf(c.group)" :key="f.key" :label="f.label" :value="f.key" />
+        </el-select>
+        <el-select v-model="c.op" size="small" style="width: 100px">
+          <el-option v-for="op in stableOpsForKind(kindOf(c))" :key="op" :label="OP_LABEL[op]" :value="op" />
+        </el-select>
+        <!-- 枚举:多选 -->
+        <el-select v-if="kindOf(c) === 'enum'" v-model="c.values" multiple collapse-tags filterable
+          size="small" style="min-width: 180px; flex: 1">
+          <el-option v-for="v in candidates(c)" :key="v" :label="v" :value="v" />
+        </el-select>
+        <!-- 文本:包含词 -->
+        <el-input v-else-if="kindOf(c) === 'text'" :model-value="(c.values && c.values[0]) || ''"
+          size="small" placeholder="包含词" style="flex: 1" @update:model-value="c.values = [$event]" />
+        <!-- 数值:min/max -->
+        <template v-else-if="kindOf(c) === 'number'">
+          <el-input-number v-model="c.min as any" :controls="false" size="small" placeholder="最小" style="width: 100px" />
+          <el-input-number v-model="c.max as any" :controls="false" size="small" placeholder="最大" style="width: 100px" />
+        </template>
+        <!-- 日期:起止 -->
+        <template v-else>
+          <el-date-picker v-model="c.min as any" type="date" value-format="YYYY-MM-DD" size="small" placeholder="起" style="width: 130px" />
+          <el-date-picker v-model="c.max as any" type="date" value-format="YYYY-MM-DD" size="small" placeholder="止" style="width: 130px" />
+        </template>
+        <el-button size="small" text type="danger" @click="removeCondition(gi, ci)">✕</el-button>
+      </div>
+      <div v-if="!g.conditions.length" class="sb-empty">该组暂无条件（空组不命中）。</div>
+    </div>
+
+    <div v-if="!draft.groups.length" class="sb-empty">暂无范围条件——「添加组」开始定义；保存空范围则页面无项目。</div>
+
+    <template #footer>
+      <span class="sb-count u-num">命中 {{ matchCount }} 个项目</span>
+      <el-button @click="onCancel">取消</el-button>
+      <el-button type="primary" data-test="sb-save" @click="onSave">保存</el-button>
+    </template>
+  </el-drawer>
 </template>
 
 <style scoped>
-/* 遮罩层 */
-.sb-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .45);
-  z-index: var(--z-panel);
-  display: flex;
-  justify-content: flex-end;
-}
-/* 抽屉面板本体 */
-.sb-panel {
-  width: 640px;
-  max-width: 100vw;
-  height: 100%;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-2);
-}
-/* 滑入动效 */
-.sb-slide-enter-active,
-.sb-slide-leave-active {
-  transition: transform var(--dur-2) var(--ease);
-}
-.sb-slide-enter-from,
-.sb-slide-leave-to {
-  transform: translateX(100%);
-}
-/* 标题栏 */
-.sb-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-}
-.sb-title { font-size: var(--fs-3); font-weight: 600; color: var(--txt); }
-/* 可滚动正文 */
-.sb-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--sp-4);
-}
-/* 页脚 */
-.sb-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4);
-  border-top: 1px solid var(--line);
-  flex-shrink: 0;
-}
-/* 内容区样式 */
 .sb-top { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .sb-label { font-size: var(--fs-1); color: var(--sub); }
 .sb-group { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); background: var(--card2); }
