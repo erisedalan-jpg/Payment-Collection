@@ -41,6 +41,12 @@ TOP_FILES = [
 TOP_DIRS = ["frontend", "deploy", "data", "input", "fonts"]
 SKIP_DIRS = {"node_modules", "__pycache__", ".git", ".pytest_cache", ".cache"}
 
+# pmisdata 按白名单纳入(避免打进时间戳备份目录与日志)
+PMISDATA_FILES = [
+    "run_pmis_pipeline.sh", "fetch_pmis_tables.py", "fetch_all_projects.py",
+    "delivery_analysis.py", "update_cookie.py", "config.json", "A.xlsx",
+]
+
 added = 0
 with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:
     for f in TOP_FILES:
@@ -59,6 +65,11 @@ with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:
                 rel = os.path.relpath(ab, ROOT)
                 z.write(ab, os.path.join(TOP, rel))
                 added += 1
+    for f in PMISDATA_FILES:
+        p = os.path.join(ROOT, "pmisdata", f)
+        if os.path.isfile(p):
+            z.write(p, os.path.join(TOP, "pmisdata", f))
+            added += 1
 
 size_mb = os.path.getsize(OUT) / 1048576
 print(f"[OK] {OUT}")
