@@ -8,6 +8,7 @@ import { usePmisSync } from '@/composables/usePmisSync'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
 import { useReprocess } from '@/composables/useReprocess'
+import { usePmisDownload } from '@/composables/usePmisDownload'
 import { useDataHistory } from '@/composables/useDataHistory'
 import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
 import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
@@ -54,6 +55,34 @@ async function onUploadInputs() {
 // —— 更新数据 / 设置 ——
 const { progress: repProgress, message: repMessage, running: repRunning, start: startReprocess } =
   useReprocess({ onDone: () => { data.reload(); loadFileStatus() } })
+
+// —— PMIS 在线下载 ——
+const pmisCookie = ref('')
+const cookieStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessionPreview: '', updatedAt: '' })
+const cookieMsg = ref('')
+const cookieErr = ref(false)
+const { progress: dlProgress, message: dlMessage, running: dlRunning, start: startDownload } =
+  usePmisDownload({ onDone: () => { loadFileStatus(); loadCookieStatus() } })
+
+async function loadCookieStatus() {
+  try { cookieStatus.value = await api.get('/api/pmis/cookie') } catch { /* 未登录/缺接口静默 */ }
+}
+async function onDownload() {
+  cookieMsg.value = ''; cookieErr.value = false
+  const ck = pmisCookie.value.trim()
+  if (ck) {
+    try {
+      const r = await api.post<{ sessionPreview: string }>('/api/pmis/cookie', { cookie: ck })
+      cookieStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
+      pmisCookie.value = ''
+    } catch (e) {
+      cookieErr.value = true
+      cookieMsg.value = 'Cookie 保存失败：' + (e instanceof Error ? e.message : String(e))
+      return  // cookie 失败则中止,不进入下载
+    }
+  }
+  await startDownload()
+}
 const { versions: historyVersions, preRollback: historyPre, source: historySource, busy: historyBusy,
         message: historyMsg, load: loadHistory, rollback: doRollback, undo: doUndo } =
   useDataHistory({ onChange: () => { data.reload(); loadFileStatus() } })
@@ -118,7 +147,7 @@ function onDisable(name: string, on: boolean) { projectTags.disableTag(name, on)
 const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => filter.setExclude(v, filter.excludeTags) })
 const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
 
-onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load() })
+onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load(); loadCookieStatus() })
 </script>
 
 <template>
@@ -163,15 +192,25 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
       </div>
     </div>
 
-    <div class="dv-grid2">
-      <div class="dv-card">
-        <div class="dv-card-head">更新数据</div>
-        <div class="dv-row">
-          <button class="dv-btn primary" :disabled="repRunning" @click="startReprocess()">更新数据（重新处理）</button>
-          <span class="dv-hint">读取已获取的全部数据文件,重算看板</span>
-        </div>
-        <div v-if="repRunning || repProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
+    <div class="dv-card">
+      <div class="dv-card-head">数据下载 / 更新数据</div>
+      <div class="dv-row dv-cookie">
+        <span class="dv-label">PMIS Cookie</span>
+        <textarea v-model="pmisCookie" data-test="pmis-cookie" class="dv-cookie-box" rows="2"
+          placeholder="粘贴完整 cookie 串；已用 update_cookie.py --server 推送可留空"></textarea>
+        <span class="dv-hint">当前 SESSION {{ cookieStatus.sessionPreview || '-' }} · 更新于 {{ cookieStatus.updatedAt || '-' }}</span>
       </div>
+      <div v-if="cookieMsg" class="dv-row dv-hint" :class="cookieErr ? '' : 'ok'">{{ cookieMsg }}</div>
+      <div class="dv-row">
+        <button class="dv-btn" data-test="btn-download" :disabled="dlRunning || repRunning" @click="onDownload">下载数据</button>
+        <button class="dv-btn primary" :disabled="repRunning || dlRunning" @click="startReprocess()">更新数据（重新处理）</button>
+        <span class="dv-hint">下载：从 PMIS 抓取并覆盖 input/（只下载不更新）；更新：读取已获取数据重算看板</span>
+      </div>
+      <div v-if="dlRunning || dlProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
+      <div v-if="repRunning || repProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
+    </div>
+
+    <div class="dv-grid2">
       <div class="dv-card">
         <div class="dv-card-head">设置</div>
         <div class="dv-row"><span class="dv-label">清空数据</span><button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button><span v-if="clearState" class="dv-hint ok">{{ clearState }}</span></div>
@@ -278,4 +317,8 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
 .dv-tag-name { width: 84px; border: none; background: transparent; color: var(--txt); font-size: var(--fs-1); }
 .dv-err { width: 100%; border-collapse: collapse; font-size: var(--fs-1); margin: var(--sp-2) 0; }
 .dv-err th, .dv-err td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; color: var(--danger-text); }
+.dv-cookie { align-items: flex-start; }
+.dv-cookie-box { flex: 1 1 320px; min-width: 220px; font-size: var(--fs-1); font-family: var(--font-sans);
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--txt);
+  padding: var(--sp-2); resize: vertical; }
 </style>
