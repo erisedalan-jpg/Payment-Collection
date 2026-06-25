@@ -3,17 +3,20 @@ import { ref, watch, computed } from 'vue'
 import Modal from './Modal.vue'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
+import { useOpportunityFollowupStore } from '@/stores/opportunityFollowup'
 
 const props = defineProps<{
   modelValue: boolean; projectId: string; projectName: string
   field: 'weekProgress' | 'nextPlan'; initial: string
-  store?: 'key' | 'temp'
+  store?: 'key' | 'temp' | 'oppFollowup'
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 
 const keyStore = useProjectProgressStore()
 const tempStore = useTempFollowupStore()
-const activeStore = computed(() => (props.store === 'temp' ? tempStore : keyStore))
+const oppStore = useOpportunityFollowupStore()
+const activeStore = computed(() =>
+  props.store === 'temp' ? tempStore : props.store === 'oppFollowup' ? oppStore : keyStore)
 const text = ref(props.initial)
 const saving = ref(false)
 watch(() => props.modelValue, (v) => { if (v) text.value = props.initial })
