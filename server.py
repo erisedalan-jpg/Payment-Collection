@@ -30,6 +30,8 @@ import data_scope
 import manual_import
 import manual_history
 import opportunities as _opp
+import temp_followup
+import temp_followup as _temp
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -158,6 +160,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/progress/archive',
     '/api/opportunities/create', '/api/opportunities/update',
     '/api/opportunities/delete', '/api/opportunities/import',
+    '/api/temp-followup/scope', '/api/temp-followup/archive',
 })
 
 
@@ -306,6 +309,35 @@ def _progress_apply_archive(store, rows, now):
     """纯函数:把当前已构建行冻结为历史快照(archiveTime=now),并清空 current(开始新一期)。"""
     store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
     store['current'] = {}
+
+
+# ── 临时重点跟进(/projects/temp;V2.1.0):scope 条件 + current 进展 + archives 快照 ──
+TEMP_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'temp_followup.json')
+_temp_lock = threading.Lock()
+
+
+def _load_temp_followup():
+    """加载临时跟进 store;缺文件/损坏 → 默认(new_store)。不抛。"""
+    if os.path.exists(TEMP_FOLLOWUP_FILE):
+        try:
+            with open(TEMP_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
+                store = json.load(f)
+            if isinstance(store, dict):
+                store.setdefault('version', 1)
+                store['scope'] = _temp.normalize_scope(store.get('scope'))
+                store.setdefault('current', {})
+                store.setdefault('archives', [])
+                return store
+        except Exception:
+            pass
+    return _temp.new_store()
+
+
+def _save_temp_followup(store):
+    with _temp_lock:
+        os.makedirs(os.path.dirname(TEMP_FOLLOWUP_FILE), exist_ok=True)
+        with open(TEMP_FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
 
 
 # ── 商机管理(V2.0.0) ──
@@ -460,6 +492,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_tags_get()
         elif parsed.path == '/api/progress':
             self.handle_progress_get()
+        elif parsed.path == '/api/temp-followup':
+            self.handle_temp_followup_get()
         elif parsed.path == '/api/opportunities':
             self.handle_opportunities_get()
         elif parsed.path == '/api/files/status':
@@ -549,6 +583,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_progress_update()
         elif parsed.path == '/api/progress/archive':
             self.handle_progress_archive()
+        elif parsed.path == '/api/temp-followup/scope':
+            self.handle_temp_followup_scope()
+        elif parsed.path == '/api/temp-followup/update':
+            self.handle_temp_followup_update()
+        elif parsed.path == '/api/temp-followup/archive':
+            self.handle_temp_followup_archive()
         elif parsed.path == '/api/opportunities/create':
             self.handle_opportunities_create()
         elif parsed.path == '/api/opportunities/update':
@@ -987,6 +1027,75 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             store = _load_progress()
             _progress_apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             _save_progress(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    def handle_temp_followup_get(self):
+        """GET /api/temp-followup — {scope, current, archives}。任意登录用户(普通管理员需 scope 在前端算命中集)。"""
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_temp_followup()
+            self._json_response({"success": True, "scope": store.get("scope"),
+                                 "current": store.get("current", {}), "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取临时跟进失败: {e}"))
+
+    def handle_temp_followup_scope(self):
+        """POST /api/temp-followup/scope {combinator, groups} — 保存范围条件。超管专属(_authz_gate 拦)。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            store = _load_temp_followup()
+            store['scope'] = _temp.normalize_scope(data)
+            _save_temp_followup(store)
+            self._json_response({"success": True, "scope": store['scope']})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+    def handle_temp_followup_update(self):
+        """POST /api/temp-followup/update {projectId, field, content} — 编辑单格进展。任意登录用户。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        pid = str(data.get('projectId') or '').strip()
+        field = data.get('field')
+        if not pid or field not in _temp.PROGRESS_FIELDS:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 weekProgress/nextPlan"))
+            return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_temp_followup()
+            rec = _temp.apply_update(store, pid, field, str(data.get('content') or ''),
+                                     account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_temp_followup(store)
+            self._json_response({"success": True, "record": rec})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
+
+    def handle_temp_followup_archive(self):
+        """POST /api/temp-followup/archive {rows} — 冻结当前为快照并清空 current。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        rows = data.get('rows')
+        if not isinstance(rows, list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
+            return
+        try:
+            store = _load_temp_followup()
+            _temp.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_temp_followup(store)
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
