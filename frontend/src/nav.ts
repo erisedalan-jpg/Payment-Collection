@@ -22,6 +22,7 @@ export const PROJECT_LINKS: NavLink[] = [
   { label: '项目总览', to: '/', key: 'overview' },
   { label: '在建项目', to: '/projects', key: 'projects' },
   { label: '已关闭项目', to: '/projects/closed', key: 'projects-closed' },
+  { label: '商机清单', to: '/opportunities', key: 'opportunities-progress' },
   { label: '项目动态', to: '/activity', key: 'activity' },
 ]
 
@@ -38,7 +39,6 @@ export const ANALYSIS_LINKS: NavLink[] = [
 // 重点跟进(SP-2):重点项目进展页
 export const KEY_FOLLOWUP_LINKS: NavLink[] = [
   { label: '重点项目进展', to: '/projects/key', key: 'projects-key' },
-  { label: '重点商机进展', to: '/opportunities', key: 'opportunities-progress' },
   { label: '临时重点跟进', to: '/projects/temp', key: 'temp-followup' },
 ]
 

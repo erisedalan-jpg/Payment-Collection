@@ -71,13 +71,13 @@ describe('AppSidebar', () => {
     expect(text).toContain('回款台账')
     expect(text).toContain('数据管理')        // 工具组
     expect(text).toContain('重点项目进展')    // 重点跟进分区
-    expect(text).toContain('重点商机进展')    // 重点跟进分区
+    expect(text).toContain('商机清单')        // 已移入「项目」组
     expect(text).toContain('临时重点跟进')    // 重点跟进分区
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
-    // 项目分析(6) + 重点跟进(3) + 回款子域(6) 均为 .nav-sub 二级呈现 = 15
-    expect(wrapper.findAll('.nav-sub').length).toBe(15)
+    // 项目分析(6) + 重点跟进(2) + 回款子域(6) 均为 .nav-sub 二级呈现 = 14
+    expect(wrapper.findAll('.nav-sub').length).toBe(14)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
