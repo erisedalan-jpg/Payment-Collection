@@ -39,8 +39,8 @@ const OPS_BY_KIND: Record<string, ScopeOp[]> = {
   number: ['between', 'notBetween'],
   date: ['between', 'notBetween'],
 }
-function stableFieldsOf(group: string): FieldDef[] {
-  return fieldsByGroup.value[group] ?? []
+function stableFieldsOf(group: string | undefined): FieldDef[] {
+  return fieldsByGroup.value[group ?? ''] ?? []
 }
 function stableOpsForKind(kind: string): ScopeOp[] {
   return OPS_BY_KIND[kind] ?? OPS_BY_KIND['number']

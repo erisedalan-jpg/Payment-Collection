@@ -1,9 +1,10 @@
 // 临时重点跟进范围筛选:条件树类型 + 字段目录 + 匹配(前端算,数据已按 L4 裁剪)。
-export type Combinator = 'AND' | 'OR'
-export type ScopeOp = 'in' | 'notIn' | 'between' | 'notBetween' | 'contains' | 'notContains'
+import { leafMatch, opsForKind, type Combinator, type ScopeOp, type FieldKind } from './scopeOps'
+export type { Combinator, ScopeOp } from './scopeOps'
+export { opsForKind } from './scopeOps'
 
 export interface ScopeCondition {
-  group: 'project' | 'paymentNode' | 'milestone'
+  group?: 'project' | 'paymentNode' | 'milestone'
   field: string
   op: ScopeOp
   values?: string[]
@@ -17,20 +18,17 @@ export interface FieldDef {
   group: 'project' | 'paymentNode' | 'milestone'
   key: string
   label: string
-  kind: 'enum' | 'number' | 'date' | 'text'
+  kind: FieldKind
 }
+
+/** ScopeBuilder 的 catalog 通用形状:temp 的 FieldDef 与 opportunity 的 {key,label,kind} 都满足。 */
+export interface FieldLike { key: string; label: string; kind: FieldKind; group?: FieldDef['group'] }
 
 export interface ScopeProjectInput {
   id: string
   proj: Record<string, any>
   nodes: Record<string, any>[]
   milestones: Record<string, any>[]
-}
-
-export function opsForKind(kind: FieldDef['kind']): ScopeOp[] {
-  if (kind === 'enum') return ['in', 'notIn']
-  if (kind === 'text') return ['contains', 'notContains']
-  return ['between', 'notBetween'] // number / date
 }
 
 // 字段目录(单一来源)。project 组 key 对应 buildScopeInputs 产出的 proj 键;
@@ -84,54 +82,6 @@ export const FIELD_CATALOG: FieldDef[] = [
 
 export function fieldsOf(group: FieldDef['group']): FieldDef[] {
   return FIELD_CATALOG.filter((f) => f.group === group)
-}
-
-function isDateLike(x: any): boolean {
-  return typeof x === 'string' && /\d{4}-\d{2}-\d{2}/.test(x)
-}
-
-function inRange(raw: any, min: any, max: any): boolean {
-  const hasMin = min != null && min !== ''
-  const hasMax = max != null && max !== ''
-  if (!hasMin && !hasMax) return true
-  if (isDateLike(min) || isDateLike(max)) {
-    const v = String(raw ?? '').slice(0, 10)
-    if (v === '') return false
-    if (hasMin && v < String(min).slice(0, 10)) return false
-    if (hasMax && v > String(max).slice(0, 10)) return false
-    return true
-  }
-  if (raw == null || raw === '') return false
-  const n = Number(raw)
-  if (Number.isNaN(n)) return false
-  if (hasMin && n < Number(min)) return false
-  if (hasMax && n > Number(max)) return false
-  return true
-}
-
-function leafMatch(raw: any, c: ScopeCondition): boolean {
-  switch (c.op) {
-    case 'in':
-    case 'notIn': {
-      const set = new Set(c.values ?? [])
-      const hit = Array.isArray(raw)
-        ? raw.some((v) => set.has(String(v)))
-        : set.has(String(raw ?? ''))
-      return c.op === 'in' ? hit : !hit
-    }
-    case 'between':
-    case 'notBetween': {
-      const within = inRange(raw, c.min, c.max)
-      return c.op === 'between' ? within : !within
-    }
-    case 'contains':
-    case 'notContains': {
-      const term = String((c.values && c.values[0]) ?? '')
-      const hit = term !== '' && String(raw ?? '').includes(term)
-      return c.op === 'contains' ? hit : !hit
-    }
-  }
-  return false
 }
 
 function evalCond(input: ScopeProjectInput, c: ScopeCondition): boolean {
