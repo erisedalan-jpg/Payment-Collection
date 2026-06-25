@@ -43,6 +43,9 @@ data/project_progress.json
 # 商机管理数据（运行时用户数据，V2.0.0）
 data/opportunities.json
 data/opportunities.backup-*.json
+# 临时重点跟进数据(运行时用户数据,V2.1.0)
+data/temp_followup.json
+data/temp_followup.backup-*.json
 # 本地账号库(含密码哈希,敏感,运行时生成,SP-2)
 data/accounts.json
 data/accounts.json.tmp
