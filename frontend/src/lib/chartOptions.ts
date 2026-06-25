@@ -18,6 +18,7 @@ export interface RankingOptionParams {
   metricLabel: string
   valueKind: ValueKind
   legendCounts?: number[]
+  palette?: string[]
 }
 
 /** 根据 valueKind 返回 ECharts label formatter 函数 */
@@ -51,6 +52,7 @@ export function buildRankingOption(
 ): Record<string, any> {
   const { categories, values, metricLabel, valueKind } = params
   const formatter = makeLabelFormatter(valueKind)
+  const color = params.palette ?? CHART_LIGHT
 
   if (type === 'pie') {
     const pieData = categories.map((name, i) => ({ name, value: values[i] }))
@@ -63,7 +65,7 @@ export function buildRankingOption(
     return {
       tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
       legend,
-      color: CHART_LIGHT,
+      color,
       series: [
         {
           name: metricLabel,
@@ -115,7 +117,7 @@ export function buildRankingOption(
   return {
     tooltip: { trigger: 'axis' },
     grid: { left: 60, right: 20, top: 40, bottom: 60 },
-    color: CHART_LIGHT,
+    color,
     xAxis: {
       type: 'category',
       data: categories,
