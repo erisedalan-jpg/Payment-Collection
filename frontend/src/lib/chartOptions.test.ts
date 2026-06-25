@@ -123,3 +123,18 @@ describe('buildRankingOption pie legendCounts', () => {
     expect((opt.legend as any).formatter).toBeUndefined()
   })
 })
+
+describe('buildRankingOption palette 参数', () => {
+  it('传 palette 覆盖默认色板(bar)', () => {
+    const opt = buildRankingOption('bar', { categories: CATS, values: VALS, metricLabel: '项目数', valueKind: 'count', palette: ['#111', '#222'] })
+    expect(opt.color).toEqual(['#111', '#222'])
+  })
+  it('pie 同样接受 palette', () => {
+    const opt = buildRankingOption('pie', { categories: CATS, values: VALS, metricLabel: '合同额', valueKind: 'amount', palette: ['#abc'] })
+    expect(opt.color).toEqual(['#abc'])
+  })
+  it('不传 palette 回落 CHART_LIGHT(零回归)', () => {
+    const opt = buildRankingOption('bar', { categories: CATS, values: VALS, metricLabel: '项目数', valueKind: 'count' })
+    expect(opt.color[0]).toBe('#0d3a69')
+  })
+})
