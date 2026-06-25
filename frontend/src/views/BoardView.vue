@@ -5,7 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useSettingsStore } from '@/stores/settings'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
+import { CHART_LIGHT, CHART_DARK } from '@/charts/echartsTheme'
 import {
   PAY_BOARD_DIMENSIONS as DIMENSIONS, PAY_BOARD_METRICS as METRICS, PAY_BOARD_METRIC_BY_KEY as METRIC_BY_KEY,
   buildPayBoardRows, groupPayBoard, payBoardCross, payBoardPivot, type PayBoardGroup,
@@ -13,7 +13,7 @@ import {
 } from '@/lib/paymentBoard'
 import { filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio, pct } from '@/lib/format'
-import { buildRankingOption } from '@/lib/chartOptions'
+import { buildRankingOption, valueKindForPie, type ValueKind } from '@/lib/chartOptions'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
@@ -93,66 +93,29 @@ const tableColumns = computed<DataColumn[]>(() => [
 // 图表类型多选（单维排名模式）；available 始终含 bar/line/pie（contractSum 是金额）
 const chartTypes = ref<string[]>(['bar'])
 
-// 柱状图（bar）：按当前排序键降序 Top15，已回/待回堆叠柱 + 总计柱顶
+// 柱/折/饼：按当前排序键降序 Top15
 const chartTop = computed(() => sortedGroups.value.slice(0, 15))
-const stackedBarOption = computed(() => {
-  const sc = settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT
-  const t = chartTop.value
-  const paid = t.map((g) => Math.round(g.actualSum / 10000))
-  const pending = t.map((g) => Math.round(g.pendingSum / 10000))
-  const total = t.map((_, i) => paid[i] + pending[i])
-  return {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['已回款', '待回款'], top: 0 },
-    grid: { left: 60, right: 20, top: 30, bottom: 60 },
-    xAxis: { type: 'category', data: t.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
-    yAxis: { type: 'value', name: '金额(万)' },
-    series: [
-      { name: '已回款', type: 'bar', stack: 'a', data: paid, itemStyle: { color: sc.ok }, label: { show: true, position: 'inside' } },
-      { name: '待回款', type: 'bar', stack: 'a', data: pending, itemStyle: { color: sc.warn }, label: { show: true, position: 'inside' } },
-      // 透明总计 series: 0 高、不入 legend，顶部显示 已回+待回 总计（ECharts 堆叠柱无内建总计）
-      { name: '总计', type: 'bar', stack: 'a', data: new Array(t.length).fill(0), itemStyle: { color: 'transparent' },
-        tooltip: { show: false }, label: { show: true, position: 'top', formatter: (p: { dataIndex: number }) => String(total[p.dataIndex]) } },
-    ],
-  }
-})
 
-// 折线图（line）：已回款 & 待回款两条折线 + 标签
-const lineChartOption = computed(() => {
-  const sc = settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT
-  const t = chartTop.value
-  const paid = t.map((g) => Math.round(g.actualSum / 10000))
-  const pending = t.map((g) => Math.round(g.pendingSum / 10000))
-  const labelStyle = { show: true, position: 'top' as const }
-  return {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['已回款', '待回款'], top: 0 },
-    grid: { left: 60, right: 20, top: 40, bottom: 60 },
-    xAxis: { type: 'category', data: t.map((g) => g.key), axisLabel: { interval: 0, rotate: 30 } },
-    yAxis: { type: 'value', name: '金额(万)' },
-    series: [
-      { name: '已回款', type: 'line', data: paid, itemStyle: { color: sc.ok }, symbol: 'circle', symbolSize: 6, label: labelStyle },
-      { name: '待回款', type: 'line', data: pending, itemStyle: { color: sc.warn }, symbol: 'circle', symbolSize: 6, label: labelStyle },
-    ],
-  }
-})
+type SortChart = { label: string; kind: ValueKind; val: (g: PayBoardGroup) => number }
+const SORT_CHART: Record<PayBoardSortKey, SortChart> = {
+  projectCount:   { label: '项目数',   kind: 'count',  val: (g) => g.projectCount },
+  contractSum:    { label: '合同金额', kind: 'amount', val: (g) => g.contractSum },
+  rate:           { label: '完成率',   kind: 'ratio',  val: (g) => g.rate ?? 0 },
+  delayedNodeSum: { label: '延期节点', kind: 'count',  val: (g) => g.delayedNodeSum },
+}
+const activeChart = computed(() => SORT_CHART[sortKey.value])
+const pieRenderable = computed(() => valueKindForPie(activeChart.value.kind))
+const chartPalette = computed(() => (settings.theme === 'dark' ? CHART_DARK : CHART_LIGHT))
 
-// 饼图（pie）：contractSum 合同总额占比
-const pieChartOption = computed(() => {
-  const t = chartTop.value
-  return buildRankingOption('pie', {
-    categories: t.map((g) => g.key),
-    values: t.map((g) => g.contractSum),
-    metricLabel: '合同总额',
-    valueKind: 'amount',
-  })
-})
-
-// 按选中图表类型输出对应 option
 function chartOptionForType(type: string) {
-  if (type === 'line') return lineChartOption.value
-  if (type === 'pie') return pieChartOption.value
-  return stackedBarOption.value
+  const ac = activeChart.value
+  return buildRankingOption(type as 'bar' | 'line' | 'pie', {
+    categories: chartTop.value.map((g) => g.key),
+    values: chartTop.value.map((g) => ac.val(g)),
+    metricLabel: ac.label,
+    valueKind: ac.kind,
+    palette: chartPalette.value,
+  })
 }
 
 // ---- 共用指标格式 ----
@@ -214,7 +177,7 @@ function onPivotCellClick({ rowKey, colKey }: { rowKey: string; colKey: string }
   const g = pivot.value?.index[rowKey]?.[colKey]
   if (g) openDrill(g)
 }
-defineExpose({ drillOpen, dimKey })
+defineExpose({ drillOpen, dimKey, activeChart, pieRenderable })
 </script>
 
 <template>
@@ -281,12 +244,9 @@ defineExpose({ drillOpen, dimKey })
             :key="type"
             class="bv-card bv-chart-item"
           >
-            <h3 class="bv-title">
-              <template v-if="type === 'bar'">已回款 / 待回款对比（Top {{ chartTop.length }}）</template>
-              <template v-else-if="type === 'line'">已回款 / 待回款折线（Top {{ chartTop.length }}）</template>
-              <template v-else>合同总额占比（Top {{ chartTop.length }}）</template>
-            </h3>
-            <ChartBox :option="chartOptionForType(type)" height="320px" />
+            <h3 class="bv-title">{{ activeChart.label }}排名（Top {{ chartTop.length }}）</h3>
+            <ChartBox v-if="type !== 'pie' || pieRenderable" :option="chartOptionForType(type)" height="320px" />
+            <div v-else class="bv-empty">完成率为比率，不宜用饼图（请改用柱状/折线）</div>
           </section>
         </div>
         <section class="bv-card">
