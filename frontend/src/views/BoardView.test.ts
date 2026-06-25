@@ -100,18 +100,29 @@ describe('BoardView', () => {
     expect((w.vm as any).drillOpen).toBe(true)
   })
 
-  it('柱状图含已回/待回/总计数字 label', () => {
+  it('柱状图随排序指标换口径：默认项目数→各组计数；切合同金额→合同额(万)', async () => {
     seed()
     const w = mount(BoardView, opts)
-    // 读 ChartBox 的 option prop（chartOption 未 defineExpose，经 prop 读取更可靠）
-    const series = (w.findComponent(ChartBox).props('option') as any).series
-    expect(series.find((s: any) => s.name === '已回款').label.show).toBe(true)
-    expect(series.find((s: any) => s.name === '待回款').label.show).toBe(true)
-    // 总计 series：透明、顶部 label、formatter 返回总计
-    const total = series.find((s: any) => s.name === '总计')
-    expect(total.label.position).toBe('top')
-    // 图按 expectedSum 降序：P1(北京 expected150万) 居首；已回 round(600000/1e4)=60 + 待回 round(900000/1e4)=90 = 150
-    expect(total.label.formatter({ dataIndex: 0 })).toBe('150')
+    await flushPromises()
+    // 默认 sort=projectCount(count)：北京/上海各 1 个项目
+    let opt = (w.findComponent(ChartBox).props('option') as any)
+    expect(opt.series[0].data).toEqual([1, 1])
+    expect(w.text()).toContain('项目数排名')
+    // 切合同金额(amount,÷万)：北京 200万 居首
+    await w.get('[data-test="seg-contractSum"]').trigger('click')
+    opt = (w.findComponent(ChartBox).props('option') as any)
+    expect(opt.xAxis.data[0]).toBe('北京')
+    expect(opt.series[0].data[0]).toBe(200)
+    expect(w.text()).toContain('合同金额排名')
+  })
+
+  it('完成率指标饼图降级(pieRenderable=false)，合同金额可饼图', async () => {
+    seed()
+    const w = mount(BoardView, opts)
+    await w.get('[data-test="seg-rate"]').trigger('click')
+    expect((w.vm as any).pieRenderable).toBe(false)
+    await w.get('[data-test="seg-contractSum"]').trigger('click')
+    expect((w.vm as any).pieRenderable).toBe(true)
   })
 
   it('切交叉模式选标签为次维度渲染矩阵', async () => {
