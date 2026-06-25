@@ -122,7 +122,7 @@ describe('OpportunitiesView', () => {
     expect(乙?.recentUpdate).toBe('否')
   })
 
-  it('defineExpose 暴露 store/filtered/paged/selectedRows/visibleColumns/fKw/sortState', async () => {
+  it('defineExpose 暴露 store/filtered/paged/selectedRows/visibleColumns/fKw/sortState/editMode/openEdit', async () => {
     const w = await mountView(true)
     const vm = w.vm as any
     expect(vm.store).toBeDefined()
@@ -132,6 +132,8 @@ describe('OpportunitiesView', () => {
     expect(vm.visibleColumns).toBeDefined()
     expect(vm.fKw).toBeDefined()
     expect(vm.sortState).toBeDefined()
+    expect(vm.editMode).toBeDefined()
+    expect(vm.openEdit).toBeDefined()
   })
 
   // ---------- Task 7 新增测试 ----------
@@ -159,23 +161,18 @@ describe('OpportunitiesView', () => {
     expect(wn.find('input[type="file"]').exists()).toBe(false)
   })
 
-  it('(T7-b) 点「新增商机」→ store.create 被调 + editOpen=true', async () => {
+  it('(T7-b) 点「新增商机」→ 不调 store.create、打开 create 模式抽屉、editRow=null', async () => {
     const w = await mountView(true)
     const store = useOpportunitiesStore()
-    const newRow = { id: 'opp-9', l4: '', salesOwner: '', customer: '', industry: '',
-      top1000: '', status: '', forecast: '', name: '', amountWan: null,
-      expectedDate: '', productCategory: '', mainProducts: '', outsource: '',
-      frOwner: '', frMatch: '', deliveryMatch: '', crossRegion: '', keyOpp: '',
-      earlyIntervene: '', remark: '', bidStatus: '', bidDate: '',
-      firstReg: '', lastUpdate: '' }
-    const createSpy = vi.spyOn(store, 'create').mockResolvedValue(newRow as any)
+    const createSpy = vi.spyOn(store, 'create')
 
     await w.find('[data-test="opp-add"]').trigger('click')
     await flushPromises()
 
-    expect(createSpy).toHaveBeenCalledOnce()
+    expect(createSpy).not.toHaveBeenCalled()
     expect((w.vm as any).editOpen).toBe(true)
-    expect((w.vm as any).editRow?.id).toBe('opp-9')
+    expect((w.vm as any).editMode).toBe('create')
+    expect((w.vm as any).editRow).toBeNull()
   })
 
   it('(T7-c) 选中行后 onDelete → ElMessageBox.confirm + store.remove(选中ids)', async () => {
