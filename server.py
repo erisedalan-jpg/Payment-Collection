@@ -32,6 +32,7 @@ import manual_history
 import opportunities as _opp
 import temp_followup
 import temp_followup as _temp
+import opportunity_followup as _oppf
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -169,6 +170,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/opportunities/create', '/api/opportunities/update',
     '/api/opportunities/delete', '/api/opportunities/import',
     '/api/temp-followup/scope', '/api/temp-followup/archive',
+    '/api/opportunity-followup/scope', '/api/opportunity-followup/archive',
     '/api/pmis/cookie', '/api/pmis/download',
 })
 
@@ -349,6 +351,37 @@ def _save_temp_followup(store):
             json.dump(store, f, ensure_ascii=False, indent=2)
 
 
+# ── 重点商机跟进(/opportunities/key;V2.2.0):scope 条件 + current 进展 + archives 快照 ──
+OPP_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'opportunity_followup.json')
+_opp_followup_lock = threading.Lock()
+
+
+def _load_opportunity_followup():
+    """加载商机跟进 store;缺文件/损坏 → 默认(new_store,含默认范围)。不抛。"""
+    if os.path.exists(OPP_FOLLOWUP_FILE):
+        try:
+            with open(OPP_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
+                store = json.load(f)
+            if isinstance(store, dict):
+                store.setdefault('version', 1)
+                store['scope'] = _oppf.normalize_scope(store.get('scope'))
+                store.setdefault('current', {})
+                store.setdefault('archives', [])
+                return store
+        except Exception:
+            pass
+    return _oppf.new_store()
+
+
+def _save_opportunity_followup(store):
+    with _opp_followup_lock:
+        os.makedirs(os.path.dirname(OPP_FOLLOWUP_FILE), exist_ok=True)
+        tmp = OPP_FOLLOWUP_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, OPP_FOLLOWUP_FILE)
+
+
 # ── 商机管理(V2.0.0) ──
 OPPORTUNITIES_FILE = os.path.join(BASE_DIR, 'data', 'opportunities.json')
 OPP_INPUT_NAMES = ('opportunities.xlsx', 'opportunitites.xlsx')  # 后者兼容用户原文笔误
@@ -503,6 +536,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_progress_get()
         elif parsed.path == '/api/temp-followup':
             self.handle_temp_followup_get()
+        elif parsed.path == '/api/opportunity-followup':
+            self.handle_opportunity_followup_get()
         elif parsed.path == '/api/opportunities':
             self.handle_opportunities_get()
         elif parsed.path == '/api/files/status':
@@ -602,6 +637,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_temp_followup_update()
         elif parsed.path == '/api/temp-followup/archive':
             self.handle_temp_followup_archive()
+        elif parsed.path == '/api/opportunity-followup/scope':
+            self.handle_opportunity_followup_scope()
+        elif parsed.path == '/api/opportunity-followup/update':
+            self.handle_opportunity_followup_update()
+        elif parsed.path == '/api/opportunity-followup/archive':
+            self.handle_opportunity_followup_archive()
         elif parsed.path == '/api/opportunities/create':
             self.handle_opportunities_create()
         elif parsed.path == '/api/opportunities/update':
@@ -1111,6 +1152,75 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             store = _load_temp_followup()
             _temp.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             _save_temp_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    def handle_opportunity_followup_get(self):
+        """GET /api/opportunity-followup — {scope, current, archives}。任意登录用户。"""
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_opportunity_followup()
+            self._json_response({"success": True, "scope": store.get("scope"),
+                                 "current": store.get("current", {}), "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取商机跟进失败: {e}"))
+
+    def handle_opportunity_followup_scope(self):
+        """POST /api/opportunity-followup/scope {combinator, groups} — 保存范围。超管专属(_authz_gate 拦)。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            store = _load_opportunity_followup()
+            store['scope'] = _oppf.normalize_scope(data)
+            _save_opportunity_followup(store)
+            self._json_response({"success": True, "scope": store['scope']})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+    def handle_opportunity_followup_update(self):
+        """POST /api/opportunity-followup/update {oppId, field, content} — 编辑单格进展。任意登录用户。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        oid = str(data.get('oppId') or '').strip()
+        field = data.get('field')
+        if not oid or field not in _oppf.PROGRESS_FIELDS:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "oppId 必填、field 须为 weekProgress/nextPlan"))
+            return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_opportunity_followup()
+            rec = _oppf.apply_update(store, oid, field, str(data.get('content') or ''),
+                                     account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_opportunity_followup(store)
+            self._json_response({"success": True, "record": rec})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
+
+    def handle_opportunity_followup_archive(self):
+        """POST /api/opportunity-followup/archive {rows} — 冻结当前为快照并清空 current。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        rows = data.get('rows')
+        if not isinstance(rows, list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
+            return
+        try:
+            store = _load_opportunity_followup()
+            _oppf.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_opportunity_followup(store)
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))

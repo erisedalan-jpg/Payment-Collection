@@ -171,7 +171,7 @@ async function onFilePick(e: Event) {
 
 function onExport() {
   exportRows(
-    '重点商机进展_' + filtered.value.length + '条.xlsx',
+    '商机清单_' + filtered.value.length + '条.xlsx',
     filtered.value.map((r) =>
       Object.fromEntries(OPP_COLUMNS.map((c) => [c.label, (r as any)[c.key] ?? ''])),
     ),
@@ -186,7 +186,7 @@ defineExpose({
 
 <template>
   <div class="opp-view">
-    <h2 class="opp-title">重点商机进展</h2>
+    <h2 class="opp-title">商机清单</h2>
 
     <!-- 工具栏 -->
     <div class="opp-toolbar">

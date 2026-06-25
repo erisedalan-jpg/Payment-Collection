@@ -1,51 +1,68 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import ScopeBuilder from './ScopeBuilder.vue'
-import type { ScopeProjectInput, ScopeFilter } from '@/lib/tempScope'
+import { OPP_SCOPE_CATALOG, opportunityMatches, DEFAULT_OPP_SCOPE } from '@/lib/opportunityScope'
+import type { ScopeProjectInput } from '@/lib/tempScope'
 
-const inputs: ScopeProjectInput[] = [
-  { id: 'P1', proj: { orgL4: '银行服务组' }, nodes: [], milestones: [] },
-  { id: 'P2', proj: { orgL4: '小金融服务组' }, nodes: [], milestones: [] },
-]
+beforeEach(() => setActivePinia(createPinia()))
 
-function mountIt(initial: ScopeFilter) {
-  // 不 stub teleport:el-drawer 内置 Teleport 经 VTU teleport-stub 会与 el-select multiple
-  // 产生测试环境特有的递归渲染(真实浏览器无此问题)。本用例只驱动暴露方法 + emitted,不查渲染 DOM,
-  // 故让 teleport 真实渲染(挂到 body)即可,生产仍用 el-drawer(符合「弹窗抽屉优先用 Element Plus」)。
-  return mount(ScopeBuilder, {
-    props: { modelValue: true, inputs, initial },
-    global: { plugins: [ElementPlus] },
-  })
+function mountSB(props: Record<string, any>) {
+  return mount(ScopeBuilder as any, { props: { modelValue: true, ...props }, global: { plugins: [ElementPlus] } })
 }
 
-describe('ScopeBuilder', () => {
-  beforeEach(() => setActivePinia(createPinia()))
-
-  it('addGroup/addCondition 改 draft 结构', async () => {
-    const w = mountIt({ combinator: 'AND', groups: [] })
-    ;(w.vm as any).addGroup()
-    expect((w.vm as any).draft.groups).toHaveLength(1)
+describe('ScopeBuilder 单表模式(商机)', () => {
+  const oppRows = [
+    { id: 'o1', top1000: 'TOP1000', earlyIntervene: '是', keyOpp: '是', status: '招投标' },
+    { id: 'o2', top1000: 'TOP1000', earlyIntervene: '是', keyOpp: '是', status: '赢单' },
+    { id: 'o3', top1000: '非TOP1000', earlyIntervene: '否', keyOpp: '否', status: '意向沟通' },
+  ]
+  it('singleTable=true 时 matchCount 用 matchFn,默认范围命中 1 条', () => {
+    const w = mountSB({
+      inputs: oppRows, initial: DEFAULT_OPP_SCOPE,
+      catalog: OPP_SCOPE_CATALOG, singleTable: true, matchFn: opportunityMatches, countUnit: '商机',
+    })
+    expect((w.vm as any).SINGLE).toBe(true)
+    expect((w.vm as any).matchCount).toBe(1)   // 仅 o1(状态非赢单+三条件齐)
+  })
+  it('addCondition 在单表模式建无 group 的条件', () => {
+    const w = mountSB({
+      inputs: oppRows, initial: { combinator: 'AND', groups: [{ combinator: 'AND', conditions: [] }] },
+      catalog: OPP_SCOPE_CATALOG, singleTable: true, matchFn: opportunityMatches,
+    })
     ;(w.vm as any).addCondition(0)
-    expect((w.vm as any).draft.groups[0].conditions).toHaveLength(1)
+    const c = (w.vm as any).draft.groups[0].conditions[0]
+    expect(c.group).toBeUndefined()
+    expect(typeof c.field).toBe('string')
   })
+})
 
-  it('命中数随条件变化', async () => {
-    const w = mountIt({ combinator: 'AND', groups: [
-      { combinator: 'AND', conditions: [{ group: 'project', field: 'orgL4', op: 'in', values: ['银行服务组'] }] },
-    ] })
-    expect((w.vm as any).matchCount).toBe(1)
+describe('ScopeBuilder 默认(temp 三子表)行为不回归', () => {
+  const inp = (over: Partial<ScopeProjectInput>): ScopeProjectInput => ({ id: 'P', proj: {}, nodes: [], milestones: [], ...over })
+  it('不传新 prop → 多表模式,addCondition 建 project/orgL4 条件', () => {
+    const w = mountSB({
+      inputs: [inp({ proj: { orgL4: '银行服务组' } })],
+      initial: { combinator: 'AND', groups: [{ combinator: 'AND', conditions: [] }] },
+    })
+    expect((w.vm as any).SINGLE).toBe(false)
+    ;(w.vm as any).addCondition(0)
+    const c = (w.vm as any).draft.groups[0].conditions[0]
+    expect(c.group).toBe('project')
+    expect(c.field).toBe('orgL4')
   })
-
-  it('保存 emit save 携带 draft', async () => {
-    const init: ScopeFilter = { combinator: 'OR', groups: [
-      { combinator: 'AND', conditions: [{ group: 'project', field: 'orgL4', op: 'in', values: ['银行服务组'] }] },
-    ] }
-    const w = mountIt(init)
+  it('onSave 触发后 emit save 事件且携带当前 draft', () => {
+    const initial = { combinator: 'AND' as const, groups: [{ combinator: 'AND' as const, conditions: [] }] }
+    const w = mountSB({
+      inputs: [inp({ proj: { orgL4: '银行服务组' } })],
+      initial,
+    })
     ;(w.vm as any).onSave()
-    const ev = w.emitted('save')
-    expect(ev).toBeTruthy()
-    expect((ev![0][0] as ScopeFilter).combinator).toBe('OR')
+    const emitted = w.emitted('save')
+    expect(emitted).toBeTruthy()
+    expect(emitted!.length).toBe(1)
+    const payload = emitted![0][0] as any
+    expect(payload.combinator).toBe('AND')
+    expect(Array.isArray(payload.groups)).toBe(true)
   })
 })

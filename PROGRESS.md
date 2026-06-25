@@ -4,9 +4,9 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.1.1**（子页面/局部调整：服务器端 PMIS 下载 + cookie 三路径 + /data 清单网格压缩 + /insight/board 排名图随排序换口径）
-- 最近更新：2026-06-25（V2.1.1：从 /data 页触发 run_pmis_pipeline.sh 服务器端下载 PMIS 表（SSE 流式进度）；cookie 三路径——粘贴框直填/服务器本机直写/update_cookie.py --server 推送；/data 文件清单由卡片改网格紧凑布局；/insight/board 排名图随选定排序指标自动换口径，单系列+饼图降级；打包纳入 pmisdata/ 白名单脚本）
-- 上一版本：V2.1.0（2026-06-25，新增 /projects/temp 临时重点跟进 + 商机新增改先弹抽屉）
+- 当前版本：**V2.2.0**（整页级调整：商机清单改造 + 新增 /opportunities/key 重点商机跟进页）
+- 最近更新：2026-06-25（V2.2.0：/opportunities 移入「项目」分区并改名「商机清单」（pageKey 仍 opportunities-progress 不变）；新增「商机级别」P1/P2/P3/P4 下拉列（预估金额后/默认显示）；新增 /opportunities/key 重点商机跟进页——单表范围引擎、默认条件 TOP1000&提前介入&重点商机&状态非赢单、复用参数化 ScopeBuilder/ProgressEditModal；页面权限注册 pageKey opportunity-followup；打包整包白名单纳入 opportunity_followup.py）
+- 上一版本：V2.1.1（2026-06-25，服务器端 PMIS 下载 + cookie 三路径 + /data 清单网格压缩 + /insight/board 排名图随排序换口径）
 - 更上版本：V1.20.2（2026-06-24，/insight/milestone 到期提醒表改造：时间段选择 + 含已完成的到期清单 + 照搬 /projects 表格栈）
 - 更上版本：V1.20.1（2026-06-24，/insight/risk 风险看板：风险统计分析加风险等级筛选 + 风险概览升级行列自选透视 + 全页下钻）
 - 上上版本：V1.20.0（2026-06-24，新增「重点跟进」导航分区 + /projects/key 重点项目进展页；进展持久化/编辑/归档/导出）
@@ -18,6 +18,10 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.2.0**（2026-06-25）整页级调整：
+  - 商机清单改造：/opportunities 从「重点跟进」分区移入「项目」分区（已关闭项目后、项目动态前）并改名「商机清单」（pageKey 仍 opportunities-progress 不变，只改 meta.title/菜单 label/H2/导出名）；新增「商机级别」下拉列（取值 P1/P2/P3/P4，位于预估金额(万元)后、预估落单时间前，默认显示）——后端 opportunities.py 的 FIELDS + HEADER_TO_FIELD 加 opportunityLevel，前端 opportunityColumns.ts 加列+默认列。
+  - 新增 /opportunities/key 重点商机跟进页（形式同 /projects/temp）：前端把范围匹配纯运算符抽出共享 scopeOps.ts（tempScope 改引用、ScopeCondition.group 改可选），新增商机单表范围引擎 opportunityScope.ts（OPP_SCOPE_CATALOG 派生自 OPP_COLUMNS、opportunityMatches、DEFAULT_OPP_SCOPE）；默认四条 AND 条件（是否TOP1000客户 in [TOP1000] & 是否提前介入 in [是] & 是否重点商机 in [是] & 商机状态 notIn [赢单]）；跟进四列（本周工作进展/后续工作计划/跟进日期/跟进人，设计同 /projects/key）；后端 opportunity_followup.py（PROGRESS_FIELDS + 单表 normalize_scope + apply_update/archive + new_store 种入默认范围）持久化 data/opportunity_followup.json + 4 端点（GET 任意登录 / scope·archive 超管 / update 任意登录 {oppId}）；参数化复用 ScopeBuilder（catalog/singleTable/matchFn/countUnit，temp 零回归）+ ProgressEditModal（加 store='oppFollowup'）；新视图 OpportunityFollowupView 取数自 opportunities store（服务端按 allowedL4 裁剪）+ 范围过滤 + 当前/历史快照 + 超管范围设置/归档/导出；auth 登入/登出两处 reset 新 store 防跨账号 L4 泄露；pageKey opportunity-followup（菜单「重点跟进」组，重点项目进展后/临时重点跟进前）。打包整包白名单补 opportunity_followup.py（增量包 *.py glob 自动纳入）。
+  - **技术债（与 temp 同款，沿用既有约定）**：`handle_opportunity_followup_*` 的 busy 无锁（与 temp_followup、pmis_download 同款 TOCTOU），后续统一用 `_history_lock` 收紧时一并处理。
 - **V2.1.1**（2026-06-25）子页面/局部调整：服务器端 PMIS 下载（/data 页触发 run_pmis_pipeline.sh，SSE 流式进度）；cookie 三路径（粘贴框/服务器本机直写/update_cookie.py --server）；/data 清单网格压缩；/insight/board 排名图随选定排序换口径（单系列+饼图降级）；打包纳入 pmisdata/ 白名单。已知边界：下载与 cookie 推送需在可访问 PMIS 的机器冒烟验证。**Backlog（终审 opus 提）**：`handle_pmis_download` 的 busy 检查与置位非原子（TOCTOU），并发两次下载理论上各起一线程同写 input/；与既有 `reprocess_state` 同模式（超管专属+每运行时间戳备份目录使实际窗口很小），但下载把无锁窗口从秒级拉到分钟级——后续做全互斥（见下方 U2 backlog 互斥单向项）时用 `_history_lock` 收紧四个 `*_state` 的 check-and-set。
 - **V2.1.0**（2026-06-25）整页级调整（新增 /projects/temp 临时重点跟进，超管定义可保存动态范围；商机新增改为先弹编辑抽屉保存才加行）
 - **V2.0.0（2026-06-24）大版本（用户钦定，预计生产交付）= 三块需求合一**（两分支 SDD + 终审 opus Ready + verify 全绿 + 真实数据 live 冒烟）
