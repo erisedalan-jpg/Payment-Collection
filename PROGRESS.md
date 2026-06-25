@@ -4,9 +4,9 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.1.1**（子页面/局部调整：服务器端 PMIS 下载 + cookie 三路径 + /data 清单网格压缩 + /insight/board 排名图随排序换口径）
-- 最近更新：2026-06-25（V2.1.1：从 /data 页触发 run_pmis_pipeline.sh 服务器端下载 PMIS 表（SSE 流式进度）；cookie 三路径——粘贴框直填/服务器本机直写/update_cookie.py --server 推送；/data 文件清单由卡片改网格紧凑布局；/insight/board 排名图随选定排序指标自动换口径，单系列+饼图降级；打包纳入 pmisdata/ 白名单脚本）
-- 上一版本：V2.1.0（2026-06-25，新增 /projects/temp 临时重点跟进 + 商机新增改先弹抽屉）
+- 当前版本：**V2.2.0**（整页级调整：商机清单改造 + 新增 /opportunities/key 重点商机跟进页）
+- 最近更新：2026-06-25（V2.2.0：商机清单移入「项目组」分区并改名「商机进展」；商机级别 P1-P4 列新增（后端字段+前端显示+默认列）；新增 /opportunities/key 重点商机跟进页——单表范围引擎、默认条件 TOP1000&提前介入&重点商机&状态非赢单、复用参数化 ScopeBuilder/ProgressEditModal；页面权限注册 opportunity-followup-key；打包整包白名单纳入 opportunity_followup.py）
+- 上一版本：V2.1.1（2026-06-25，服务器端 PMIS 下载 + cookie 三路径 + /data 清单网格压缩 + /insight/board 排名图随排序换口径）
 - 更上版本：V1.20.2（2026-06-24，/insight/milestone 到期提醒表改造：时间段选择 + 含已完成的到期清单 + 照搬 /projects 表格栈）
 - 更上版本：V1.20.1（2026-06-24，/insight/risk 风险看板：风险统计分析加风险等级筛选 + 风险概览升级行列自选透视 + 全页下钻）
 - 上上版本：V1.20.0（2026-06-24，新增「重点跟进」导航分区 + /projects/key 重点项目进展页；进展持久化/编辑/归档/导出）
@@ -18,6 +18,10 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.2.0**（2026-06-25）整页级调整：
+  - 商机清单改造：/opportunities 从「重点跟进」分区移入「项目组」分区并改名「商机进展」；商机级别字段（P1/P2/P3/P4）加入后端 schema/seed + 前端列定义（默认显示，位于项目名后）；导航排序调整（商机进展置于项目进展之后）。
+  - 新增 /opportunities/key 重点商机跟进页：单表范围引擎（OPP_SCOPE_CATALOG，复用 tempScope 派生的 FieldLike/ScopeCondition/ScopeBuilder）；默认四条 AND 条件（TOP1000客户=是 & 商机阶段=提前介入 & 商机类型=重点商机 & 赢单状态≠已赢单）；跟进四列（关键跟进进展/下一步计划/跟进人/跟进日期，后端 opportunity_followup.py 持久化 data/opportunity_followup.json + 4 端点）；复用参数化 ScopeBuilder 定义筛选规则（可保存/重置/导入预设）；复用 ProgressEditModal 编辑弹窗；权限注册 pageKey `opportunity-followup-key`（超管可授普通管理员）。打包整包白名单补 opportunity_followup.py。
+  - **技术债（与 temp 同款，沿用既有约定）**：`handle_opportunity_followup_*` 的 busy 无锁（与 temp_followup、pmis_download 同款 TOCTOU），后续统一用 `_history_lock` 收紧时一并处理。
 - **V2.1.1**（2026-06-25）子页面/局部调整：服务器端 PMIS 下载（/data 页触发 run_pmis_pipeline.sh，SSE 流式进度）；cookie 三路径（粘贴框/服务器本机直写/update_cookie.py --server）；/data 清单网格压缩；/insight/board 排名图随选定排序换口径（单系列+饼图降级）；打包纳入 pmisdata/ 白名单。已知边界：下载与 cookie 推送需在可访问 PMIS 的机器冒烟验证。**Backlog（终审 opus 提）**：`handle_pmis_download` 的 busy 检查与置位非原子（TOCTOU），并发两次下载理论上各起一线程同写 input/；与既有 `reprocess_state` 同模式（超管专属+每运行时间戳备份目录使实际窗口很小），但下载把无锁窗口从秒级拉到分钟级——后续做全互斥（见下方 U2 backlog 互斥单向项）时用 `_history_lock` 收紧四个 `*_state` 的 check-and-set。
 - **V2.1.0**（2026-06-25）整页级调整（新增 /projects/temp 临时重点跟进，超管定义可保存动态范围；商机新增改为先弹编辑抽屉保存才加行）
 - **V2.0.0（2026-06-24）大版本（用户钦定，预计生产交付）= 三块需求合一**（两分支 SDD + 终审 opus Ready + verify 全绿 + 真实数据 live 冒烟）
