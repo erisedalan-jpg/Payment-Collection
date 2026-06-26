@@ -206,11 +206,12 @@ defineExpose({
         @move-down="prefs.moveDown"
         @reset="prefs.reset"
       />
-      <!-- 超管专属写操作按钮 -->
+      <!-- 新增商机:任意登录管理员(普通管理员限本人 L4,由后端 + 编辑抽屉约束) -->
+      <el-button size="small" type="primary" data-test="opp-add" @click="onCreate">
+        新增商机
+      </el-button>
+      <!-- 超管专属写操作:删除/导入/导出 -->
       <template v-if="auth.isSuper">
-        <el-button size="small" type="primary" data-test="opp-add" @click="onCreate">
-          新增商机
-        </el-button>
         <el-button
           size="small"
           type="danger"
@@ -289,8 +290,8 @@ defineExpose({
           </template>
         </el-table-column>
 
-        <!-- 操作列：超管专属 -->
-        <el-table-column v-if="auth.isSuper" label="操作" width="80" fixed="right">
+        <!-- 操作列：任意登录管理员可编辑(普通管理员经 GET 已只见本人 L4 行;写入后端再校验 L4) -->
+        <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text @click.stop="openEdit(row)">编辑</el-button>
           </template>

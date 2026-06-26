@@ -5,6 +5,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import OpportunityEditDrawer from './OpportunityEditDrawer.vue'
 import { useOpportunitiesStore } from '@/stores/opportunities'
+import { useAuthStore } from '@/stores/auth'
 
 beforeEach(() => setActivePinia(createPinia()))
 const row = { id: 'opp-1', l4: '小金融服务组', customer: '甲', status: '招投标', amountWan: 100, firstReg: '2026-06-01', lastUpdate: '2026-06-20 10:00' }
@@ -79,5 +80,41 @@ describe('OpportunityEditDrawer create 模式', () => {
     await flushPromises()
     expect(updateSpy).toHaveBeenCalledOnce()
     expect(createSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('OpportunityEditDrawer L4 写入约束', () => {
+  const L4_FULL = ['小金融服务组', '银行服务组', '运营商服务组']
+
+  it('普通管理员:L4 选项仅含本人 allowedL4；create 单 L4 预填+锁定', async () => {
+    const auth = useAuthStore()
+    auth.user = { account: 'u', displayName: '普管', isSuper: false,
+      allowedPages: ['opportunities'], allowedL4: ['银行服务组'] } as any
+    const w = mount(OpportunityEditDrawer, {
+      props: { modelValue: true, row: null, mode: 'create' },
+      global: { plugins: [ElementPlus], stubs: STUBS },
+    })
+    await flushPromises()
+    const vm = w.vm as any
+    // L4 列仅本人范围；非 L4 列不受限
+    expect(vm.optionsFor({ key: 'l4', options: L4_FULL })).toEqual(['银行服务组'])
+    expect(vm.optionsFor({ key: 'status', options: ['A', 'B'] })).toEqual(['A', 'B'])
+    // 单 L4 → 锁定 + 预填
+    expect(vm.l4Locked).toBe(true)
+    expect(vm.form.l4).toBe('银行服务组')
+  })
+
+  it('超管:L4 选项为全集、不锁定', async () => {
+    const auth = useAuthStore()
+    auth.user = { account: 'admin', displayName: '超管', isSuper: true,
+      allowedPages: [], allowedL4: [] } as any
+    const w = mount(OpportunityEditDrawer, {
+      props: { modelValue: true, row, mode: 'edit' },
+      global: { plugins: [ElementPlus], stubs: STUBS },
+    })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.optionsFor({ key: 'l4', options: L4_FULL })).toEqual(L4_FULL)
+    expect(vm.l4Locked).toBe(false)
   })
 })

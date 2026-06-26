@@ -138,26 +138,24 @@ describe('OpportunitiesView', () => {
 
   // ---------- Task 7 新增测试 ----------
 
-  it('(T7-a) 超管见四个写操作按钮及操作列"编辑"；普通管理员都不见', async () => {
-    // 超管
+  it('(T7-a) 超管见全部写操作；普通管理员见新增+编辑、不见删除/导入/导出', async () => {
+    // 超管：全部写操作可见
     const ws = await mountView(true)
     const htmlS = ws.html()
     expect(ws.find('[data-test="opp-add"]').exists()).toBe(true)
     expect(ws.find('[data-test="opp-del"]').exists()).toBe(true)
     expect(ws.find('[data-test="opp-import"]').exists()).toBe(true)
     expect(ws.find('[data-test="opp-export"]').exists()).toBe(true)
-    // 操作列"编辑"按钮
     expect(htmlS).toContain('编辑')
-    // file input 存在
     expect(ws.find('input[type="file"]').exists()).toBe(true)
 
-    // 普通管理员
+    // 普通管理员：新增 + 操作列编辑放开；删除/导入/导出仍超管专属
     const wn = await mountView(false)
-    expect(wn.find('[data-test="opp-add"]').exists()).toBe(false)
+    expect(wn.find('[data-test="opp-add"]').exists()).toBe(true)       // 新增放开
+    expect(wn.html()).toContain('编辑')                                // 操作列编辑放开
     expect(wn.find('[data-test="opp-del"]').exists()).toBe(false)
     expect(wn.find('[data-test="opp-import"]').exists()).toBe(false)
     expect(wn.find('[data-test="opp-export"]').exists()).toBe(false)
-    // 普通管理员无 file input
     expect(wn.find('input[type="file"]').exists()).toBe(false)
   })
 
