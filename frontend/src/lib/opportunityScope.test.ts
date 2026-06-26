@@ -14,7 +14,8 @@ describe('OPP_SCOPE_CATALOG', () => {
     expect(m.get('amountWan')).toBe('number')
     expect(m.get('expectedDate')).toBe('date')
     expect(m.get('customer')).toBe('text')
-    expect(OPP_SCOPE_CATALOG.length).toBe(26)
+    expect(m.get('majorPoc')).toBe('enum')
+    expect(OPP_SCOPE_CATALOG.length).toBe(27)
   })
 })
 

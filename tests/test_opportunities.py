@@ -134,3 +134,22 @@ def test_read_xlsx_maps_opportunity_level(tmp_path):
     wb.save(p)
     rows = opp.read_opportunities_xlsx(str(p))
     assert rows[0]["opportunityLevel"] == "P1"
+
+
+def test_major_poc_is_editable_field():
+    assert 'majorPoc' in opp.FIELDS
+    r = opp.new_row("opp-1")
+    assert r["majorPoc"] == ""
+    s = _store(); opp.apply_create(s, "d")
+    r2 = opp.apply_update(s, "opp-1", {"majorPoc": "是"}, "admin", "d", "t")
+    assert r2["majorPoc"] == "是"
+
+
+def test_read_xlsx_maps_major_poc(tmp_path):
+    p = tmp_path / "opp_poc.xlsx"
+    wb = openpyxl.Workbook(); ws = wb.active
+    ws.append(["客户名称", "是否重大POC"])
+    ws.append(["甲公司", "是"])
+    wb.save(p)
+    rows = opp.read_opportunities_xlsx(str(p))
+    assert rows[0]["majorPoc"] == "是"
