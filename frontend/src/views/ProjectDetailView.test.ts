@@ -334,6 +334,34 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('实际比例')           // S7 新增列表头
   })
 
+  it('回款节点表金额列以「元」展示原始值(精度,非万)', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].paymentPmis = {
+      contract: 1000000, actualTotal: 700000, paymentCount: 1,
+      expectedTotal: 1000000, nodeCount: 1, reachedCount: 1, delayedCount: 0,
+      lastPaymentDate: '2026-06-04', fromOrigin: false,
+    }
+    ;(ds.data as any).paymentNodes = { 'P-1': [
+      { stage: '到货款', category: '到货款', planDate: '2026-01-01', actualDate: '2026-01-02',
+        payRatio: 0.7, expectedPayment: 123456, receivedAmount: 123456, unpaidAmount: 0,
+        actualRatio: 1, termDays: 90, payTerm: '到货后付款', reached: true, status: '已回款' },
+    ] }
+    const w = await mountAt('/project/P-1')
+    // 三列表头改为「元」
+    expect(w.text()).toContain('计划回款(元)')
+    expect(w.text()).toContain('已收(元)')
+    expect(w.text()).toContain('未收(元)')
+    // 这两列不再有「万」表头(它们只作为节点列存在,不在汇总卡片中)
+    expect(w.text()).not.toContain('已收(万)')
+    expect(w.text()).not.toContain('未收(万)')
+    // 展示原始元值(精确,无万元四舍五入: 123456 元 → 123,456, 而非 12.35)
+    expect(w.text()).toContain('123,456')
+    expect(w.text()).not.toContain('12.35')
+    // 账期仍为天(不动)
+    expect(w.text()).toContain('账期(天)')
+  })
+
   it('渲染项目标签块，显示已挂标签(2C)', async () => {
     seed()
     const tags = useProjectTagsStore()
