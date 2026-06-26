@@ -167,7 +167,8 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/data-history/rollback', '/api/data-history/undo-rollback',
     '/api/manual/import', '/api/manual/rollback',
     '/api/progress/archive',
-    '/api/opportunities/create', '/api/opportunities/update',
+    # 商机 create/update 放开到普通管理员(仍须登录;L4 越权由处理器内 can_access_l4 校验)。
+    # delete/import 维持超管专属(破坏性/整表替换)。
     '/api/opportunities/delete', '/api/opportunities/import',
     '/api/temp-followup/scope', '/api/temp-followup/archive',
     '/api/opportunity-followup/scope', '/api/opportunity-followup/archive',
@@ -1249,7 +1250,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"读取商机失败: {e}"))
 
-    def handle_opportunities_create(self):  # 超管(由 _authz_gate 拦)
+    def handle_opportunities_create(self):  # 任意登录管理员;非超管限本人 L4
         data = self._read_json_body() if int(self.headers.get('Content-Length', 0)) > 0 else {}
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
@@ -1258,7 +1259,22 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if fields is not None and not isinstance(fields, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "fields 须为对象"))
             return
-        account, _ = self._session_account_rec()
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        is_super = bool(rec.get('isSuper'))
+        allowed = rec.get('allowedL4', []) or []
+        # 非超管:新增必须落在本人 L4 范围(仅一个 L4 时缺省自动补该值)
+        if not is_super and '*' not in set(allowed):
+            fields = dict(fields or {})
+            l4 = str(fields.get('l4') or '').strip()
+            if not l4 and len(allowed) == 1:
+                l4 = allowed[0]
+                fields['l4'] = l4
+            if not _opp.can_access_l4(l4, allowed, False):
+                self._send_json(403, _error_payload(ERR_FORBIDDEN, "只能在本人 L4 范围内新增商机"))
+                return
         try:
             store = _load_opportunities()
             now_date, now_dt = self._opp_now()
@@ -1268,7 +1284,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"新增商机失败: {e}"))
 
-    def handle_opportunities_update(self):  # 超管
+    def handle_opportunities_update(self):  # 任意登录管理员;非超管限本人 L4
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
@@ -1278,14 +1294,28 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not rid or not isinstance(fields, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "id 必填、fields 须为对象"))
             return
-        account, _ = self._session_account_rec()
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        is_super = bool(rec.get('isSuper'))
+        allowed = rec.get('allowedL4', []) or []
         try:
             store = _load_opportunities()
-            now_date, now_dt = self._opp_now()
-            row = _opp.apply_update(store, rid, fields, account, now_date, now_dt)
-            if row is None:
+            target = next((r for r in store.get('rows', []) if r.get('id') == rid), None)
+            if target is None:
                 self._send_json(404, _error_payload(ERR_NOT_FOUND, f"商机不存在: {rid}"))
                 return
+            # 非超管:只能改本人 L4 范围内的行;且不得把行的 L4 改到本人范围外
+            if not is_super:
+                if not _opp.can_access_l4(target.get('l4'), allowed, False):
+                    self._send_json(403, _error_payload(ERR_FORBIDDEN, "无权修改该 L4 范围外的商机"))
+                    return
+                if 'l4' in fields and not _opp.can_access_l4(fields.get('l4'), allowed, False):
+                    self._send_json(403, _error_payload(ERR_FORBIDDEN, "不能将商机移出本人 L4 范围"))
+                    return
+            now_date, now_dt = self._opp_now()
+            row = _opp.apply_update(store, rid, fields, account, now_date, now_dt)
             _save_opportunities(store)
             self._json_response({"row": row})
         except Exception as e:

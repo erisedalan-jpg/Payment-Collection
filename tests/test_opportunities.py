@@ -153,3 +153,23 @@ def test_read_xlsx_maps_major_poc(tmp_path):
     wb.save(p)
     rows = opp.read_opportunities_xlsx(str(p))
     assert rows[0]["majorPoc"] == "是"
+
+
+def test_can_access_l4_super_and_wildcard_always_true():
+    # 超管恒 True（即便 allowedL4 为空）
+    assert opp.can_access_l4("银行服务组", [], True) is True
+    assert opp.can_access_l4("", [], True) is True
+    # allowedL4 含 '*' → 恒 True
+    assert opp.can_access_l4("任意组", ["*"], False) is True
+
+
+def test_can_access_l4_normal_admin_scoped():
+    allowed = ["小金融服务组", "银行服务组"]
+    # 命中本人 L4 → True
+    assert opp.can_access_l4("小金融服务组", allowed, False) is True
+    assert opp.can_access_l4("银行服务组", allowed, False) is True
+    # 越权 L4 → False（防普通管理员改/建本人范围外的商机）
+    assert opp.can_access_l4("运营商服务组", allowed, False) is False
+    # 空 L4 值 / 空 allowedL4 → False
+    assert opp.can_access_l4("", allowed, False) is False
+    assert opp.can_access_l4("小金融服务组", [], False) is False

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { OPP_COLUMNS, OPP_FIELDS } from '@/lib/opportunityColumns'
 import { useOpportunitiesStore } from '@/stores/opportunities'
+import { useAuthStore } from '@/stores/auth'
 import type { OppRow } from '@/lib/opportunitiesApi'
 
 const props = defineProps<{
@@ -16,9 +17,25 @@ const emit = defineEmits<{
 }>()
 
 const store = useOpportunitiesStore()
+const auth = useAuthStore()
 
 // 只取 type 非 auto/derived 的可编辑列
 const editCols = OPP_COLUMNS.filter((c) => c.type !== 'auto' && c.type !== 'derived')
+
+// L4 写入约束:普通管理员只能选本人 allowedL4(后端同样校验);'*' 视为全集。
+function optionsFor(col: { key: string; options?: string[] }): string[] {
+  const full = col.options ?? []
+  if (col.key !== 'l4' || auth.isSuper) return full
+  const allowed = auth.user?.allowedL4 ?? []
+  if (allowed.includes('*')) return full
+  return full.filter((o) => allowed.includes(o))
+}
+// 普通管理员恰有一个 L4 时:新增预填该值并锁定(不可改)。
+const l4Locked = computed(() => {
+  if (auth.isSuper) return false
+  const allowed = auth.user?.allowedL4 ?? []
+  return allowed.length === 1 && allowed[0] !== '*'
+})
 
 // 只读信息字段
 const infoKeys = ['firstReg', 'lastUpdate', 'recentUpdate'] as const
@@ -34,11 +51,16 @@ function rebuildForm(row: OppRow | null) {
   OPP_FIELDS.forEach((k) => {
     form[k] = row ? (row[k] ?? null) : null
   })
+  // 普通管理员新增:仅一个 L4 时预填该值(与后端缺省补 L4 一致)
+  if (props.mode === 'create' && !auth.isSuper) {
+    const allowed = auth.user?.allowedL4 ?? []
+    if (allowed.length === 1 && allowed[0] !== '*') form['l4'] = allowed[0]
+  }
 }
 
-// 初始建立副本 + 监听 row 变化
+// 初始建立副本 + 监听 row / mode 变化
 rebuildForm(props.row)
-watch(() => props.row, (r) => rebuildForm(r))
+watch(() => [props.row, props.mode], () => rebuildForm(props.row))
 
 async function onSave() {
   const fields: Record<string, any> = {}
@@ -54,7 +76,7 @@ async function onSave() {
   emit('update:modelValue', false)
 }
 
-defineExpose({ form, onSave })
+defineExpose({ form, onSave, optionsFor, l4Locked })
 </script>
 
 <template>
@@ -77,10 +99,11 @@ defineExpose({ form, onSave })
           v-if="col.type === 'select'"
           v-model="form[col.key]"
           clearable
+          :disabled="col.key === 'l4' && l4Locked"
           style="width: 100%"
         >
           <el-option
-            v-for="opt in col.options"
+            v-for="opt in optionsFor(col)"
             :key="opt"
             :label="opt"
             :value="opt"

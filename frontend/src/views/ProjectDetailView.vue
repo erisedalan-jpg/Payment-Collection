@@ -198,13 +198,26 @@ const riskSummary = computed(() => [
   { k: '最高等级', v: m.value.risk?.最高等级 || '无' },
   { k: '闭环率', v: fmtRatio(m.value.risk?.闭环率) },
 ])
-const riskCols: DataColumn[] = RISK_COLUMNS.map((c) => ({
-  key: c.key,
-  label: c.label,
-  width: c.width,
-  formatter: c.date ? (v: unknown) => fmtDateCell(v) : undefined,
-}))
 const riskRows = computed(() => (m.value.riskRecords ?? []) as Record<string, any>[])
+// 风险明细全量展示:按真实数据的全部列构建(命中 RISK_COLUMNS 的沿用精选标签/宽度/日期格式,
+// 其余列用原始中文键名);所有列 wrap 换行、不截断。内部键 id 不成列。
+const riskCols = computed<DataColumn[]>(() => {
+  const rows = riskRows.value
+  if (!rows.length) return []
+  const known = new Map(RISK_COLUMNS.map((c) => [c.key, c]))
+  return Object.keys(rows[0])
+    .filter((key) => key !== 'id')
+    .map((key) => {
+      const c = known.get(key)
+      return {
+        key,
+        label: c?.label ?? key,
+        width: c?.width ?? 160,
+        wrap: true,
+        formatter: c?.date ? (v: unknown) => fmtDateCell(v) : undefined,
+      } as DataColumn
+    })
+})
 
 // —— 预算核算 ——
 const costSummary = computed(() => [
