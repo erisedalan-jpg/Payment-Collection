@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.2.0**（整页级调整：商机清单改造 + 新增 /opportunities/key 重点商机跟进页）
-- 最近更新：2026-06-25（V2.2.0：/opportunities 移入「项目」分区并改名「商机清单」（pageKey 仍 opportunities-progress 不变）；新增「商机级别」P1/P2/P3/P4 下拉列（预估金额后/默认显示）；新增 /opportunities/key 重点商机跟进页——单表范围引擎、默认条件 TOP1000&提前介入&重点商机&状态非赢单、复用参数化 ScopeBuilder/ProgressEditModal；页面权限注册 pageKey opportunity-followup；打包整包白名单纳入 opportunity_followup.py）
+- 当前版本：**V2.2.1**（子页面·局部调整：回款明细三列改元 + 商机新增是否重大POC列）
+- 最近更新：2026-06-26（V2.2.1：/project/:id 回款明细表三列改元；/opportunities 新增「是否重大POC」下拉列；/opportunities/key 筛选/可选列自动派生新列）
 - 上一版本：V2.1.1（2026-06-25，服务器端 PMIS 下载 + cookie 三路径 + /data 清单网格压缩 + /insight/board 排名图随排序换口径）
 - 更上版本：V1.20.2（2026-06-24，/insight/milestone 到期提醒表改造：时间段选择 + 含已完成的到期清单 + 照搬 /projects 表格栈）
 - 更上版本：V1.20.1（2026-06-24，/insight/risk 风险看板：风险统计分析加风险等级筛选 + 风险概览升级行列自选透视 + 全页下钻）
@@ -18,6 +18,10 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.2.1**（2026-06-26，Z 级·子页面局部调整）：
+  - `/project/:id` 回款明细表「计划回款/已收/未收」三列由「万元」改为「元」展示（`fmtWan`→`fmtYuan`），消除 ÷10000 + 两位小数四舍五入导致的精度丢失；账期(天) 与回款 Tab 顶部汇总卡片不变。与 `/payment` 台账下钻「已收(元)/未收(元)」口径一致。
+  - `/opportunities`（商机清单）新增「是否重大POC」是/否下拉列，位于「预估落单时间」之后、「实际中标状态」之前，默认显示；后端 `opportunities.py` `FIELDS`/`HEADER_TO_FIELD` 加 `majorPoc`（字段 23→24）。`/opportunities/key`（重点商机跟进）的范围筛选目录与可选显示列均派生自 `OPP_COLUMNS`，新列自动成为可筛选字段 + 可选列（按定不进该页默认列）。
+  - 无 `preprocess_data.py` 改动 → 升级不需点「更新数据」；无新依赖。
 - **V2.2.0**（2026-06-25）整页级调整：
   - 商机清单改造：/opportunities 从「重点跟进」分区移入「项目」分区（已关闭项目后、项目动态前）并改名「商机清单」（pageKey 仍 opportunities-progress 不变，只改 meta.title/菜单 label/H2/导出名）；新增「商机级别」下拉列（取值 P1/P2/P3/P4，位于预估金额(万元)后、预估落单时间前，默认显示）——后端 opportunities.py 的 FIELDS + HEADER_TO_FIELD 加 opportunityLevel，前端 opportunityColumns.ts 加列+默认列。
   - 新增 /opportunities/key 重点商机跟进页（形式同 /projects/temp）：前端把范围匹配纯运算符抽出共享 scopeOps.ts（tempScope 改引用、ScopeCondition.group 改可选），新增商机单表范围引擎 opportunityScope.ts（OPP_SCOPE_CATALOG 派生自 OPP_COLUMNS、opportunityMatches、DEFAULT_OPP_SCOPE）；默认四条 AND 条件（是否TOP1000客户 in [TOP1000] & 是否提前介入 in [是] & 是否重点商机 in [是] & 商机状态 notIn [赢单]）；跟进四列（本周工作进展/后续工作计划/跟进日期/跟进人，设计同 /projects/key）；后端 opportunity_followup.py（PROGRESS_FIELDS + 单表 normalize_scope + apply_update/archive + new_store 种入默认范围）持久化 data/opportunity_followup.json + 4 端点（GET 任意登录 / scope·archive 超管 / update 任意登录 {oppId}）；参数化复用 ScopeBuilder（catalog/singleTable/matchFn/countUnit，temp 零回归）+ ProgressEditModal（加 store='oppFollowup'）；新视图 OpportunityFollowupView 取数自 opportunities store（服务端按 allowedL4 裁剪）+ 范围过滤 + 当前/历史快照 + 超管范围设置/归档/导出；auth 登入/登出两处 reset 新 store 防跨账号 L4 泄露；pageKey opportunity-followup（菜单「重点跟进」组，重点项目进展后/临时重点跟进前）。打包整包白名单补 opportunity_followup.py（增量包 *.py glob 自动纳入）。
