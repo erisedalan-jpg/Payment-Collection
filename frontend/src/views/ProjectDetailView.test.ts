@@ -53,7 +53,7 @@ function seed() {
         customer: { 最终客户: '海聚博源', 合同总额: 5276000.0 },
         team: { 项目经理: '何平', L4部门: '安全A组', L3部门: '安全事业部', L3_1部门: '三部一组', AR: 'AR张', SR: 'SR李', CSR: 'CSR王', CDR: 'CDR赵', Sponsor: 'Sponsor陈' },
         riskRecords: [
-          { 风险编码: 'FX-1', 风险名称: '工期风险', 风险等级: '中', 风险状态: '已识别', 风险大类: '进度', 识别日期: '2025-09-19T00:00:00', 计划应对完成日期: '2025-10-01T00:00:00', 实际应对完成日期: null, 是否超期: '否', 责任人: '何平' },
+          { 风险编码: 'FX-1', 风险名称: '工期风险', 风险描述: '这是一段较长的风险描述文本用于验证换行展示不被截断', 风险等级: '中', 风险状态: '已识别', 风险大类: '进度', 识别日期: '2025-09-19T00:00:00', 计划应对完成日期: '2025-10-01T00:00:00', 实际应对完成日期: null, 是否超期: '否', 责任人: '何平', 备注: '附加说明列应作为全量列出现' },
         ],
       },
       'OLD-9': { source: '已关闭', team: { 项目名称: '某局一期', 项目经理: '王五' }, customer: { 最终客户: '某局', 合同总额: 1000000 }, status: { 项目状态: '已验收' }, progress: { 项目阶段: '项目收尾', 完工进展: 1 } },
@@ -193,6 +193,20 @@ describe('ProjectDetailView', () => {
     expect(w.text()).toContain('工期风险')
     expect(w.text()).toContain('2025-09-19') // fmtDateCell 截断
     expect(w.text()).toContain('未关闭风险')
+  })
+
+  it('风险 tab:全量列(含非精选列 备注)展示 + 长文本换行不截断', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '风险')!.trigger('click')
+    await flushPromises()
+    const html = w.html()
+    // 非精选列(备注:不在 RISK_COLUMNS 13 列里)也作为表头出现 = 全量 43 列展示
+    expect(html).toContain('备注')
+    expect(w.text()).toContain('附加说明列应作为全量列出现')
+    // 长文本风险描述全文渲染(不截断)且挂换行类 dt-wrap-col
+    expect(w.text()).toContain('这是一段较长的风险描述文本用于验证换行展示不被截断')
+    expect(html).toContain('dt-wrap-col')
   })
 
   it('切预算核算 tab 显示成本汇总与明细', async () => {
