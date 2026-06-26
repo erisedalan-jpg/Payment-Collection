@@ -119,6 +119,18 @@ def filter_for_account(rows, allowed_l4, is_super) -> List[dict]:
     return [r for r in (rows or []) if _s(r.get('l4')) in allow]
 
 
+def can_access_l4(l4_value, allowed_l4, is_super) -> bool:
+    """某 L4 值是否在账号写入权限内(与 filter_for_account 的可见判定同源)。
+    超管或 allowedL4 含 '*' → 恒 True;否则要求 l4 值 ∈ allowedL4。
+    用于商机写端点的 L4 越权校验:普通管理员只能改/建本人 L4 范围内的商机。"""
+    if is_super:
+        return True
+    allow = set(allowed_l4 or [])
+    if '*' in allow:
+        return True
+    return _s(l4_value) in allow
+
+
 def read_opportunities_xlsx(path: str) -> List[dict]:
     from projects import _read_header_sheet
     raw = _read_header_sheet(path, '客户名称')
