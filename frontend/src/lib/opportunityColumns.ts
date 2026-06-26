@@ -24,6 +24,7 @@ export const OPP_COLUMNS: OppColumn[] = [
   { key: 'amountWan', label: '预估金额(万元)', type: 'number', width: 120, sortable: true },
   { key: 'opportunityLevel', label: '商机级别', type: 'select', options: OPPORTUNITY_LEVEL_OPTIONS, width: 100, filterable: true },
   { key: 'expectedDate', label: '预估落单时间', type: 'date', width: 130, sortable: true },
+  { key: 'majorPoc', label: '是否重大POC', type: 'select', options: YN, width: 120, filterable: true },
   { key: 'productCategory', label: '产品大类', type: 'text', width: 120, filterable: true },
   { key: 'mainProducts', label: '主要涉及产品', type: 'text', width: 160, wrap: true },
   { key: 'outsource', label: '是否含外包外采', type: 'select', options: YN, width: 120, filterable: true },
@@ -43,7 +44,7 @@ export const OPP_COLUMNS: OppColumn[] = [
 
 export const OPP_FIELDS = OPP_COLUMNS.filter((c) => !['auto', 'derived'].includes(c.type)).map((c) => c.key)
 
-export const DEFAULT_VISIBLE = ['l4','salesOwner','customer','top1000','status','forecast','name','amountWan','opportunityLevel','expectedDate','bidStatus','lastUpdate','recentUpdate']
+export const DEFAULT_VISIBLE = ['l4','salesOwner','customer','top1000','status','forecast','name','amountWan','opportunityLevel','expectedDate','majorPoc','bidStatus','lastUpdate','recentUpdate']
 export const FILTERABLE = new Set(OPP_COLUMNS.filter((c) => c.filterable).map((c) => c.key))
 
 /** lastUpdate 距今 ≤7 天→是;空/更早→否。比较按日期(取前 10 位)。 */
