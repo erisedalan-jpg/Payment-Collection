@@ -145,7 +145,7 @@ describe('riskCategory 过滤', () => {
 
   const rows = [
     makeRow('A', '健康', ['回款延期']),
-    makeRow('B', '关注', ['里程碑滞后', '成本超支']),
+    makeRow('B', '关注', ['里程碑滞后', '总成本超支']),
     makeRow('C', '风险', []),
     makeRow('D', '健康', []),
   ]
@@ -157,8 +157,8 @@ describe('riskCategory 过滤', () => {
     const res = filterProjectRows(rows, { ...F0, riskCategory: '回款延期' })
     expect(res.map(r => r.projectId)).toEqual(['A'])
   })
-  it('riskCategory="成本超支" → 只含命中行', () => {
-    const res = filterProjectRows(rows, { ...F0, riskCategory: '成本超支' })
+  it('riskCategory="总成本超支" → 只含命中行', () => {
+    const res = filterProjectRows(rows, { ...F0, riskCategory: '总成本超支' })
     expect(res.map(r => r.projectId)).toEqual(['B'])
   })
   it('riskCategory="健康度低" → health∈{关注,风险}', () => {

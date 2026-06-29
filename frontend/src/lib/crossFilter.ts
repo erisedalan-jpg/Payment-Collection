@@ -31,8 +31,14 @@ export interface UniqueValue {
   raw: unknown
 }
 
-/** 列去重枚举：按展示值升序返回唯一值。忠实移植 showPopup 的 uvMap（后值覆盖）+ Object.keys().sort()。 */
+/** 列去重枚举：按展示值升序返回唯一值。忠实移植 showPopup 的 uvMap（后值覆盖）+ Object.keys().sort()。
+ * riskReasons 列特例：摊平各条 category 为去重选项（而非把数组 String 化）。 */
 export function cfUniqueValues(rows: Record<string, any>[], colKey: string): UniqueValue[] {
+  if (colKey === 'riskReasons') {
+    const set = new Set<string>()
+    for (const r of rows) for (const rr of (r.riskReasons ?? [])) if (rr?.category) set.add(String(rr.category))
+    return [...set].sort().map((display) => ({ display, raw: display }))
+  }
   const uvMap: Record<string, unknown> = {}
   for (const r of rows) {
     const v = r[colKey]
@@ -54,6 +60,11 @@ export function applyColumnFilters(
   return rows.filter((row) => {
     for (const ck of keys) {
       const sel = filters[ck].value
+      if (ck === 'riskReasons') {
+        const cats = ((row.riskReasons ?? []) as { category?: string }[]).map((rr) => rr.category)
+        if (!sel.some((c) => cats.includes(c))) return false
+        continue
+      }
       const cv = row[ck]
       const fv = cfFormatValue(ck, cv)
       let match = false
