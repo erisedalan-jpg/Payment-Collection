@@ -33,11 +33,15 @@ export const useOpportunityFollowupStore = defineStore('opportunityFollowup', ()
     archives.value = r.archives ?? []
     current.value = {}
   }
+  async function deleteArchive(idx: number) {
+    const r = await opportunityFollowupApi.deleteArchive(idx)
+    archives.value = r.archives ?? []
+  }
   function reset() {
     scope.value = { ...EMPTY_SCOPE }
     current.value = {}
     archives.value = []
     loaded.value = false
   }
-  return { scope, current, archives, loaded, load, saveScope, update, archive, reset }
+  return { scope, current, archives, loaded, load, saveScope, update, archive, deleteArchive, reset }
 })

@@ -12,4 +12,6 @@ export const projectProgressApi = {
     api.post<UpdateResp>('/api/progress/update', { projectId, field, content }),
   archiveProgress: (rows: Partial<KeyProjectRow>[]) =>
     api.post<ArchiveResp>('/api/progress/archive', { rows }),
+  deleteArchive: (archiveIdx: number) =>
+    api.post<ArchiveResp>('/api/progress/archive/delete', { archiveIdx }),
 }

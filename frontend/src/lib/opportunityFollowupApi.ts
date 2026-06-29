@@ -14,4 +14,5 @@ export const opportunityFollowupApi = {
   update: (oppId: string, field: 'weekProgress' | 'nextPlan', content: string) =>
     api.post<OppFollowupUpdateResp>('/api/opportunity-followup/update', { oppId, field, content }),
   archive: (rows: Record<string, unknown>[]) => api.post<OppFollowupArchiveResp>('/api/opportunity-followup/archive', { rows }),
+  deleteArchive: (archiveIdx: number) => api.post<OppFollowupArchiveResp>('/api/opportunity-followup/archive/delete', { archiveIdx }),
 }
