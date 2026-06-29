@@ -107,6 +107,8 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
     if (f.riskCategory) {
       if (f.riskCategory === '健康度低') {
         if (!['关注', '风险'].includes(r.health)) return false
+      } else if (f.riskCategory === '成本超支') {
+        if (!r.riskReasons.some(rr => rr.category === '总成本超支' || rr.category === '交付成本超支')) return false
       } else {
         if (!r.riskReasons.some(rr => rr.category === f.riskCategory)) return false
       }
