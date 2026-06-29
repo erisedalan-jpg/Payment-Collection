@@ -54,7 +54,7 @@ async function onUploadInputs() {
 
 // —— 更新数据 / 设置 ——
 const { progress: repProgress, message: repMessage, running: repRunning, start: startReprocess } =
-  useReprocess({ onDone: () => { data.reload(); loadFileStatus() } })
+  useReprocess({ onDone: () => { data.reload(); loadFileStatus(); projectTags.load() } })
 
 // —— PMIS 在线下载 ——
 const pmisCookie = ref('')
