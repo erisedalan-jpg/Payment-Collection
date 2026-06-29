@@ -63,7 +63,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
     return {
       projectId: p.projectId,
       projectName: p.projectName || '-',
-      customer: customer.最终客户 || '-',
+      customer: p.customer || '-',
       contractAmount: typeof customer.合同总额 === 'number' ? customer.合同总额 : null,
       projectLevel: status.项目级别 || '-',
       projectType: status.项目类型 || '-',

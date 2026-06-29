@@ -39,15 +39,13 @@ export function buildProgressRowBase(
   p: Project,
   pmis: ProjectPmis | undefined,
   rec: ProgressRecord,
-  closedPmis?: ProjectPmis,
 ): KeyProjectRow {
   const m = (pmis ?? {}) as Record<string, any>
-  const st = m.status ?? {}, risk = m.risk ?? {}, cust = m.customer ?? {}, team = m.team ?? {}
-  const ccust = ((closedPmis ?? {}) as Record<string, any>).customer ?? {}
+  const st = m.status ?? {}, risk = m.risk ?? {}, team = m.team ?? {}
   const contract = p.paymentPmis?.contract
   return {
     projectId: p.projectId,
-    customer: p.isPresale ? v(ccust.最终客户, '-') : v(cust.最终客户, '-'),
+    customer: v(p.customer, '-'),
     projectName: p.projectName || p.projectId,
     projectLevel: v(st.项目级别, '-'),
     projectManager: v(p.projectManager, '-'),
@@ -75,5 +73,5 @@ export function buildKeyProjectRows(
 ): KeyProjectRow[] {
   return projects
     .filter((p) => isKeyProject(p, pmisMap[p.projectId]))
-    .map((p) => buildProgressRowBase(p, pmisMap[p.projectId], current[p.projectId] ?? {}, pmisMap[p.relatedClosedId ?? '']))
+    .map((p) => buildProgressRowBase(p, pmisMap[p.projectId], current[p.projectId] ?? {}))
 }

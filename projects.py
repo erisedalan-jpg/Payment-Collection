@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import config
@@ -198,6 +199,22 @@ def compute_health(pm: Dict[str, Any], delayed_count: int) -> Dict[str, Any]:
             "costAbnormal": cost_ab, "paymentAbnormal": pay_ab, "overall": overall}
 
 
+def parse_presale_customer_from_name(name) -> str:
+    """从售前项目名解析客户:`售前服务-客户名称-12位数字` → 客户名称。
+    贪婪 + 尾部数字锚定(客户名内含 '-' 也正确);不匹配 → ''。"""
+    m = re.match(r'^' + re.escape(config.PRESALE_PREFIX) + r'-(.+)-(\d+)$', str(name or '').strip())
+    return m.group(1).strip() if m else ''
+
+
+def effective_customer(is_presale: bool, own_fc: str, orig_fc: str, project_name) -> str:
+    """有效客户(单一来源):非售前=本项目最终客户;售前=原项目最终客户,空则项目名解析。"""
+    if not is_presale:
+        return own_fc
+    if orig_fc:
+        return orig_fc
+    return parse_presale_customer_from_name(project_name)
+
+
 def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
                    mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
                    top1000_map: Optional[Dict[str, Dict[str, str]]] = None) -> List[Dict[str, Any]]:
@@ -232,13 +249,11 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
         customer = pm.get("customer") or {}
         is_presale = ((pm.get("status") or {}).get("项目类型") == config.PRESALE_PROJECT_TYPE)
         related_closed = (m["closed"] if m else "")
-        # TOP1000/象限 客户取数:售前服务类按原项目(relatedClosedId)最终客户判定(本项目最终客户对售前无意义,
-        # 实测全为空);无原项目/原项目无客户 → 空 → 否/空(不回退本项目)。非售前用本项目最终客户。
-        if is_presale:
-            orig_customer = (project_pmis.get(related_closed) or {}).get("customer") or {}
-            final_customer = str(orig_customer.get("最终客户") or "").strip()
-        else:
-            final_customer = str(customer.get("最终客户") or "").strip()
+        # 有效客户(单一来源):非售前=本项目最终客户;售前=原项目最终客户,空则项目名解析。
+        # 用于 TOP1000 判定 + 落 Project.customer(前端各客户列/筛选统一读)。
+        own_fc = str(customer.get("最终客户") or "").strip()
+        orig_fc = str(((project_pmis.get(related_closed) or {}).get("customer") or {}).get("最终客户") or "").strip()
+        final_customer = effective_customer(is_presale, own_fc, orig_fc, name)
         t1 = top1000_map.get(final_customer) if final_customer else None
         top1000 = "是" if (t1 and t1.get("level") == config.TOP1000_LEVEL) else "否"
         quadrant = (t1.get("quad") if t1 else "") or ""
@@ -255,6 +270,7 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
             "health": health,
             "top1000": top1000,
             "quadrant": quadrant,
+            "customer": final_customer,
         })
     out.sort(key=lambda p: p["projectId"])
     return out

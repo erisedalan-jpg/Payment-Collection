@@ -30,8 +30,6 @@ export function buildRiskRows(
     if (!recs.length) continue
     const contract = (p.paymentPmis as Record<string, any> | null | undefined)?.contract
     const status = m.status ?? {}
-    const ownCust = (m.customer ?? {}) as Record<string, any>
-    const closedCust = ((pmisMap[p.relatedClosedId ?? ''] ?? {}) as Record<string, any>).customer ?? {}
     for (const rr of recs) {
       const riskCode = s(rr['风险编码'])
       const riskKey = `${p.projectId}::${riskCode}`
@@ -41,7 +39,7 @@ export function buildRiskRows(
         projectId: p.projectId,
         '项目编号': p.projectId,                 // 项目主域权威值,覆盖风险记录里可能存在的同名键
         '项目名称': p.projectName ?? '',
-        '客户': p.isPresale ? s(closedCust['最终客户']) : s(ownCust['最终客户']),
+        '客户': s(p.customer),
         '项目金额': typeof contract === 'number' ? Math.round(contract / 1000) / 10 : null,  // 万,1 位小数
         '项目级别': s(status['项目级别']),
         '项目经理': p.projectManager ?? '',
