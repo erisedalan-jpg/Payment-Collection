@@ -38,19 +38,18 @@ describe('buildRiskRows', () => {
 })
 
 describe('buildRiskRows 客户列', () => {
-  it('风险行客户列:售前取原项目、非售前取本项目', () => {
+  it('风险行客户列读 Project.customer(单一来源)', () => {
     const projects = [
-      { projectId: 'A', projectName: '甲', isPresale: true, relatedClosedId: 'OLD', paymentPmis: { contract: 0 } },
-      { projectId: 'B', projectName: '乙', isPresale: false, paymentPmis: { contract: 0 } },
+      { projectId: 'A', projectName: '甲', customer: 'A已算客户', paymentPmis: { contract: 0 } },
+      { projectId: 'B', projectName: '乙', customer: '', paymentPmis: { contract: 0 } },
     ] as any
     const pmis = {
-      A: { status: {}, customer: { 最终客户: 'A本项目' }, riskRecords: [{ 风险编码: 'X1', 风险状态: '未关闭' }] },
-      OLD: { customer: { 最终客户: 'A原项目' } },
-      B: { status: {}, customer: { 最终客户: 'B本项目' }, riskRecords: [{ 风险编码: 'X2', 风险状态: '未关闭' }] },
+      A: { status: {}, riskRecords: [{ 风险编码: 'X1', 风险状态: '未关闭' }] },
+      B: { status: {}, riskRecords: [{ 风险编码: 'X2', 风险状态: '未关闭' }] },
     } as any
     const rows = buildRiskRows(projects, pmis, {})
-    expect(rows.find((r) => r.riskKey === 'A::X1')!['客户']).toBe('A原项目')
-    expect(rows.find((r) => r.riskKey === 'B::X2')!['客户']).toBe('B本项目')
+    expect(rows.find((r) => r.riskKey === 'A::X1')!['客户']).toBe('A已算客户')
+    expect(rows.find((r) => r.riskKey === 'B::X2')!['客户']).toBe('')
   })
 })
 

@@ -35,7 +35,7 @@ function seed() {
       { projectId: 'OLD-9', nodeName: '终验款', planDate: '2024-01-01', expectedPayment: 200000, actualPayment: 200000, nodeStatus: '已全额回款', tier: '50万以下', isPaymentRelated: true },
     ],
     projects: [
-      { projectId: 'P-1', projectName: '终端安全项目', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '', 合同编号: 'HT-2026-001',
+      { projectId: 'P-1', projectName: '终端安全项目', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '', 合同编号: 'HT-2026-001', customer: '海聚博源',
         payment: { relatedNodeCount: 1, expectedTotal: 500000, actualTotal: 0, remainingTotal: 500000, paymentRatio: 0, delayedCount: 1 },
         deliveryCosts: [{ 类别: '内部人员成本', 预算金额: 122641.51, 实际发生: 0.0, 剩余预算: 122641.51, 消耗率: 0.0 }],
         top1000: '是', quadrant: 'M1 战略核心区',

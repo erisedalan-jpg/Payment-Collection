@@ -4,7 +4,7 @@ import { isKeyProject, buildKeyProjectRows, buildProgressRowBase, followDate, fo
 
 const proj = (over: Partial<Project> = {}): Project => ({
   projectId: 'P1', projectName: '甲', projectManager: '何平', orgL4: 'A组',
-  isPresale: false, relatedClosedId: '', top1000: '是',
+  isPresale: false, relatedClosedId: '', top1000: '是', customer: '某客户',
   paymentPmis: { contract: 2_000_000 } as any,
   payment: {} as any, deliveryCosts: [], health: {} as any, ...over,
 } as Project)
@@ -74,20 +74,12 @@ describe('isKeyProject 新口径: P1 || (TOP1000 && 合同>100万)', () => {
   })
 })
 
-describe('buildProgressRowBase 客户列售前取原项目', () => {
-  const own = { customer: { 最终客户: '本项目客户' } } as any
-  const closed = { customer: { 最终客户: '原项目客户' } } as any
-  it('售前服务类 → 取原项目客户', () => {
-    const p = { projectId: 'A', isPresale: true, relatedClosedId: 'OLD', paymentPmis: { contract: 0 } } as any
-    expect(buildProgressRowBase(p, own, {}, closed).customer).toBe('原项目客户')
-  })
-  it('售前但原项目无客户 → "-"(不回退本项目)', () => {
-    const p = { projectId: 'A', isPresale: true, relatedClosedId: 'OLD', paymentPmis: { contract: 0 } } as any
-    expect(buildProgressRowBase(p, own, {}, {} as any).customer).toBe('-')
-  })
-  it('非售前 → 取本项目客户', () => {
-    const p = { projectId: 'A', isPresale: false, paymentPmis: { contract: 0 } } as any
-    expect(buildProgressRowBase(p, own, {}, closed).customer).toBe('本项目客户')
+describe('buildProgressRowBase 客户取 Project.customer(单一来源)', () => {
+  it('读 p.customer(售前/非售前都一样,口径在后端算好)', () => {
+    const p1 = { projectId: 'A', customer: '已算好的客户', paymentPmis: { contract: 0 } } as any
+    expect(buildProgressRowBase(p1, {} as any, {}).customer).toBe('已算好的客户')
+    const p2 = { projectId: 'B', customer: '', paymentPmis: { contract: 0 } } as any
+    expect(buildProgressRowBase(p2, {} as any, {}).customer).toBe('-')   // 空 → '-'
   })
 })
 
