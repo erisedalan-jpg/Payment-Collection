@@ -169,6 +169,15 @@ describe('riskCategory 过滤', () => {
     const res = filterProjectRows(rows, { ...F0, riskCategory: '数据异常' })
     expect(res).toHaveLength(0)
   })
+  it('riskCategory="成本超支"（首页桶名）→ 命中含总成本超支或交付成本超支的行，不命中无超支行', () => {
+    const rows2 = [
+      makeRow('X1', '健康', ['总成本超支']),
+      makeRow('X2', '健康', ['交付成本超支']),
+      makeRow('X3', '健康', ['回款延期']),
+    ]
+    const res = filterProjectRows(rows2, { ...F0, riskCategory: '成本超支' })
+    expect(res.map(r => r.projectId).sort()).toEqual(['X1', 'X2'])
+  })
 })
 
 describe('paused/overspend 扩展(P4 风险焦点行)', () => {

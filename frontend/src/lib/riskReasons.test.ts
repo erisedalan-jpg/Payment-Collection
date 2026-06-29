@@ -144,6 +144,12 @@ describe('riskReasons — 成本超支拆分', () => {
     const result = riskReasons(p, pmis)
     expect(result.some((r) => r.category === '总成本超支')).toBe(false)
   })
+  it('消耗比>1 且 overspendAmount=0 且项目超支 false → 命中总成本超支', () => {
+    const p = baseProject({ overspendAmount: 0 })
+    const pmis = basePmis({ cost: { 项目超支: false, 消耗比: 1.1 } })
+    const result = riskReasons(p, pmis)
+    expect(result.some((r) => r.category === '总成本超支')).toBe(true)
+  })
 })
 
 describe('riskReasons — 风险未闭环', () => {

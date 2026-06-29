@@ -410,8 +410,10 @@ def _load_risk_followup():
 def _save_risk_followup(store):
     with _risk_lock:
         os.makedirs(os.path.dirname(RISK_FOLLOWUP_FILE), exist_ok=True)
-        with open(RISK_FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
+        tmp = RISK_FOLLOWUP_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(store, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, RISK_FOLLOWUP_FILE)
 
 
 # ── 商机管理(V2.0.0) ──
@@ -1298,14 +1300,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
         rk = str(data.get('riskKey') or '').strip()
         field = data.get('field')
         if not rk or field not in _riskfu.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "riskKey 必填、field 须为 followAction/revConclusion/nextRevDate"))
-            return
-        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
-        if not account:
-            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         try:
             store = _load_risk_followup()
