@@ -29,6 +29,7 @@ import KeyProjectsView from '@/views/KeyProjectsView.vue'
 import OpportunitiesView from '@/views/OpportunitiesView.vue'
 import TempFollowupView from '@/views/TempFollowupView.vue'
 import OpportunityFollowupView from '@/views/OpportunityFollowupView.vue'
+import OpportunitiesBoardView from '@/views/OpportunitiesBoardView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -57,6 +58,7 @@ export const router = createRouter({
     { path: '/insight/milestone', name: 'insight-milestone', component: MilestoneView, meta: { title: '里程碑管理', hideFilter: true, pageKey: 'insight-milestone' } },
     { path: '/insight/costdetail', name: 'insight-costdetail', component: CostDetailView, meta: { title: '成本分析', hideFilter: true, pageKey: 'insight-costdetail' } },
     { path: '/insight/risk', name: 'insight-risk', component: RiskBoardView, meta: { title: '风险看板', hideFilter: true, pageKey: 'insight-risk' } },
+    { path: '/opportunities/board', name: 'opportunities-board', component: OpportunitiesBoardView, meta: { title: '商机看板', hideFilter: true, pageKey: 'opportunities-board' } },
     { path: '/insight/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析', pageKey: 'insight-board' } },
     { path: '/insight/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历', pageKey: 'insight-calendar' } },
     { path: '/projects/key', name: 'projects-key', component: KeyProjectsView, meta: { title: '重点项目进展', hideFilter: true, pageKey: 'projects-key' } },

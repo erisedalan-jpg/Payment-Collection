@@ -22,6 +22,7 @@ function makeRouter() {
       { path: '/insight/milestone', component: { template: '<div/>' } },
       { path: '/insight/costdetail', component: { template: '<div/>' } },
       { path: '/insight/risk', component: { template: '<div/>' } },
+      { path: '/opportunities/board', component: { template: '<div/>' } },
       { path: '/insight/board', component: { template: '<div/>' } },
       { path: '/insight/calendar', component: { template: '<div/>' } },
       { path: '/payment', component: { template: '<div/>' } },
@@ -79,8 +80,8 @@ describe('AppSidebar', () => {
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
-    // 项目分析(6) + 重点跟进(4) + 回款子域(6) 均为 .nav-sub 二级呈现 = 16
-    expect(wrapper.findAll('.nav-sub').length).toBe(16)
+    // 项目分析(7) + 重点跟进(4) + 回款子域(6) 均为 .nav-sub 二级呈现 = 17
+    expect(wrapper.findAll('.nav-sub').length).toBe(17)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
