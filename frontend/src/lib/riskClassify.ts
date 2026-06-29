@@ -48,9 +48,11 @@ export function classifyProjects(projects: InputRow[]): RiskClassEntry[] {
   for (const row of projects) {
     const { projectId, projectName, health, riskReasons } = row
 
-    // 前 5 类：从 riskReasons 匹配
+    // 前 5 类：从 riskReasons 匹配；总/交付成本超支 remap 回「成本超支」桶（首页不拆桶）
+    const COST_SPLIT = new Set(['总成本超支', '交付成本超支'])
     for (const rr of riskReasons) {
-      const bucket = buckets.get(rr.category)
+      const cat = COST_SPLIT.has(rr.category) ? '成本超支' : rr.category
+      const bucket = buckets.get(cat)
       if (bucket) {
         bucket.projects.push({ projectId, projectName, detail: rr.detail })
       }

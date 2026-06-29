@@ -2,7 +2,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from '@/lib/anomaly'
 
 /** 关注/风险原因的分类枚举 */
-export type RiskCategory = '回款延期' | '里程碑滞后' | '成本超支' | '风险未闭环' | '数据异常'
+export type RiskCategory = '回款延期' | '里程碑滞后' | '总成本超支' | '交付成本超支' | '风险未闭环' | '数据异常'
 
 /** 单条关注/风险原因 */
 export interface RiskReason {
@@ -45,12 +45,16 @@ export function riskReasons(project: Project, pmis?: ProjectPmis): RiskReason[] 
     out.push({ category: '里程碑滞后', detail: msStatus, tone: 'warn' })
   }
 
-  // 3. 成本超支：overspendAmount > 0 优先；否则看 PMIS 项目超支 flag 或消耗比 > 1
+  // 3. 总成本超支(整体预算维度):overspendAmount > 0 优先；否则 PMIS 项目超支 flag 或消耗比 > 1
   const over = project.overspendAmount ?? 0
   if (over > 0) {
-    out.push({ category: '成本超支', detail: `超支 ${(over / 10000).toFixed(1)} 万`, tone: 'danger' })
+    out.push({ category: '总成本超支', detail: `超支 ${(over / 10000).toFixed(1)} 万`, tone: 'danger' })
   } else if ((pmis?.cost?.['项目超支']) || ((pmis?.cost?.['消耗比'] ?? 0) > 1)) {
-    out.push({ category: '成本超支', detail: '项目超支', tone: 'danger' })
+    out.push({ category: '总成本超支', detail: '项目超支', tone: 'danger' })
+  }
+  // 3b. 交付成本超支(交付部门人工成本):PMIS 现成布尔 flag
+  if (pmis?.cost?.['交付超支'] === true) {
+    out.push({ category: '交付成本超支', detail: '交付人工超支', tone: 'danger' })
   }
 
   // 4. 风险未闭环：存在未关闭风险
