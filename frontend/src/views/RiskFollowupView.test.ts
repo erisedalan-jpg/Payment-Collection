@@ -66,6 +66,14 @@ describe('RiskFollowupView', () => {
     await w.vm.$nextTick()
     expect(w.text()).toContain('删除此历史')
   })
+  it('客户列存在于 ALL_COLUMNS 但不在默认可见 16 列', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.allKeys).toContain('客户')                       // 可选列存在
+    expect(vm.prefs.visibleKeys.value).not.toContain('客户')   // 默认隐藏
+  })
   it('普通管理员历史模式不见删除按钮', async () => {
     seed(false)
     const risk = useRiskFollowupStore()

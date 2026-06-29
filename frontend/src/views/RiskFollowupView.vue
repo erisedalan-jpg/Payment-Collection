@@ -52,6 +52,7 @@ const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(T
 const PROJECT_COLS: DataColumn[] = [
   { key: '项目编号', label: '项目编号', width: 175, sortable: true },
   { key: '项目名称', label: '项目名称', width: 220, sortable: true },
+  { key: '客户', label: '客户', width: 180, sortable: true },
   { key: '项目金额', label: '项目金额(万)', width: 110, sortable: true, num: true,
     formatter: (v) => (v == null ? '-' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
   { key: '项目级别', label: '项目级别', width: 80, sortable: true },
@@ -87,7 +88,7 @@ const ALL_COLUMNS = computed<DataColumn[]>(() => [...riskCols.value, ...PROJECT_
 const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
-const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态'])
+const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户'])
 const prefs = useColumnPrefsDynamic(TABLE_ID, allKeys, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
@@ -164,7 +165,7 @@ function doExport() {
   exportOpen.value = false
 }
 
-defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, exportSel, allSelected, datasetOpts, toggleAllExport, allRows, scopedRows, hasScope })
+defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, exportSel, allSelected, datasetOpts, toggleAllExport, allRows, scopedRows, hasScope, allKeys, prefs })
 </script>
 
 <template>
