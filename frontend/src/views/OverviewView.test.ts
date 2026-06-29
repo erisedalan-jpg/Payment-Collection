@@ -4,6 +4,8 @@ import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import OverviewView from './OverviewView.vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
+import { useFilterStore } from '@/stores/filter'
 
 let router: Router
 beforeEach(() => {
@@ -128,5 +130,39 @@ describe('OverviewView', () => {
     const w = await mountView()
     expect(w.text()).toContain('首次同步，暂无变化记录')
     expect(w.text()).toContain('在管项目')
+  })
+})
+
+describe('OverviewView 标签排除', () => {
+  function seedSmall() {
+    const data = useDataStore()
+    ;(data as any).data = {
+      projects: [
+        { projectId: 'P1', projectName: '甲', orgL4: '一组', health: { overall: '健康' } },
+        { projectId: 'P2', projectName: '乙', orgL4: '一组', health: { overall: '健康' } },
+      ],
+      projectPmis: {}, paymentNodes: {}, paymentRecords: [], events: [],
+    }
+  }
+
+  it('开启排除后被排除项目不进 baseProjects', async () => {
+    seedSmall()
+    const tags = useProjectTagsStore(); tags.assignments = { P2: ['排除标签'] } as any
+    const filter = useFilterStore(); filter.setExclude(true, ['排除标签'])
+    await router.push('/'); await router.isReady()
+    const w = mount(OverviewView, { global: { plugins: [router] } })
+    await flushPromises()
+    const base = (w.vm as any).baseProjects as { projectId: string }[]
+    expect(base.map((p) => p.projectId)).toEqual(['P1'])
+  })
+
+  it('关闭排除时回到全量', async () => {
+    seedSmall()
+    const tags = useProjectTagsStore(); tags.assignments = { P2: ['排除标签'] } as any
+    const filter = useFilterStore(); filter.setExclude(false, ['排除标签'])
+    await router.push('/'); await router.isReady()
+    const w = mount(OverviewView, { global: { plugins: [router] } })
+    await flushPromises()
+    expect(((w.vm as any).baseProjects as any[]).map((p) => p.projectId)).toEqual(['P1', 'P2'])
   })
 })

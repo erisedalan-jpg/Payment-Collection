@@ -17,13 +17,17 @@ const filter = useFilterStore()
 const router = useRouter()
 onMounted(() => { if (!data.data) data.load() })
 
-const projects = computed(() => (data.data?.projects ?? []) as Project[])
+const baseProjects = computed(() => {
+  const all = (data.data?.projects ?? []) as Project[]
+  return filter.excludeOn ? all.filter((p) => !filter.excludedIds[p.projectId]) : all
+})
+const projects = baseProjects
 const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 
 const kpis = computed(() => computeKpis(projects.value, pmisMap.value, data.data?.paymentRecords))
 const health = computed(() => healthSummary(projects.value))
 const band = computed(() => paymentBand(
-  paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
+  paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis),
   new Date(),
   filter.payRecordsAll,
   filter.dateStart,
@@ -49,6 +53,7 @@ const expandedCategory = ref<string | null>(null)
 function toggleCategory(cat: string) {
   expandedCategory.value = expandedCategory.value === cat ? null : cat
 }
+defineExpose({ baseProjects })
 </script>
 
 <template>
