@@ -4,9 +4,9 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.3.0**（整页级调整：新增 /risk 风险跟进页；首页/成本分析补标签排除；治理页原项目数据缺失告警；/projects 六列排序+关注原因拆两类+列筛选）
-- 最近更新：2026-06-29（V2.3.0：新页 /risk 风险跟进（全列+换行+可选列+排序+三字段跟进+留存归档，pageKey risk-followup 需授权）；首页/成本分析补按标签排除；治理页新增 originMissing 原项目数据缺失告警；/projects 六列加排序+关注原因拆「总成本超支/交付成本超支」+该列列筛选）
-- 上一版本：V2.2.2（2026-06-26，/project/:id 风险子页面全 43 列展示+长文本换行；/opportunities 普通管理员可编辑+新增[限本人L4，后端 can_access_l4 校验]）
+- 当前版本：**V2.3.1**（子页面局部调整：/projects/key 取数口径改 P1 一律入选；标签升级后前端 store 补刷；四跟进页历史快照超管逐条删除；key/temp/risk 客户列售前取原项目最终客户）
+- 最近更新：2026-06-29（V2.3.1：/projects/key 取数改 P1 或(TOP1000且合同>100万)；标签升级后看似丢失=reprocess 完成漏刷前端 projectTags store 已补 load()；四个跟进页历史快照超管逐条删除含二次确认；key/temp/risk 客户列对售前服务类取原项目最终客户；risk 新增客户列默认隐藏）
+- 上一版本：V2.3.0（2026-06-29，新页 /risk 风险跟进；首页/成本分析补标签排除；治理页 originMissing 告警；/projects 六列排序+关注原因拆两类+列筛选）
 - 更上版本：V2.2.1（2026-06-26，/project/:id 回款明细三列改元 + 商机新增是否重大POC列；/opportunities/key 筛选/可选列自动派生新列）
 - 更上版本：V1.20.2（2026-06-24，/insight/milestone 到期提醒表改造：时间段选择 + 含已完成的到期清单 + 照搬 /projects 表格栈）
 - 更上版本：V1.20.1（2026-06-24，/insight/risk 风险看板：风险统计分析加风险等级筛选 + 风险概览升级行列自选透视 + 全页下钻）
@@ -19,6 +19,12 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.3.1**（2026-06-29，Z 级·子页面局部调整）：
+  - **/projects/key 取数口径调整**：重点项目进展页入选条件改为「商机级别=P1，或（TOP1000客户 且 合同>100万元）」，P1 项目一律入选、不再要求同时满足 TOP1000 且合同额，使重点项目进展列表覆盖面更完整。
+  - **标签升级后看似丢失修复**：升级并点「更新数据」完成后，若不刷新页面标签看似丢失，根因=`useProjectTagsStore` 数据已在后端写入但前端 store 未刷新。已在 `reprocess` SSE 完成回调中补调 `projectTags.load()`，后端数据从未丢失。
+  - **四个跟进页历史快照超管逐条删除**：/projects/key、/opportunities/key、/projects/temp、/risk 四页历史归档快照均支持超管逐条删除（二次确认弹窗），无需只能清全部；后端各模块新增 `apply_archive_delete` 纯函数 + server.py 各页面对应 `DELETE /api/.../archive/:archiveIdx` 端点（超管专属）；前端各页历史列表每行加删除按钮，确认后调 `store.deleteArchive(idx)`。
+  - **key/temp/risk 客户列售前取原项目最终客户**：/projects/key、/projects/temp、/risk 三个跟进页的「客户」列对售前服务类项目（有 relatedClosedId）取原项目的最终客户（endCustomer），与 V1.19.1 售前 TOP1000/象限 口径一致（不回退本项目）；/risk 页新增「客户」可选列，默认隐藏，由列选择器控制显示。
+  - 无 `preprocess_data.py`/`schema.py` 改动 → 升级不需点「更新数据」；无新依赖；无新页面/pageKey。
 - **V2.3.0**（2026-06-29，Y 级·整页级调整）：
   - **新增 /risk 风险跟进页**（以风险记录为核心的跟进看板）：后端新建 `risk_followup.py`（持久化 `data/risk_followup.json`，端点 GET/update/archive，pageKey `risk-followup` 需授权，归档为「留存跟进」不清空 current）；前端全列展示+长文本换行+列选择（`useColumnPrefsDynamic`）+可排序；新增三字段内联编辑：「跟进动作/rev结论」（文本）、「下次rev时间」（日期），记编辑时间与编辑人（EditTime/EditBy）；范围设置同临时重点跟进（`ScopeBuilder`），可自定义过滤哪些风险进入跟进视图；归档语义为「留存跟进」快照不清空当前跟进记录。注册 `risk-followup` pageKey（建号表单可授权）。
   - **首页/成本分析补按标签排除**：首页健康度 CARD 和成本分析页的项目统计/汇总均补充按标签排除逻辑（与回款看板等页面对齐），排除被标为「排除」标签的项目，使各页指标口径一致。
