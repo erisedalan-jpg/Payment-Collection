@@ -43,16 +43,16 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'projectId', label: '项目编号', width: 175 },
   { key: 'contractAmount', label: '合同金额(万)', width: 110, sortable: true,
     formatter: (v) => (v == null ? '-' : (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
-  { key: 'projectManager', label: '项目经理', width: 96 },
-  { key: 'orgL4', label: 'L4组', width: 110 },
+  { key: 'projectManager', label: '项目经理', width: 96, sortable: true },
+  { key: 'orgL4', label: 'L4组', width: 110, sortable: true },
   { key: 'stage', label: '阶段', width: 100 },
   { key: 'progress', label: '完工%', width: 90, sortable: true, formatter: (v) => fmtRatio(v) },
-  { key: 'riskLevel', label: '风险', width: 96, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
-  { key: 'projectLevel', label: '级别', width: 80 },
-  { key: 'projectType', label: '项目类型', width: 110 },
+  { key: 'riskLevel', label: '风险', width: 96, sortable: true, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
+  { key: 'projectLevel', label: '级别', width: 80, sortable: true },
+  { key: 'projectType', label: '项目类型', width: 110, sortable: true },
   { key: 'costRatio', label: '预算消耗比', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
   { key: 'paymentRatio', label: '回款完成率', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
-  { key: 'projectStatus', label: '项目状态', width: 100 },
+  { key: 'projectStatus', label: '项目状态', width: 100, sortable: true },
   { key: 'health', label: '健康度', width: 96 },
   { key: 'riskReasons', label: '关注原因', width: 220 },
   { key: 'paymentStatus', label: '回款状态', width: 100 },
@@ -133,6 +133,8 @@ async function doExport() {
   exportSheets(`项目数据导出_${filtered.value.length}项.xlsx`, sheets)
   exOpen.value = false
 }
+
+defineExpose({ ALL_COLUMNS })
 </script>
 
 <template>
