@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Project, ProjectPmis } from '@/types/analysis'
-import { isKeyProject, buildKeyProjectRows, followDate, followBy } from './keyProjects'
+import { isKeyProject, buildKeyProjectRows, buildProgressRowBase, followDate, followBy } from './keyProjects'
 
 const proj = (over: Partial<Project> = {}): Project => ({
   projectId: 'P1', projectName: '甲', projectManager: '何平', orgL4: 'A组',
@@ -71,6 +71,23 @@ describe('isKeyProject 新口径: P1 || (TOP1000 && 合同>100万)', () => {
   })
   it('非 TOP1000、非 P1、合同>100万 → 不入选', () => {
     const { p, pmis: pm } = mk('否', 5_000_000, 'P3'); expect(isKeyProject(p, pm)).toBe(false)
+  })
+})
+
+describe('buildProgressRowBase 客户列售前取原项目', () => {
+  const own = { customer: { 最终客户: '本项目客户' } } as any
+  const closed = { customer: { 最终客户: '原项目客户' } } as any
+  it('售前服务类 → 取原项目客户', () => {
+    const p = { projectId: 'A', isPresale: true, relatedClosedId: 'OLD', paymentPmis: { contract: 0 } } as any
+    expect(buildProgressRowBase(p, own, {}, closed).customer).toBe('原项目客户')
+  })
+  it('售前但原项目无客户 → "-"(不回退本项目)', () => {
+    const p = { projectId: 'A', isPresale: true, relatedClosedId: 'OLD', paymentPmis: { contract: 0 } } as any
+    expect(buildProgressRowBase(p, own, {}, {} as any).customer).toBe('-')
+  })
+  it('非售前 → 取本项目客户', () => {
+    const p = { projectId: 'A', isPresale: false, paymentPmis: { contract: 0 } } as any
+    expect(buildProgressRowBase(p, own, {}, closed).customer).toBe('本项目客户')
   })
 })
 
