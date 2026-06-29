@@ -57,4 +57,30 @@ describe('RiskFollowupView', () => {
     expect(w.text()).not.toContain('范围设置')
     expect(w.text()).not.toContain('归档（留存跟进）')
   })
+  it('历史模式:超管见「删除此历史」按钮,普通管理员不见', async () => {
+    seed(true)
+    const risk = useRiskFollowupStore()
+    risk.archives = [{ archiveTime: '2026-06-01 10:00', rows: [] }] as any
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    ;(w.vm as any).mode = 'history'
+    await w.vm.$nextTick()
+    expect(w.text()).toContain('删除此历史')
+  })
+  it('客户列存在于 ALL_COLUMNS 但不在默认可见 16 列', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.allKeys).toContain('客户')                       // 可选列存在
+    expect(vm.prefs.visibleKeys.value).not.toContain('客户')   // 默认隐藏
+  })
+  it('普通管理员历史模式不见删除按钮', async () => {
+    seed(false)
+    const risk = useRiskFollowupStore()
+    risk.archives = [{ archiveTime: '2026-06-01 10:00', rows: [] }] as any
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    ;(w.vm as any).mode = 'history'
+    await w.vm.$nextTick()
+    expect(w.text()).not.toContain('删除此历史')
+  })
 })

@@ -14,4 +14,5 @@ export const riskFollowupApi = {
   update: (riskKey: string, field: 'followAction' | 'revConclusion' | 'nextRevDate', content: string) =>
     api.post<RiskUpdateResp>('/api/risk-followup/update', { riskKey, field, content }),
   archive: (rows: Record<string, unknown>[]) => api.post<RiskArchiveResp>('/api/risk-followup/archive', { rows }),
+  deleteArchive: (archiveIdx: number) => api.post<RiskArchiveResp>('/api/risk-followup/archive/delete', { archiveIdx }),
 }

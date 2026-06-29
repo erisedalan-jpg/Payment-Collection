@@ -98,6 +98,19 @@ function openEdit(row: OppFollowupRow, field: 'weekProgress' | 'nextPlan') {
 
 const scopeOpen = ref(false)
 
+// 删除历史快照(超管)
+const delConfirm = ref(false)
+const deleting = ref(false)
+async function doDeleteArchive() {
+  deleting.value = true
+  try {
+    await oppf.deleteArchive(historyIdx.value)
+    delConfirm.value = false
+    if (!oppf.archives.length) mode.value = 'current'
+    else historyIdx.value = Math.min(historyIdx.value, oppf.archives.length - 1)
+  } finally { deleting.value = false }
+}
+
 const archiving = ref(false)
 const archiveConfirm = ref(false)
 async function doArchive() {
@@ -144,6 +157,8 @@ defineExpose({ scopeOpen, mode, historyIdx, isCurrent, editOpen, editCtx, inScop
         :disabled="!oppf.archives.length" placeholder="选择历史快照">
         <el-option v-for="o in historyOpts" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>
+      <button v-if="auth.isSuper && mode === 'history' && oppf.archives.length" class="kp-archive-btn"
+        @click="delConfirm = true">删除此历史</button>
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="scopeOpen = true">范围设置</button>
@@ -180,6 +195,14 @@ defineExpose({ scopeOpen, mode, historyIdx, isCurrent, editOpen, editCtx, inScop
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="oppf.scope"
       :catalog="OPP_SCOPE_CATALOG" :single-table="true" :match-fn="opportunityMatches"
       title="范围设置（重点商机跟进）" count-unit="商机" @save="(s) => oppf.saveScope(s)" />
+
+    <Modal v-model="delConfirm" title="删除历史快照" width="420px">
+      <div>将永久删除该条历史快照（{{ historyOpts[historyIdx]?.label }}），不可恢复。确认删除？</div>
+      <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
+        <button class="kp-cancel" @click="delConfirm = false">取消</button>
+        <button class="kp-archive-btn" :disabled="deleting" @click="doDeleteArchive">确认删除</button>
+      </div>
+    </Modal>
 
     <Modal v-model="archiveConfirm" title="更新（归档）" width="420px">
       <div>将把当前数据归档为历史快照，并清空两列进展（开始新一期）。确认更新？</div>

@@ -121,6 +121,19 @@ function openEdit(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan') {
   editOpen.value = true
 }
 
+// 删除历史快照(超管)
+const delConfirm = ref(false)
+const deleting = ref(false)
+async function doDeleteArchive() {
+  deleting.value = true
+  try {
+    await progress.deleteArchive(historyIdx.value)
+    delConfirm.value = false
+    if (!progress.archives.length) mode.value = 'current'
+    else historyIdx.value = Math.min(historyIdx.value, progress.archives.length - 1)
+  } finally { deleting.value = false }
+}
+
 // 更新归档(超管)
 const archiving = ref(false)
 const archiveConfirm = ref(false)
@@ -193,6 +206,8 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
         :disabled="!progress.archives.length" placeholder="选择历史快照">
         <el-option v-for="o in historyOpts" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>
+      <button v-if="auth.isSuper && mode === 'history' && progress.archives.length" class="kp-archive-btn"
+        @click="delConfirm = true">删除此历史</button>
       <ColumnPicker
         :columns="pickerColumns"
         :visible-keys="prefs.visibleKeys.value"
@@ -211,7 +226,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
       >清除所有筛选</el-button>
     </div>
 
-    <div v-if="!rows.length" class="kp-empty">暂无重点项目（取数：TOP1000 大客户 且 合同&gt;100万元 或 级别 P1）。</div>
+    <div v-if="!rows.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
     <div v-else class="kp-scroll">
       <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false" clickable @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
@@ -244,6 +259,14 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
       :field="editCtx.field"
       :initial="editCtx.initial"
     />
+
+    <Modal v-model="delConfirm" title="删除历史快照" width="420px">
+      <div>将永久删除该条历史快照（{{ historyOpts[historyIdx]?.label }}），不可恢复。确认删除？</div>
+      <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
+        <button class="kp-cancel" @click="delConfirm = false">取消</button>
+        <button class="kp-archive-btn" :disabled="deleting" @click="doDeleteArchive">确认删除</button>
+      </div>
+    </Modal>
 
     <Modal v-model="archiveConfirm" title="更新（归档）" width="420px">
       <div>将把当前数据归档为历史快照，并清空两列进展（开始新一期）。确认更新？</div>

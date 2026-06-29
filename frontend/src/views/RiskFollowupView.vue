@@ -52,6 +52,7 @@ const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(T
 const PROJECT_COLS: DataColumn[] = [
   { key: '项目编号', label: '项目编号', width: 175, sortable: true },
   { key: '项目名称', label: '项目名称', width: 220, sortable: true },
+  { key: '客户', label: '客户', width: 180, sortable: true },
   { key: '项目金额', label: '项目金额(万)', width: 110, sortable: true, num: true,
     formatter: (v) => (v == null ? '-' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
   { key: '项目级别', label: '项目级别', width: 80, sortable: true },
@@ -87,7 +88,7 @@ const ALL_COLUMNS = computed<DataColumn[]>(() => [...riskCols.value, ...PROJECT_
 const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
-const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态'])
+const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户'])
 const prefs = useColumnPrefsDynamic(TABLE_ID, allKeys, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
@@ -116,6 +117,19 @@ function openEdit(row: RiskRow, field: 'followAction' | 'revConclusion') {
 async function onDateChange(row: RiskRow, val: string | null) {
   if (!isCurrent.value) return
   await risk.update(row.riskKey, 'nextRevDate', val ?? '')
+}
+
+// —— 删除历史快照(超管) ——
+const delConfirm = ref(false)
+const deleting = ref(false)
+async function doDeleteArchive() {
+  deleting.value = true
+  try {
+    await risk.deleteArchive(historyIdx.value)
+    delConfirm.value = false
+    if (!risk.archives.length) mode.value = 'current'
+    else historyIdx.value = Math.min(historyIdx.value, risk.archives.length - 1)
+  } finally { deleting.value = false }
 }
 
 // —— 范围/归档/导出(超管) ——
@@ -151,7 +165,7 @@ function doExport() {
   exportOpen.value = false
 }
 
-defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, exportSel, allSelected, datasetOpts, toggleAllExport, allRows, scopedRows, hasScope })
+defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, exportSel, allSelected, datasetOpts, toggleAllExport, allRows, scopedRows, hasScope, allKeys, prefs })
 </script>
 
 <template>
@@ -164,6 +178,8 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
         :disabled="!risk.archives.length" placeholder="选择历史快照">
         <el-option v-for="o in historyOpts" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>
+      <button v-if="auth.isSuper && mode === 'history' && risk.archives.length" class="kp-archive-btn"
+        @click="delConfirm = true">删除此历史</button>
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="scopeOpen = true">范围设置</button>
@@ -205,6 +221,14 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="risk.scope"
       single-table :catalog="RISK_SCOPE_CATALOG" :match-fn="riskRowMatches"
       title="范围设置（风险跟进）" count-unit="风险" @save="(s) => risk.saveScope(s)" />
+
+    <Modal v-model="delConfirm" title="删除历史快照" width="420px">
+      <div>将永久删除该条历史快照（{{ historyOpts[historyIdx]?.label }}），不可恢复。确认删除？</div>
+      <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
+        <button class="kp-cancel" @click="delConfirm = false">取消</button>
+        <button class="kp-archive-btn" :disabled="deleting" @click="doDeleteArchive">确认删除</button>
+      </div>
+    </Modal>
 
     <Modal v-model="archiveConfirm" title="归档（留存跟进）" width="460px">
       <div>将当前风险跟进快照归档为历史；已填写的跟进动作 / rev结论 / 下次rev时间<strong>保留不清空</strong>（下次「更新数据」后按风险编码重新挂到最新风险上）。确认归档？</div>
