@@ -103,6 +103,7 @@ export function monthlyTrendByTeam(rows: OppRow[]): {
   for (const r of rows) { const k = monthKey(r.firstReg); if (isMonth(k)) set.add(k) }
   const sorted = [...set].sort()
   const months = sorted.length ? monthRange(sorted[0], sorted[sorted.length - 1]) : []
+  // 月趋势仅统计标准 L4 团队(L4_OPTIONS);非标准/越界 l4 值的行不计入趋势(l4 为 select、正常即 L4_OPTIONS)
   const teams = L4_OPTIONS.filter((t) => rows.some((r) => String(r.l4 ?? '').trim() === t))
   const mIdx = new Map(months.map((m, i) => [m, i]))
   const tIdx = new Map(teams.map((t, i) => [t, i]))

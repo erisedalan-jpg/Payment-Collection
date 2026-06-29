@@ -6,6 +6,7 @@
  *   amount → 万（除以 10000，toLocaleString 保留 2 位小数 + "万"）
  *   ratio  → 百分比（×100 + "%"）
  *   count  → 整数字符串
+ *   wan    → 万（值原样不除万，toLocaleString 保留 1 位小数 + "万"；供已是万元的字段如商机 amountWan 用）
  */
 import { CHART_LIGHT } from '@/charts/echartsTheme'
 
