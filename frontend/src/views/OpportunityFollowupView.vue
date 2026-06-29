@@ -9,6 +9,7 @@ import { OPP_SCOPE_CATALOG, opportunityMatches } from '@/lib/opportunityScope'
 import { buildOppFollowupRows, type OppFollowupRow } from '@/lib/opportunityFollowup'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { withSortable } from '@/lib/columnSort'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -65,7 +66,7 @@ const FOLLOWUP_COLUMNS: DataColumn[] = [
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
 ]
-const ALL_COLUMNS: DataColumn[] = [...OPP_COLUMNS.map(oppToDataColumn), ...FOLLOWUP_COLUMNS]
+const ALL_COLUMNS: DataColumn[] = withSortable([...OPP_COLUMNS.map(oppToDataColumn), ...FOLLOWUP_COLUMNS])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['name', 'customer', 'top1000', 'amountWan', 'opportunityLevel', 'status', 'frOwner',
   'weekProgress', 'nextPlan', 'followDate', 'followBy']

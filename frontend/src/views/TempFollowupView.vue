@@ -10,6 +10,7 @@ import { buildTempRows, buildScopeInputs, type TempRow } from '@/lib/tempFollowu
 import { projectMatches } from '@/lib/tempScope'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { withSortable } from '@/lib/columnSort'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -58,7 +59,7 @@ const rows = computed<TempRow[]>(() =>
   isCurrent.value ? currentRows.value : ((temp.archives[historyIdx.value]?.rows ?? []) as TempRow[]))
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as TempRow[])
 
-const ALL_COLUMNS: DataColumn[] = [
+const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
   { key: 'customer', label: '客户', width: 180 },
   { key: 'projectName', label: '项目名称', width: 200 },
@@ -89,7 +90,7 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'top1000', label: 'TOP1000', width: 90 },
   { key: 'quadrant', label: '象限', width: 140 },
   { key: 'milestoneStatus', label: '里程碑状态', width: 120 },
-]
+])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 // 默认可见 = key 页那 14 列(额外列默认隐藏)
 const DEFAULT_VISIBLE = ['projectId', 'customer', 'projectName', 'projectLevel', 'projectManager', 'ar', 'sr',
