@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.3.3**（子页面局部调整：三跟进页列排序——重点项目进展/重点商机跟进/临时重点跟进，除 4 个长文本列外全列可点表头排序，el-table 原生口径。**纯前端，升级不需点「更新数据」、无新依赖、无新页**）
-- 最近更新：2026-06-29（V2.3.3：三跟进页列排序，纯前端原生排序，无 schema/后端改动）
+- 当前版本：**V2.4.0**（整页级·新增页面：商机看板 /opportunities/board——读现有商机数据，复刻 oppoboard.pdf 的 KPI/环形/柱/折线/双轴/堆叠 约 19 个统计元素；在「项目分析」分区。**纯前端，升级不需点「更新数据」、无新依赖、无新后端端点；新页 pageKey opportunities-board 需授权**）
+- 最近更新：2026-06-29（V2.4.0：新增商机看板 /opportunities/board，纯前端，读现有 /api/opportunities）
 - 上一版本：V2.3.2（2026-06-29，售前客户口径单一来源化——后端算有效客户落 `Project.customer`，TOP1000 与前端客户列/筛选统一读它；约 19 售前入 TOP1000、约 90 客户列由空变有值。**升级须点「更新数据」**）
 - 更上版本：V2.3.1（2026-06-29，/projects/key 取数口径改 P1 一律入选；标签升级后前端 store 补刷；四跟进页历史快照超管逐条删除；key/temp/risk 客户列售前取原项目最终客户）
 - 更上版本：V2.3.0（2026-06-29，新页 /risk 风险跟进；首页/成本分析补标签排除；治理页 originMissing 告警；/projects 六列排序+关注原因拆两类+列筛选）
@@ -21,6 +21,11 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.4.0**（2026-06-29，Y 级·整页级·新增页面）：
+  - **新增商机看板页 `/opportunities/board`**（项目分析分区，风险看板下/回款多维分析上）：读现有商机数据（`useOpportunitiesStore`，`/api/opportunities`，已按 L4 隔离），自上而下复刻 `oppoboard.pdf` 约 19 个统计元素——顶部 4 KPI（本周新增/更新数·额[近7天]、商机总数/总额）+ 商机覆盖产品（横向柱，按 productCategory ΣamountWan）+ 主观预测/阶段分布环形 + 各团队金额/数量及【重点】4 柱 + 数量/金额月趋势 2 多系列折线（按 firstReg 分月×l4）+ 各级别客户双轴组合柱（top1000 桶：ΣamountWan + 去重客户数）+ 预估落单时间堆叠柱（expectedDate 月×forecast）+ AI 相关两饼及两 KPI（productCategory 含 'AI'）。
+  - 新增 `lib/opportunityBoard.ts`（聚合纯函数 + 复杂图 option 构造）+ `OpportunitiesBoardView.vue`；复用 `ChartBox`/`buildRankingOption`（后者加 `'wan'` valueKind，加法）。
+  - 接路由/`nav.ts`/`pageAccess.ts`/`AppSidebar.vue`；**新 pageKey `opportunities-board`**（超管默认可见，普通管理员需在「页面访问控制」授权）。
+  - 无 `preprocess_data.py`/`schema.py`/后端改动 → 升级不需点「更新数据」；无新依赖；无新后端端点。
 - **V2.3.3**（2026-06-29，Z 级·子页面局部调整）：
   - **三跟进页列排序**：`/projects/key`（重点项目进展）、`/opportunities/key`（重点商机跟进）、`/projects/temp`（临时重点跟进）三页表格，除 4 个长文本列（`weekProgress` 本周工作进展 / `nextPlan` 后续工作计划 / `remark` 情况备注 / `mainProducts` 主要涉及产品）外的所有列均可点表头排序。新增纯函数 `frontend/src/lib/columnSort.ts`（`NON_SORTABLE_KEYS` + `withSortable`），三页各对 `ALL_COLUMNS` 外包一层；走 el-table 原生排序（按行对象原始值，数值/日期/P1–P4 精确，枚举/中文按字符编码、空值穿插）。
   - **边界**：不改 `DataTable.vue`、不改共享 `OPP_COLUMNS`（`/opportunities` 商机清单页不受影响）、不改后端/schema。客户名称、商机名称虽换行展示但仍可排。
