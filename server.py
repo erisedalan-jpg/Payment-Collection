@@ -167,13 +167,13 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/pmis/upload', '/api/inputs/upload',
     '/api/data-history/rollback', '/api/data-history/undo-rollback',
     '/api/manual/import', '/api/manual/rollback',
-    '/api/progress/archive',
+    '/api/progress/archive', '/api/progress/archive/delete',
     # 商机 create/update 放开到普通管理员(仍须登录;L4 越权由处理器内 can_access_l4 校验)。
     # delete/import 维持超管专属(破坏性/整表替换)。
     '/api/opportunities/delete', '/api/opportunities/import',
-    '/api/temp-followup/scope', '/api/temp-followup/archive',
-    '/api/opportunity-followup/scope', '/api/opportunity-followup/archive',
-    '/api/risk-followup/scope', '/api/risk-followup/archive',
+    '/api/temp-followup/scope', '/api/temp-followup/archive', '/api/temp-followup/archive/delete',
+    '/api/opportunity-followup/scope', '/api/opportunity-followup/archive', '/api/opportunity-followup/archive/delete',
+    '/api/risk-followup/scope', '/api/risk-followup/archive', '/api/risk-followup/archive/delete',
     '/api/pmis/cookie', '/api/pmis/download',
 })
 
@@ -323,6 +323,15 @@ def _progress_apply_archive(store, rows, now):
     """纯函数:把当前已构建行冻结为历史快照(archiveTime=now),并清空 current(开始新一期)。"""
     store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
     store['current'] = {}
+
+
+def _progress_apply_archive_delete(store, idx) -> bool:
+    """纯函数:删除第 idx 条历史快照;越界/非法 idx → False(不动 store)。"""
+    archives = store.setdefault('archives', [])
+    if not isinstance(idx, int) or idx < 0 or idx >= len(archives):
+        return False
+    del archives[idx]
+    return True
 
 
 # ── 临时重点跟进(/projects/temp;V2.1.0):scope 条件 + current 进展 + archives 快照 ──
@@ -667,24 +676,32 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_progress_update()
         elif parsed.path == '/api/progress/archive':
             self.handle_progress_archive()
+        elif parsed.path == '/api/progress/archive/delete':
+            self.handle_progress_archive_delete()
         elif parsed.path == '/api/temp-followup/scope':
             self.handle_temp_followup_scope()
         elif parsed.path == '/api/temp-followup/update':
             self.handle_temp_followup_update()
         elif parsed.path == '/api/temp-followup/archive':
             self.handle_temp_followup_archive()
+        elif parsed.path == '/api/temp-followup/archive/delete':
+            self.handle_temp_followup_archive_delete()
         elif parsed.path == '/api/opportunity-followup/scope':
             self.handle_opportunity_followup_scope()
         elif parsed.path == '/api/opportunity-followup/update':
             self.handle_opportunity_followup_update()
         elif parsed.path == '/api/opportunity-followup/archive':
             self.handle_opportunity_followup_archive()
+        elif parsed.path == '/api/opportunity-followup/archive/delete':
+            self.handle_opportunity_followup_archive_delete()
         elif parsed.path == '/api/risk-followup/scope':
             self.handle_risk_followup_scope()
         elif parsed.path == '/api/risk-followup/update':
             self.handle_risk_followup_update()
         elif parsed.path == '/api/risk-followup/archive':
             self.handle_risk_followup_archive()
+        elif parsed.path == '/api/risk-followup/archive/delete':
+            self.handle_risk_followup_archive_delete()
         elif parsed.path == '/api/opportunities/create':
             self.handle_opportunities_create()
         elif parsed.path == '/api/opportunities/update':
@@ -1129,6 +1146,23 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
 
+    def handle_progress_archive_delete(self):
+        """POST /api/progress/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        idx = data.get('archiveIdx')
+        if not isinstance(idx, int) or idx < 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        try:
+            store = _load_progress()
+            if not _progress_apply_archive_delete(store, idx):
+                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+            _save_progress(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+
     def handle_temp_followup_get(self):
         """GET /api/temp-followup — {scope, current, archives}。任意登录用户(普通管理员需 scope 在前端算命中集)。"""
         account, rec = self._session_account_rec()
@@ -1197,6 +1231,23 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    def handle_temp_followup_archive_delete(self):
+        """POST /api/temp-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        idx = data.get('archiveIdx')
+        if not isinstance(idx, int) or idx < 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        try:
+            store = _load_temp_followup()
+            if not _temp.apply_archive_delete(store, idx):
+                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+            _save_temp_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
 
     def handle_opportunity_followup_get(self):
         """GET /api/opportunity-followup — {scope, current, archives}。任意登录用户。"""
@@ -1267,6 +1318,23 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
 
+    def handle_opportunity_followup_archive_delete(self):
+        """POST /api/opportunity-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        idx = data.get('archiveIdx')
+        if not isinstance(idx, int) or idx < 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        try:
+            store = _load_opportunity_followup()
+            if not _oppf.apply_archive_delete(store, idx):
+                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+            _save_opportunity_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+
     def handle_risk_followup_get(self):
         """GET /api/risk-followup — {scope, current, archives}。任意登录用户(范围/筛选前端算)。"""
         account, rec = self._session_account_rec()
@@ -1335,6 +1403,23 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    def handle_risk_followup_archive_delete(self):
+        """POST /api/risk-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        idx = data.get('archiveIdx')
+        if not isinstance(idx, int) or idx < 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        try:
+            store = _load_risk_followup()
+            if not _riskfu.apply_archive_delete(store, idx):
+                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+            _save_risk_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
 
     # ── 商机管理处理器(V2.0.0) ──
 

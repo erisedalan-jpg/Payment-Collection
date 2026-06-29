@@ -77,3 +77,12 @@ def apply_update(store, opp_id, field, content, account, now) -> Dict[str, Any]:
 def apply_archive(store, rows, now) -> None:
     store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
     store['current'] = {}
+
+
+def apply_archive_delete(store, idx) -> bool:
+    """删除第 idx 条历史快照;越界/非法 idx → False(不动 store)。"""
+    archives = store.setdefault('archives', [])
+    if not isinstance(idx, int) or idx < 0 or idx >= len(archives):
+        return False
+    del archives[idx]
+    return True

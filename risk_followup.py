@@ -66,3 +66,12 @@ def apply_update(store, risk_key, field, content, account, now) -> Dict[str, Any
 def apply_archive(store, rows, now) -> None:
     """只追加历史快照;不清空 current(跟进动作/rev结论/下次rev时间 留存)。"""
     store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
+
+
+def apply_archive_delete(store, idx) -> bool:
+    """删除第 idx 条历史快照;越界/非法 idx → False(不动 store)。"""
+    archives = store.setdefault('archives', [])
+    if not isinstance(idx, int) or idx < 0 or idx >= len(archives):
+        return False
+    del archives[idx]
+    return True
