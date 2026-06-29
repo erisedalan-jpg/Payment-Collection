@@ -4,8 +4,8 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.3.2**（子页面局部调整：售前客户口径单一来源化——后端算有效客户落 `Project.customer`，TOP1000 与前端客户列/筛选统一读它；约 19 个售前入 TOP1000；约 90 个客户列由空变有值。**升级须点「更新数据」才生效**）
-- 最近更新：2026-06-29（V2.3.2：售前客户口径单一来源化；schema/preprocess 改动 → 升级必须点「更新数据」重算）
+- 当前版本：**V2.3.3**（子页面局部调整：三跟进页列排序——重点项目进展/重点商机跟进/临时重点跟进，除 4 个长文本列外全列可点表头排序，el-table 原生口径。**纯前端，升级不需点「更新数据」、无新依赖、无新页**）
+- 最近更新：2026-06-29（V2.3.3：三跟进页列排序，纯前端原生排序，无 schema/后端改动）
 - 上一版本：V2.3.1（2026-06-29，/projects/key 取数口径改 P1 一律入选；标签升级后前端 store 补刷；四跟进页历史快照超管逐条删除；key/temp/risk 客户列售前取原项目最终客户）
 - 更上版本：V2.3.0（2026-06-29，新页 /risk 风险跟进；首页/成本分析补标签排除；治理页 originMissing 告警；/projects 六列排序+关注原因拆两类+列筛选）
 - 更上版本：V2.2.1（2026-06-26，/project/:id 回款明细三列改元 + 商机新增是否重大POC列；/opportunities/key 筛选/可选列自动派生新列）
@@ -20,6 +20,10 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.3.3**（2026-06-29，Z 级·子页面局部调整）：
+  - **三跟进页列排序**：`/projects/key`（重点项目进展）、`/opportunities/key`（重点商机跟进）、`/projects/temp`（临时重点跟进）三页表格，除 4 个长文本列（`weekProgress` 本周工作进展 / `nextPlan` 后续工作计划 / `remark` 情况备注 / `mainProducts` 主要涉及产品）外的所有列均可点表头排序。新增纯函数 `frontend/src/lib/columnSort.ts`（`NON_SORTABLE_KEYS` + `withSortable`），三页各对 `ALL_COLUMNS` 外包一层；走 el-table 原生排序（按行对象原始值，数值/日期/P1–P4 精确，枚举/中文按字符编码、空值穿插）。
+  - **边界**：不改 `DataTable.vue`、不改共享 `OPP_COLUMNS`（`/opportunities` 商机清单页不受影响）、不改后端/schema。客户名称、商机名称虽换行展示但仍可排。
+  - 无 `preprocess_data.py`/`schema.py` 改动 → 升级不需点「更新数据」；无新依赖；无新页面/pageKey。
 - **V2.3.2**（2026-06-29，Z 级·子页面局部调整）：
   - **售前客户口径单一来源化**（`schema.py` + `preprocess_data.py` + `projects.py`，前端各消费点同步）：后端新增两纯函数 `parse_presale_customer_from_name`（按正则 `^售前服务-(.+)-(\d+)$` 解析项目名中的客户）与 `effective_customer`（售前=原项目最终客户→空则用名称解析→再空则空串）；将有效客户结果落入 `Project.customer` 字段（schema 显式字段），TOP1000 客户匹配改用 `p.customer` 而非 `p.endCustomer`；前端项目清单（projectList）、重点项目/临时重点跟进/风险跟进（key/temp/risk 三页客户列）均统一读 `p.customer`，与后端单一来源保持一致。
   - **覆盖面**：约 19 个售前项目因此进入 TOP1000 统计；约 90 个售前项目客户列由空值变为有效客户名；商机清单（/opportunities）与已关闭页不动（无 `relatedClosedId` 影响）。
