@@ -211,7 +211,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
       >清除所有筛选</el-button>
     </div>
 
-    <div v-if="!rows.length" class="kp-empty">暂无重点项目（取数：TOP1000 大客户 且 合同&gt;100万元 或 级别 P1）。</div>
+    <div v-if="!rows.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
     <div v-else class="kp-scroll">
       <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false" clickable @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">

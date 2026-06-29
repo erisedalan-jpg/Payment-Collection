@@ -19,12 +19,11 @@ export interface KeyProjectRow {
   followDate: string; followBy: string
 }
 
-/** 重点项目:TOP1000 大客户 且(合同>100万元 或 级别 P1)。合同已由 paymentPmis.contract 上游回退原项目(售前)。 */
+/** 重点项目:级别 P1 或(TOP1000 大客户 且 合同>100万元)。合同已由 paymentPmis.contract 上游回退原项目(售前)。 */
 export function isKeyProject(p: Project, pmis: ProjectPmis | undefined): boolean {
-  if (p.top1000 !== '是') return false
   const contract = Number(p.paymentPmis?.contract ?? 0)
   const level = v((pmis?.status as Record<string, unknown> | undefined)?.['项目级别'])
-  return contract > 1_000_000 || level === 'P1'
+  return level === 'P1' || (p.top1000 === '是' && contract > 1_000_000)
 }
 
 export function followDate(rec: ProgressRecord): string {

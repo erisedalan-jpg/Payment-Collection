@@ -54,6 +54,26 @@ describe('buildKeyProjectRows', () => {
   })
 })
 
+const mk = (top1000: string, contract: number | null, level: string) => ({
+  p: { top1000, paymentPmis: { contract } } as any,
+  pmis: { status: { 项目级别: level } } as any,
+})
+
+describe('isKeyProject 新口径: P1 || (TOP1000 && 合同>100万)', () => {
+  it('P1 且非 TOP1000 → 入选(旧口径不入选)', () => {
+    const { p, pmis: pm } = mk('否', 50_000, 'P1'); expect(isKeyProject(p, pm)).toBe(true)
+  })
+  it('TOP1000 且合同>100万且非 P1 → 入选', () => {
+    const { p, pmis: pm } = mk('是', 2_000_000, 'P2'); expect(isKeyProject(p, pm)).toBe(true)
+  })
+  it('TOP1000 但合同<=100万且非 P1 → 不入选', () => {
+    const { p, pmis: pm } = mk('是', 1_000_000, 'P2'); expect(isKeyProject(p, pm)).toBe(false)
+  })
+  it('非 TOP1000、非 P1、合同>100万 → 不入选', () => {
+    const { p, pmis: pm } = mk('否', 5_000_000, 'P3'); expect(isKeyProject(p, pm)).toBe(false)
+  })
+})
+
 describe('followDate / followBy', () => {
   it('跟进日期取两格较大非空', () => {
     expect(followDate({ weekProgressEditTime: '2026-06-24 10:00:00', nextPlanEditTime: '2026-06-25 09:00:00' })).toBe('2026-06-25 09:00:00')
