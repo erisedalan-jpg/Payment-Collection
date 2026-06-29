@@ -32,11 +32,15 @@ export const useRiskFollowupStore = defineStore('riskFollowup', () => {
     archives.value = r.archives ?? []
     // 注意:不清空 current —— 跟进数据留存(与 temp/key 关键差异)
   }
+  async function deleteArchive(idx: number) {
+    const r = await riskFollowupApi.deleteArchive(idx)
+    archives.value = r.archives ?? []
+  }
   function reset() {
     scope.value = { ...EMPTY_SCOPE }
     current.value = {}
     archives.value = []
     loaded.value = false
   }
-  return { scope, current, archives, loaded, load, saveScope, update, archive, reset }
+  return { scope, current, archives, loaded, load, saveScope, update, archive, deleteArchive, reset }
 })
