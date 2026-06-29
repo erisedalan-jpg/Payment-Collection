@@ -7,7 +7,7 @@ const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingT
 function proj(over: Partial<Project> = {}): Project {
   return {
     projectId: 'QABJ-SS-1', projectName: '终端安全项目', projectManager: '何平', orgL4: '小微部',
-    isPresale: false, relatedClosedId: '', payment: { ...PAY0 },
+    isPresale: false, relatedClosedId: '', customer: '北京海聚博源', payment: { ...PAY0 },
     deliveryCosts: [], health: { progressAbnormal: false, riskAbnormal: false, costAbnormal: false, paymentAbnormal: false, overall: '健康' },
     ...over,
   } as Project
@@ -57,7 +57,7 @@ describe('buildProjectRows', () => {
     expect(r.projectType).toBe('交付项目')
   })
   it('pmis 缺失时取占位默认值', () => {
-    const [r] = buildProjectRows([proj({ projectId: 'NO-PMIS' })], PMIS)
+    const [r] = buildProjectRows([proj({ projectId: 'NO-PMIS', customer: '' as any })], PMIS)
     expect(r.stage).toBe('-')
     expect(r.customer).toBe('-')
     expect(r.contractAmount).toBeNull()
@@ -89,7 +89,7 @@ const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '',
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
-    [proj(), proj({ projectId: 'QAX-2', projectName: '售前服务-某局', projectManager: '李四', isPresale: true, relatedClosedId: 'OLD-9', health: { progressAbnormal: true, riskAbnormal: false, costAbnormal: false, paymentAbnormal: false, overall: '关注' } })],
+    [proj(), proj({ projectId: 'QAX-2', projectName: '售前服务-某局', projectManager: '李四', customer: '' as any, isPresale: true, relatedClosedId: 'OLD-9', health: { progressAbnormal: true, riskAbnormal: false, costAbnormal: false, paymentAbnormal: false, overall: '关注' } })],
     PMIS,
   )
   it('search 命中 项目名/编号/客户/经理 任一（大小写不敏感）', () => {

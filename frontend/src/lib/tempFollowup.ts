@@ -21,7 +21,7 @@ export function buildTempRows(
     .filter((p) => inScopeIds.has(p.projectId))
     .map((p) => {
       const pmis = pmisMap[p.projectId]
-      const base = buildProgressRowBase(p, pmis, current[p.projectId] ?? {}, pmisMap[p.relatedClosedId ?? ''])
+      const base = buildProgressRowBase(p, pmis, current[p.projectId] ?? {})
       const pr = prMap.get(p.projectId)
       const prog = ((pmis ?? {}) as Record<string, any>).progress ?? {}
       return {
