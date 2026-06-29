@@ -156,6 +156,19 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
     columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' }, { key: 'reason', label: '原因' }],
     rows: anomalies, exportName: '回款排除-L4缺失.xlsx' })
 
+  const orphanOrigin = (data.projects ?? [])
+    .filter((p) => p.relatedClosedId && !(data.projectPmis ?? {})[p.relatedClosedId])
+    .map((p) => ({
+      projectId: p.projectId, projectName: p.projectName ?? '',
+      projectManager: (p as Record<string, unknown>).projectManager ?? '', orgL4: p.orgL4 ?? '',
+      relatedClosedId: p.relatedClosedId,
+    }))
+  alerts.push({ key: 'originMissing', label: '原项目数据缺失', severity: 'mid', count: orphanOrigin.length,
+    columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' },
+              { key: 'projectManager', label: '项目经理' }, { key: 'orgL4', label: 'L4组' },
+              { key: 'relatedClosedId', label: '原项目号' }],
+    rows: orphanOrigin, exportName: '原项目数据缺失.xlsx' })
+
   alerts.sort((a, b) =>
     (a.count === 0 ? 1 : 0) - (b.count === 0 ? 1 : 0) || SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.count - a.count)
 
