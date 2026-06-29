@@ -131,10 +131,10 @@ describe('buildHealthReport', () => {
     expect(r.sources.find((s) => s.key === 'pmis')!.subs[0]).toContain('主题 1/2 可用')
   })
 
-  it('导出文件名只挂在指定五类目', () => {
+  it('导出文件名只挂在指定六类目', () => {
     const r = buildHealthReport(makeData())
     expect(r.alerts.filter((a) => a.exportName).map((a) => a.key).sort())
-      .toEqual(['backfill', 'l4Missing', 'managerNotInOrg', 'presaleUnmapped', 'unmatched'])
+      .toEqual(['backfill', 'l4Missing', 'managerNotInOrg', 'originMissing', 'presaleUnmapped', 'unmatched'])
   })
 
   it('orgL4 空项目进 l4Missing 告警组', () => {
@@ -171,5 +171,31 @@ describe('buildHealthReport', () => {
     expect(r.alerts.find((a) => a.key === 'missing-msClosed')!.severity).toBe('mid')
     expect(r.alerts.find((a) => a.key === 'missing-budget')!.severity).toBe('mid')
     expect(r.verdict).toBe('yellow')
+  })
+})
+
+function baseData(extra: Record<string, unknown> = {}) {
+  return {
+    meta: {}, projects: [], projectPmis: {}, dataQuality: null, projectsQuality: null,
+    ...extra,
+  } as any
+}
+
+describe('governance — 原项目数据缺失(originMissing)', () => {
+  it('relatedClosedId 命中 projectPmis 不算缺失,未命中才算', () => {
+    const data = baseData({
+      projects: [
+        { projectId: 'A', projectName: '甲', projectManager: '张', orgL4: '一组', relatedClosedId: 'OLD-1' },
+        { projectId: 'B', projectName: '乙', projectManager: '李', orgL4: '二组', relatedClosedId: 'OLD-X' },
+        { projectId: 'C', projectName: '丙', projectManager: '王', orgL4: '三组', relatedClosedId: '' },
+      ],
+      projectPmis: { 'OLD-1': { matched: true } },
+    })
+    const rep = buildHealthReport(data)
+    const g = rep.alerts.find((a) => a.key === 'originMissing')!
+    expect(g).toBeTruthy()
+    expect(g.count).toBe(1)
+    expect((g.rows[0] as any).projectId).toBe('B')
+    expect((g.rows[0] as any).relatedClosedId).toBe('OLD-X')
   })
 })

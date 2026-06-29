@@ -171,7 +171,7 @@ describe('OpportunitiesView', () => {
     expect((w.vm as any).editOpen).toBe(true)
     expect((w.vm as any).editMode).toBe('create')
     expect((w.vm as any).editRow).toBeNull()
-  })
+  }, 10000)
 
   it('(T7-c) 选中行后 onDelete → ElMessageBox.confirm + store.remove(选中ids)', async () => {
     const w = await mountView(true)

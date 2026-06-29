@@ -33,6 +33,7 @@ import opportunities as _opp
 import temp_followup
 import temp_followup as _temp
 import opportunity_followup as _oppf
+import risk_followup as _riskfu
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -172,6 +173,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/opportunities/delete', '/api/opportunities/import',
     '/api/temp-followup/scope', '/api/temp-followup/archive',
     '/api/opportunity-followup/scope', '/api/opportunity-followup/archive',
+    '/api/risk-followup/scope', '/api/risk-followup/archive',
     '/api/pmis/cookie', '/api/pmis/download',
 })
 
@@ -383,6 +385,37 @@ def _save_opportunity_followup(store):
         os.replace(tmp, OPP_FOLLOWUP_FILE)
 
 
+# ── 风险跟进(/risk;V2.3.0):scope 条件 + current 跟进 + archives 快照(归档不清空 current) ──
+RISK_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'risk_followup.json')
+_risk_lock = threading.Lock()
+
+
+def _load_risk_followup():
+    """加载风险跟进 store;缺文件/损坏 → 默认(new_store)。不抛。"""
+    if os.path.exists(RISK_FOLLOWUP_FILE):
+        try:
+            with open(RISK_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
+                store = json.load(f)
+            if isinstance(store, dict):
+                store.setdefault('version', 1)
+                store['scope'] = _riskfu.normalize_scope(store.get('scope'))
+                store.setdefault('current', {})
+                store.setdefault('archives', [])
+                return store
+        except Exception:
+            pass
+    return _riskfu.new_store()
+
+
+def _save_risk_followup(store):
+    with _risk_lock:
+        os.makedirs(os.path.dirname(RISK_FOLLOWUP_FILE), exist_ok=True)
+        tmp = RISK_FOLLOWUP_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, RISK_FOLLOWUP_FILE)
+
+
 # ── 商机管理(V2.0.0) ──
 OPPORTUNITIES_FILE = os.path.join(BASE_DIR, 'data', 'opportunities.json')
 OPP_INPUT_NAMES = ('opportunities.xlsx', 'opportunitites.xlsx')  # 后者兼容用户原文笔误
@@ -539,6 +572,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_temp_followup_get()
         elif parsed.path == '/api/opportunity-followup':
             self.handle_opportunity_followup_get()
+        elif parsed.path == '/api/risk-followup':
+            self.handle_risk_followup_get()
         elif parsed.path == '/api/opportunities':
             self.handle_opportunities_get()
         elif parsed.path == '/api/files/status':
@@ -644,6 +679,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_opportunity_followup_update()
         elif parsed.path == '/api/opportunity-followup/archive':
             self.handle_opportunity_followup_archive()
+        elif parsed.path == '/api/risk-followup/scope':
+            self.handle_risk_followup_scope()
+        elif parsed.path == '/api/risk-followup/update':
+            self.handle_risk_followup_update()
+        elif parsed.path == '/api/risk-followup/archive':
+            self.handle_risk_followup_archive()
         elif parsed.path == '/api/opportunities/create':
             self.handle_opportunities_create()
         elif parsed.path == '/api/opportunities/update':
@@ -1222,6 +1263,75 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             store = _load_opportunity_followup()
             _oppf.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             _save_opportunity_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    def handle_risk_followup_get(self):
+        """GET /api/risk-followup — {scope, current, archives}。任意登录用户(范围/筛选前端算)。"""
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_risk_followup()
+            self._json_response({"success": True, "scope": store.get("scope"),
+                                 "current": store.get("current", {}), "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取风险跟进失败: {e}"))
+
+    def handle_risk_followup_scope(self):
+        """POST /api/risk-followup/scope {combinator, groups} — 保存范围。超管专属(_authz_gate 拦)。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            store = _load_risk_followup()
+            store['scope'] = _riskfu.normalize_scope(data)
+            _save_risk_followup(store)
+            self._json_response({"success": True, "scope": store['scope']})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+    def handle_risk_followup_update(self):
+        """POST /api/risk-followup/update {riskKey, field, content} — 编辑跟进单格。任意登录用户。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        rk = str(data.get('riskKey') or '').strip()
+        field = data.get('field')
+        if not rk or field not in _riskfu.PROGRESS_FIELDS:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "riskKey 必填、field 须为 followAction/revConclusion/nextRevDate"))
+            return
+        try:
+            store = _load_risk_followup()
+            rec = _riskfu.apply_update(store, rk, field, str(data.get('content') or ''),
+                                       account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_risk_followup(store)
+            self._json_response({"success": True, "record": rec})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存跟进失败: {e}"))
+
+    def handle_risk_followup_archive(self):
+        """POST /api/risk-followup/archive {rows} — 归档快照,保留 current。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        rows = data.get('rows')
+        if not isinstance(rows, list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
+            return
+        try:
+            store = _load_risk_followup()
+            _riskfu.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_risk_followup(store)
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))

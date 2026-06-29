@@ -114,7 +114,7 @@ describe('classifyProjects', () => {
       health: '风险',
       riskReasons: [
         { category: '回款延期', detail: '3个延期节点', tone: 'warn' },
-        { category: '成本超支', detail: '超支 2.0 万', tone: 'danger' },
+        { category: '总成本超支', detail: '超支 2.0 万', tone: 'danger' },
       ],
     })
     const result = classifyProjects([row])
@@ -149,5 +149,14 @@ describe('classifyProjects', () => {
     const result = classifyProjects([row])
     const entry = result.find((e) => e.category === '健康度低')!
     expect(entry.projects[0].detail).toBe('健康度评级: 关注')
+  })
+
+  it('总成本超支/交付成本超支 都计入首页「成本超支」桶', () => {
+    const rows = [
+      { projectId: 'A', projectName: '甲', health: '健康', isAnomalous: false, riskReasons: [{ category: '总成本超支', detail: '超支 1.0 万', tone: 'danger' }] },
+      { projectId: 'B', projectName: '乙', health: '健康', isAnomalous: false, riskReasons: [{ category: '交付成本超支', detail: '交付人工超支', tone: 'danger' }] },
+    ] as any
+    const res = classifyProjects(rows)
+    expect(res.find((e) => e.category === '成本超支')!.count).toBe(2)
   })
 })
