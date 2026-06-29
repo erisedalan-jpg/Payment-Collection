@@ -23,10 +23,14 @@ export const useProjectProgressStore = defineStore('projectProgress', () => {
     archives.value = r.archives ?? []
     current.value = {}
   }
+  async function deleteArchive(idx: number) {
+    const r = await projectProgressApi.deleteArchive(idx)
+    archives.value = r.archives ?? []
+  }
   function reset() {
     current.value = {}
     archives.value = []
     loaded.value = false
   }
-  return { current, archives, loaded, load, update, archive, reset }
+  return { current, archives, loaded, load, update, archive, deleteArchive, reset }
 })

@@ -14,4 +14,5 @@ export const tempFollowupApi = {
   update: (projectId: string, field: 'weekProgress' | 'nextPlan', content: string) =>
     api.post<TempUpdateResp>('/api/temp-followup/update', { projectId, field, content }),
   archive: (rows: Record<string, unknown>[]) => api.post<TempArchiveResp>('/api/temp-followup/archive', { rows }),
+  deleteArchive: (archiveIdx: number) => api.post<TempArchiveResp>('/api/temp-followup/archive/delete', { archiveIdx }),
 }
