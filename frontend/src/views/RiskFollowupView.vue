@@ -61,8 +61,8 @@ const PROJECT_COLS: DataColumn[] = [
   { key: '项目状态', label: '项目状态', width: 100, sortable: true },
 ]
 const FOLLOW_COLS: DataColumn[] = [
-  { key: 'followAction', label: '跟进动作', width: 240, wrap: true },
-  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true },
+  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, sortable: true },
+  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, sortable: true },
   { key: 'nextRevDate', label: '下次rev时间', width: 170, sortable: true },
 ]
 const NON_RISK_KEYS = new Set<string>([
@@ -101,7 +101,7 @@ function progCell(row: RiskRow, field: 'followAction' | 'revConclusion'): string
   const t = field === 'followAction' ? row.followActionEditTime : row.revConclusionEditTime
   const c = (row as Record<string, any>)[field]
   if (!c) return isCurrent.value ? '点击填写' : '-'
-  return `${t}：${c}`
+  return t ? `${t}：${c}` : `${c}`
 }
 function openEdit(row: RiskRow, field: 'followAction' | 'revConclusion') {
   if (!isCurrent.value) return
