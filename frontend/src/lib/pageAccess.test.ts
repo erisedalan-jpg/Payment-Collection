@@ -15,12 +15,15 @@ describe('pageAccess.canAccess', () => {
 })
 
 describe('nav links', () => {
-  it('KEY_FOLLOWUP_LINKS = [重点项目进展, 重点商机跟进, 临时重点跟进]', () => {
+  it('KEY_FOLLOWUP_LINKS = [重点项目进展, 重点商机跟进, 临时重点跟进, 风险跟进]', () => {
     const keys = KEY_FOLLOWUP_LINKS.map((l) => l.key)
-    expect(keys).toEqual(['projects-key', 'opportunity-followup', 'temp-followup'])
+    expect(keys).toEqual(['projects-key', 'opportunity-followup', 'temp-followup', 'risk-followup'])
     const oppf = KEY_FOLLOWUP_LINKS.find((l) => l.key === 'opportunity-followup')!
     expect(oppf.to).toBe('/opportunities/key')
     expect(oppf.label).toBe('重点商机跟进')
+    const riskf = KEY_FOLLOWUP_LINKS.find((l) => l.key === 'risk-followup')!
+    expect(riskf.to).toBe('/risk')
+    expect(riskf.label).toBe('风险跟进')
   })
   it('商机清单(opportunities-progress)移入 PROJECT_LINKS,在已关闭项目后、项目动态前', () => {
     const keys = PROJECT_LINKS.map((l) => l.key)
