@@ -32,7 +32,7 @@
 - `lastUpdate`（最后更新日期，ISO 时间戳；取前 10 位做日期比较）
 
 **口径定义（用户钦定）：**
-- **近7天**：日期字符串 `d` 满足 `0 ≤ (今天 - d) ≤ 6`（按自然日，取日期前 10 位）。「本周新增/更新」= `firstReg 近7天 OR lastUpdate 近7天`。
+- **近7天**：日期字符串 `d` 满足 `0 ≤ (今天 - d) ≤ 7`（按自然日，取日期前 10 位；**与 `opportunityColumns.ts` 的 `recentUpdateOf` 同口径**，用户钦定复用现有口径）。「本周新增/更新」= `firstReg 近7天 OR lastUpdate 近7天`。
 - **AI相关**：`String(productCategory).toUpperCase().includes('AI')`（不分大小写；用户接受子串判定）。
 - **月趋势分月**：按 `firstReg` 前 7 位 `YYYY-MM`。
 - **去重客户数**：某桶内 `customer` 去空白后的不重复个数。
