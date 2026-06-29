@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 
 const PREFIX = 'colprefs:'
 
@@ -69,5 +69,40 @@ export function useColumnPrefs(viewKey: string, allKeys: string[], defaultVisibl
   function reset() {
     set(defaultVisible.filter((k) => allKeys.includes(k)))
   }
+  return { visibleKeys, toggle, moveUp, moveDown, reset }
+}
+
+/** 动态列版本:allKeys 为 Ref(数据异步到达后变化)。首次非空时从 localStorage 懒加载。 */
+export function useColumnPrefsDynamic(
+  viewKey: string,
+  allKeys: Ref<string[]>,
+  defaultVisible: string[],
+): ColumnPrefs {
+  const visibleKeys = ref<string[]>([])
+  let inited = false
+  function set(keys: string[]) { visibleKeys.value = keys; saveKeys(viewKey, keys) }
+  function init(ks: string[]) {
+    if (inited || !ks.length) return
+    inited = true
+    visibleKeys.value = loadKeys(viewKey, ks, defaultVisible)
+  }
+  init(allKeys.value)
+  watch(allKeys, init)
+
+  function toggle(key: string) {
+    if (!allKeys.value.includes(key)) return
+    set(visibleKeys.value.includes(key)
+      ? visibleKeys.value.filter((k) => k !== key)
+      : [...visibleKeys.value, key])
+  }
+  function moveUp(key: string) {
+    const i = visibleKeys.value.indexOf(key)
+    if (i > 0) { const n = [...visibleKeys.value]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; set(n) }
+  }
+  function moveDown(key: string) {
+    const i = visibleKeys.value.indexOf(key)
+    if (i >= 0 && i < visibleKeys.value.length - 1) { const n = [...visibleKeys.value]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; set(n) }
+  }
+  function reset() { set(defaultVisible.filter((k) => allKeys.value.includes(k))) }
   return { visibleKeys, toggle, moveUp, moveDown, reset }
 }

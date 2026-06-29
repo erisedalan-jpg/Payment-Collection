@@ -63,6 +63,8 @@ export const router = createRouter({
     { path: '/opportunities', name: 'opportunities', component: OpportunitiesView, meta: { title: '商机清单', hideFilter: true, pageKey: 'opportunities-progress' } },
     { path: '/opportunities/key', name: 'opportunity-followup', component: OpportunityFollowupView, meta: { title: '重点商机跟进', hideFilter: true, pageKey: 'opportunity-followup' } },
     { path: '/projects/temp', name: 'temp-followup', component: TempFollowupView, meta: { title: '临时重点跟进', hideFilter: true, pageKey: 'temp-followup' } },
+    { path: '/risk', name: 'risk-followup', component: () => import('@/views/RiskFollowupView.vue'),
+      meta: { title: '风险跟进', hideFilter: true, pageKey: 'risk-followup' } },
     { path: '/ledger', name: 'ledger', component: LedgerView, meta: { title: '回款台账', pageKey: 'ledger' } },
     // 回款分析五页:由旧 /panalysis 单页拆为 /payment/* 平铺独立路由(SP4);均依赖 FilterBar(不 hideFilter)
     // /payment(精确)与 /payment/*(精确子路径)均为精确路由、互不遮蔽，定义顺序不影响解析；

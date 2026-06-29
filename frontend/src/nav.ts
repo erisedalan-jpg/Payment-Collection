@@ -41,6 +41,7 @@ export const KEY_FOLLOWUP_LINKS: NavLink[] = [
   { label: '重点项目进展', to: '/projects/key', key: 'projects-key' },
   { label: '重点商机跟进', to: '/opportunities/key', key: 'opportunity-followup' },
   { label: '临时重点跟进', to: '/projects/temp', key: 'temp-followup' },
+  { label: '风险跟进', to: '/risk', key: 'risk-followup' },
 ]
 
 // 回款重点子域（SP4 拆分；V1.16.0 board/calendar 迁出至项目分析中心）

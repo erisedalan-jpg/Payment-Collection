@@ -145,7 +145,7 @@ describe('riskCategory 过滤', () => {
 
   const rows = [
     makeRow('A', '健康', ['回款延期']),
-    makeRow('B', '关注', ['里程碑滞后', '成本超支']),
+    makeRow('B', '关注', ['里程碑滞后', '总成本超支']),
     makeRow('C', '风险', []),
     makeRow('D', '健康', []),
   ]
@@ -157,8 +157,8 @@ describe('riskCategory 过滤', () => {
     const res = filterProjectRows(rows, { ...F0, riskCategory: '回款延期' })
     expect(res.map(r => r.projectId)).toEqual(['A'])
   })
-  it('riskCategory="成本超支" → 只含命中行', () => {
-    const res = filterProjectRows(rows, { ...F0, riskCategory: '成本超支' })
+  it('riskCategory="总成本超支" → 只含命中行', () => {
+    const res = filterProjectRows(rows, { ...F0, riskCategory: '总成本超支' })
     expect(res.map(r => r.projectId)).toEqual(['B'])
   })
   it('riskCategory="健康度低" → health∈{关注,风险}', () => {
@@ -168,6 +168,15 @@ describe('riskCategory 过滤', () => {
   it('riskCategory="数据异常" → 无命中时返回空', () => {
     const res = filterProjectRows(rows, { ...F0, riskCategory: '数据异常' })
     expect(res).toHaveLength(0)
+  })
+  it('riskCategory="成本超支"（首页桶名）→ 命中含总成本超支或交付成本超支的行，不命中无超支行', () => {
+    const rows2 = [
+      makeRow('X1', '健康', ['总成本超支']),
+      makeRow('X2', '健康', ['交付成本超支']),
+      makeRow('X3', '健康', ['回款延期']),
+    ]
+    const res = filterProjectRows(rows2, { ...F0, riskCategory: '成本超支' })
+    expect(res.map(r => r.projectId).sort()).toEqual(['X1', 'X2'])
   })
 })
 

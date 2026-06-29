@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useSettingsStore } from '@/stores/settings'
+import { useFilterStore } from '@/stores/filter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildCostRows, costKpis, costL4Dist, costL4Summary } from '@/lib/costAnalysis'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
@@ -16,11 +17,16 @@ import StatusBadge from '@/components/StatusBadge.vue'
 
 const data = useDataStore()
 const settings = useSettingsStore()
+const filter = useFilterStore()
 onMounted(() => { if (!data.data) data.load() })
 
 const sc = computed(() => (settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT))
+const baseProjects = computed(() => {
+  const all = (data.data?.projects ?? []) as Project[]
+  return filter.excludeOn ? all.filter((p) => !filter.excludedIds[p.projectId]) : all
+})
 const rows = computed(() => buildCostRows(
-  (data.data?.projects ?? []) as Project[],
+  baseProjects.value,
   (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
 ))
 
@@ -125,6 +131,7 @@ function onExport() {
   })))
 }
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
+defineExpose({ baseProjects })
 </script>
 
 <template>
