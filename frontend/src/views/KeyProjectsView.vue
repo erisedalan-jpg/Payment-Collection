@@ -9,6 +9,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildKeyProjectRows, type KeyProjectRow } from '@/lib/keyProjects'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { withSortable } from '@/lib/columnSort'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -63,7 +64,7 @@ const rows = computed<KeyProjectRow[]>(() =>
 )
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as KeyProjectRow[])
 
-const ALL_COLUMNS: DataColumn[] = [
+const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
   { key: 'customer', label: '客户', width: 180 },
   { key: 'projectName', label: '项目名称', width: 200 },
@@ -79,7 +80,7 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'nextPlan', label: '后续工作计划', width: 240, wrap: true },
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
-]
+])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ALL_KEYS
 const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate'])
