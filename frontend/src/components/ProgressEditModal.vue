@@ -4,29 +4,38 @@ import Modal from './Modal.vue'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useOpportunityFollowupStore } from '@/stores/opportunityFollowup'
+import { useRiskFollowupStore } from '@/stores/riskFollowup'
 
 const props = defineProps<{
   modelValue: boolean; projectId: string; projectName: string
-  field: 'weekProgress' | 'nextPlan'; initial: string
-  store?: 'key' | 'temp' | 'oppFollowup'
+  field: 'weekProgress' | 'nextPlan' | 'followAction' | 'revConclusion'; initial: string
+  store?: 'key' | 'temp' | 'oppFollowup' | 'riskFollowup'
+  headText?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 
 const keyStore = useProjectProgressStore()
 const tempStore = useTempFollowupStore()
 const oppStore = useOpportunityFollowupStore()
+const riskStore = useRiskFollowupStore()
 const activeStore = computed(() =>
-  props.store === 'temp' ? tempStore : props.store === 'oppFollowup' ? oppStore : keyStore)
+  props.store === 'temp' ? tempStore
+    : props.store === 'oppFollowup' ? oppStore
+      : props.store === 'riskFollowup' ? riskStore
+        : keyStore)
 const text = ref(props.initial)
 const saving = ref(false)
 watch(() => props.modelValue, (v) => { if (v) text.value = props.initial })
 
-const FIELD_LABEL = { weekProgress: '本周工作进展', nextPlan: '后续工作计划' } as const
+const FIELD_LABEL = { weekProgress: '本周工作进展', nextPlan: '后续工作计划',
+  followAction: '跟进动作', revConclusion: 'rev结论' } as const
 
 async function save() {
   saving.value = true
   try {
-    await activeStore.value.update(props.projectId, props.field, text.value)
+    // 各 store 的 update field 联合类型不同,此处用通用键透传(后端亦校验 field 合法性)
+    await (activeStore.value as { update: (id: string, field: string, content: string) => Promise<unknown> })
+      .update(props.projectId, props.field, text.value)
     emit('update:modelValue', false)
   } finally {
     saving.value = false
@@ -38,7 +47,7 @@ defineExpose({ save, text })
 <template>
   <Modal :model-value="modelValue" :title="'编辑 ' + FIELD_LABEL[field]" width="480px"
     @update:model-value="emit('update:modelValue', $event)">
-    <div class="pem-head">{{ projectName }} / 编号 {{ projectId }}</div>
+    <div class="pem-head">{{ headText || (projectName + ' / 编号 ' + projectId) }}</div>
     <el-input v-model="text" type="textarea" :rows="6" placeholder="输入内容..." />
     <div class="pem-actions">
       <button class="pem-cancel" @click="emit('update:modelValue', false)">取消</button>
