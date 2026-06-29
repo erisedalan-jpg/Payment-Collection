@@ -7,6 +7,8 @@ import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable from '@/components/DataTable.vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
+import { useFilterStore } from '@/stores/filter'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -97,5 +99,23 @@ describe('CostDetailView 上半', () => {
     const d1 = (l4.props('rows') as any[]).find((r) => r.orgL4 === 'D1')
     expect(d1.contractTotal).toBe(2500000)
     expect(d1.remainingTotal).toBe(-7900)
+  })
+})
+
+describe('CostDetailView 标签排除', () => {
+  function seedSmall() {
+    const data = useDataStore()
+    ;(data as any).data = {
+      projects: [{ projectId: 'P1', projectName: '甲', orgL4: '一组' }, { projectId: 'P2', projectName: '乙', orgL4: '一组' }],
+      projectPmis: {},
+    }
+  }
+
+  it('开启排除后被排除项目不进 baseProjects', () => {
+    seedSmall()
+    const tags = useProjectTagsStore(); tags.assignments = { P2: ['排除标签'] } as any
+    useFilterStore().setExclude(true, ['排除标签'])
+    const w = mount(CostDetailView, opts)
+    expect(((w.vm as any).baseProjects as any[]).map((p) => p.projectId)).toEqual(['P1'])
   })
 })
