@@ -316,3 +316,28 @@ describe('ProjectsView', () => {
     expect(w.findAll('.pv-anomaly').length).toBe(1)
   })
 })
+
+describe('ProjectsView 列排序', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<div />' } },
+        { path: '/projects', component: ProjectsView },
+        { path: '/project/:id', component: { template: '<div />' } },
+      ],
+    })
+    const tagsStore = useProjectTagsStore()
+    tagsStore.load = vi.fn().mockResolvedValue(undefined)
+    const d = useDataStore()
+    ;(d as any).data = { projects: [], projectPmis: {} }
+  })
+  it('六列开启 sortable', () => {
+    const w = mountView()
+    const cols = (w.vm as any).ALL_COLUMNS as { key: string; sortable?: boolean }[]
+    for (const k of ['projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'projectStatus']) {
+      expect(cols.find((c) => c.key === k)?.sortable, k).toBe(true)
+    }
+  })
+})
