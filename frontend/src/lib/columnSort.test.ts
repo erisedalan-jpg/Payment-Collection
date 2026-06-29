@@ -38,7 +38,7 @@ describe('withSortable', () => {
   })
 
   it('保留其它字段（label/width/wrap/num/fixed/formatter）', () => {
-    const fmt = (v: any) => String(v)
+    const fmt = (v: unknown) => String(v)
     const out = withSortable([
       { key: 'amountWan', label: '预估金额(万元)', width: 120, num: true, formatter: fmt },
       { key: 'projectName', label: '项目名称', width: 200, wrap: true, fixed: 'left' },
