@@ -138,3 +138,27 @@ describe('buildRankingOption palette 参数', () => {
     expect(opt.color[0]).toBe('#0d3a69')
   })
 })
+
+describe("buildRankingOption valueKind 'wan'", () => {
+  it('bar: 值原样不除万, 标签带「万」', () => {
+    const opt = buildRankingOption('bar', {
+      categories: ['终端安全'], values: [22604], metricLabel: '预估金额(万元)', valueKind: 'wan',
+    })
+    // series 数据未被 ÷10000
+    expect(opt.series[0].data).toEqual([22604])
+    // y 轴名沿用 metricLabel(不追加 (万))
+    expect(opt.yAxis.name).toBe('预估金额(万元)')
+    // label formatter 输出含「万」
+    const txt = opt.series[0].label.formatter({ value: 22604 })
+    expect(txt).toContain('万')
+    expect(txt).toContain('22,604')
+  })
+  it('pie: label formatter 带「万」且不除万', () => {
+    const opt = buildRankingOption('pie', {
+      categories: ['可参与'], values: [38108], metricLabel: '预估金额(万元)', valueKind: 'wan',
+    })
+    const txt = opt.series[0].label.formatter({ name: '可参与', value: 38108, percent: 50 })
+    expect(txt).toContain('38,108')
+    expect(txt).toContain('万')
+  })
+})

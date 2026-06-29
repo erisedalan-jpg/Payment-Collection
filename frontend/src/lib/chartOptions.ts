@@ -9,7 +9,7 @@
  */
 import { CHART_LIGHT } from '@/charts/echartsTheme'
 
-export type ValueKind = 'amount' | 'ratio' | 'count'
+export type ValueKind = 'amount' | 'ratio' | 'count' | 'wan'
 export type ChartType = 'bar' | 'line' | 'pie'
 
 export interface RankingOptionParams {
@@ -35,6 +35,9 @@ function makeLabelFormatter(valueKind: ValueKind): (p: { value: number }) => str
       if (pctVal === Math.round(pctVal)) return Math.round(pctVal) + '%'
       return pctVal.toFixed(1) + '%'
     }
+  }
+  if (valueKind === 'wan') {
+    return (p) => p.value.toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '万'
   }
   // count
   return (p) => String(Math.round(p.value))
