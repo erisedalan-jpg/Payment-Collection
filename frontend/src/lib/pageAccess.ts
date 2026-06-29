@@ -1,6 +1,6 @@
 export type PageKey =
   | 'overview' | 'projects' | 'projects-closed' | 'activity'
-  | 'insight' | 'insight-milestone' | 'insight-costdetail' | 'insight-risk' | 'insight-board' | 'insight-calendar'
+  | 'insight' | 'insight-milestone' | 'insight-costdetail' | 'insight-risk' | 'insight-board' | 'insight-calendar' | 'opportunities-board'
   | 'payment' | 'payment-projects' | 'payment-nodes' | 'payment-plan' | 'payment-risk' | 'ledger'
   | 'projects-key' | 'opportunities-progress' | 'temp-followup' | 'opportunity-followup' | 'risk-followup'
   | 'data' | 'governance' | 'about'
