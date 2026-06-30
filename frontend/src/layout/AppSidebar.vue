@@ -43,7 +43,7 @@ function onToggle(key: string) {
         </button>
         <div v-show="expanded('project')" class="section-links">
           <RouterLink v-for="link in projectLinks" :key="link.to" :to="link.to"
-            class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ function onToggle(key: string) {
         </button>
         <div v-show="expanded('tools')" class="section-links">
           <RouterLink v-for="link in toolLinks" :key="link.to" :to="link.to"
-            class="nav-item" active-class="active">{{ link.label }}</RouterLink>
+            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ function onToggle(key: string) {
           <span class="section-caret">{{ expanded('admin') ? '▾' : '▸' }}</span>系统管理
         </button>
         <div v-show="expanded('admin')" class="section-links">
-          <RouterLink to="/admin" class="nav-item" active-class="active">账号管理</RouterLink>
+          <RouterLink to="/admin" class="nav-sub" active-class="active">账号管理</RouterLink>
         </div>
       </div>
     </nav>
@@ -113,13 +113,14 @@ function onToggle(key: string) {
 .section-label:hover { background: var(--hover-tint); }
 .section-caret { display: inline-block; width: 12px; margin-right: var(--sp-2); color: var(--mut); font-size: var(--fs-1); }
 .group-label { font-size: var(--fs-1); color: var(--sub); padding: var(--sp-2) var(--sp-4) 2px; }
-.nav-item, .nav-sub { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4);
-  font-size: var(--fs-2); color: var(--txt); text-decoration: none;
+/* 全部分区子项统一为二级缩进样式(.nav-sub):字号 --fs-1、左缩进 30px,
+   六个分区(项目/项目分析/重点跟进/回款/工具/系统管理)子项对齐一致。 */
+.nav-sub { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4) var(--sp-2) 30px;
+  font-size: var(--fs-1); color: var(--txt); text-decoration: none;
   transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
-.nav-sub { padding-left: 30px; font-size: var(--fs-1); }
-.nav-item:hover, .nav-sub:hover { background: var(--hover-tint); }
+.nav-sub:hover { background: var(--hover-tint); }
 /* 选中=accent 淡底 + 2px 当前项指示条(功能性,inset 阴影不占位、不偏移) */
-.nav-item.active, .nav-sub.active { background: var(--selected-tint); color: var(--accent); font-weight: 600;
+.nav-sub.active { background: var(--selected-tint); color: var(--accent); font-weight: 600;
   box-shadow: inset 2px 0 0 var(--accent); }
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .sidebar-toggle { width: 16px; border: none; border-right: 1px solid var(--line);

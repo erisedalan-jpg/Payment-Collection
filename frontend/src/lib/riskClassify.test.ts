@@ -159,4 +159,31 @@ describe('classifyProjects', () => {
     const res = classifyProjects(rows)
     expect(res.find((e) => e.category === '成本超支')!.count).toBe(2)
   })
+
+  // 同一项目「整体超支」+「交付成本超支」并存时,成本超支桶按 projectId 去重(不重复计数)
+  it('同一项目同时命中 总成本超支+交付成本超支 时「成本超支」桶去重计 1', () => {
+    const rows = [
+      { projectId: 'X', projectName: '丙', health: '健康', isAnomalous: false, riskReasons: [
+        { category: '总成本超支', detail: '超支 3.0 万', tone: 'danger' },
+        { category: '交付成本超支', detail: '交付人工超支', tone: 'danger' },
+      ] },
+    ] as any
+    const res = classifyProjects(rows)
+    const cost = res.find((e) => e.category === '成本超支')!
+    expect(cost.count).toBe(1)
+    expect(cost.projects).toHaveLength(1)
+    expect(cost.projects[0].projectId).toBe('X')
+    // 保留首条 detail(总成本超支/整体超支维度,顺序在前)
+    expect(cost.projects[0].detail).toBe('超支 3.0 万')
+  })
+
+  // 不同项目各命中一类时仍分别计数(去重只针对同一 projectId,不误并不同项目)
+  it('总成本超支(项目A)+交付成本超支(项目B) 仍计 2(去重不跨项目)', () => {
+    const rows = [
+      { projectId: 'A', projectName: '甲', health: '健康', isAnomalous: false, riskReasons: [{ category: '总成本超支', detail: '项目超支', tone: 'danger' }] },
+      { projectId: 'B', projectName: '乙', health: '健康', isAnomalous: false, riskReasons: [{ category: '交付成本超支', detail: '交付人工超支', tone: 'danger' }] },
+    ] as any
+    const res = classifyProjects(rows)
+    expect(res.find((e) => e.category === '成本超支')!.count).toBe(2)
+  })
 })
