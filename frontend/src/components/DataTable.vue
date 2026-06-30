@@ -22,13 +22,23 @@ const props = withDefaults(
     rows: Record<string, any>[]
     showCount?: boolean
     clickable?: boolean
+    /** 外部排序模式：sortable 列渲染为 el-table 'custom'(不内部排序、仅发 sort-change),
+     * 由父级对全量数据排序后再传分页切片。默认 false=保持原内置布尔排序(排当前 rows)。 */
+    externalSort?: boolean
   }>(),
-  { showCount: true, clickable: false },
+  { showCount: true, clickable: false, externalSort: false },
 )
 
-const emit = defineEmits<{ 'row-click': [Record<string, any>] }>()
+const emit = defineEmits<{
+  'row-click': [Record<string, any>]
+  'sort-change': [{ prop: string | null; order: string | null }]
+}>()
 
 const count = computed(() => props.rows.length)
+
+function onSortChange(e: { prop: string | null; order: string | null }) {
+  emit('sort-change', { prop: e.prop, order: e.order })
+}
 </script>
 
 <template>
@@ -41,6 +51,7 @@ const count = computed(() => props.rows.length)
       style="width: 100%"
       :row-class-name="props.clickable ? 'dt-clickable-row' : ''"
       @row-click="(row: Record<string, any>) => emit('row-click', row)"
+      @sort-change="onSortChange"
     >
       <el-table-column
         v-for="col in props.columns"
@@ -49,7 +60,7 @@ const count = computed(() => props.rows.length)
         :label="col.label"
         :width="col.width"
         :fixed="col.fixed"
-        :sortable="!!col.sortable"
+        :sortable="props.externalSort ? (col.sortable ? 'custom' : false) : !!col.sortable"
         :show-overflow-tooltip="!col.wrap"
         :cell-class-name="col.wrap ? 'dt-wrap-col' : ''"
       >
