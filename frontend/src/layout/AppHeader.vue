@@ -26,23 +26,23 @@ async function onLogout() {
 </script>
 
 <template>
-  <header class="app-header">
+  <header class="app-header u-hairline-b">
     <div class="brand">
       <span class="title">项目管理平台</span>
       <span class="version">{{ APP_VERSION }}</span>
     </div>
     <div class="meta">
       <template v-if="store.data">
-        <span class="sync-dot" /> 数据已同步
+        <span class="sync-dot u-pulse" /> 数据已同步
         <span class="date-badge">{{ store.data.meta.lastUpdate }}</span>
       </template>
       <span v-else class="no-data">未加载数据</span>
       <template v-if="auth.user">
         <span class="user-name">{{ auth.user.displayName || auth.user.account }}</span>
-        <button data-test="logout" class="logout-btn" @click="onLogout">登出</button>
+        <button data-test="logout" class="logout-btn u-press" @click="onLogout">登出</button>
       </template>
       <DisplaySettings />
-      <button data-test="stop-server" class="stop-btn" title="停止服务" @click="stopServer">■</button>
+      <button data-test="stop-server" class="stop-btn u-press" title="停止服务" @click="stopServer">■</button>
     </div>
   </header>
 </template>

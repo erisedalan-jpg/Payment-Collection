@@ -107,6 +107,13 @@
   --selected-tint: color-mix(in srgb, var(--accent) 12%, transparent);
   --disabled-opacity: 0.45;
 
+  /* 微交互/质感令牌(V2.5.2):卡片上浮位移、柔光 focus 环、浮层毛玻璃。
+     全用既有结构色/状态色派生,不引入新色;动效复用 --dur-*/--ease。 */
+  --lift: -2px;                                          /* 可交互卡片 hover 上浮位移 */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); /* 柔光 focus 环 */
+  --glass-backdrop: blur(3px);                          /* 浮层遮罩:背后页面轻模糊(弹窗本身不透明) */
+  --hairline: var(--line);                              /* 发丝分隔线色(retina 下细化为 0.5px) */
+
   /* 层叠阶梯(V2):自绘浮层只准用这三级;弹窗/抽屉/下拉优先用 EP(自带 2000+ 动态管理) */
   --z-sticky: 100;
   --z-panel: 1500;
@@ -221,6 +228,46 @@ body {
 
 /* 数字排版(V2):金额/百分比/KPI/表格数字列必须挂 —— 等宽数字,列对齐、刷新不跳动。 */
 .u-num { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   微交互/质感(V2.5.2):统一动效,EP 与自绘件共享;全部走 --dur-*/--ease,
+   prefers-reduced-motion 由文末媒体查询统一关停(位移/动画归零)。
+   ============================================================ */
+
+/* 按下回弹:EP 按钮全站生效;自绘按钮挂 .u-press 同款触觉 */
+.el-button { transition: transform var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+.el-button:active { transform: scale(0.97); }
+.u-press { transition: transform var(--dur-1) var(--ease); }
+.u-press:active { transform: scale(0.96); }
+
+/* 可交互卡片悬浮上浮(opt-in:仅可点卡片挂,静态信息卡不挂,避免无意义动效) */
+.u-lift { transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
+.u-lift:hover { transform: translateY(var(--lift)); box-shadow: var(--shadow-2); }
+.u-lift:active { transform: translateY(0) scale(0.997); }
+
+/* 柔光 focus 环(自绘可交互件键盘聚焦;替代默认实线 outline,对比仍达 ~3:1) */
+.u-focus-ring:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* 状态点脉冲:同步/运行中等"实时"态(用状态色 --ok,不引 Apple 绿) */
+@keyframes u-pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent); }
+  70% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 0%, transparent); }
+}
+.u-pulse { animation: u-pulse-ring 1.8s var(--ease) infinite; }
+
+/* 发丝分隔线:retina 屏把 1px chrome 边框细化为 0.5px(更接近桌面 App 质感) */
+@media (min-resolution: 2dppx) {
+  .u-hairline-b { border-bottom-width: 0.5px; }
+  .u-hairline-r { border-right-width: 0.5px; }
+}
+
+/* P2 浮层:EP 遮罩背后页面轻模糊(聚焦弹窗;弹窗本身保持不透明,可读性不降)。
+   prefers-reduced-transparency 下退化为无模糊。 */
+.el-overlay { backdrop-filter: var(--glass-backdrop); -webkit-backdrop-filter: var(--glass-backdrop); }
+@media (prefers-reduced-transparency: reduce) {
+  .el-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
 
 /* 减少动态效果：尊重系统「prefers-reduced-motion」，关闭过渡与动画位移。 */
 @media (prefers-reduced-motion: reduce) {
