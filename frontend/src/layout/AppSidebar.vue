@@ -35,7 +35,7 @@ function onToggle(key: string) {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed: ui.sidebarCollapsed }">
+  <aside class="sidebar u-hairline-r" :class="{ collapsed: ui.sidebarCollapsed }">
     <nav class="sidebar-nav">
       <div v-if="projectLinks.length" class="section" :class="{ collapsed: !expanded('project') }">
         <button type="button" class="section-label" @click="onToggle('project')">
@@ -114,10 +114,13 @@ function onToggle(key: string) {
 .section-caret { display: inline-block; width: 12px; margin-right: var(--sp-2); color: var(--mut); font-size: var(--fs-1); }
 .group-label { font-size: var(--fs-1); color: var(--sub); padding: var(--sp-2) var(--sp-4) 2px; }
 .nav-item, .nav-sub { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4);
-  font-size: var(--fs-2); color: var(--txt); text-decoration: none; }
+  font-size: var(--fs-2); color: var(--txt); text-decoration: none;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
 .nav-sub { padding-left: 30px; font-size: var(--fs-1); }
-.nav-item:hover, .nav-sub:hover { background: var(--card2); }
-.nav-item.active, .nav-sub.active { background: var(--bg); color: var(--accent); font-weight: 600; }
+.nav-item:hover, .nav-sub:hover { background: var(--hover-tint); }
+/* 选中=accent 淡底 + 2px 当前项指示条(功能性,inset 阴影不占位、不偏移) */
+.nav-item.active, .nav-sub.active { background: var(--selected-tint); color: var(--accent); font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent); }
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .sidebar-toggle { width: 16px; border: none; border-right: 1px solid var(--line);
   background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); padding: 0; }
