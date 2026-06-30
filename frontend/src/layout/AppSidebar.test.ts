@@ -80,8 +80,8 @@ describe('AppSidebar', () => {
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
-    // 项目分析(7) + 重点跟进(4) + 回款子域(6) 均为 .nav-sub 二级呈现 = 17
-    expect(wrapper.findAll('.nav-sub').length).toBe(17)
+    // 六个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(4)+回款(6)+工具(3)+系统管理(1) = 26
+    expect(wrapper.findAll('.nav-sub').length).toBe(26)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
