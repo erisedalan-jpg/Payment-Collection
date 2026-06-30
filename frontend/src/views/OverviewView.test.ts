@@ -69,52 +69,43 @@ async function mountView() {
 }
 
 describe('OverviewView', () => {
-  it('KPI 条六指标', async () => {
+  it('体检带:在管/进行中/暂停 + 健康分段条 + 回款达成率环', async () => {
     seed()
     const w = await mountView()
-    expect(w.text()).toContain('在管项目')
-    expect(w.find('.ov-kpis').text()).toContain('2')   // 在管
-    expect(w.text()).toContain('回款达成率')
-    expect(w.text()).toContain('60%')                   // 600/1000 fmtRatio
+    expect(w.find('.ov-band').text()).toContain('在管')
+    expect(w.find('.ov-band').text()).toContain('回款达成率')
+    expect(w.find('.ratio-ring-val').text()).toBe('60%')   // 600/1000
+    expect(w.find('.hsb').exists()).toBe(true)
   })
 
-  it('KPI 六卡均带跳转(用户反馈)', async () => {
+  it('体检带回款三数:年度进度/本月待回/7天临期,均链 /payment', async () => {
     seed()
     const w = await mountView()
-    const kpis = w.find('.ov-kpis')
-    expect(kpis.findAll('a')).toHaveLength(6)
-    expect(kpis.find('a[href="/projects"]').exists()).toBe(true)
-    expect(kpis.find('a[href="/projects?paused=yes"]').exists()).toBe(true)
-    expect(kpis.find('a[href="/payment"]').exists()).toBe(true)   // 回款达成率
+    const band = w.find('.ov-band-pay')
+    expect(band.text()).toContain('年度回款进度')
+    expect(band.text()).toContain('本月待回款')
+    expect(band.text()).toContain('50')   // 本月待回 30+20=50 万
+    expect(band.text()).toContain('7 天临期')
+    expect(band.findAll('a').every((a) => a.attributes('href') === '/payment')).toBe(true)
   })
 
-  it('健康度总览:三档计数+四维+6类风险分类(去掉单项目风险卡)', async () => {
+  it('健康段链接带 health query', async () => {
     seed()
     const w = await mountView()
-    expect(w.text()).toContain('进度异常')
-    // 已去掉冗余的单项目风险卡片扁平列
-    expect(w.find('.ov-risk-card').exists()).toBe(false)
-    // 保留 6 类风险分类汇总
-    expect(w.find('.ov-risk-cats').exists()).toBe(true)
+    expect(
+      w.find('a[href="/projects?health=%E9%A3%8E%E9%99%A9"]').exists()
+      || w.find('a[href="/projects?health=风险"]').exists(),
+    ).toBe(true)
   })
 
-  it('回款重点带:年度进度/本月待回/7天临期/延期Top', async () => {
+  it('异常分诊区有标题;旧冗余元素已移除', async () => {
     seed()
     const w = await mountView()
-    expect(w.text()).toContain('年度回款进度')
-    expect(w.text()).toContain('本月待回款')
-    expect(w.find('.ov-pay').text()).toContain('50')   // 本月待回 50 万(30+20)
-    expect(w.text()).toContain('7 天临期')
-    expect(w.text()).toContain('延期 Top')
-    expect(w.find('.ov-top-item').text()).toContain('30') // 延期款待回 30 万
-  })
-
-  it('风险焦点行链接带筛选 query', async () => {
-    seed()
-    const w = await mountView()
-    expect(w.find('a[href="/projects?riskLevel=%E9%AB%98"]').exists() || w.find('a[href="/projects?riskLevel=高"]').exists()).toBe(true)
-    expect(w.find('a[href="/projects?paused=yes"]').exists()).toBe(true)
-    expect(w.find('a[href="/projects?overspend=yes"]').exists()).toBe(true)
+    expect(w.text()).toContain('需要处理的异常')
+    expect(w.find('.ov-kpis').exists()).toBe(false)
+    expect(w.find('.ov-focus').exists()).toBe(false)
+    expect(w.text()).not.toContain('进度异常')
+    expect(w.text()).not.toContain('健康度低')
   })
 
   it('右栏动态最多 10 条 + 查看全部链接', async () => {
@@ -129,7 +120,7 @@ describe('OverviewView', () => {
     ds.data = { meta: {}, dashboard: {}, summary: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, rawNodes: [], events: [] } as any
     const w = await mountView()
     expect(w.text()).toContain('首次同步，暂无变化记录')
-    expect(w.text()).toContain('在管项目')
+    expect(w.find('.ov-band').text()).toContain('在管')
   })
 })
 

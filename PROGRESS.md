@@ -4,9 +4,10 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V2.4.0**（整页级·新增页面：商机看板 /opportunities/board——读现有商机数据，复刻 oppoboard.pdf 的 KPI/环形/柱/折线/双轴/堆叠 约 19 个统计元素；在「项目分析」分区。**纯前端，升级不需点「更新数据」、无新依赖、无新后端端点；新页 pageKey opportunities-board 需授权**）。**2026-06-29 已生产上线**（在线基线由 V2.2.2 一次跨期升至 V2.4.0，累积含 V2.3.0–V2.4.0 全部代码；下一版更新包从 V2.4.0 增量即可，不再需累积自 V2.2.2）。
-- 最近更新：2026-06-29（V2.4.0：新增商机看板 /opportunities/board，纯前端，读现有 /api/opportunities）
-- 上一版本：V2.3.2（2026-06-29，售前客户口径单一来源化——后端算有效客户落 `Project.customer`，TOP1000 与前端客户列/筛选统一读它；约 19 售前入 TOP1000、约 90 客户列由空变有值。**升级须点「更新数据」**）
+- 当前版本：**V2.5.0**（整页级·整页重设计：项目总览首页 `/` 深度重做——「体检带（健康分段条+回款 CSS 环）→ 异常分诊卡网格（按严重度 danger→warn→mut，可下钻）→ 右栏动态」三段式；删冗余（底部三色块/健康度低卡/4 维异常行/KPI 超支）。**纯前端、零口径改动，升级不需点「更新数据」、无新依赖、无新页/无新 pageKey**。**尚未部署**）。
+- 最近更新：2026-06-30（V2.5.0：项目总览首页深度重做，新增 RatioRing/HealthSegmentBar 组件，复用 overview.ts/riskClassify.ts 不改口径）
+- 上一版本：V2.4.0（2026-06-29，**已生产上线**——商机看板 /opportunities/board，纯前端读现有 /api/opportunities；在线基线由 V2.2.2 一次跨期升至 V2.4.0，下一版更新包从 V2.4.0 增量即可）
+- 更上版本：V2.3.2（2026-06-29，售前客户口径单一来源化——后端算有效客户落 `Project.customer`，TOP1000 与前端客户列/筛选统一读它；约 19 售前入 TOP1000、约 90 客户列由空变有值。**升级须点「更新数据」**）
 - 更上版本：V2.3.1（2026-06-29，/projects/key 取数口径改 P1 一律入选；标签升级后前端 store 补刷；四跟进页历史快照超管逐条删除；key/temp/risk 客户列售前取原项目最终客户）
 - 更上版本：V2.3.0（2026-06-29，新页 /risk 风险跟进；首页/成本分析补标签排除；治理页 originMissing 告警；/projects 六列排序+关注原因拆两类+列筛选）
 - 更上版本：V2.2.1（2026-06-26，/project/:id 回款明细三列改元 + 商机新增是否重大POC列；/opportunities/key 筛选/可选列自动派生新列）
@@ -21,6 +22,12 @@
 
 - **单一来源**：`frontend/src/version.ts`（APP_VERSION/RELEASE_DATE），改版本只改此处；本文件头部同步记录。
 - **三位策略 `VX.Y.Z`（用户钦定）**：X（大版本）调整**须用户确认**；Y=整页级调整（新增页面/整页重设计）；Z=子页面、下钻页、页内局部调整。
+- **V2.5.0**（2026-06-30，Y 级·整页重设计·项目总览首页 `/`）：
+  - **首页深度重做**：旧「6 KPI 卡 + 健康度卡 + 回款重点卡 + 底部三色块 + 右栏动态」改为三段式——① 全宽**体检带**（`HealthSegmentBar` 健康/关注/风险分段条 + 在管/进行中/暂停上下文 ｜ `RatioRing` 回款达成 CSS conic 环 + 年度/本月待回/7天临期）；② **异常分诊卡网格**（`classifyProjects` 结果在视图层过滤排序：去「健康度低」[并入体检带]、隐藏 count=0、按 tone danger→warn→mut 排；每卡 tone 左色条+tone 色计数+迷你说明+查看清单下钻+就地展开 Top5；「回款延期」卡展开用 `band.delayedTop` 带「待回 X 万」）；③ 右栏项目动态（`EventTimeline` 不动）。
+  - **去重**：删底部三色块（高风险/暂停/超支）、健康度低单卡、4 维异常行（进度/风险/成本/回款异常）、易混的 KPI 超支数；语义均并入体检带或异常卡（健康度低=关注+风险=分段条）。
+  - 新增 `frontend/src/components/RatioRing.vue`（CSS conic 环，props `ratio/label/size/thickness/color`，ratio=null 显「-」置灰）+ `HealthSegmentBar.vue`（实色分段条[条内无字]+可点图例，props `segments/height/minSegmentPct`，count=0 段不渲染）；重写 `OverviewView.vue`（模板+scoped CSS，唯一 `key` 防回款延期同项目多节点重复键）。
+  - **零后端/零口径改动**：复用 `lib/overview.ts`（computeKpis/healthSummary/paymentBand）、`lib/riskClassify.ts`（classifyProjects），去重排序只在视图层；不改 schema/preprocess/路由/store/EventTimeline。→ **升级不需点「更新数据」；无新依赖；无新页/无新 pageKey**。
+  - 全令牌（状态色 健康=`--ok`/关注=`--warn`/风险=`--danger`、回款环=`--accent`；仅图形尺寸像素例外）；`verify.sh` 全绿（pytest434+vitest971+build），dark/三档字号/≤1200·≤768 断点真机冒烟通过、无 console JS 错误。
 - **V2.4.0**（2026-06-29，Y 级·整页级·新增页面）：
   - **新增商机看板页 `/opportunities/board`**（项目分析分区，风险看板下/回款多维分析上）：读现有商机数据（`useOpportunitiesStore`，`/api/opportunities`，已按 L4 隔离），自上而下复刻 `oppoboard.pdf` 约 19 个统计元素——顶部 4 KPI（本周新增/更新数·额[近7天]、商机总数/总额）+ 商机覆盖产品（横向柱，按 productCategory ΣamountWan）+ 主观预测/阶段分布环形 + 各团队金额/数量及【重点】4 柱 + 数量/金额月趋势 2 多系列折线（按 firstReg 分月×l4）+ 各级别客户双轴组合柱（top1000 桶：ΣamountWan + 去重客户数）+ 预估落单时间堆叠柱（expectedDate 月×forecast）+ AI 相关两饼及两 KPI（productCategory 含 'AI'）。
   - 新增 `lib/opportunityBoard.ts`（聚合纯函数 + 复杂图 option 构造）+ `OpportunitiesBoardView.vue`；复用 `ChartBox`/`buildRankingOption`（后者加 `'wan'` valueKind，加法）。
