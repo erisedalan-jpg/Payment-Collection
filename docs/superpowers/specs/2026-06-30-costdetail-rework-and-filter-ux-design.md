@@ -68,7 +68,7 @@
 | <0 | <0 | 原厂外包均超支 |
 
 - 用 `StatusBadge` 渲染（tone：未超支 `ok`、交付预算超支 `warn`、交付外包超支 `warn`、原厂外包均超支 `danger`；实现时定，状态色令牌）。
-- 售前按 Q4 用售前**自身** `deliveryCosts`（多为空→部门=0、外包=0→「未超支」）。
+- **交付成本状态对所有行（含售前）一律由本表 `deliveryDeptRemaining`/`deliveryOutsourceRemaining` 两列计算**；这两列取自 `Project.deliveryCosts`（来源 `delivery_analysis.csv`，同 /project/:id，V2.5.1 已约定）。售前同样有真实 delivery_analysis 数据（实测 638 行全有 deliveryCosts，交付部门剩余非 0 的 573、交付外包剩余非 0 的 308），**非空**，故售前交付成本状态据其真实交付剩余判定，售前不特殊处理。
 
 #### 1.5.3 售前服务类项目三列预算改取原项目（修取数异常）
 `buildCostRows` 内，对 `project.isPresale && project.relatedClosedId && pmis[relatedClosedId]` 的行：
@@ -128,7 +128,7 @@
 1. 图（超支分布）与 L4 汇总表、明细旧「成本状态」列**保留 ±5000 口径**，仅四卡换总/交付口径（与卡不完全对齐，用户已认可）。
 2. 交付成本状态：`=0` 归「不超支」侧（部门/外包剩余 `≥0` 视为不超支）。
 3. 售前无 `relatedClosedId`（7 个）三列回退自身（0）。
-4. 售前「交付成本状态」「四卡超支判定」按售前自身字段；仅三列预算显示取原项目（连带旧「成本状态」列随显示 remaining 反映原项目）。
+4. 售前「交付成本状态」由本表两交付剩余列（`deliveryCosts`/delivery_analysis.csv，同 /project/:id，售前有真实非空数据）判定；「四卡超支判定」按售前自身字段；仅总预算/已核算/剩余三列显示取原项目（连带旧「成本状态」列随显示 remaining 反映原项目）。
 5. 成本统计项目数 = 本页全部行（含 XS/售前/异常），不再剔 XS。
 6. 明细表旧「成本状态」列**保留**（未要求删；如要删 spec 评审告知）。
 
