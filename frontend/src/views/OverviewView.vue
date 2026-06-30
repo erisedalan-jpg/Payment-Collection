@@ -6,7 +6,7 @@ import type { Event, Project, ProjectPmis } from '@/types/analysis'
 import { computeKpis, healthSummary, paymentBand } from '@/lib/overview'
 import { paymentNodeRows } from '@/lib/paymentPmis'
 import { useFilterStore } from '@/stores/filter'
-import { fmtWan, fmtRatio } from '@/lib/format'
+import { fmtWan } from '@/lib/format'
 import EventTimeline from '@/components/EventTimeline.vue'
 import RatioRing from '@/components/RatioRing.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
@@ -66,16 +66,16 @@ const anomalyCards = computed(() =>
 const expanded = reactive<Record<string, boolean>>({})
 function toggle(cat: string) { expanded[cat] = !expanded[cat] }
 
-interface DrillItem { projectId: string; primary: string; secondary: string }
+interface DrillItem { key: string; projectId: string; primary: string; secondary: string }
 function cardItems(cat: string): DrillItem[] {
   if (cat === '回款延期' && band.value.delayedTop.length) {
-    return band.value.delayedTop.map((t) => ({
-      projectId: t.projectId, primary: t.projectName || t.projectId, secondary: `待回 ${fmtWan(t.remaining)} 万`,
+    return band.value.delayedTop.map((t, i) => ({
+      key: `${t.projectId}-${t.stage}-${i}`, projectId: t.projectId, primary: t.projectName || t.projectId, secondary: `待回 ${fmtWan(t.remaining)} 万`,
     }))
   }
   const entry = classEntries.value.find((e) => e.category === cat)
-  return (entry?.projects ?? []).slice(0, 5).map((p) => ({
-    projectId: p.projectId, primary: p.projectName || p.projectId, secondary: p.detail,
+  return (entry?.projects ?? []).slice(0, 5).map((p, i) => ({
+    key: `${p.projectId}-${i}`, projectId: p.projectId, primary: p.projectName || p.projectId, secondary: p.detail,
   }))
 }
 function catLink(cat: string): string { return `/projects?riskCategory=${encodeURIComponent(cat)}` }
@@ -133,7 +133,7 @@ defineExpose({ baseProjects })
               </button>
             </div>
             <div v-if="expanded[c.category]" class="ov-acard-body">
-              <button v-for="it in cardItems(c.category)" :key="it.projectId" type="button"
+              <button v-for="it in cardItems(c.category)" :key="it.key" type="button"
                 class="ov-acard-item" @click="router.push(`/project/${it.projectId}`)">
                 <span class="ov-acard-item-name">{{ it.primary }}</span>
                 <span class="ov-acard-item-detail">{{ it.secondary }}</span>
