@@ -21,14 +21,14 @@ function seed() {
     meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
     followupRecords: {},
     projects: [
-      { projectId: 'WS1', projectName: '甲', projectManager: '张', orgL4: 'D1', orgL3_1: 'L31', paymentPmis: { contract: 2000000 },
+      { projectId: 'WS1', projectName: '甲', projectManager: '张', orgL4: 'D1', orgL3_1: 'L31', paymentPmis: { contract: 2000000 }, overspendAmount: 8000,
         deliveryCosts: [{ 类别: '交付部门人工成本', 剩余预算: 12345 }, { 类别: '交付外包服务成本', 剩余预算: 6789 }] },
       { projectId: 'WS2', projectName: '乙', projectManager: '李', orgL4: 'D1', orgL3_1: 'L31', paymentPmis: { contract: 500000 } },
       { projectId: 'XS9', projectName: '售前', projectManager: '王', orgL4: 'D2', orgL3_1: '', paymentPmis: { contract: 0 } },
     ],
     projectPmis: {
       WS1: { status: { 项目类型: '正常实施类' }, team: { L3部门: '一部' }, cost: { 总预算: 1000, 核算: 1200, 剩余预算: -8000 } },
-      WS2: { status: { 项目类型: '正常实施类' }, team: { L3部门: '一部' }, cost: { 总预算: 1000, 核算: 900, 剩余预算: 100 } },
+      WS2: { status: { 项目类型: '正常实施类' }, team: { L3部门: '一部' }, cost: { 总预算: 1000, 核算: 900, 剩余预算: 100, 交付超支: true } },
       XS9: { status: { 项目类型: '售前服务类' }, team: { L3部门: '二部' }, cost: { 剩余预算: -9999 } },
     },
   } as any
@@ -50,15 +50,11 @@ describe('CostDetailView 明细表', () => {
     expect((detail.props('rows') as any[]).map((r: any) => r.projectId)).toEqual(['XS9'])
   })
 
-  it('点 KPI(超支大于5K)写成本状态列筛选缩小明细;序号列 + 导出按钮', async () => {
-    ;(Element.prototype as any).scrollIntoView = vi.fn()
+  it('序号列 + 导出按钮', () => {
     seed()
     const w = mount(CostDetailView, opts)
-    ;(w.vm as any).onKpiClick(3)
-    await w.vm.$nextTick()
     const tables = w.findAllComponents({ name: 'DataTable' })
     const detail = tables[tables.length - 1]
-    expect((detail.props('rows') as any[]).map((r: any) => r.projectId)).toEqual(['WS1'])
     expect((detail.props('rows') as any[])[0]._seq).toBe(1)
     expect(w.find('[data-test="cost-export"]').exists()).toBe(true)
   })
@@ -102,14 +98,15 @@ describe('CostDetailView 明细表', () => {
 })
 
 describe('CostDetailView 上半', () => {
-  it('标题 + 4 KPI(剔 XS:总数2/未超支1/不足5k0/大于5k1)', () => {
+  it('四卡:成本统计(含XS)/未超支/总成本超支数(+大于5000子)/交付成本超支数', () => {
     seed()
     const w = mount(CostDetailView, opts)
-    expect(w.text()).toContain('成本分析')
     const items = w.findComponent(MetricGrid).props('items') as any[]
-    expect(items.map((i) => i.k)).toEqual(['成本统计项目数', '未超支', '超支不足5K', '超支大于5K'])
-    expect(items.find((i) => i.k === '成本统计项目数').v).toBe('2')
-    expect(items.find((i) => i.k === '超支大于5K').v).toBe('1')
+    expect(items.map((i) => i.k)).toEqual(['成本统计项目数', '未超支', '总成本超支数', '交付成本超支数'])
+    expect(items.find((i) => i.k === '成本统计项目数').v).toBe('3') // WS1/WS2/XS9 全计入(不剔XS)
+    expect(items.find((i) => i.k === '总成本超支数').v).toBe('1')   // WS1
+    expect(items.find((i) => i.k === '总成本超支数').sub).toContain('超支大于5000')
+    expect(items.find((i) => i.k === '交付成本超支数').v).toBe('1') // WS2
   })
   it('渲染超支分布 ChartBox + L4 汇总表(行=D1)', () => {
     seed()
@@ -117,16 +114,15 @@ describe('CostDetailView 上半', () => {
     expect(w.findComponent(ChartBox).exists()).toBe(true)
     expect((w.findComponent(DataTable).props('rows') as any[]).some((r) => r.orgL4 === 'D1')).toBe(true)
   })
-  it('点 KPI(超支大于5K)就地筛选明细表;点总数恢复', async () => {
+  it('点 KPI(总成本超支数)就地筛选明细=WS1;点成本统计复位', async () => {
     ;(Element.prototype as any).scrollIntoView = vi.fn()
     seed()
     const w = mount(CostDetailView, opts)
-    w.findComponent(MetricGrid).vm.$emit('item-click', 3)
+    ;(w.vm as any).onKpiClick(2)
     await w.vm.$nextTick()
-    const tables = w.findAllComponents({ name: 'DataTable' })
-    const detail = tables[tables.length - 1]
-    expect((detail.props('rows') as any[]).map((r) => r.projectId)).toEqual(['WS1'])
-    w.findComponent(MetricGrid).vm.$emit('item-click', 0)
+    const detail = w.findAllComponents({ name: 'DataTable' }).at(-1)!
+    expect((detail.props('rows') as any[]).map((r: any) => r.projectId)).toEqual(['WS1'])
+    ;(w.vm as any).onKpiClick(0)
     await w.vm.$nextTick()
     expect((detail.props('rows') as any[]).length).toBe(3)
   })
@@ -140,6 +136,21 @@ describe('CostDetailView 上半', () => {
     const d1 = (l4.props('rows') as any[]).find((r) => r.orgL4 === 'D1')
     expect(d1.contractTotal).toBe(2500000)
     expect(d1.remainingTotal).toBe(-7900)
+  })
+})
+
+describe('CostDetailView Task5', () => {
+  it('明细含交付成本状态列;L4 汇总表可选列;标题去括号', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    const detailCols = (w.vm as any).DETAIL_COLS as any[]
+    expect(detailCols.map((c) => c.key)).toContain('deliveryStatus')
+    // L4 汇总表暴露可见列
+    expect(((w.vm as any).l4VisibleColumns as any[]).length).toBeGreaterThan(0)
+    // 标题去括号(不含"(按")
+    expect(w.text()).toContain('项目成本明细')
+    expect(w.text()).not.toContain('项目成本明细(按')
+    expect(w.text()).not.toContain('超支项目分布(按')
   })
 })
 

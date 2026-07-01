@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useCrossFilterStore } from '@/stores/crossFilter'
-import { cfUniqueValues } from '@/lib/crossFilter'
+import { cfUniqueValues, applyColumnFilters } from '@/lib/crossFilter'
 
 const props = defineProps<{
   tableId: string
@@ -15,7 +15,13 @@ const visible = ref(false)
 const search = ref('')
 const selected = ref<Set<string>>(new Set())
 
-const uniques = computed(() => cfUniqueValues(props.sourceRows, props.colKey))
+const uniques = computed(() => {
+  const all = store.tableFilters(props.tableId)
+  const others: typeof all = {}
+  for (const k of Object.keys(all)) if (k !== props.colKey) others[k] = all[k]
+  const scoped = applyColumnFilters(props.sourceRows, others)
+  return cfUniqueValues(scoped, props.colKey)
+})
 const visibleUniques = computed(() => {
   const kw = search.value.trim().toLowerCase()
   if (!kw) return uniques.value
@@ -26,12 +32,15 @@ const allChecked = computed(
   () => uniques.value.length > 0 && selected.value.size === uniques.value.length,
 )
 
-// 打开弹层时初始化勾选：有筛选→沿用其选中值；否则全选
+// 打开弹层时初始化勾选：有筛选→与当前可见 uniques 取交集；否则全选可见
 watch(visible, (open) => {
   if (!open) return
   search.value = ''
   const cur = store.tableFilters(props.tableId)[props.colKey]
-  selected.value = cur ? new Set(cur.value) : new Set(uniques.value.map((u) => u.display))
+  const visibleSet = new Set(uniques.value.map((u) => u.display))
+  selected.value = cur
+    ? new Set(cur.value.filter((v) => visibleSet.has(v)))
+    : new Set(uniques.value.map((u) => u.display))
 })
 
 function toggle(display: string, checked: boolean) {
@@ -68,7 +77,7 @@ function clear() {
     popper-class="cf-popover"
   >
     <template #reference>
-      <span class="cf-icon" :class="{ active }" title="列筛选">&#9660;</span>
+      <span class="cf-icon" :class="{ active }" title="列筛选" @click.stop>&#9660;</span>
     </template>
     <div class="cf-inner">
       <div class="cf-title">
