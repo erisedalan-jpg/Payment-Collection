@@ -103,3 +103,57 @@ describe('deliveryStatusOf', () => {
     expect(deliveryStatusOf(-1, -1)).toBe('原厂外包均超支')
   })
 })
+
+describe('buildCostRows 售前预算回退原项目 + 超支布尔', () => {
+  it('售前项目三列取原项目:总预算=原总预算、已核算=原核算+售前自身核算、剩余=总-已', () => {
+    const projects = [
+      { projectId: 'SF1', projectName: '售前甲', isPresale: true, relatedClosedId: 'O1', orgL4: 'D1',
+        deliveryCosts: [{ 类别: '交付部门人工成本', 剩余预算: 100 }, { 类别: '交付外包服务成本', 剩余预算: -5 }] },
+    ] as any
+    const pmis = {
+      SF1: { cost: { 核算: 100 }, status: {}, team: {} },
+      O1: { cost: { 总预算: 1000, 核算: 600 }, status: {}, team: {} },
+    } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.totalBudget).toBe(1000)
+    expect(r.actualCost).toBe(700)   // 原核算600 + 售前核算100
+    expect(r.remaining).toBe(300)    // 1000 - 700
+    expect(r.deliveryStatus).toBe('交付外包超支') // 部门100≥0, 外包-5<0
+  })
+  it('非售前项目三列读自身 cost(不变)', () => {
+    const projects = [{ projectId: 'WS1', orgL4: 'D1', deliveryCosts: [] }] as any
+    const pmis = { WS1: { cost: { 总预算: 200, 核算: 50, 剩余预算: 150 }, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.totalBudget).toBe(200)
+    expect(r.actualCost).toBe(50)
+    expect(r.remaining).toBe(150)
+  })
+  it('售前无 relatedClosedId → 回退自身 cost', () => {
+    const projects = [{ projectId: 'SF2', isPresale: true, orgL4: 'D1', deliveryCosts: [] }] as any
+    const pmis = { SF2: { cost: { 总预算: 0, 核算: 0, 剩余预算: 0 }, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.totalBudget).toBe(0)
+  })
+  it('总成本超支布尔与 overspendAmount(overspendAmount>0)', () => {
+    const projects = [{ projectId: 'WS2', orgL4: 'D1', overspendAmount: 8000, deliveryCosts: [] }] as any
+    const pmis = { WS2: { cost: {}, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.totalOverspend).toBe(true)
+    expect(r.overspendAmount).toBe(8000)
+    expect(r.deliveryOverspend).toBe(false)
+  })
+  it('交付成本超支布尔(cost.交付超支 flag)', () => {
+    const projects = [{ projectId: 'WS3', orgL4: 'D1', deliveryCosts: [] }] as any
+    const pmis = { WS3: { cost: { 交付超支: true }, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.deliveryOverspend).toBe(true)
+    expect(r.totalOverspend).toBe(false)
+  })
+  it('异常项目(orgL4 空)两超支均否(riskReasons 短路数据异常)', () => {
+    const projects = [{ projectId: 'WS4', orgL4: '', overspendAmount: 9000, deliveryCosts: [] }] as any
+    const pmis = { WS4: { cost: { 交付超支: true }, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.totalOverspend).toBe(false)
+    expect(r.deliveryOverspend).toBe(false)
+  })
+})
