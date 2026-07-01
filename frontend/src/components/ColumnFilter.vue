@@ -28,9 +28,15 @@ const visibleUniques = computed(() => {
   return uniques.value.filter((u) => u.display.toLowerCase().includes(kw))
 })
 const active = computed(() => !!store.tableFilters(props.tableId)[props.colKey])
-const allChecked = computed(
-  () => uniques.value.length > 0 && selected.value.size === uniques.value.length,
-)
+const searching = computed(() => search.value.trim().length > 0)
+// 搜索态下,全选/勾选/确定只作用于「当前搜索结果」——修「必须先取消全选再勾搜索项」的坑。
+const allChecked = computed(() => {
+  if (searching.value) {
+    const vis = visibleUniques.value
+    return vis.length > 0 && vis.every((u) => selected.value.has(u.display))
+  }
+  return uniques.value.length > 0 && selected.value.size === uniques.value.length
+})
 
 // 打开弹层时初始化勾选：有筛选→与当前可见 uniques 取交集；否则全选可见
 watch(visible, (open) => {
@@ -50,16 +56,21 @@ function toggle(display: string, checked: boolean) {
   selected.value = s
 }
 function toggleAll(checked: boolean) {
-  selected.value = checked ? new Set(uniques.value.map((u) => u.display)) : new Set()
+  if (searching.value) {
+    // 只增删当前搜索结果,不动搜索框外的其它值
+    const s = new Set(selected.value)
+    for (const u of visibleUniques.value) checked ? s.add(u.display) : s.delete(u.display)
+    selected.value = s
+  } else {
+    selected.value = checked ? new Set(uniques.value.map((u) => u.display)) : new Set()
+  }
 }
 function apply() {
-  store.setColumnFilter(
-    props.tableId,
-    props.colKey,
-    Array.from(selected.value),
-    uniques.value.length,
-    props.group,
-  )
+  // 搜索态:确定 = 只筛「搜索结果中被勾选的值」(无需先取消全选);非搜索态:按整体勾选。
+  const values = searching.value
+    ? visibleUniques.value.filter((u) => selected.value.has(u.display)).map((u) => u.display)
+    : Array.from(selected.value)
+  store.setColumnFilter(props.tableId, props.colKey, values, uniques.value.length, props.group)
   visible.value = false
 }
 function clear() {
@@ -86,7 +97,7 @@ function clear() {
       <el-input v-model="search" size="small" placeholder="搜索筛选选项..." clearable />
       <label v-activate class="cf-row cf-all">
         <el-checkbox :model-value="allChecked" @change="(v: any) => toggleAll(!!v)" />
-        全选/取消全选
+        {{ searching ? '全选/取消全选(搜索结果)' : '全选/取消全选' }}
       </label>
       <div class="cf-list">
         <label v-for="u in visibleUniques" :key="u.display" v-activate class="cf-row" :title="u.display">
