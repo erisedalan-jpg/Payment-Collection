@@ -72,7 +72,7 @@ describe('costKpis 五值(不剔 XS)', () => {
   })
 })
 
-describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
+describe('costL4Dist / costL4Summary(均剔 XS)', () => {
   const rows = [
     cr({ orgL4: 'B', status: '未超支' }),
     cr({ orgL4: 'B', status: '超支不足5k' }),
@@ -137,6 +137,18 @@ describe('buildCostRows 售前预算回退原项目 + 超支布尔', () => {
     expect(r.remaining).toBe(300)    // 1000 - 700
     expect(r.deliveryStatus).toBe('交付外包超支') // 部门100≥0, 外包-5<0
   })
+  it('售前超支布尔来自售前自身 pmis,不泄漏原项目(Q4 钦定:预算走原项目、判定走自身)', () => {
+    const projects = [{ projectId: 'SF3', isPresale: true, relatedClosedId: 'O2', orgL4: 'D1', deliveryCosts: [] }] as any
+    // 原项目 O2 有 交付超支/项目超支 flag,售前 SF3 自身无 → 售前判定必须不受 O2 影响
+    const pmis = {
+      SF3: { cost: { 核算: 0 }, status: {}, team: {} },
+      O2: { cost: { 总预算: 1000, 核算: 900, 交付超支: true, 项目超支: true }, status: {}, team: {} },
+    } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.deliveryOverspend).toBe(false) // O2 的交付超支不泄漏到售前
+    expect(r.totalOverspend).toBe(false)    // O2 的项目超支不泄漏到售前
+    expect(r.totalBudget).toBe(1000)        // 但预算三列仍取原项目(证明两者分离)
+  })
   it('非售前项目三列读自身 cost(不变)', () => {
     const projects = [{ projectId: 'WS1', orgL4: 'D1', deliveryCosts: [] }] as any
     const pmis = { WS1: { cost: { 总预算: 200, 核算: 50, 剩余预算: 150 }, status: {}, team: {} } } as any
@@ -145,11 +157,13 @@ describe('buildCostRows 售前预算回退原项目 + 超支布尔', () => {
     expect(r.actualCost).toBe(50)
     expect(r.remaining).toBe(150)
   })
-  it('售前无 relatedClosedId → 回退自身 cost', () => {
+  it('售前无 relatedClosedId → 回退自身 cost(三列均读自身,非全 0 以区分分支)', () => {
     const projects = [{ projectId: 'SF2', isPresale: true, orgL4: 'D1', deliveryCosts: [] }] as any
-    const pmis = { SF2: { cost: { 总预算: 0, 核算: 0, 剩余预算: 0 }, status: {}, team: {} } } as any
+    const pmis = { SF2: { cost: { 总预算: 300, 核算: 50, 剩余预算: 250 }, status: {}, team: {} } } as any
     const r = buildCostRows(projects, pmis)[0]
-    expect(r.totalBudget).toBe(0)
+    expect(r.totalBudget).toBe(300)
+    expect(r.actualCost).toBe(50)
+    expect(r.remaining).toBe(250)
   })
   it('总成本超支布尔与 overspendAmount(overspendAmount>0)', () => {
     const projects = [{ projectId: 'WS2', orgL4: 'D1', overspendAmount: 8000, deliveryCosts: [] }] as any
