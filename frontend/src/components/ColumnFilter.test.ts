@@ -27,6 +27,38 @@ describe('ColumnFilter', () => {
     await w.vm.$nextTick()
     expect(w.find('.cf-icon.active').exists()).toBe(true)
   })
+  it('搜索后直接确定 → 只筛「搜索结果中被勾选的值」(无需先取消全选)', async () => {
+    const store = useCrossFilterStore()
+    const rows = [{ v: '张三' }, { v: '张四' }, { v: '李五' }, { v: '王六' }]
+    const w = mount(ColumnFilter, {
+      props: { tableId: 'T', colKey: 'v', sourceRows: rows },
+      global: { plugins: [ElementPlus] },
+    })
+    ;(w.vm as any).visible = true
+    await w.vm.$nextTick()
+    // 默认全选(4 值);输入搜索「张」→ 可见张三/张四(仍在 selected 中)
+    ;(w.vm as any).search = '张'
+    await w.vm.$nextTick()
+    // 直接确定:应只筛张三/张四,而非旧行为的全部 4 个(无需先取消全选)
+    ;(w.vm as any).apply()
+    expect(store.tableFilters('T').v.value.slice().sort()).toEqual(['张三', '张四'].sort())
+  })
+  it('搜索态「取消全选」只移除搜索结果、不动搜索框外的值', async () => {
+    const store = useCrossFilterStore()
+    const rows = [{ v: '张三' }, { v: '张四' }, { v: '李五' }]
+    const w = mount(ColumnFilter, {
+      props: { tableId: 'T2', colKey: 'v', sourceRows: rows },
+      global: { plugins: [ElementPlus] },
+    })
+    ;(w.vm as any).visible = true
+    await w.vm.$nextTick()
+    ;(w.vm as any).search = '张'
+    await w.vm.$nextTick()
+    ;(w.vm as any).toggleAll(false)        // 取消全选(搜索结果)→ 只去掉张三/张四
+    await w.vm.$nextTick()
+    expect([...(w.vm as any).selected].sort()).toEqual(['李五'])  // 李五(搜索框外)仍在
+  })
+
   it('级联:A 列已筛选后,B 列选项只列 A 筛选后行的 B 值', async () => {
     setActivePinia(createPinia())
     const store = useCrossFilterStore()

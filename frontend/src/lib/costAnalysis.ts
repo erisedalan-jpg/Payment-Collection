@@ -3,34 +3,30 @@ import { riskReasons } from './riskReasons'
 
 export type CostStatus = '超支大于5k' | '超支不足5k' | '未超支'
 
-export function isXs(projectId: string): boolean {
-  return (projectId ?? '').toUpperCase().startsWith('XS')
-}
-
-/** 成本状态三档(忠实对方):XS 强制未超支;null→0;rb<-5000 大于5k;-5000≤rb<0 不足5k;rb≥0 未超支。 */
-export function costStatusOf(remainingBudget: number | null | undefined, projectId: string): CostStatus {
-  if (isXs(projectId)) return '未超支'
-  const rb = remainingBudget == null ? 0 : Number(remainingBudget)
-  if (rb < -5000) return '超支大于5k'
-  if (rb < 0) return '超支不足5k'
-  return '未超支'
+/** 成本状态三档(与卡「总成本超支数」/首页/projects 同源 riskReasons 口径):
+ *  未超支 = 非总成本超支;超支再按 overspendAmount 是否 > 5000 分档(与卡「超支大于5000」子项一致)。
+ *  不再用 remaining、不再对 XS 强制判断 —— XS 由整页 /data 标签排除统一处理,不在此层硬编码。 */
+export function costStatusOf(totalOverspend: boolean, overspendAmount: number): CostStatus {
+  if (!totalOverspend) return '未超支'
+  return overspendAmount > 5000 ? '超支大于5k' : '超支不足5k'
 }
 
 export interface CostRow {
   projectId: string; projectName: string; projectType: string
   orgL3: string; orgL3_1: string; orgL4: string; manager: string
   amount: number; status: CostStatus
-  totalBudget: number; actualCost: number; remaining: number; xs: boolean
+  totalBudget: number; actualCost: number; remaining: number
   deliveryDeptRemaining: number; deliveryOutsourceRemaining: number
   deliveryStatus: DeliveryStatus
   totalOverspend: boolean; deliveryOverspend: boolean; overspendAmount: number
 }
 
-/** 全部主域项目装配成本行(明细表用;XS 保留并标记)。
- * 售前服务类(isPresale + relatedClosedId)的 总预算/已核算/剩余 回退原项目:
- *   总预算=原项目总预算; 已核算=原项目核算 + 售前自身核算; 剩余=总预算 − 已核算。
- * 超支判定(totalOverspend/deliveryOverspend)沿用 riskReasons(售前用自身),与 /projects 同源。
- * 交付成本状态由本行两交付剩余列判定(售前同样用自身 deliveryCosts/delivery_analysis.csv)。 */
+/** 全部主域项目装配成本行(明细表用)。
+ * 售前服务类(isPresale):总预算=原项目总预算(缺→0);剩余/已核算随毛利超支额定——
+ *   有毛利数据 → 剩余=−overspendAmount(超支即为负,与成本状态一致)、已核算=总预算+overspendAmount(含现项目实际成本);
+ *   无毛利数据(overspendAmount=null)→ 回退原项目预算视图(已核算=原核算+售前自身核算、剩余=总−已核算)。
+ * 成本状态/超支判定(status/totalOverspend/deliveryOverspend)统一走 riskReasons,与卡/首页/projects 同源。
+ * 交付成本状态由本行两交付剩余列判定(售前同用自身 deliveryCosts)。XS 不在此硬编码剔除,交整页 /data 标签排除。 */
 export function buildCostRows(projects: Project[], pmis: Record<string, ProjectPmis>): CostRow[] {
   return projects.map((p) => {
     const m = (pmis[p.projectId] ?? {}) as any
@@ -40,22 +36,33 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
     const deptRem = findRem('交付部门人工成本')
     const outRem = findRem('交付外包服务成本')
 
-    // 售前三列回退原项目;否则读自身
-    const originCost = (p.isPresale && p.relatedClosedId && pmis[p.relatedClosedId])
-      ? ((pmis[p.relatedClosedId] as any).cost ?? {}) : null
+    // 整体超支额(元,来自毛利 profit_loss:非售前=实际成本−预算成本、售前=实际成本−原剩余预算);null=无毛利数据
+    const rawOverspend = p.overspendAmount
+    const overspendAmount = Number(rawOverspend ?? 0)
+
+    // 售前:总预算=原项目总预算(缺→0);有毛利数据 → 剩余=−超支额(超支即为负,与成本状态天然一致)、
+    //   已核算=总预算+超支额(=原核算+现项目实际成本;超支时现项目核算必非 0);无毛利数据回退原项目预算视图。
+    // 非售前:读自身 cost。
     let totalBudget: number, actualCost: number, remaining: number
-    if (originCost) {
-      totalBudget = Number(originCost.总预算 ?? 0)
-      actualCost = Number(originCost.核算 ?? 0) + Number(cost.核算 ?? 0)
-      remaining = totalBudget - actualCost
+    if (p.isPresale) {
+      const oc = (p.relatedClosedId && pmis[p.relatedClosedId]) ? ((pmis[p.relatedClosedId] as any).cost ?? {}) : {}
+      totalBudget = Number(oc.总预算 ?? 0)
+      if (rawOverspend == null) {
+        actualCost = Number(oc.核算 ?? 0) + Number(cost.核算 ?? 0)
+        remaining = totalBudget - actualCost
+      } else {
+        remaining = -overspendAmount
+        actualCost = totalBudget - remaining
+      }
     } else {
       totalBudget = Number(cost.总预算 ?? 0)
       actualCost = Number(cost.核算 ?? 0)
       remaining = Number(cost.剩余预算 ?? 0)
     }
 
-    // 超支判定:复用 riskReasons(售前/异常按自身,与 /projects 一致)
+    // 超支判定:复用 riskReasons(售前/异常按自身,与 /projects、首页、卡「总成本超支」同源)
     const cats = riskReasons(p, m as ProjectPmis).map((rr) => rr.category)
+    const totalOverspend = cats.includes('总成本超支')
 
     return {
       projectId: p.projectId,
@@ -66,15 +73,15 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
       orgL4: (p.orgL4 ?? '').trim(),
       manager: (p.projectManager ?? '').trim(),
       amount: Number(p.paymentPmis?.contract ?? 0),
-      status: costStatusOf(remaining, p.projectId),
+      // 成本状态与超支判定同源 riskReasons(不看 remaining;剩余预算仅金额展示)
+      status: costStatusOf(totalOverspend, overspendAmount),
       totalBudget, actualCost, remaining,
-      xs: isXs(p.projectId),
       deliveryDeptRemaining: deptRem,
       deliveryOutsourceRemaining: outRem,
       deliveryStatus: deliveryStatusOf(deptRem, outRem),
-      totalOverspend: cats.includes('总成本超支'),
+      totalOverspend,
       deliveryOverspend: cats.includes('交付成本超支'),
-      overspendAmount: Number(p.overspendAmount ?? 0),
+      overspendAmount,
     }
   })
 }
@@ -96,7 +103,6 @@ export interface CostL4Dist { orgL4: string; under5k: number; over5k: number }
 export function costL4Dist(rows: CostRow[]): CostL4Dist[] {
   const m: Record<string, CostL4Dist> = {}
   for (const r of rows) {
-    if (r.xs) continue
     const d = r.orgL4 || '未知'
     if (!m[d]) m[d] = { orgL4: d, under5k: 0, over5k: 0 }
     if (r.status === '超支不足5k') m[d].under5k++
@@ -109,7 +115,6 @@ export interface CostL4Summary { orgL4: string; total: number; normal: number; u
 export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
   const m: Record<string, CostL4Summary> = {}
   for (const r of rows) {
-    if (r.xs) continue
     const d = r.orgL4 || '未知'
     if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, over5kRatio: 0, contractTotal: 0, remainingTotal: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 }
     m[d].total++
