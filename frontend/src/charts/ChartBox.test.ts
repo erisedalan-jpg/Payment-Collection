@@ -53,4 +53,29 @@ describe('ChartBox', () => {
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('datapoint-click')?.[0]?.[0]).toMatchObject({ seriesName: '终验', dataIndex: 2 })
   })
+
+  // 性能护栏：tooltip 切 richText 消除 HTML tooltip 每次 mousemove 的强制回流（柱状图 hover 卡顿主因）。
+  it('给带 tooltip 的图注入 richText 并保留视图自带的 trigger/axisPointer', () => {
+    const wrapper = mount(ChartBox, {
+      props: { option: { tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, series: [] } },
+      global: { stubs: { VChart: VChartStub } },
+    })
+    const opt = wrapper.findComponent({ name: 'VChart' }).props('option') as any
+    expect(opt.tooltip.renderMode).toBe('richText')
+    expect(opt.tooltip.transitionDuration).toBe(0)
+    expect(opt.tooltip.trigger).toBe('axis')            // 视图字段保留
+    expect(opt.tooltip.axisPointer.type).toBe('shadow') // 视图字段保留
+    expect(opt.tooltip.axisPointer.animation).toBe(false)
+    expect(opt.axisPointer.animation).toBe(false)
+  })
+
+  it('无 tooltip 的图不新增 tooltip 键，且注入进场动画时长', () => {
+    const wrapper = mount(ChartBox, {
+      props: { option: { series: [] } },
+      global: { stubs: { VChart: VChartStub } },
+    })
+    const opt = wrapper.findComponent({ name: 'VChart' }).props('option') as any
+    expect('tooltip' in opt).toBe(false)
+    expect(opt.animationDuration).toBe(260)
+  })
 })
