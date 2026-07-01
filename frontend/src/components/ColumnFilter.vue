@@ -77,7 +77,7 @@ function clear() {
     popper-class="cf-popover"
   >
     <template #reference>
-      <span class="cf-icon" :class="{ active }" title="列筛选">&#9660;</span>
+      <span class="cf-icon" :class="{ active }" title="列筛选" @click.stop>&#9660;</span>
     </template>
     <div class="cf-inner">
       <div class="cf-title">
