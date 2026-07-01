@@ -6,7 +6,7 @@ import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildCostRows, costKpis, costL4Dist, costL4Summary } from '@/lib/costAnalysis'
-import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
+import { applyColumnFilters } from '@/lib/crossFilter'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
@@ -43,9 +43,9 @@ const kpiItems = computed(() => {
   const k = kpi.value
   return [
     { k: '成本统计项目数', v: String(k.total), clickable: true },
-    { k: '未超支', v: String(k.normal), cls: 'ok', clickable: true },
-    { k: '超支不足5K', v: String(k.under5k), cls: 'warn', clickable: true },
-    { k: '超支大于5K', v: String(k.over5k), cls: 'danger', clickable: true },
+    { k: '未超支', v: String(k.notOverspent), cls: 'ok', clickable: true },
+    { k: '总成本超支数', v: String(k.totalOverspend), sub: `超支大于5000: ${k.totalOverspendOver5k}`, cls: 'danger', clickable: true },
+    { k: '交付成本超支数', v: String(k.deliveryOverspend), cls: 'danger', clickable: true },
   ]
 })
 
@@ -107,11 +107,24 @@ const TONE: Record<string, string> = { 未超支: 'ok', 超支不足5k: 'warn', 
 const detailCardRef = ref<HTMLElement | null>(null)
 const fKw = ref('')
 
-// 列头多选筛选 → 关键词搜索 → 默认按 L4 升序(标题"按 L4 组织排序")
+// KPI 卡点击 → 就地筛选明细(本地 kpiFilter,不写 crossFilter)
+type KpiFilter = 'all' | 'notOverspent' | 'totalOverspend' | 'deliveryOverspend'
+const KPI_FILTER: KpiFilter[] = ['all', 'notOverspent', 'totalOverspend', 'deliveryOverspend']
+const kpiFilter = ref<KpiFilter>('all')
+function onKpiClick(i: number) {
+  const f = KPI_FILTER[i]
+  kpiFilter.value = (i === 0 || kpiFilter.value === f) ? 'all' : f
+  detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 列头多选筛选 → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
   const kw = fKw.value.trim()
-  const r = kw ? colFiltered.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : colFiltered
+  let r = kw ? colFiltered.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : colFiltered
+  if (kpiFilter.value === 'notOverspent') r = r.filter((x) => !x.totalOverspend && !x.deliveryOverspend)
+  else if (kpiFilter.value === 'totalOverspend') r = r.filter((x) => x.totalOverspend)
+  else if (kpiFilter.value === 'deliveryOverspend') r = r.filter((x) => x.deliveryOverspend)
   return [...r].sort((a, b) => a.orgL4.localeCompare(b.orgL4) || a.projectId.localeCompare(b.projectId))
 })
 
@@ -138,15 +151,6 @@ const sorted = computed(() => {
 const { paged, currentPage, pageSize } = usePagedRows(sorted, 20)
 const pagedSeq = computed(() => paged.value.map((r, i) => ({ ...r, _seq: (currentPage.value - 1) * pageSize.value + i + 1 })))
 
-// KPI 卡点击 → 写/清 成本状态列筛选(就地缩小明细)
-const KPI_STATUS = [null, '未超支', '超支不足5k', '超支大于5k'] as const
-function onKpiClick(i: number) {
-  const s = KPI_STATUS[i]
-  if (s) cf.setColumnFilter(TABLE_ID, 'status', [s], cfUniqueValues(rows.value, 'status').length)
-  else cf.clearColumn(TABLE_ID, 'status')
-  detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
 function reset() { fKw.value = ''; cf.clearAll(TABLE_ID); sortState.value = { prop: '', order: '' } }
 function onExport() {
   exportRows('项目成本明细.xlsx', sorted.value.map((r) => ({
@@ -157,7 +161,7 @@ function onExport() {
   })))
 }
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
-defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, onKpiClick, onSortChange, sortState, TABLE_ID })
+defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter, onKpiClick, onSortChange, sortState, TABLE_ID })
 </script>
 
 <template>
