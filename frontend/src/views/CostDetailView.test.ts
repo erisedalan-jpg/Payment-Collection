@@ -139,6 +139,21 @@ describe('CostDetailView 上半', () => {
   })
 })
 
+describe('CostDetailView Task5', () => {
+  it('明细含交付成本状态列;L4 汇总表可选列;标题去括号', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    const detailCols = (w.vm as any).DETAIL_COLS as any[]
+    expect(detailCols.map((c) => c.key)).toContain('deliveryStatus')
+    // L4 汇总表暴露可见列
+    expect(((w.vm as any).l4VisibleColumns as any[]).length).toBeGreaterThan(0)
+    // 标题去括号(不含"(按")
+    expect(w.text()).toContain('项目成本明细')
+    expect(w.text()).not.toContain('项目成本明细(按')
+    expect(w.text()).not.toContain('超支项目分布(按')
+  })
+})
+
 describe('CostDetailView 标签排除', () => {
   function seedSmall() {
     const data = useDataStore()
