@@ -19,6 +19,7 @@ import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { useDeferredMount } from '@/lib/useDeferredMount'
 
 const TABLE_ID = 'cost-detail'
 const data = useDataStore()
@@ -26,6 +27,8 @@ const settings = useSettingsStore()
 const filter = useFilterStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
+// 延迟渲染:点击进页先出标题/KPI,下一两帧再挂图表+两张表,消除跨页点击冻结。
+const { ready } = useDeferredMount()
 onMounted(() => { if (!data.data) data.load() })
 // 进页先清空本表残留列筛选,避免跨导航叠加
 cf.clearAll(TABLE_ID)
@@ -183,6 +186,8 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter
 
     <template v-else>
       <MetricGrid :items="kpiItems" :col-min="'160px'" @item-click="onKpiClick" />
+      <div v-if="!ready" class="cd-defer"><el-skeleton :rows="8" animated /></div>
+      <template v-else>
       <div class="cd-grid2">
         <div class="cd-card"><div class="cd-card-h">超支项目分布</div><ChartBox :option="distOption" height="420px" /></div>
         <div class="cd-card">
@@ -220,6 +225,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter
           <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="sorted.length" layout="sizes, prev, pager, next" size="small" background />
         </div>
       </div>
+      </template>
     </template>
   </div>
 </template>
@@ -235,6 +241,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter
 .cd-red { color: var(--danger); font-weight: 600; }
 .cd-green { color: var(--ok); }
 .cd-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.cd-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
 .cd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .cd-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
 .cd-btn:hover { background: var(--bg); color: var(--accent); }

@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import type { AnalysisData } from '@/types/analysis'
 import { apiUrl } from '@/lib/baseUrl'
 
 // 数据源：preprocess_data.py 生成的 data/analysis_data.json（开发期经 Vite 代理到 :8080）
 export const useDataStore = defineStore('data', () => {
-  const data = ref<AnalysisData | null>(null)
+  // 性能:analysis_data.json 约 16MB 只读快照,用 shallowRef 避免深层响应式代理 ——
+  // 否则各派生页(成本/里程碑/风险等)遍历数百项目时,每次字段访问都走 reactive proxy(track/get),
+  // 白白放大挂载耗时。全仓仅整体重赋值 data.value(load/reload/clear/reset),无深层字段写入,故安全。
+  const data = shallowRef<AnalysisData | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
