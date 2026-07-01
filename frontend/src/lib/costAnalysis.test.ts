@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isXs, costStatusOf, buildCostRows, costKpis, costL4Dist, costL4Summary } from './costAnalysis'
+import { isXs, costStatusOf, buildCostRows, costKpis, costL4Dist, costL4Summary, deliveryStatusOf } from './costAnalysis'
 
 describe('isXs / costStatusOf', () => {
   it('XS 前缀(大小写不敏感)', () => {
@@ -82,5 +82,24 @@ describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
     ]
     const a = costL4Summary(rows).find((x) => x.orgL4 === 'A')!
     expect(a).toMatchObject({ contractTotal: 3000, remainingTotal: 50, deliveryDeptRemaining: 15, deliveryOutsourceRemaining: 20 })
+  })
+})
+
+describe('deliveryStatusOf', () => {
+  it('部门≥0 且 外包≥0 → 未超支(含 =0 边界)', () => {
+    expect(deliveryStatusOf(100, 50)).toBe('未超支')
+    expect(deliveryStatusOf(0, 0)).toBe('未超支')
+    expect(deliveryStatusOf(0, 10)).toBe('未超支')
+  })
+  it('部门<0 且 外包≥0 → 交付预算超支', () => {
+    expect(deliveryStatusOf(-1, 50)).toBe('交付预算超支')
+    expect(deliveryStatusOf(-1, 0)).toBe('交付预算超支')
+  })
+  it('部门≥0 且 外包<0 → 交付外包超支', () => {
+    expect(deliveryStatusOf(50, -1)).toBe('交付外包超支')
+    expect(deliveryStatusOf(0, -1)).toBe('交付外包超支')
+  })
+  it('部门<0 且 外包<0 → 原厂外包均超支', () => {
+    expect(deliveryStatusOf(-1, -1)).toBe('原厂外包均超支')
   })
 })

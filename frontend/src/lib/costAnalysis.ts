@@ -97,3 +97,15 @@ export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
     .map((s) => ({ ...s, over5kRatio: s.total > 0 ? +((s.over5k / s.total) * 100).toFixed(1) : 0 }))
     .sort((a, b) => a.orgL4.localeCompare(b.orgL4))
 }
+
+export type DeliveryStatus = '未超支' | '交付预算超支' | '交付外包超支' | '原厂外包均超支'
+
+/** 交付成本状态:由交付部门剩余、交付外包剩余两列判定。<0=超支,≥0=不超支(含 =0)。 */
+export function deliveryStatusOf(deptRemain: number, outsourceRemain: number): DeliveryStatus {
+  const deptOver = deptRemain < 0
+  const outOver = outsourceRemain < 0
+  if (deptOver && outOver) return '原厂外包均超支'
+  if (deptOver) return '交付预算超支'
+  if (outOver) return '交付外包超支'
+  return '未超支'
+}
