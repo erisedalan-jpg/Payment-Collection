@@ -6,7 +6,7 @@ import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildCostRows, costKpis, costL4Dist, costL4Summary } from '@/lib/costAnalysis'
-import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
+import { applyColumnFilters } from '@/lib/crossFilter'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
@@ -17,6 +17,8 @@ import { fmtWan } from '@/lib/format'
 import { usePagedRows } from '@/lib/usePagedRows'
 import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
+import ColumnPicker from '@/components/ColumnPicker.vue'
+import { useColumnPrefs } from '@/lib/useColumnPrefs'
 
 const TABLE_ID = 'cost-detail'
 const data = useDataStore()
@@ -43,9 +45,9 @@ const kpiItems = computed(() => {
   const k = kpi.value
   return [
     { k: '成本统计项目数', v: String(k.total), clickable: true },
-    { k: '未超支', v: String(k.normal), cls: 'ok', clickable: true },
-    { k: '超支不足5K', v: String(k.under5k), cls: 'warn', clickable: true },
-    { k: '超支大于5K', v: String(k.over5k), cls: 'danger', clickable: true },
+    { k: '未超支', v: String(k.notOverspent), cls: 'ok', clickable: true },
+    { k: '总成本超支数', v: String(k.totalOverspend), sub: `超支大于5000: ${k.totalOverspendOver5k}`, cls: 'danger', clickable: true },
+    { k: '交付成本超支数', v: String(k.deliveryOverspend), cls: 'danger', clickable: true },
   ]
 })
 
@@ -80,6 +82,12 @@ const L4_COLS: DataColumn[] = [
   { key: 'deliveryOutsourceRemaining', label: '交付外包剩余(万)', width: 130, num: true, sortable: true, formatter: (v) => fmtWan(v) },
 ]
 
+const L4_TABLE_ID = 'cost-l4-summary'
+const l4Prefs = useColumnPrefs(L4_TABLE_ID, L4_COLS.map((c) => c.key), L4_COLS.map((c) => c.key))
+const l4VisibleColumns = computed(() =>
+  l4Prefs.visibleKeys.value.map((k) => L4_COLS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
+const l4PickerColumns = L4_COLS.map((c) => ({ key: c.key, label: c.label }))
+
 // —— 项目成本明细表 ——
 const num0 = (v: any) => Number(v || 0).toLocaleString('zh-CN')
 const DETAIL_COLS: DataColumn[] = [
@@ -96,6 +104,7 @@ const DETAIL_COLS: DataColumn[] = [
   { key: 'remaining', label: '剩余预算(元)', width: 140, num: true, sortable: true, formatter: num0 },
   { key: 'deliveryDeptRemaining', label: '交付部门剩余(元)', width: 140, num: true, sortable: true, formatter: num0 },
   { key: 'deliveryOutsourceRemaining', label: '交付外包剩余(元)', width: 140, num: true, sortable: true, formatter: num0 },
+  { key: 'deliveryStatus', label: '交付成本状态', width: 130, sortable: true },
 ]
 // 全列(除序号)可列头多选筛选
 const FILTERABLE = new Set(DETAIL_COLS.map((c) => c.key).filter((k) => k !== '_seq'))
@@ -103,15 +112,29 @@ const FILTERABLE = new Set(DETAIL_COLS.map((c) => c.key).filter((k) => k !== '_s
 const NUMERIC_KEYS = new Set(['amount', 'totalBudget', 'actualCost', 'remaining', 'deliveryDeptRemaining', 'deliveryOutsourceRemaining'])
 
 const TONE: Record<string, string> = { 未超支: 'ok', 超支不足5k: 'warn', 超支大于5k: 'danger' }
+const DELIVERY_TONE: Record<string, string> = { 未超支: 'ok', 交付预算超支: 'warn', 交付外包超支: 'warn', 原厂外包均超支: 'danger' }
 
 const detailCardRef = ref<HTMLElement | null>(null)
 const fKw = ref('')
 
-// 列头多选筛选 → 关键词搜索 → 默认按 L4 升序(标题"按 L4 组织排序")
+// KPI 卡点击 → 就地筛选明细(本地 kpiFilter,不写 crossFilter)
+type KpiFilter = 'all' | 'notOverspent' | 'totalOverspend' | 'deliveryOverspend'
+const KPI_FILTER: KpiFilter[] = ['all', 'notOverspent', 'totalOverspend', 'deliveryOverspend']
+const kpiFilter = ref<KpiFilter>('all')
+function onKpiClick(i: number) {
+  const f = KPI_FILTER[i]
+  kpiFilter.value = (i === 0 || kpiFilter.value === f) ? 'all' : f
+  detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 列头多选筛选 → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
   const kw = fKw.value.trim()
-  const r = kw ? colFiltered.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : colFiltered
+  let r = kw ? colFiltered.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : colFiltered
+  if (kpiFilter.value === 'notOverspent') r = r.filter((x) => !x.totalOverspend && !x.deliveryOverspend)
+  else if (kpiFilter.value === 'totalOverspend') r = r.filter((x) => x.totalOverspend)
+  else if (kpiFilter.value === 'deliveryOverspend') r = r.filter((x) => x.deliveryOverspend)
   return [...r].sort((a, b) => a.orgL4.localeCompare(b.orgL4) || a.projectId.localeCompare(b.projectId))
 })
 
@@ -138,26 +161,18 @@ const sorted = computed(() => {
 const { paged, currentPage, pageSize } = usePagedRows(sorted, 20)
 const pagedSeq = computed(() => paged.value.map((r, i) => ({ ...r, _seq: (currentPage.value - 1) * pageSize.value + i + 1 })))
 
-// KPI 卡点击 → 写/清 成本状态列筛选(就地缩小明细)
-const KPI_STATUS = [null, '未超支', '超支不足5k', '超支大于5k'] as const
-function onKpiClick(i: number) {
-  const s = KPI_STATUS[i]
-  if (s) cf.setColumnFilter(TABLE_ID, 'status', [s], cfUniqueValues(rows.value, 'status').length)
-  else cf.clearColumn(TABLE_ID, 'status')
-  detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-function reset() { fKw.value = ''; cf.clearAll(TABLE_ID); sortState.value = { prop: '', order: '' } }
+function reset() { fKw.value = ''; cf.clearAll(TABLE_ID); sortState.value = { prop: '', order: '' }; kpiFilter.value = 'all' }
 function onExport() {
   exportRows('项目成本明细.xlsx', sorted.value.map((r) => ({
     项目编号: r.projectId, 项目名称: r.projectName, 项目类型: r.projectType,
     L4部门: r.orgL4, 项目经理: r.manager, 项目金额: r.amount, 成本状态: r.status,
     总预算: r.totalBudget, 已核算: r.actualCost, 剩余预算: r.remaining,
     交付部门剩余: r.deliveryDeptRemaining, 交付外包剩余: r.deliveryOutsourceRemaining,
+    交付成本状态: r.deliveryStatus,
   })))
 }
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
-defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, onKpiClick, onSortChange, sortState, TABLE_ID })
+defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter, onKpiClick, onSortChange, sortState, TABLE_ID, l4VisibleColumns })
 </script>
 
 <template>
@@ -169,13 +184,19 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, onKpiClic
     <template v-else>
       <MetricGrid :items="kpiItems" :col-min="'160px'" @item-click="onKpiClick" />
       <div class="cd-grid2">
-        <div class="cd-card"><div class="cd-card-h">超支项目分布(按 L4,剔 XS)</div><ChartBox :option="distOption" height="300px" /></div>
-        <div class="cd-card"><div class="cd-card-h">L4 部门成本情况汇总</div><DataTable :columns="L4_COLS" :rows="l4Rows" :show-count="false">
+        <div class="cd-card"><div class="cd-card-h">超支项目分布</div><ChartBox :option="distOption" height="420px" /></div>
+        <div class="cd-card">
+          <div class="cd-card-h cd-card-h--row">
+            <span>L4 部门成本情况汇总</span>
+            <ColumnPicker :columns="l4PickerColumns" :visible-keys="l4Prefs.visibleKeys.value"
+              @toggle="l4Prefs.toggle" @move-up="l4Prefs.moveUp" @move-down="l4Prefs.moveDown" @reset="l4Prefs.reset" />
+          </div>
+          <DataTable :columns="l4VisibleColumns" :rows="l4Rows" :show-count="false">
           <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}%</span></template>
         </DataTable></div>
       </div>
       <div class="cd-card" ref="detailCardRef">
-        <div class="cd-card-h">项目成本明细(按 L4 组织排序)</div>
+        <div class="cd-card-h">项目成本明细</div>
         <div class="cd-bar">
           <el-input v-model="fKw" size="small" placeholder="编号/名称" style="width: 160px" clearable />
           <button class="cd-btn" @click="reset">重置</button>
@@ -191,6 +212,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, onKpiClic
             <template #cell-projectId="{ value }"><span class="cd-link">{{ value }}</span></template>
             <template #cell-status="{ value }"><StatusBadge :label="value" :tone="TONE[value]" /></template>
             <template #cell-remaining="{ row, value }"><span class="u-num" :class="row.remaining < 0 ? 'cd-red' : 'cd-green'">{{ num0(value) }}</span></template>
+            <template #cell-deliveryStatus="{ value }"><StatusBadge :label="value" :tone="DELIVERY_TONE[value]" /></template>
           </DataTable>
         </div>
         <div class="cd-pager">
@@ -208,6 +230,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, onKpiClic
 .cd-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--gap-card); }
 .cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
 .cd-card-h { font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
+.cd-card-h--row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .cd-th { display: inline-flex; align-items: center; }
 .cd-red { color: var(--danger); font-weight: 600; }
 .cd-green { color: var(--ok); }

@@ -56,7 +56,9 @@ describe('CalendarView', () => {
     seed()
     const w = mount(CalendarView, { global: { plugins: [ElementPlus] } })
     expect(w.find('.cyh').exists()).toBe(true)
-    await w.findAll('.cyh-cell')[5].trigger('click')
-    expect(w.findComponent({ name: 'CalGrid' }).props('month')).toBe(5)
+    // 点击有数据的「热」格才会 emit(冷格 remaining<=0 无响应);seed 数据在 2 月(month 索引 1)。
+    // 断言随点击的绝对月份,不依赖当前系统月(旧测试点冷格、实测默认当前月,跨月界会 flaky)。
+    await w.findAll('.cyh-cell')[1].trigger('click')
+    expect(w.findComponent({ name: 'CalGrid' }).props('month')).toBe(1)
   })
 })
