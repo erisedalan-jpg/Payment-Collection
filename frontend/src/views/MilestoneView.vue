@@ -21,11 +21,14 @@ import MilestoneStatusModal from '@/components/MilestoneStatusModal.vue'
 import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
+import { useDeferredMount } from '@/lib/useDeferredMount'
 
 const data = useDataStore()
 const filter = useFilterStore()
 const projectTags = useProjectTagsStore()
 const settings = useSettingsStore()
+// 延迟渲染:点击进页先出标题/工具栏/KPI,下一两帧再挂 6 图 + 明细 tab,消除跨页点击冻结。
+const { ready } = useDeferredMount()
 
 onMounted(() => {
   if (!data.data) data.load()
@@ -231,6 +234,8 @@ defineExpose({ faGran, onNodeClick, nodeYear })
     <template v-else>
       <MetricGrid :items="kpiItems" @item-click="onKpiClick" />
 
+      <div v-if="!ready" class="mv-defer"><el-skeleton :rows="10" animated /></div>
+      <template v-else>
       <div class="mv-card">
         <div class="mv-card-h">
           项目终验完成情况
@@ -274,6 +279,7 @@ defineExpose({ faGran, onNodeClick, nodeYear })
         <MilestoneReminderTab v-else-if="detailTab === 'reminder'" :projects="mps" :now="now" />
         <MilestonePlanTab v-else :projects="mps" />
       </div>
+      </template>
     </template>
   </div>
 </template>
@@ -289,6 +295,7 @@ defineExpose({ faGran, onNodeClick, nodeYear })
 .mv-card-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .mv-grid2-half { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
 .mv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+.mv-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
 .mv-detail { margin-top: var(--sp-4); }
 .mv-detail > :first-child { margin-bottom: var(--sp-3); }
 </style>

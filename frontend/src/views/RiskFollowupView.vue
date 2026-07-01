@@ -17,12 +17,15 @@ import SegToggle from '@/components/SegToggle.vue'
 import ProgressEditModal from '@/components/ProgressEditModal.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import { exportSheets } from '@/lib/exportXlsx'
+import { useDeferredMount } from '@/lib/useDeferredMount'
 
 const TABLE_ID = 'risk-followup'
 const data = useDataStore()
 const auth = useAuthStore()
 const risk = useRiskFollowupStore()
 const cf = useCrossFilterStore()
+// 延迟渲染:点击进页先出标题/工具栏,下一两帧再挂全量风险大表(数百行×数十列),消除跨页点击冻结。
+const { ready } = useDeferredMount()
 
 onMounted(() => {
   if (!data.data) data.load()
@@ -189,6 +192,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
     </div>
 
     <div v-if="!rows.length" class="kp-empty">暂无风险数据。</div>
+    <div v-else-if="!ready" class="kp-defer"><el-skeleton :rows="10" animated /></div>
     <div v-else class="kp-scroll">
       <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
@@ -258,6 +262,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
 .kp-scroll { overflow-x: auto; }
 .kp-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .kp-empty { padding: var(--sp-5); color: var(--mut); text-align: center; }
+.kp-defer { padding: var(--sp-4); min-height: 360px; }
 .kp-prog-cell { display: inline-block; white-space: pre-wrap; }
 .kp-prog-cell.editable { cursor: pointer; color: var(--accent); }
 .kp-archive-btn, .kp-export-btn, .kp-cancel {
