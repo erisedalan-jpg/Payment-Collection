@@ -52,6 +52,26 @@ function cr(o: Partial<any> = {}): any {
   return { projectId: 'W', projectName: 'x', projectType: '', orgL3: '', orgL3_1: '', orgL4: 'D1', manager: '', amount: 0, status: '未超支', totalBudget: 0, actualCost: 0, remaining: 0, xs: false, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0, ...o }
 }
 
+describe('costKpis 五值(不剔 XS)', () => {
+  const mk = (o: Partial<any>) => ({ totalOverspend: false, deliveryOverspend: false, overspendAmount: 0, xs: false, ...o })
+  it('total=全部行(含 XS);未超支=两维度皆否;总超支/大于5000/交付超支', () => {
+    const rows = [
+      mk({ xs: true }),                                   // XS:也计入 total;两维度否→未超支
+      mk({ totalOverspend: true, overspendAmount: 8000 }),// 总超支 + 大于5000
+      mk({ totalOverspend: true, overspendAmount: 3000 }),// 总超支但不大于5000
+      mk({ deliveryOverspend: true }),                    // 交付超支
+      mk({ totalOverspend: true, deliveryOverspend: true, overspendAmount: 9000 }), // 两者
+      mk({}),                                             // 未超支
+    ] as any
+    const k = costKpis(rows)
+    expect(k.total).toBe(6)
+    expect(k.notOverspent).toBe(2)       // XS 行 + 末行
+    expect(k.totalOverspend).toBe(3)     // 三行 totalOverspend
+    expect(k.totalOverspendOver5k).toBe(2) // 8000、9000
+    expect(k.deliveryOverspend).toBe(2)  // 两行 deliveryOverspend
+  })
+})
+
 describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
   const rows = [
     cr({ orgL4: 'B', status: '未超支' }),
@@ -60,9 +80,6 @@ describe('costKpis / costL4Dist / costL4Summary(均剔 XS)', () => {
     cr({ orgL4: 'A', status: '超支大于5k' }),
     cr({ orgL4: 'A', status: 'XS忽略', xs: true }), // XS→不计
   ]
-  it('KPI 剔 XS 计数', () => {
-    expect(costKpis(rows)).toEqual({ total: 4, normal: 1, under5k: 1, over5k: 2 })
-  })
   it('L4 分布按 orgL4 升序、两档', () => {
     expect(costL4Dist(rows)).toEqual([
       { orgL4: 'A', under5k: 0, over5k: 2 },

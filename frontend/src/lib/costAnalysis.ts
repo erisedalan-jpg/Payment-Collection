@@ -79,15 +79,15 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
   })
 }
 
-export interface CostKpis { total: number; normal: number; under5k: number; over5k: number }
+export interface CostKpis { total: number; notOverspent: number; totalOverspend: number; totalOverspendOver5k: number; deliveryOverspend: number }
+/** 成本卡计数(不剔 XS):总数=全部行;未超支=两维度皆否;总/交付超支沿用 riskReasons 派生布尔;大于5000=overspendAmount>5000。 */
 export function costKpis(rows: CostRow[]): CostKpis {
-  const k: CostKpis = { total: 0, normal: 0, under5k: 0, over5k: 0 }
+  const k: CostKpis = { total: 0, notOverspent: 0, totalOverspend: 0, totalOverspendOver5k: 0, deliveryOverspend: 0 }
   for (const r of rows) {
-    if (r.xs) continue
     k.total++
-    if (r.status === '未超支') k.normal++
-    else if (r.status === '超支不足5k') k.under5k++
-    else if (r.status === '超支大于5k') k.over5k++
+    if (!r.totalOverspend && !r.deliveryOverspend) k.notOverspent++
+    if (r.totalOverspend) { k.totalOverspend++; if (r.overspendAmount > 5000) k.totalOverspendOver5k++ }
+    if (r.deliveryOverspend) k.deliveryOverspend++
   }
   return k
 }
