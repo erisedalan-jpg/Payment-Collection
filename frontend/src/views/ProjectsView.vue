@@ -12,6 +12,7 @@ import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
+import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupModal from '@/components/FollowupModal.vue'
 import Modal from '@/components/Modal.vue'
@@ -151,9 +152,7 @@ defineExpose({ ALL_COLUMNS })
         <el-option value="yes" label="售前整合" />
         <el-option value="no" label="非售前" />
       </el-select>
-      <el-select v-model="sp.tags" size="small" multiple collapse-tags clearable placeholder="标签" style="width: 140px">
-        <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
-      </el-select>
+      <TagFilterSelect v-model="sp.tags" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button class="pv-export-btn" @click="exOpen = true">导出</button>
