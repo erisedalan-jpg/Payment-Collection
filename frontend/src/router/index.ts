@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { PageKey } from '@/lib/pageAccess'
 import { useAuthStore } from '@/stores/auth'
+import { trackNavigation } from '@/lib/viewReturn'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import BoardView from '@/views/BoardView.vue'
@@ -101,4 +102,9 @@ router.beforeEach(async (to) => {
   const key = to.meta.pageKey
   if (auth.isSuper || !key || auth.canAccess(key)) return true
   return { path: auth.firstAllowedPath() }
+})
+
+// 下钻返回保持视图状态(V2.5.9):在 DOM 更新前定好 token,避免 afterEach 触发的二次重挂
+router.beforeResolve((to, from) => {
+  trackNavigation(to.name, from.name)
 })
