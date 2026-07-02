@@ -1,6 +1,7 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
 import { riskReasons, type RiskReason } from './riskReasons'
+import { tagMatch } from './tagFilter'
 
 // 项目清单行：projects[](P1 主域) join projectPmis[id] 的扁平展示模型
 export interface ProjectRow {
@@ -100,10 +101,7 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
     if (f.overspend === 'yes' && !r.overspend) return false
     if (f.presale === 'yes' && !r.isPresale) return false
     if (f.presale === 'no' && r.isPresale) return false
-    if (f.tags && f.tags.length) {
-      const sel = new Set(f.tags)
-      if (!(r.tags ?? []).some((t) => sel.has(t))) return false
-    }
+    if (f.tags && f.tags.length && !tagMatch(r.tags ?? [], f.tags)) return false
     if (f.riskCategory) {
       if (f.riskCategory === '健康度低') {
         if (!['关注', '风险'].includes(r.health)) return false
