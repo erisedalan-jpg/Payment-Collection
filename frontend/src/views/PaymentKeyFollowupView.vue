@@ -67,6 +67,11 @@ const rows = computed<PaymentKeyRow[]>(() =>
   isCurrent.value ? currentRows.value : ((pk.archives[historyIdx.value]?.rows ?? []) as PaymentKeyRow[]))
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as PaymentKeyRow[])
 
+const pageSize = ref(50)
+const currentPage = ref(1)
+const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+watch(filtered, () => { currentPage.value = 1 })
+
 const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
   { key: 'projectName', label: '项目名称', width: 200 },
@@ -207,7 +212,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
       {{ auth.isSuper ? '请点击「范围设置」定义回款重点跟进范围。' : '暂无回款重点跟进项目。' }}
     </div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
@@ -230,6 +235,13 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
           <span v-else>{{ (row as PaymentKeyRow).nextRevDate || '-' }}</span>
         </template>
       </DataTable>
+    </div>
+
+    <div v-if="filtered.length" class="kp-pager">
+      <span class="u-num">共 {{ filtered.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        layout="sizes, prev, pager, next" size="small" background />
     </div>
 
     <ProgressEditModal v-model="editOpen" store="paymentKey"
@@ -280,4 +292,6 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
   font-size: var(--fs-1); border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 2px 10px; cursor: pointer; background: var(--card2); color: var(--accent); }
 .kp-archive-btn:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
+.kp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

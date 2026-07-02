@@ -120,4 +120,23 @@ describe('KeyProjectsView', () => {
     await mountView()
     expect(cf.tableFilters('key-projects').orgL4).toBeUndefined()
   })
+
+  // V2.6.3:分页 + 总数(同 /projects)
+  it('S1:>50 行触发分页,总数与渲染行数受控', async () => {
+    const ds = useDataStore()
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      projectId: `K${i}`, projectName: `重点${i}`, projectManager: '何平', orgL4: 'A组', top1000: '是',
+      paymentPmis: { contract: 2_000_000 }, payment: {}, health: {},
+    }))
+    ds.data = {
+      meta: {}, dashboard: {}, summary: {}, rawNodes: [], displayColumns: {}, followupRecords: {},
+      projects: many, projectPmis: {},
+    } as any
+    const a = useAuthStore()
+    a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['projects-key'], allowedL4: [] }
+    const w = await mountView()
+    expect(w.text()).toContain('共 51 条')
+    expect(w.find('.el-pagination').exists()).toBe(true)
+    expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
+  })
 })
