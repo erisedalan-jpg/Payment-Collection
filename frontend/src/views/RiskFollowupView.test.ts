@@ -3,6 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import RiskFollowupView from './RiskFollowupView.vue'
+import ColumnFilter from '@/components/ColumnFilter.vue'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
@@ -26,6 +27,19 @@ function seed(isSuper = true) {
     ] } },
   }
   const auth = useAuthStore(); (auth as any).user = { isSuper, allowedPages: ['*'], allowedL4: ['*'] }
+  const risk = useRiskFollowupStore(); risk.loaded = true; risk.scope = { combinator: 'AND', groups: [] }
+}
+
+function seedMany(n: number) {
+  const data = useDataStore()
+  const riskRecords = Array.from({ length: n }, (_, i) => ({
+    风险编码: `FX-${i}`, 风险名称: `风险${i}`, 风险等级: '高', 风险状态: '未关闭', 风险大类: '进度', 风险小类: '排期',
+  }))
+  ;(data as any).data = {
+    projects: [{ projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: '一组', paymentPmis: { contract: 2_000_000 } }],
+    projectPmis: { P1: { status: { 项目级别: 'P1' }, riskRecords } },
+  }
+  const auth = useAuthStore(); (auth as any).user = { isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
   const risk = useRiskFollowupStore(); risk.loaded = true; risk.scope = { combinator: 'AND', groups: [] }
 }
 
@@ -82,5 +96,27 @@ describe('RiskFollowupView', () => {
     ;(w.vm as any).mode = 'history'
     await w.vm.$nextTick()
     expect(w.text()).not.toContain('删除此历史')
+  })
+  it('分页器与总数;>50 行时单页渲染行数≤50', async () => {
+    seedMany(55)
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.kp-pager').exists()).toBe(true)
+    expect(w.text()).toContain('共 55 条')
+    expect(w.find('.el-pagination').exists()).toBe(true)
+    const bodyRows = w.findAll('tbody tr')
+    expect(bodyRows.length).toBeLessThanOrEqual(50)
+  }, 20000) // 渲染满页(55行)重表,并行争用下放宽超时
+  it('rev结论/下次rev时间两列头渲染 ColumnFilter', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.FILTERABLE.has('revConclusion')).toBe(true)
+    expect(vm.FILTERABLE.has('nextRevDate')).toBe(true)
+    const filters = w.findAllComponents(ColumnFilter)
+    const filteredKeys = filters.map((f) => f.props('colKey'))
+    expect(filteredKeys).toContain('revConclusion')
+    expect(filteredKeys).toContain('nextRevDate')
   })
 })

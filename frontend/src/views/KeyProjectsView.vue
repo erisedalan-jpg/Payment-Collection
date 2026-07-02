@@ -71,6 +71,11 @@ const rows = computed<KeyProjectRow[]>(() =>
 )
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as KeyProjectRow[])
 
+const pageSize = ref(50)
+const currentPage = ref(1)
+const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+watch(filtered, () => { currentPage.value = 1 })
+
 const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
   { key: 'customer', label: '客户', width: 180 },
@@ -236,7 +241,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
 
     <div v-if="!rows.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
@@ -258,6 +263,13 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
           >{{ progCell(row as KeyProjectRow, 'nextPlan') }}</span>
         </template>
       </DataTable>
+    </div>
+
+    <div v-if="filtered.length" class="kp-pager">
+      <span class="u-num">共 {{ filtered.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        layout="sizes, prev, pager, next" size="small" background />
     </div>
 
     <ProgressEditModal
@@ -321,4 +333,6 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
   color: var(--accent);
 }
 .kp-archive-btn:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
+.kp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

@@ -50,4 +50,17 @@ describe('OpportunityFollowupView', () => {
     const wn = await mountView(false)
     expect(wn.text()).not.toContain('范围设置')
   })
+
+  // V2.6.3:分页 + 总数(同 /projects)
+  it('S1:>50 行触发分页,总数与渲染行数受控', async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      id: `opp-${i}`, name: `商机${i}`, customer: `客户${i}`, top1000: 'TOP1000', earlyIntervene: '是', keyOpp: '是',
+      status: '招投标', amountWan: 100, opportunityLevel: 'P2', frOwner: '王', lastUpdate: '2026-06-20',
+    }))
+    vi.spyOn(oppApi.opportunitiesApi, 'list').mockResolvedValue({ rows: many as any })
+    const w = await mountView(true)
+    expect(w.text()).toContain('共 51 条')
+    expect(w.find('.el-pagination').exists()).toBe(true)
+    expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
+  })
 })
