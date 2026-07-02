@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
   buildInsightRows, groupInsight, insightCross, insightPivot,
@@ -9,6 +10,7 @@ import {
 } from '@/lib/projectPivot'
 import { fmtWan, pct } from '@/lib/format'
 import { buildRankingOption, valueKindForPie, type ValueKind } from '@/lib/chartOptions'
+import { tagMatch } from '@/lib/tagFilter'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
 import DimPicker from '@/components/DimPicker.vue'
@@ -17,16 +19,22 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import BoardMatrix from '@/components/BoardMatrix.vue'
 import PivotTable from '@/components/PivotTable.vue'
 import InsightDrillModal from '@/components/InsightDrillModal.vue'
+import TagFilterSelect from '@/components/TagFilterSelect.vue'
 
 const data = useDataStore()
-onMounted(() => { if (!data.data) data.load() })
+const projectTags = useProjectTagsStore()
+onMounted(() => {
+  if (!data.data) data.load()
+  if (!projectTags.loaded) projectTags.load()
+})
 
-const rows = computed(() =>
-  buildInsightRows(
-    (data.data?.projects ?? []) as Project[],
-    (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
-  ),
-)
+const selectedTags = ref<string[]>([])
+
+const rows = computed(() => {
+  const ps = ((data.data?.projects ?? []) as Project[])
+    .filter((p) => tagMatch(projectTags.assignments[p.projectId] ?? [], selectedTags.value))
+  return buildInsightRows(ps, (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
+})
 
 const MODES = [
   { value: 'rank', label: '排名' },
@@ -141,6 +149,8 @@ function onCellClick(p: { row: string; col: string }) {
 function onPivotCell(p: { rowKey: string; colKey: string }) {
   openDrill(pivot.value?.index[p.rowKey]?.[p.colKey] as InsightGroup | undefined, `${p.rowKey}${p.colKey ? ' / ' + p.colKey : ''}`)
 }
+
+defineExpose({ selectedTags })
 </script>
 
 <template>
@@ -151,6 +161,7 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
       <SegToggle v-model="mode" :options="MODES" />
       <SegToggle v-if="mode !== 'pivot'" v-model="dimKey" :options="DIM_OPTS" />
       <SegToggle v-model="metricKey" :options="METRIC_OPTS" />
+      <TagFilterSelect v-model="selectedTags" />
     </div>
     <div v-if="mode === 'cross'" class="iv-toolbar">
       <span class="iv-dims-label">次维度</span>
