@@ -43,6 +43,11 @@ export function trackNavigation(toName: unknown, fromName: unknown): void {
     const isReturn = armed === String(toName) && isDetailRoute(fromName)
     armed = null
     if (!isReturn) tokens[String(toName)] = (tokens[String(toName)] ?? 0) + 1
+  } else if (!isDetailRoute(toName)) {
+    // 离开到既非 keep-alive 列表、又非详情的路由(首页/回款/台账等)→ 作废登记,
+    // 避免残留 armed 让之后从无关详情返回该列表时被误判为"返回"而不重置。
+    // detail→detail 连跳(to 仍是详情)保留登记,不伤"详情A→详情B→返回列表"的保持。
+    armed = null
   }
 }
 
