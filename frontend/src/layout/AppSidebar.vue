@@ -20,7 +20,7 @@ const activeSectionKey = computed(() => {
   if (p.startsWith('/opportunities/key')) return 'keyfollowup'
   if (p.startsWith('/opportunities/board')) return 'analysis'
   if (p.startsWith('/insight')) return 'analysis'
-  if (p.startsWith('/payment') || p.startsWith('/ledger')) return 'payment'
+  if (p.startsWith('/payment')) return 'payment'
   if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
   if (p.startsWith('/admin')) return 'admin'
   return 'project'
