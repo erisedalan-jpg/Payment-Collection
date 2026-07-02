@@ -11,6 +11,10 @@ import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'ClosedProjectsView' })
+useViewScrollMemory()
 
 const TABLE_ID = 'projects-closed'
 const data = useDataStore()
