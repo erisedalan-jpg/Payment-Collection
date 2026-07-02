@@ -10,10 +10,16 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { NO_TAG_VALUE } from '@/lib/tagFilter'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
+beforeEach(() => {
+  setActivePinia(createPinia())
+  localStorage.clear()
+  // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+  useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
+})
 
 function seed() {
   const ds = useDataStore()
@@ -169,5 +175,52 @@ describe('CostDetailView 标签排除', () => {
     useFilterStore().setExclude(true, ['排除标签'])
     const w = mount(CostDetailView, opts)
     expect(((w.vm as any).baseProjects as any[]).map((p) => p.projectId)).toEqual(['P1'])
+  })
+})
+
+describe('CostDetailView 标签筛选(仅明细表)', () => {
+  it('工具栏含标签筛选控件;选标签后 filtered/sorted 收窄,而 kpi(用 rows)不变', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.assignments = { WS1: ['重点'], XS9: ['关注'] } // WS2 无标签
+    const w = mount(CostDetailView, opts)
+    expect(w.find('[data-test="tag-filter"]').exists()).toBe(true)
+
+    ;(w.vm as any).selectedTags = ['重点']
+    await w.vm.$nextTick()
+    expect(((w.vm as any).filtered as any[]).map((r: any) => r.projectId)).toEqual(['WS1'])
+    expect(((w.vm as any).sorted as any[]).map((r: any) => r.projectId)).toEqual(['WS1'])
+
+    // 明细表随标签筛选收窄
+    const detail = w.findAllComponents({ name: 'DataTable' }).at(-1)!
+    expect((detail.props('rows') as any[]).map((r: any) => r.projectId)).toEqual(['WS1'])
+
+    // KPI 卡不受明细表标签筛选影响(用 rows,非 filtered)
+    const items = w.findComponent(MetricGrid).props('items') as any[]
+    expect(items.find((i) => i.k === '成本统计项目数').v).toBe('3')
+  })
+
+  it('选「无标签」只保留未打标签项目(WS2)', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.assignments = { WS1: ['重点'] } // WS2/XS9 无标签
+    const w = mount(CostDetailView, opts)
+    ;(w.vm as any).selectedTags = [NO_TAG_VALUE]
+    await w.vm.$nextTick()
+    expect(((w.vm as any).filtered as any[]).map((r: any) => r.projectId).sort()).toEqual(['WS2', 'XS9'])
+  })
+
+  it('点重置按钮清空标签筛选', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.assignments = { WS1: ['重点'] }
+    const w = mount(CostDetailView, opts)
+    ;(w.vm as any).selectedTags = ['重点']
+    await w.vm.$nextTick()
+    expect(((w.vm as any).filtered as any[]).length).toBe(1)
+    const resetBtn = w.findAll('button.cd-btn').find((b) => b.text() === '重置')!
+    await resetBtn.trigger('click')
+    expect((w.vm as any).selectedTags).toEqual([])
+    expect(((w.vm as any).filtered as any[]).length).toBe(3)
   })
 })
