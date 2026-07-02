@@ -8,6 +8,7 @@ export const KEEPALIVE_ROUTES = [
   'projects-key',
   'temp-followup',
   'insight-milestone',
+  'payment-key',
 ] as const
 
 // keep-alive :include 需要"组件 name"，须与各 SFC 的 defineOptions({name}) 一致
@@ -18,6 +19,7 @@ export const KEEPALIVE_COMPONENTS = [
   'KeyProjectsView',
   'TempFollowupView',
   'MilestoneView',
+  'PaymentKeyFollowupView',
 ] as const
 
 // 下钻目标（详情）路由 = 返回来源

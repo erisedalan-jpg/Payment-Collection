@@ -2,7 +2,7 @@ export type PageKey =
   | 'overview' | 'projects' | 'projects-closed' | 'activity'
   | 'insight' | 'insight-milestone' | 'insight-costdetail' | 'insight-risk' | 'insight-board' | 'insight-calendar' | 'opportunities-board'
   | 'payment' | 'payment-projects' | 'payment-nodes'
-  | 'projects-key' | 'opportunities-progress' | 'temp-followup' | 'opportunity-followup' | 'risk-followup'
+  | 'projects-key' | 'opportunities-progress' | 'temp-followup' | 'opportunity-followup' | 'risk-followup' | 'payment-key'
   | 'data' | 'governance' | 'about'
 
 /** allowedPages 含 '*' 或该 key → 可访问(isSuper 由调用方先判)。 */
