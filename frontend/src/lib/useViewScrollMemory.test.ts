@@ -35,10 +35,11 @@ describe('useViewScrollMemory', () => {
     const { which } = makeHost()
     await nextTick()
     mainEl.scrollTop = 240
-    which.value = 'B'          // A 被 keep-alive 停用（存 240）
+    mainEl.dispatchEvent(new Event('scroll')) // 激活期滚动被监听记录(saved=240)
+    which.value = 'B'          // A 被 keep-alive 停用（移除监听，saved 保留 240）
     await nextTick()
-    mainEl.scrollTop = 0
-    which.value = 'A'          // A 再激活（恢复）
+    mainEl.scrollTop = 0       // 切走后容器被较矮内容归零
+    which.value = 'A'          // A 再激活（恢复到记录的 240）
     await flushPromises()
     expect(mainEl.scrollTop).toBe(240)
   })
