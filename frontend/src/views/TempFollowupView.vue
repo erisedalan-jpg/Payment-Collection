@@ -19,6 +19,10 @@ import SegToggle from '@/components/SegToggle.vue'
 import ProgressEditModal from '@/components/ProgressEditModal.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import { exportSheets } from '@/lib/exportXlsx'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'TempFollowupView' })
+useViewScrollMemory()
 
 const TABLE_ID = 'temp-followup'
 const data = useDataStore()
@@ -26,6 +30,9 @@ const auth = useAuthStore()
 const temp = useTempFollowupStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
+
+// 进页清空本表残留列筛选（keep-alive 下：菜单进入=新挂载会重置，下钻返回=缓存激活不重置）
+cf.clearAll(TABLE_ID)
 
 onMounted(() => {
   if (!data.data) data.load()

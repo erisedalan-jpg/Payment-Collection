@@ -7,6 +7,7 @@ import KeyProjectsView from './KeyProjectsView.vue'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectProgressStore } from '@/stores/projectProgress'
+import { useCrossFilterStore } from '@/stores/crossFilter'
 import * as ppApi from '@/lib/projectProgressApi'
 
 let router: Router
@@ -108,5 +109,15 @@ describe('KeyProjectsView', () => {
     expect((w.vm as any).exportSel.length).toBe((w.vm as any).datasetOpts.length)
     ;(w.vm as any).toggleAllExport(false)
     expect((w.vm as any).exportSel).toEqual([])
+  })
+
+  // 下钻返回保持视图状态(V2.5.9)：菜单进入(新挂载)应清空本表残留列筛选
+  it('挂载时清空 key-projects 列筛选（菜单=重置）', async () => {
+    seed()
+    const cf = useCrossFilterStore()
+    cf.setColumnFilter('key-projects', 'orgL4', ['A组'], 5)
+    expect(cf.tableFilters('key-projects').orgL4).toBeDefined()
+    await mountView()
+    expect(cf.tableFilters('key-projects').orgL4).toBeUndefined()
   })
 })

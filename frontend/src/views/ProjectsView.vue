@@ -18,6 +18,10 @@ import Modal from '@/components/Modal.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { buildExportSheets, type ExportScope } from '@/lib/projectExport'
 import { followupApi } from '@/lib/followupApi'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'ProjectsView' })
+useViewScrollMemory()
 
 const TABLE_ID = 'projects-active'
 const data = useDataStore()
