@@ -12,7 +12,9 @@ import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import { useDataStore } from '@/stores/data'
+import { NO_TAG_VALUE } from '@/lib/tagFilter'
 import { useFilterStore } from '@/stores/filter'
+import { useProjectTagsStore } from '@/stores/projectTags'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/lib/projectTagsApi', () => ({
@@ -114,6 +116,54 @@ describe('MilestoneView 明细 tab', () => {
     expect(w.findComponent(MilestoneReminderTab).exists()).toBe(true)
     await w.get('[data-test="seg-plan"]').trigger('click')
     expect(w.findComponent(MilestonePlanTab).exists()).toBe(true)
+  })
+})
+
+describe('MilestoneView 标签筛选(仅三表)', () => {
+  it('三表区域存在标签筛选控件', () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    expect(w.find('[data-test="tag-filter"]').exists()).toBe(true)
+  })
+  it('选标签后 mpsFiltered 收窄；mps/kpi 不变', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.load = vi.fn().mockResolvedValue(undefined) // 避免真实 load() 异步覆盖下面手设的 assignments
+    tags.assignments = { A: ['重点'] }
+    const w = mount(MilestoneView, opts)
+    expect((w.vm as any).mps.length).toBe(2)
+    ;(w.vm as any).selectedTags = ['重点']
+    await w.vm.$nextTick()
+    expect((w.vm as any).mpsFiltered.length).toBe(1)
+    expect((w.vm as any).mpsFiltered[0].projectId).toBe('A')
+    // KPI/mps 不受三表标签筛选影响
+    expect((w.vm as any).mps.length).toBe(2)
+    expect(w.findComponent(MetricGrid).props('items').find((i: any) => i.k === '项目总数')?.v).toBe('2')
+  })
+  it('“无标签”选项匹配未打标签的项目', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.load = vi.fn().mockResolvedValue(undefined)
+    tags.assignments = { A: ['重点'] }
+    const w = mount(MilestoneView, opts)
+    ;(w.vm as any).selectedTags = [NO_TAG_VALUE]
+    await w.vm.$nextTick()
+    expect((w.vm as any).mpsFiltered.length).toBe(1)
+    expect((w.vm as any).mpsFiltered[0].projectId).toBe('B')
+  })
+  it('选择后传给三表组件的 projects 收窄，切到其余两 tab 同样生效', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.load = vi.fn().mockResolvedValue(undefined)
+    tags.assignments = { A: ['重点'] }
+    const w = mount(MilestoneView, opts)
+    ;(w.vm as any).selectedTags = ['重点']
+    await w.vm.$nextTick()
+    expect(w.findComponent(MilestoneDelayedTab).props('projects').length).toBe(1)
+    await w.get('[data-test="seg-reminder"]').trigger('click')
+    expect(w.findComponent(MilestoneReminderTab).props('projects').length).toBe(1)
+    await w.get('[data-test="seg-plan"]').trigger('click')
+    expect(w.findComponent(MilestonePlanTab).props('projects').length).toBe(1)
   })
 })
 

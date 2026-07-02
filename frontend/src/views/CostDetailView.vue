@@ -4,14 +4,17 @@ import { useDataStore } from '@/stores/data'
 import { useSettingsStore } from '@/stores/settings'
 import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildCostRows, costKpis, costL4Dist, costL4Summary } from '@/lib/costAnalysis'
 import { applyColumnFilters } from '@/lib/crossFilter'
+import { tagMatch } from '@/lib/tagFilter'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
+import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import { useRouter } from 'vue-router'
 import { fmtWan } from '@/lib/format'
 import { usePagedRows } from '@/lib/usePagedRows'
@@ -30,10 +33,14 @@ const data = useDataStore()
 const settings = useSettingsStore()
 const filter = useFilterStore()
 const cf = useCrossFilterStore()
+const projectTags = useProjectTagsStore()
 const router = useRouter()
 // 延迟渲染:点击进页先出标题/KPI,下一两帧再挂图表+两张表,消除跨页点击冻结。
 const { ready } = useDeferredMount()
-onMounted(() => { if (!data.data) data.load() })
+onMounted(() => {
+  if (!data.data) data.load()
+  if (!projectTags.loaded) projectTags.load()
+})
 // 进页先清空本表残留列筛选,避免跨导航叠加
 cf.clearAll(TABLE_ID)
 
@@ -123,6 +130,7 @@ const DELIVERY_TONE: Record<string, string> = { 未超支: 'ok', 交付预算超
 
 const detailCardRef = ref<HTMLElement | null>(null)
 const fKw = ref('')
+const selectedTags = ref<string[]>([])
 
 // KPI 卡点击 → 就地筛选明细(本地 kpiFilter,不写 crossFilter)
 type KpiFilter = 'all' | 'notOverspent' | 'totalOverspend' | 'deliveryOverspend'
@@ -134,11 +142,12 @@ function onKpiClick(i: number) {
   detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-// 列头多选筛选 → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
+// 列头多选筛选 → 标签筛选(含无标签) → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
+  const tagged = colFiltered.filter((x) => tagMatch(projectTags.assignments[x.projectId] ?? [], selectedTags.value))
   const kw = fKw.value.trim()
-  let r = kw ? colFiltered.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : colFiltered
+  let r = kw ? tagged.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : tagged
   if (kpiFilter.value === 'notOverspent') r = r.filter((x) => !x.totalOverspend && !x.deliveryOverspend)
   else if (kpiFilter.value === 'totalOverspend') r = r.filter((x) => x.totalOverspend)
   else if (kpiFilter.value === 'deliveryOverspend') r = r.filter((x) => x.deliveryOverspend)
@@ -168,7 +177,7 @@ const sorted = computed(() => {
 const { paged, currentPage, pageSize } = usePagedRows(sorted, 20)
 const pagedSeq = computed(() => paged.value.map((r, i) => ({ ...r, _seq: (currentPage.value - 1) * pageSize.value + i + 1 })))
 
-function reset() { fKw.value = ''; cf.clearAll(TABLE_ID); sortState.value = { prop: '', order: '' }; kpiFilter.value = 'all' }
+function reset() { fKw.value = ''; selectedTags.value = []; cf.clearAll(TABLE_ID); sortState.value = { prop: '', order: '' }; kpiFilter.value = 'all' }
 function onExport() {
   exportRows('项目成本明细.xlsx', sorted.value.map((r) => ({
     项目编号: r.projectId, 项目名称: r.projectName, 项目类型: r.projectType,
@@ -179,7 +188,7 @@ function onExport() {
   })))
 }
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
-defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter, onKpiClick, onSortChange, sortState, TABLE_ID, l4VisibleColumns })
+defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedTags, kpiFilter, onKpiClick, onSortChange, sortState, TABLE_ID, l4VisibleColumns })
 </script>
 
 <template>
@@ -208,6 +217,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, kpiFilter
         <div class="cd-card-h">项目成本明细</div>
         <div class="cd-bar">
           <el-input v-model="fKw" size="small" placeholder="编号/名称" style="width: 160px" clearable />
+          <TagFilterSelect v-model="selectedTags" />
           <button class="cd-btn" @click="reset">重置</button>
           <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
           <button class="cd-btn" data-test="cost-export" @click="onExport">导出Excel</button>
