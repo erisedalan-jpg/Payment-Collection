@@ -115,4 +115,25 @@ describe('PaymentKeyFollowupView', () => {
     await mountAs(true)
     expect(cf.tableFilters('payment-key').orgL4).toBeUndefined()
   })
+
+  // V2.6.3:分页 + 总数(同 /projects)
+  it('S1:>50 行触发分页,总数与渲染行数受控', async () => {
+    const data = useDataStore()
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      projectId: `P${i}`, projectName: `项目${i}`, projectManager: '张三', orgL4: '银行服务组', top1000: '是',
+      paymentPmis: { contract: 2_000_000 }, payment: { paymentRatio: 0.4 }, quadrant: 'A',
+    }))
+    const manyPmis = Object.fromEntries(many.map((p) => [p.projectId,
+      { status: {}, progress: {}, risk: {}, cost: {}, customer: { 最终客户: '客' }, team: {} }]))
+    data.data = { projects: many, projectPmis: manyPmis, paymentNodes: {}, projectMilestones: {} } as any
+    const auth = useAuthStore()
+    auth.user = { account: 'admin', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] } as any
+    await usePaymentKeyFollowupStore().load()
+    const router = makeRouter(); router.push('/payment/key'); await router.isReady()
+    const w = mount(PaymentKeyFollowupView, { global: { plugins: [ElementPlus, router] } })
+    await flushPromises()
+    expect(w.text()).toContain('共 51 条')
+    expect(w.find('.el-pagination').exists()).toBe(true)
+    expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
+  })
 })
