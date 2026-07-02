@@ -72,4 +72,25 @@ describe('NoStageProjectsTable', () => {
     const w = mount(NoStageProjectsTable, opts)
     expect(w.text()).toContain('全部在建项目均有收款阶段')
   })
+
+  it('超过一页(>20行)时显示分页器与总数', () => {
+    const data = useDataStore()
+    const projects = Array.from({ length: 25 }, (_, i) => ({
+      projectId: `P${i + 1}`, projectName: `项目${i + 1}`, projectManager: '张三', orgL4: 'A组',
+      paymentPmis: { contract: 1_000_000 },
+    }))
+    const paymentNodes: Record<string, any[]> = {}
+    projects.forEach((p) => { paymentNodes[p.projectId] = [] })
+    data.data = {
+      meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
+      rawNodes: [], displayColumns: {}, followupRecords: {},
+      projects, projectPmis: {}, paymentNodes, paymentRecords: {},
+    } as any
+    const w = mount(NoStageProjectsTable, opts)
+    expect(w.text()).toContain('无回款阶段数据项目（25）')
+    expect(w.text()).toContain('共 25 条')
+    expect(w.find('.el-pagination').exists()).toBe(true)
+    const rows = w.findComponent(DataTable).props('rows') as any[]
+    expect(rows.length).toBe(20)
+  })
 })

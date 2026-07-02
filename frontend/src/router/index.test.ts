@@ -145,4 +145,11 @@ describe('router', () => {
     expect(router.resolve('/').name).toBe('overview')
     expect(router.resolve('/payment').name).toBe('payment')
   })
+
+  it('/payment/key 解析到 payment-key（PaymentKeyFollowupView）', () => {
+    const r = router.resolve('/payment/key')
+    expect(r.name).toBe('payment-key')
+    expect((r.matched[0].components?.default as any).__name).toBe('PaymentKeyFollowupView')
+    expect(r.matched[0].meta.pageKey).toBe('payment-key')
+  })
 })

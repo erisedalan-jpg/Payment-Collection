@@ -6,6 +6,7 @@ import { useFilterStore } from '@/stores/filter'
 import { noStageProjects } from '@/lib/payDashboard'
 import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
+import { usePagedRows } from '@/lib/usePagedRows'
 
 const router = useRouter()
 const data = useDataStore()
@@ -15,6 +16,8 @@ const rows = computed(() => noStageProjects(data.data?.projects ?? [], data.data
   viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
   excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
 }))
+
+const { paged, currentPage, pageSize } = usePagedRows(rows, 20)
 
 // contractWan 已是万元(noStageProjects 内已 /10000)，此处只格式化千分位，不再用 fmtWan 二次除万（同 KeyProjectsView.vue contractWan 列约定）
 const COLS: DataColumn[] = [
@@ -40,7 +43,13 @@ function onExport() {
       <button class="nsp-btn" data-test="nostage-export" @click="onExport">导出Excel</button>
     </div>
     <div v-if="!rows.length" class="nsp-empty">无——全部在建项目均有收款阶段。</div>
-    <DataTable v-else :columns="COLS" :rows="rows" :show-count="false" clickable @row-click="onRow" />
+    <template v-else>
+      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable @row-click="onRow" />
+      <div class="nsp-pager">
+        <span class="u-num">共 {{ rows.length }} 条</span>
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="rows.length" layout="sizes, prev, pager, next" size="small" background />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -49,4 +58,5 @@ function onExport() {
 .nsp-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
 .nsp-btn:hover { background: var(--bg); color: var(--accent); }
 .nsp-empty { color: var(--mut); padding: var(--sp-4) 0; }
+.nsp-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 </style>

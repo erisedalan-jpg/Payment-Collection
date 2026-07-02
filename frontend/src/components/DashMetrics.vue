@@ -25,7 +25,7 @@ const summary = computed(() =>
 const metrics = computed(() => {
   const s = summary.value
   return [
-    { k: '项目数', v: String(s.totalAll), cls: '', sub: `${s.noStageCount} 个项目无回款阶段`, subAction: 'nostage' },
+    { k: '项目数', v: String(s.totalAll), cls: '', sub: `${s.noStageCount} 个项目无回款阶段`, action: 'projects' },
     { k: '回款节点数', v: String(s.relatedNodeCount), cls: '', action: 'nodes' },
     { k: '已回款(万)', v: fmtWan(s.totalActual), cls: 'paid' },
     { k: '待回款(万)', v: fmtWan(s.totalRemaining), cls: 'remain' },
@@ -37,20 +37,18 @@ const metrics = computed(() => {
 function onCard(action?: string) {
   if (action === 'nodes') router.push('/payment/nodes')
   else if (action === 'delayed') router.push('/projects?riskCategory=回款延期')
-}
-function onSub(subAction?: string) {
-  if (subAction === 'nostage') router.push('/projects')
+  else if (action === 'projects') router.push('/projects')
 }
 </script>
 
 <template>
   <div class="dash-metrics u-grid-auto">
     <div v-for="m in metrics" :key="m.k" class="dm-card" :class="{ 'dm-card--link': m.action }"
-      :data-test="m.action === 'nodes' ? 'pay-nodes-card' : m.action === 'delayed' ? 'pay-delayed-card' : undefined"
+      :data-test="m.action === 'nodes' ? 'pay-nodes-card' : m.action === 'delayed' ? 'pay-delayed-card' : m.action === 'projects' ? 'pay-projects-card' : undefined"
       @click="onCard(m.action)">
       <div class="dm-k">{{ m.k }}</div>
       <div class="dm-v u-num" :class="m.cls">{{ m.v }}</div>
-      <button v-if="m.sub" class="dm-sub" data-test="pay-nostage-link" @click.stop="onSub(m.subAction)">{{ m.sub }} →</button>
+      <span v-if="m.sub" class="dm-sub">{{ m.sub }}</span>
     </div>
   </div>
 </template>
@@ -66,5 +64,5 @@ function onSub(subAction?: string) {
 .dm-v.remain { color: var(--c-remaining); }
 .dm-v.pending { color: var(--c-pending); }
 .dm-v.danger { color: var(--danger); }
-.dm-sub { display: block; border: none; background: none; color: var(--accent); font-size: var(--fs-1); cursor: pointer; padding: 4px 0 0; }
+.dm-sub { display: block; color: var(--accent); font-size: var(--fs-1); padding: 4px 0 0; }
 </style>

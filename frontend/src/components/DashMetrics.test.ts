@@ -82,12 +82,12 @@ describe('DashMetrics', () => {
     expect(projectCard).toBeTruthy()
     expect(projectCard!.find('.dm-v').text()).toBe('2') // totalAll
 
-    const sub = projectCard!.find('[data-test="pay-nostage-link"]')
+    const sub = projectCard!.find('.dm-sub')
     expect(sub.exists()).toBe(true)
     expect(sub.text()).toContain('无回款阶段')
     expect(sub.text()).toContain('1') // noStageCount
 
-    await sub.trigger('click')
+    await w.find('[data-test="pay-projects-card"]').trigger('click')
     expect(push).toHaveBeenCalledWith('/projects')
 
     await w.find('[data-test="pay-delayed-card"]').trigger('click')

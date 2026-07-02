@@ -28,6 +28,7 @@ import OpportunitiesView from '@/views/OpportunitiesView.vue'
 import TempFollowupView from '@/views/TempFollowupView.vue'
 import OpportunityFollowupView from '@/views/OpportunityFollowupView.vue'
 import OpportunitiesBoardView from '@/views/OpportunitiesBoardView.vue'
+import PaymentKeyFollowupView from '@/views/PaymentKeyFollowupView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -70,6 +71,7 @@ export const router = createRouter({
     // 后续新增回款子页须保持精确路径，勿引入 /payment/:param 通配，否则会遮蔽 DashboardView。
     { path: '/payment/projects', name: 'pay-projects', component: PayProjectsView, meta: { title: '回款项目', pageKey: 'payment-projects' } },
     { path: '/payment/nodes', name: 'pay-nodes', component: PayNodesView, meta: { title: '回款节点', pageKey: 'payment-nodes' } },
+    { path: '/payment/key', name: 'payment-key', component: PaymentKeyFollowupView, meta: { title: '回款重点跟进', hideFilter: true, pageKey: 'payment-key' } },
     // 兼容旧深链:board/calendar 迁至 /insight 后,旧路径单跳 redirect 到新规范路径(保 query;board 依赖 ?dim=)
     { path: '/payment/board', redirect: (to) => ({ path: '/insight/board', query: to.query }) },
     { path: '/calendar', redirect: (to) => ({ path: '/insight/calendar', query: to.query }) },
