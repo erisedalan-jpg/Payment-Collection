@@ -19,6 +19,10 @@ import SegToggle from '@/components/SegToggle.vue'
 import ProgressEditModal from '@/components/ProgressEditModal.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import { exportSheets } from '@/lib/exportXlsx'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'TempFollowupView' })
+useViewScrollMemory()
 
 const TABLE_ID = 'temp-followup'
 const data = useDataStore()

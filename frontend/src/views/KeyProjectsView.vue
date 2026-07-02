@@ -17,6 +17,10 @@ import Modal from '@/components/Modal.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ProgressEditModal from '@/components/ProgressEditModal.vue'
 import { exportSheets } from '@/lib/exportXlsx'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'KeyProjectsView' })
+useViewScrollMemory()
 
 const TABLE_ID = 'key-projects'
 const data = useDataStore()
