@@ -5,9 +5,15 @@ import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import FilterBar from './FilterBar.vue'
 import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
+import { useAuthStore } from '@/stores/auth'
+import { KEEPALIVE_COMPONENTS, viewKey } from '@/lib/viewReturn'
 const route = useRoute()
+const auth = useAuthStore()
 const fullscreen = computed(() => !!route.meta?.fullscreen)
 const showFilter = computed(() => !route.meta?.hideFilter)
+// 账号护栏：换号即换 keep-alive key → 缓存重建；登出经全屏页已卸载 v-else，此为防御纵深
+const cacheKey = computed(() => auth.user?.account ?? 'anon')
+const includeList = KEEPALIVE_COMPONENTS as unknown as string[]
 </script>
 
 <template>
@@ -18,7 +24,11 @@ const showFilter = computed(() => !route.meta?.hideFilter)
       <AppSidebar />
       <main class="app-main">
         <FilterBar v-if="showFilter" />
-        <router-view />
+        <router-view v-slot="{ Component, route: r }">
+          <keep-alive :include="includeList" :max="10" :key="cacheKey">
+            <component :is="Component" :key="viewKey(r.name)" />
+          </keep-alive>
+        </router-view>
       </main>
     </div>
     <ProjectDetailDrawer />
