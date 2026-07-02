@@ -16,6 +16,7 @@ function makeRouter() {
       { path: '/opportunities', component: { template: '<div/>' } },
       { path: '/opportunities/key', component: { template: '<div/>' } },
       { path: '/projects/temp', component: { template: '<div/>' } },
+      { path: '/payment/key', component: { template: '<div/>' } },
       { path: '/projects/closed', component: { template: '<div/>' } },
       { path: '/activity', component: { template: '<div/>' } },
       { path: '/insight', component: { template: '<div/>' } },
@@ -71,14 +72,15 @@ describe('AppSidebar', () => {
     expect(text).toContain('重点商机跟进')    // 重点跟进分区(新页)
     expect(text).toContain('临时重点跟进')    // 重点跟进分区
     expect(text).toContain('风险跟进')        // 重点跟进分区(新页)
+    expect(text).toContain('回款重点跟进')    // 重点跟进分区(新页)
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
     expect(text).not.toContain('回款进度')    // /payment/plan 已删
     expect(text).not.toContain('风险项目')    // /payment/risk 已删
     expect(text).not.toContain('回款台账')    // /ledger 已删
-    // 六个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(4)+回款(3)+工具(3)+系统管理(1) = 23
-    expect(wrapper.findAll('.nav-sub').length).toBe(23)
+    // 六个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+工具(3)+系统管理(1) = 24
+    expect(wrapper.findAll('.nav-sub').length).toBe(24)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
