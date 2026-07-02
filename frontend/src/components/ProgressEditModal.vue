@@ -5,11 +5,12 @@ import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useOpportunityFollowupStore } from '@/stores/opportunityFollowup'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
+import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
 
 const props = defineProps<{
   modelValue: boolean; projectId: string; projectName: string
   field: 'weekProgress' | 'nextPlan' | 'followAction' | 'revConclusion'; initial: string
-  store?: 'key' | 'temp' | 'oppFollowup' | 'riskFollowup'
+  store?: 'key' | 'temp' | 'oppFollowup' | 'riskFollowup' | 'paymentKey'
   headText?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
@@ -18,11 +19,13 @@ const keyStore = useProjectProgressStore()
 const tempStore = useTempFollowupStore()
 const oppStore = useOpportunityFollowupStore()
 const riskStore = useRiskFollowupStore()
+const payKeyStore = usePaymentKeyFollowupStore()
 const activeStore = computed(() =>
   props.store === 'temp' ? tempStore
     : props.store === 'oppFollowup' ? oppStore
       : props.store === 'riskFollowup' ? riskStore
-        : keyStore)
+        : props.store === 'paymentKey' ? payKeyStore
+          : keyStore)
 const text = ref(props.initial)
 const saving = ref(false)
 watch(() => props.modelValue, (v) => { if (v) text.value = props.initial })
