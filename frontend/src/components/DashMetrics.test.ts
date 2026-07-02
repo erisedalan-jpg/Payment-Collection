@@ -1,11 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import DashMetrics from './DashMetrics.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
+const push = vi.fn()
+vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
+
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all'); push.mockReset() })
 
 describe('DashMetrics', () => {
   it('渲染六个指标含延期数(流水口径)', () => {
@@ -51,5 +54,46 @@ describe('DashMetrics', () => {
     const w = mount(DashMetrics)
     const text = w.text()
     expect(text).toContain('0%')
+  })
+
+  it('项目数卡=totalAll 且副字含无回款阶段数; 三处下钻正确', async () => {
+    const ds = useDataStore()
+    ds.data = {
+      meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
+      rawNodes: [], displayColumns: {}, followupRecords: {},
+      projects: [
+        { projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } },
+        { projectId: 'P2', projectName: '乙', projectManager: '李四', orgL4: 'B组', paymentPmis: { contract: 1000000 } },
+      ],
+      projectPmis: {},
+      paymentNodes: {
+        P1: [
+          { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.6, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
+        ],
+        P2: [],
+      },
+      paymentRecords: {
+        P1: { total: 800000, count: 1, records: [{ date: '2026-02-10', amount: 800000 }] },
+      },
+    } as any
+    const w = mount(DashMetrics)
+
+    const projectCard = w.findAll('.dm-card').find((c) => c.text().includes('项目数'))
+    expect(projectCard).toBeTruthy()
+    expect(projectCard!.find('.dm-v').text()).toBe('2') // totalAll
+
+    const sub = projectCard!.find('[data-test="pay-nostage-link"]')
+    expect(sub.exists()).toBe(true)
+    expect(sub.text()).toContain('无回款阶段')
+    expect(sub.text()).toContain('1') // noStageCount
+
+    await sub.trigger('click')
+    expect(push).toHaveBeenCalledWith('/projects')
+
+    await w.find('[data-test="pay-delayed-card"]').trigger('click')
+    expect(push).toHaveBeenCalledWith('/projects?riskCategory=回款延期')
+
+    await w.find('[data-test="pay-nodes-card"]').trigger('click')
+    expect(push).toHaveBeenCalledWith('/payment/nodes')
   })
 })

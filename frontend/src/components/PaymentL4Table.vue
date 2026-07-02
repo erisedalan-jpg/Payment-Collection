@@ -48,7 +48,7 @@ const COLUMNS: DataColumn[] = [
 
 <template>
   <div class="pl4">
-    <h3 class="pl4-title">回款数据（按 L4 服务组）</h3>
+    <h3 class="pl4-title">回款数据</h3>
     <div v-if="!rows.length" class="pl4-empty">暂无数据</div>
     <div v-else class="pl4-scroll">
       <DataTable :columns="COLUMNS" :rows="rows" :show-count="false" />
@@ -57,6 +57,7 @@ const COLUMNS: DataColumn[] = [
 </template>
 
 <style scoped>
+.pl4 { width: 100%; }
 .pl4-title { font-size: var(--fs-4); font-weight: 600; color: var(--txt); margin: 0 0 var(--sp-3); }
 .pl4-empty { color: var(--mut); padding: var(--sp-5) 0; text-align: center; }
 .pl4-scroll { overflow-x: auto; }

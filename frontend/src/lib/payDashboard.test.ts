@@ -324,3 +324,27 @@ describe('payMonthlyTrend/payQuarterlyTrend', () => {
     expect(t.data[i]).toBe(10)
   })
 })
+
+import { noStageProjects } from './payDashboard'
+
+describe('payDashboard 整体项目数/无回款阶段', () => {
+  const OPTS = { viewMode: 'global' as const, viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} }
+  const P = (id: string, orgL4 = 'X', contract = 1000000) =>
+    ({ projectId: id, projectName: id + '名', projectManager: '张', orgL4, paymentPmis: { contract } }) as any
+
+  it('totalAll=在建主域全量, noStageCount=空节点数', () => {
+    const projects = [P('A'), P('B'), P('C')]
+    const paymentNodes = { A: [{ planDate: '2026-01-01', expectedPayment: 1, unpaidAmount: 0, status: '待回款' }], B: [], C: [] } as any
+    const s = payDashSummary([], projects, OPTS, {}, paymentNodes, '', '')
+    expect(s.totalAll).toBe(3)
+    expect(s.noStageCount).toBe(2)  // B、C 空节点
+  })
+
+  it('noStageProjects 只列空节点项目 + 合同额转万', () => {
+    const projects = [P('A'), P('B'), P('C')]
+    const paymentNodes = { A: [{ planDate: '2026-01-01', expectedPayment: 1, unpaidAmount: 0, status: '待回款' }], B: [], C: [] } as any
+    const rows = noStageProjects(projects, paymentNodes, OPTS)
+    expect(rows.map((r) => r.projectId)).toEqual(['B', 'C'])
+    expect(rows[0]).toMatchObject({ projectId: 'B', projectName: 'B名', projectManager: '张', orgL4: 'X', contractWan: 100 })
+  })
+})

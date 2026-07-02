@@ -28,9 +28,6 @@ function makeRouter() {
       { path: '/payment', component: { template: '<div/>' } },
       { path: '/payment/projects', component: { template: '<div/>' } },
       { path: '/payment/nodes', component: { template: '<div/>' } },
-      { path: '/payment/plan', component: { template: '<div/>' } },
-      { path: '/payment/risk', component: { template: '<div/>' } },
-      { path: '/ledger', name: 'ledger', component: { template: '<div/>' } },
       { path: '/data', component: { template: '<div/>' } },
       { path: '/governance', component: { template: '<div/>' } },
       { path: '/about', component: { template: '<div/>' } },
@@ -68,9 +65,6 @@ describe('AppSidebar', () => {
     expect(text).toContain('回款总览')        // 回款组
     expect(text).toContain('回款项目')
     expect(text).toContain('回款节点')
-    expect(text).toContain('回款进度')
-    expect(text).toContain('风险项目')
-    expect(text).toContain('回款台账')
     expect(text).toContain('数据管理')        // 工具组
     expect(text).toContain('重点项目进展')    // 重点跟进分区
     expect(text).toContain('商机清单')        // 已移入「项目」组
@@ -80,8 +74,11 @@ describe('AppSidebar', () => {
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
-    // 六个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(4)+回款(6)+工具(3)+系统管理(1) = 26
-    expect(wrapper.findAll('.nav-sub').length).toBe(26)
+    expect(text).not.toContain('回款进度')    // /payment/plan 已删
+    expect(text).not.toContain('风险项目')    // /payment/risk 已删
+    expect(text).not.toContain('回款台账')    // /ledger 已删
+    // 六个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(4)+回款(3)+工具(3)+系统管理(1) = 23
+    expect(wrapper.findAll('.nav-sub').length).toBe(23)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
@@ -108,7 +105,7 @@ describe('AppSidebar 权限过滤', () => {
     const w = mount(AppSidebar, { global: { plugins: [router] } })
     expect(w.text()).toContain('数据管理')
     expect(w.text()).toContain('在建项目')
-    expect(w.text()).toContain('回款台账')
+    expect(w.text()).toContain('回款节点')
   })
   it('普通用户(仅 data)只显数据管理,其余 section 不显', async () => {
     const router = makeRouter()
@@ -119,7 +116,7 @@ describe('AppSidebar 权限过滤', () => {
     const w = mount(AppSidebar, { global: { plugins: [router] } })
     expect(w.text()).toContain('数据管理')
     expect(w.text()).not.toContain('在建项目')
-    expect(w.text()).not.toContain('回款台账')
+    expect(w.text()).not.toContain('回款节点')
   })
 })
 
@@ -186,6 +183,6 @@ describe('AppSidebar 分区可折叠', () => {
   it('已手动展开的分区在非活动页仍保持展开(覆盖默认)', async () => {
     localStorage.setItem('sidebar_sections', JSON.stringify({ payment: true }))
     const w = await mountAt('/')   // 活动分区是 project,但 payment 被手动置 true
-    expect(sec(w, '回款台账').classes()).not.toContain('collapsed')
+    expect(sec(w, '回款节点').classes()).not.toContain('collapsed')
   })
 })

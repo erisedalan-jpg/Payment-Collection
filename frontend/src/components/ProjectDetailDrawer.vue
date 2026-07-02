@@ -36,6 +36,13 @@ const detail = computed(() =>
     : { project: null, nodes: [] },
 )
 
+// 主域项目但收款阶段节点为空（未在 collection_stages 台账建节点）——与"未找到该项目数据"(项目不存在)区分展示
+const hasNoStage = computed(() => {
+  const id = pd.openId
+  if (!id || !inDomain.value) return false
+  return !(data.data?.paymentNodes?.[id]?.length)
+})
+
 const NODE_COLS: DataColumn[] = [
   { key: 'stage', label: '阶段' },
   { key: 'planDate', label: '计划日期' },
@@ -70,19 +77,25 @@ const summary = computed(() => {
   <el-drawer
     v-model="visible"
     :title="detail.project ? detail.project.projectName || detail.project.projectId : '项目详情'"
-    size="600px"
+    size="900px"
     append-to-body
   >
-    <div v-if="detail.project" class="pd">
-      <button v-if="inDomain" class="pd-full-link" @click="goFull">查看完整详情 →</button>
-      <div class="pd-grid">
-        <div v-for="item in summary" :key="item.k" class="pd-cell">
-          <span class="pd-k">{{ item.k }}</span>
-          <span class="pd-v">{{ item.v }}</span>
+    <div v-if="detail.project || hasNoStage" class="pd">
+      <template v-if="hasNoStage">
+        <div class="pd-nostage">该项目无回款阶段数据</div>
+        <button class="pd-full-link" @click="goFull">查看完整详情 →</button>
+      </template>
+      <template v-else>
+        <button v-if="inDomain" class="pd-full-link" @click="goFull">查看完整详情 →</button>
+        <div class="pd-grid">
+          <div v-for="item in summary" :key="item.k" class="pd-cell">
+            <span class="pd-k">{{ item.k }}</span>
+            <span class="pd-v">{{ item.v }}</span>
+          </div>
         </div>
-      </div>
-      <div class="pd-nodes-title">回款节点明细（{{ detail.nodes.length }}）</div>
-      <DataTable :columns="NODE_COLS" :rows="detail.nodes" :show-count="false" />
+        <div class="pd-nodes-title">回款节点明细（{{ detail.nodes.length }}）</div>
+        <DataTable :columns="NODE_COLS" :rows="detail.nodes" :show-count="false" />
+      </template>
     </div>
     <div v-else class="pd-empty">未找到该项目数据</div>
   </el-drawer>
@@ -96,5 +109,6 @@ const summary = computed(() => {
 .pd-v { color: var(--txt); font-weight: 600; text-align: right; }
 .pd-nodes-title { font-weight: 700; color: var(--accent); font-size: var(--fs-2); margin-bottom: var(--sp-2); }
 .pd-empty { color: var(--mut); padding: var(--sp-5); text-align: center; }
+.pd-nostage { color: var(--mut); padding: var(--sp-4) 0; font-size: var(--fs-2); }
 .pd-full-link { border: none; background: none; color: var(--accent); font-size: var(--fs-2); font-weight: 600; cursor: pointer; padding: 0; margin-bottom: var(--sp-3); }
 </style>
