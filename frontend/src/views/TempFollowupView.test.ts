@@ -7,6 +7,7 @@ import TempFollowupView from './TempFollowupView.vue'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
+import { useCrossFilterStore } from '@/stores/crossFilter'
 
 vi.mock('@/lib/tempFollowupApi', () => ({
   tempFollowupApi: {
@@ -74,5 +75,14 @@ describe('TempFollowupView', () => {
     const w = await mountAs(true)
     expect(w.text()).toContain('项目编号')
     expect(w.text()).not.toContain('健康度')
+  })
+
+  // 下钻返回保持视图状态(V2.5.9)：菜单进入(新挂载)应清空本表残留列筛选
+  it('挂载时清空 temp-followup 列筛选（菜单=重置）', async () => {
+    const cf = useCrossFilterStore()
+    cf.setColumnFilter('temp-followup', 'orgL4', ['银行服务组'], 5)
+    expect(cf.tableFilters('temp-followup').orgL4).toBeDefined()
+    await mountAs(true)
+    expect(cf.tableFilters('temp-followup').orgL4).toBeUndefined()
   })
 })

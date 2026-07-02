@@ -25,6 +25,9 @@ const progress = useProjectProgressStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
 
+// 进页清空本表残留列筛选（keep-alive 下：菜单进入=新挂载会重置，下钻返回=缓存激活不重置）
+cf.clearAll(TABLE_ID)
+
 onMounted(() => {
   if (!data.data) data.load()
   if (!progress.loaded) progress.load()
