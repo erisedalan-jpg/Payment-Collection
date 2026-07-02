@@ -48,7 +48,7 @@ function onCard(action?: string) {
       @click="onCard(m.action)">
       <div class="dm-k">{{ m.k }}</div>
       <div class="dm-v u-num" :class="m.cls">{{ m.v }}</div>
-      <span v-if="m.sub" class="dm-sub">{{ m.sub }} →</span>
+      <span v-if="m.sub" class="dm-sub">{{ m.sub }}</span>
     </div>
   </div>
 </template>
