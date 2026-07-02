@@ -34,6 +34,7 @@ import temp_followup
 import temp_followup as _temp
 import opportunity_followup as _oppf
 import risk_followup as _riskfu
+import payment_key_followup as _paykey
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -174,6 +175,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/temp-followup/scope', '/api/temp-followup/archive', '/api/temp-followup/archive/delete',
     '/api/opportunity-followup/scope', '/api/opportunity-followup/archive', '/api/opportunity-followup/archive/delete',
     '/api/risk-followup/scope', '/api/risk-followup/archive', '/api/risk-followup/archive/delete',
+    '/api/payment-key-followup/scope', '/api/payment-key-followup/archive', '/api/payment-key-followup/archive/delete',
     '/api/pmis/cookie', '/api/pmis/download',
 })
 
@@ -425,6 +427,37 @@ def _save_risk_followup(store):
         os.replace(tmp, RISK_FOLLOWUP_FILE)
 
 
+# ── 回款重点跟进(/payment/key;V2.6.1):scope 条件 + current 跟进 + archives 快照(归档不清空 current) ──
+PAYKEY_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'payment_key_followup.json')
+_paykey_lock = threading.Lock()
+
+
+def _load_paykey_followup():
+    """加载回款重点跟进 store;缺文件/损坏 → 默认(new_store)。不抛。"""
+    if os.path.exists(PAYKEY_FOLLOWUP_FILE):
+        try:
+            with open(PAYKEY_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
+                store = json.load(f)
+            if isinstance(store, dict):
+                store.setdefault('version', 1)
+                store['scope'] = _paykey.normalize_scope(store.get('scope'))
+                store.setdefault('current', {})
+                store.setdefault('archives', [])
+                return store
+        except Exception:
+            pass
+    return _paykey.new_store()
+
+
+def _save_paykey_followup(store):
+    with _paykey_lock:
+        os.makedirs(os.path.dirname(PAYKEY_FOLLOWUP_FILE), exist_ok=True)
+        tmp = PAYKEY_FOLLOWUP_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(store, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, PAYKEY_FOLLOWUP_FILE)
+
+
 # ── 商机管理(V2.0.0) ──
 OPPORTUNITIES_FILE = os.path.join(BASE_DIR, 'data', 'opportunities.json')
 OPP_INPUT_NAMES = ('opportunities.xlsx', 'opportunitites.xlsx')  # 后者兼容用户原文笔误
@@ -583,6 +616,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_opportunity_followup_get()
         elif parsed.path == '/api/risk-followup':
             self.handle_risk_followup_get()
+        elif parsed.path == '/api/payment-key-followup':
+            self.handle_paykey_followup_get()
         elif parsed.path == '/api/opportunities':
             self.handle_opportunities_get()
         elif parsed.path == '/api/files/status':
@@ -702,6 +737,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_risk_followup_archive()
         elif parsed.path == '/api/risk-followup/archive/delete':
             self.handle_risk_followup_archive_delete()
+        elif parsed.path == '/api/payment-key-followup/scope':
+            self.handle_paykey_followup_scope()
+        elif parsed.path == '/api/payment-key-followup/update':
+            self.handle_paykey_followup_update()
+        elif parsed.path == '/api/payment-key-followup/archive':
+            self.handle_paykey_followup_archive()
+        elif parsed.path == '/api/payment-key-followup/archive/delete':
+            self.handle_paykey_followup_archive_delete()
         elif parsed.path == '/api/opportunities/create':
             self.handle_opportunities_create()
         elif parsed.path == '/api/opportunities/update':
@@ -1417,6 +1460,92 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             if not _riskfu.apply_archive_delete(store, idx):
                 self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
             _save_risk_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+
+    def handle_paykey_followup_get(self):
+        """GET /api/payment-key-followup — {scope, current, archives}。任意登录用户(范围/筛选前端算)。"""
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        try:
+            store = _load_paykey_followup()
+            self._json_response({"success": True, "scope": store.get("scope"),
+                                 "current": store.get("current", {}), "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取回款重点跟进失败: {e}"))
+
+    def handle_paykey_followup_scope(self):
+        """POST /api/payment-key-followup/scope {combinator, groups} — 保存范围。超管专属(_authz_gate 拦)。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            store = _load_paykey_followup()
+            store['scope'] = _paykey.normalize_scope(data)
+            _save_paykey_followup(store)
+            self._json_response({"success": True, "scope": store['scope']})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+    def handle_paykey_followup_update(self):
+        """POST /api/payment-key-followup/update {projectId, field, content} — 编辑跟进单格。任意登录用户。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        pid = str(data.get('projectId') or '').strip()
+        field = data.get('field')
+        if not pid or field not in _paykey.PROGRESS_FIELDS:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 followAction/revConclusion/nextRevDate"))
+            return
+        try:
+            store = _load_paykey_followup()
+            rec = _paykey.apply_update(store, pid, field, str(data.get('content') or ''),
+                                       account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_paykey_followup(store)
+            self._json_response({"success": True, "record": rec})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"保存跟进失败: {e}"))
+
+    def handle_paykey_followup_archive(self):
+        """POST /api/payment-key-followup/archive {rows} — 归档快照,保留 current。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        rows = data.get('rows')
+        if not isinstance(rows, list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
+            return
+        try:
+            store = _load_paykey_followup()
+            _paykey.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            _save_paykey_followup(store)
+            self._json_response({"success": True, "archives": store.get("archives", [])})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+
+    def handle_paykey_followup_archive_delete(self):
+        """POST /api/payment-key-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        idx = data.get('archiveIdx')
+        if not isinstance(idx, int) or idx < 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        try:
+            store = _load_paykey_followup()
+            if not _paykey.apply_archive_delete(store, idx):
+                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+            _save_paykey_followup(store)
             self._json_response({"success": True, "archives": store.get("archives", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
