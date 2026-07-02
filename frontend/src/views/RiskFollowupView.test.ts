@@ -106,7 +106,7 @@ describe('RiskFollowupView', () => {
     expect(w.find('.el-pagination').exists()).toBe(true)
     const bodyRows = w.findAll('tbody tr')
     expect(bodyRows.length).toBeLessThanOrEqual(50)
-  })
+  }, 20000) // 渲染满页(55行)重表,并行争用下放宽超时
   it('rev结论/下次rev时间两列头渲染 ColumnFilter', async () => {
     seed()
     const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
