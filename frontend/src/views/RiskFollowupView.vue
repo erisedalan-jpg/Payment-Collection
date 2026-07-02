@@ -220,12 +220,12 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
           <span v-else>{{ (row as RiskRow).nextRevDate || '-' }}</span>
         </template>
       </DataTable>
-      <div v-if="filtered.length" class="kp-pager">
-        <span class="u-num">共 {{ filtered.length }} 条</span>
-        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-          :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
-          layout="sizes, prev, pager, next" size="small" background />
-      </div>
+    </div>
+    <div v-if="ready && filtered.length" class="kp-pager">
+      <span class="u-num">共 {{ filtered.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        layout="sizes, prev, pager, next" size="small" background />
     </div>
 
     <ProgressEditModal v-model="editOpen" store="riskFollowup"
