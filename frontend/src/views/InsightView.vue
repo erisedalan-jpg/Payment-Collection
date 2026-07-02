@@ -173,7 +173,7 @@ defineExpose({ selectedTags })
       <span class="iv-dims-label">列维度</span><DimPicker v-model="colDims" :options="DIM_OPTS" />
     </div>
 
-    <div v-if="!rows.length" class="iv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
+    <div v-if="!rows.length" class="iv-empty">{{ (data.data?.projects?.length && selectedTags.length) ? '无匹配所选标签的项目。' : '暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。' }}</div>
 
     <template v-else>
       <template v-if="mode === 'rank'">
