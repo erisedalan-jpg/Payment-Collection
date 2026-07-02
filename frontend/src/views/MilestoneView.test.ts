@@ -12,6 +12,7 @@ import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import { useDataStore } from '@/stores/data'
+import { NO_TAG_VALUE } from '@/lib/tagFilter'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectTagsStore } from '@/stores/projectTags'
 
@@ -145,7 +146,7 @@ describe('MilestoneView 标签筛选(仅三表)', () => {
     tags.load = vi.fn().mockResolvedValue(undefined)
     tags.assignments = { A: ['重点'] }
     const w = mount(MilestoneView, opts)
-    ;(w.vm as any).selectedTags = ['__NO_TAG__']
+    ;(w.vm as any).selectedTags = [NO_TAG_VALUE]
     await w.vm.$nextTick()
     expect((w.vm as any).mpsFiltered.length).toBe(1)
     expect((w.vm as any).mpsFiltered[0].projectId).toBe('B')
