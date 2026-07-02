@@ -10,7 +10,7 @@ const options = computed(() => tagFilterOptions(tags.activeTags))
 
 <template>
   <el-select v-model="model" multiple collapse-tags clearable placeholder="标签筛选"
-    size="small" style="min-width: 160px" data-test="tag-filter">
+    size="small" style="width: 140px" data-test="tag-filter">
     <el-option v-for="o in options" :key="o.value" :label="o.label" :value="o.value" />
   </el-select>
 </template>
