@@ -50,4 +50,21 @@ describe('viewReturn', () => {
     expect(isKeepAliveRoute(undefined)).toBe(false)
     expect(isKeepAliveRoute(123)).toBe(false)
   })
+
+  it('经非详情中转页后从无关详情返回列表:重置(armed 已作废,不误判返回)', () => {
+    trackNavigation('project-detail', 'projects') // /projects 下钻,armed=projects
+    trackNavigation('overview', 'project-detail') // 去首页(非 keep-alive、非详情)→ armed 作废
+    trackNavigation('project-detail', 'overview')  // 首页点某项目进详情(from 非列表,不重新登记)
+    const k0 = viewKey('projects')
+    trackNavigation('projects', 'project-detail')  // 菜单回 /projects
+    expect(viewKey('projects')).not.toBe(k0)       // 应重置(token+1),非误判为返回
+  })
+
+  it('detail→detail 连跳后返回列表仍保持(中转是详情,armed 不作废)', () => {
+    trackNavigation('project-detail', 'projects') // armed=projects
+    trackNavigation('project-detail', 'project-detail') // 详情A→详情B(to 是详情,不清 armed)
+    const k0 = viewKey('projects')
+    trackNavigation('projects', 'project-detail') // 返回
+    expect(viewKey('projects')).toBe(k0)          // 保持(token 不变)
+  })
 })
