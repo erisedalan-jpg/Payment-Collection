@@ -6,9 +6,10 @@ import ClosedProjectsView from './ClosedProjectsView.vue'
 import KeyProjectsView from './KeyProjectsView.vue'
 import TempFollowupView from './TempFollowupView.vue'
 import MilestoneView from './MilestoneView.vue'
+import PaymentKeyFollowupView from './PaymentKeyFollowupView.vue'
 
 const comps: Record<string, { name?: string }> = {
-  ProjectsView, CostDetailView, ClosedProjectsView, KeyProjectsView, TempFollowupView, MilestoneView,
+  ProjectsView, CostDetailView, ClosedProjectsView, KeyProjectsView, TempFollowupView, MilestoneView, PaymentKeyFollowupView,
 }
 
 describe('目标视图组件 name 与 KEEPALIVE_COMPONENTS 一致', () => {
