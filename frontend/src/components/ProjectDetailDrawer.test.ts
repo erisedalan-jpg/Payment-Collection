@@ -96,3 +96,46 @@ describe('查看完整详情入口', () => {
     expect(btn.exists()).toBe(false)
   })
 })
+
+describe('抽屉宽度', () => {
+  it('size 为 900px', async () => {
+    const ds = useDataStore()
+    ds.data = { paymentNodes, projects } as any
+    useProjectDetailStore().open('P1')
+    const w = mountDrawer()
+    await flushPromises()
+    const drawer = w.findComponent(DrawerStub)
+    expect(drawer.props('size')).toBe('900px')
+  })
+})
+
+describe('无回款阶段项目特殊态', () => {
+  it('主域项目 paymentNodes 为空数组 → 显示占位文案 + 查看完整详情按钮，不渲染节点表，点击跳详情页', async () => {
+    const ds = useDataStore()
+    ds.data = { paymentNodes: { P1: [] }, projects } as any
+    const pd = useProjectDetailStore()
+    pd.open('P1')
+    const router = makeRouter()
+    const push = vi.spyOn(router, 'push')
+    const w = mountDrawer(router)
+    await flushPromises()
+    expect(w.text()).toContain('该项目无回款阶段数据')
+    expect(w.text()).not.toContain('回款节点明细')
+    expect(w.text()).not.toContain('未找到该项目数据')
+    const btn = w.find('.pd-full-link')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    expect(push).toHaveBeenCalledWith('/project/P1')
+    expect(useProjectDetailStore().openId).toBeNull()
+  })
+
+  it('有节点的主域项目正常渲染节点明细，不显示无阶段占位文案', async () => {
+    const ds = useDataStore()
+    ds.data = { paymentNodes, projects } as any
+    useProjectDetailStore().open('P1')
+    const w = mountDrawer()
+    await flushPromises()
+    expect(w.text()).not.toContain('该项目无回款阶段数据')
+    expect(w.text()).toContain('回款节点明细（2）')
+  })
+})

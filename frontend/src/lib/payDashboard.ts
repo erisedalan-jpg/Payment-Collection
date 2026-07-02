@@ -26,6 +26,8 @@ export function filterPayNodes(rows: PayNodeRow[], opts: PayNodeFilterOpts): Pay
 export interface PayDashSummary {
   relatedNodeCount: number
   totalProjects: number
+  totalAll: number
+  noStageCount: number
   totalExpected: number
   totalActual: number
   totalRemaining: number
@@ -44,6 +46,8 @@ export function payDashSummary(
   end = '',
 ): PayDashSummary {
   const inScope = filterProjects(projects, opts)
+  const totalAll = inScope.length
+  const noStageCount = inScope.filter((p) => !(paymentNodes?.[p.projectId]?.length)).length
   const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, start, end), 0)
   // 完成率分母:选了日期区间时只算区间内有回款活动的项目合同(与分子同范围,避免窄区间下分母不缩、完成率被压低);
   // 全部(start=end='')时保持 Σ全 inScope 合同不变(基线不动)。
@@ -58,6 +62,8 @@ export function payDashSummary(
   return {
     relatedNodeCount: rows.length,
     totalProjects,
+    totalAll,
+    noStageCount,
     totalExpected, totalActual, totalRemaining,
     rate: totalContract > 0 ? totalActual / totalContract : 0,
     delayedProjects: delayedPids.size,
@@ -195,4 +201,29 @@ export function payQuarterlyTrend(rows: PayNodeRow[], start: string, end: string
 }
 export function payMonthlyTrend(rows: PayNodeRow[], start: string, end: string): PeriodSeries {
   return buildPaySeries(rows, (m) => m, fillKeysFromRange(start, end, 'month'))
+}
+
+export interface NoStageRow {
+  projectId: string
+  projectName: string
+  projectManager: string
+  orgL4: string
+  contractWan: number
+}
+
+/** 在建主域(经视角/排除)中 paymentNodes 为空数组的项目 → 清单行。合同额转万。 */
+export function noStageProjects(
+  projects: Project[],
+  paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
+  opts: ProjFilterOpts,
+): NoStageRow[] {
+  return filterProjects(projects, opts)
+    .filter((p) => !(paymentNodes?.[p.projectId]?.length))
+    .map((p) => ({
+      projectId: p.projectId,
+      projectName: p.projectName || p.projectId,
+      projectManager: (p.projectManager ?? '').trim() || '未指定',
+      orgL4: (p.orgL4 ?? '').trim() || '未指定',
+      contractWan: (p.paymentPmis?.contract ?? 0) / 10000,
+    }))
 }

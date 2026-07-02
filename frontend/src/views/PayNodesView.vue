@@ -1,20 +1,33 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { usePagedRows } from '@/lib/usePagedRows'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
+import { useProjectTagsStore } from '@/stores/projectTags'
+import { useCrossFilterStore } from '@/stores/crossFilter'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
-import SegToggle from '@/components/SegToggle.vue'
+import ColumnFilter from '@/components/ColumnFilter.vue'
+import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
-import { paymentNodeRows, nodeSummary, filterProjects, PAY_FACET_DIMS } from '@/lib/paymentPmis'
+import { paymentNodeRows, nodeSummary, filterProjects } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
+import { applyColumnFilters } from '@/lib/crossFilter'
+import { tagMatch } from '@/lib/tagFilter'
+import { exportRows } from '@/lib/exportXlsx'
 
-const dim = ref<'dept' | 'stage' | 'tier' | 'progress'>('dept')
-const DIM_OPTS = PAY_FACET_DIMS.map((d) => ({ value: d.key, label: d.label }))
+defineOptions({ name: 'PayNodesView' })
+
+const TABLE_ID = 'pay-nodes'
 const data = useDataStore()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()
+const tags = useProjectTagsStore()
+const cf = useCrossFilterStore()
+
+onMounted(() => { if (!tags.tags.length) tags.load() })
+// 进页先清空本表残留列筛选，避免跨导航叠加
+cf.clearAll(TABLE_ID)
 
 const rows = computed(() => {
   const ps = filterProjects(data.data?.projects ?? [], {
@@ -28,48 +41,68 @@ const rows = computed(() => {
   // 按计划日∈区间过滤（全部区间时 inRange 恒真）
   return allNodes.filter((n) => inRange(n.planDate, filter.dateStart, filter.dateEnd))
 })
+// 5 卡口径 = 区间过滤后全集（不随主表列筛选/标签筛选/排序变化，保持既有语义）
 const sum = computed(() => nodeSummary(rows.value))
-const { paged, currentPage, pageSize } = usePagedRows(rows, 50)
-
-// 按选中维度分组（spec §3：节点 tab 可按维度分组；维度已 join 到节点所属项目）
-// 维度 key 'stage' 取项目阶段字段 projStage（区别于节点阶段名 stage）
-const dimField = computed(() => (dim.value === 'stage' ? 'projStage' : dim.value))
-const dimLabel = computed(() => PAY_FACET_DIMS.find((d) => d.key === dim.value)?.label ?? '维度')
-const byDim = computed(() => {
-  const m: Record<string, { count: number; reached: number; delayed: number; pending: number; exp: number }> = {}
-  for (const r of rows.value) {
-    const key = String((r as Record<string, any>)[dimField.value] ?? '未指定')
-    const g = (m[key] ||= { count: 0, reached: 0, delayed: 0, pending: 0, exp: 0 })
-    g.count++
-    if (r.status === '已回款') g.reached++
-    else if (r.status === '延期') g.delayed++
-    else g.pending++
-    g.exp += r.expectedPayment
-  }
-  return Object.entries(m)
-    .map(([value, v]) => ({ value, ...v }))
-    .sort((a, b) => b.count - a.count)
-})
 
 const COLS: DataColumn[] = [
-  { key: 'projectName', label: '项目' },
-  { key: 'stage', label: '阶段' },
-  { key: 'planDate', label: '计划日' },
-  { key: 'actualDate', label: '实际日' },
-  { key: 'payRatio', label: '计划比例', formatter: (v) => fmtRatio(v) },
-  { key: 'expectedPayment', label: '计划金额(万)', sortable: true, formatter: (v) => fmtWan(v) },
-  { key: 'status', label: '状态' },
+  { key: 'projectName', label: '项目', wrap: true, sortable: true },
+  { key: 'projectManager', label: '项目经理', width: 100, sortable: true },
+  { key: 'dept', label: 'L4组', width: 110, sortable: true },
+  { key: 'stage', label: '阶段', width: 100, sortable: true },
+  { key: 'planDate', label: '计划日', width: 110, sortable: true },
+  { key: 'actualDate', label: '实际日', width: 110, sortable: true },
+  { key: 'payRatio', label: '计划比例', width: 100, num: true, sortable: true, formatter: (v) => fmtRatio(v) },
+  { key: 'expectedPayment', label: '计划金额(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
+  { key: 'status', label: '状态', width: 100, sortable: true },
 ]
 const STATUS_CLASS: Record<string, string> = { 已回款: 'st-ok', 延期: 'st-danger', 待回款: 'st-warn', 部分回款: 'st-warn', 质保期: 'st-warn' }
+// 枚举列可列头多选筛选
+const FILTERABLE = new Set(['projectManager', 'dept', 'stage', 'status'])
+// 数值列排序按数值，其余按中文 localeCompare
+const NUMERIC_KEYS = new Set(['payRatio', 'expectedPayment'])
+
+const selectedTags = ref<string[]>([])
+
+// 列头多选筛选 → 标签筛选
+const filtered = computed(() => {
+  const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
+  return colFiltered.filter((r) => tagMatch(tags.assignments[r.projectId] ?? [], selectedTags.value))
+})
+
+// 表头排序（custom，跨页排全集）
+const sortState = ref<{ prop: string; order: '' | 'asc' | 'desc' }>({ prop: '', order: '' })
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }) {
+  sortState.value = {
+    prop: prop || '',
+    order: order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : '',
+  }
+}
+const sorted = computed(() => {
+  const { prop, order } = sortState.value
+  if (!prop || !order) return filtered.value
+  const dir = order === 'asc' ? 1 : -1
+  const isNum = NUMERIC_KEYS.has(prop)
+  return [...filtered.value].sort((a, b) => {
+    const x = (a as any)[prop], y = (b as any)[prop]
+    if (isNum) return ((Number(x) || 0) - (Number(y) || 0)) * dir
+    return String(x ?? '').localeCompare(String(y ?? ''), 'zh') * dir
+  })
+})
+
+const { paged, currentPage, pageSize } = usePagedRows(sorted, 50)
+
 function onRow(row: Record<string, any>) { pd.open(row.projectId) }
+function onExport() {
+  exportRows('回款节点.xlsx', sorted.value.map((r) => ({
+    项目: r.projectName, 项目经理: r.projectManager, L4组: r.dept, 阶段: r.stage,
+    计划日: r.planDate, 实际日: r.actualDate, 计划比例: fmtRatio(r.payRatio), 计划金额万: fmtWan(r.expectedPayment),
+    状态: r.status,
+  })))
+}
 </script>
 
 <template>
   <div class="nodes-tab">
-    <div class="pv-ctl">
-      <span class="pv-label">维度</span>
-      <SegToggle v-model="dim" :options="DIM_OPTS" />
-    </div>
     <section class="nsum u-num">
       <div class="ns"><span class="ns-l">节点总数</span><span class="ns-v">{{ sum.total }}</span></div>
       <div class="ns"><span class="ns-l">已回款</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></div>
@@ -77,52 +110,41 @@ function onRow(row: Record<string, any>) { pd.open(row.projectId) }
       <div class="ns"><span class="ns-l">待回款</span><span class="ns-v" style="color:var(--warn-text)">{{ sum.pending }}</span></div>
       <div class="ns"><span class="ns-l">计划回款Σ(万)</span><span class="ns-v">{{ fmtWan(sum.expectedTotal) }}</span></div>
     </section>
-    <section class="dim-summary">
-      <div class="ds-head">{{ dimLabel }}分组</div>
-      <table class="ds-table u-num">
-        <thead>
-          <tr><th>{{ dimLabel }}</th><th>节点数</th><th>已回款</th><th>延期</th><th>待回款</th><th>计划回款Σ(万)</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="g in byDim" :key="g.value">
-            <td class="ds-val">{{ g.value }}</td>
-            <td>{{ g.count }}</td>
-            <td style="color:var(--ok-text)">{{ g.reached }}</td>
-            <td style="color:var(--danger-text)">{{ g.delayed }}</td>
-            <td style="color:var(--warn-text)">{{ g.pending }}</td>
-            <td>{{ fmtWan(g.exp) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-    <DataTable :columns="COLS" :rows="paged" clickable @row-click="onRow">
-      <template #cell-status="{ value }">
-        <span class="st-badge" :class="STATUS_CLASS[value] || 'st-warn'">{{ value }}</span>
-      </template>
-    </DataTable>
-    <div v-if="rows.length" class="pn-pager">
-      <span class="u-num">共 {{ rows.length }} 条</span>
+    <div class="pv-bar">
+      <TagFilterSelect v-model="selectedTags" />
+      <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
+      <button class="pv-btn" data-test="pay-nodes-export" @click="onExport">导出Excel</button>
+    </div>
+    <div class="pv-scroll">
+      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable external-sort
+        @row-click="onRow" @sort-change="onSortChange">
+        <template v-for="col in COLS" :key="col.key" #[`header-${col.key}`]="{ col: c }">
+          <span class="pv-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>
+        </template>
+        <template #cell-status="{ value }">
+          <span class="st-badge" :class="STATUS_CLASS[value] || 'st-warn'">{{ value }}</span>
+        </template>
+      </DataTable>
+    </div>
+    <div v-if="sorted.length" class="pn-pager">
+      <span class="u-num">共 {{ sorted.length }} 条</span>
       <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]" :total="rows.length"
+        :page-sizes="[20, 50, 80, 100]" :total="sorted.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
   </div>
 </template>
 
 <style scoped>
-.pv-ctl { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--gap-card); }
-.pv-label { font-size: var(--fs-1); color: var(--mut); }
 .nsum { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--gap-card); margin-bottom: var(--gap-section); }
-.dim-summary { margin-bottom: var(--gap-section); }
-.ds-head { font-size: var(--fs-2); color: var(--sub); margin-bottom: var(--sp-2); }
-.ds-table { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
-.ds-table th, .ds-table td { border: 1px solid var(--line); padding: 8px 12px; text-align: right; }
-.ds-table th:first-child, .ds-table td.ds-val { text-align: left; }
-.ds-table th { background: var(--card2); color: var(--sub); font-weight: 600; }
-.ds-table td { color: var(--txt); }
 .ns { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); display: flex; flex-direction: column; gap: var(--sp-1); }
 .ns-l { font-size: var(--fs-1); color: var(--mut); }
 .ns-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); }
+.pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.pv-th { display: inline-flex; align-items: center; }
+.pv-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
+.pv-btn:hover { background: var(--bg); color: var(--accent); }
+.pv-scroll { overflow-x: auto; }
 .st-badge { padding: 2px 8px; border-radius: var(--r-sm); font-size: var(--fs-1); }
 .st-ok { background: var(--ok-bg); color: var(--ok-text); }
 .st-danger { background: var(--danger-bg); color: var(--danger-text); }

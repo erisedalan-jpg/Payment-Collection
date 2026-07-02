@@ -1,20 +1,12 @@
 // 侧边栏导航配置（取代旧版散落的内联 onclick）
 import type { PageKey } from '@/lib/pageAccess'
 export interface NavLink { label: string; to: string; key: PageKey }
-export interface TierTab { label: string; tab: string }
 export interface TierOpt { label: string; slug: string; color: string }
 
 export const TIERS: TierOpt[] = [
   { label: '100万以上', slug: 'above1m', color: 'var(--danger)' },
   { label: '50-100万', slug: '50to100', color: 'var(--warn)' },
   { label: '50万以下', slug: 'below50', color: 'var(--ok)' },
-]
-
-export const TIER_TABS: TierTab[] = [
-  { label: '项目总览', tab: 'projects' },
-  { label: '回款节点', tab: 'nodes' },
-  { label: '回款进度', tab: 'plan' },
-  { label: '风险项目', tab: 'risk' },
 ]
 
 // 项目主域（P2 起逐期补全：P3 项目动态 /activity、P4 项目总览 /、子项目2 已关闭项目）
@@ -45,14 +37,11 @@ export const KEY_FOLLOWUP_LINKS: NavLink[] = [
   { label: '风险跟进', to: '/risk', key: 'risk-followup' },
 ]
 
-// 回款重点子域（SP4 拆分；V1.16.0 board/calendar 迁出至项目分析中心）
+// 回款重点子域（SP4 拆分；V1.16.0 board/calendar 迁出至项目分析中心；P1 删 plan/risk/ledger 三页）
 export const PAYMENT_LINKS: NavLink[] = [
   { label: '回款总览', to: '/payment', key: 'payment' },
   { label: '回款项目', to: '/payment/projects', key: 'payment-projects' },
   { label: '回款节点', to: '/payment/nodes', key: 'payment-nodes' },
-  { label: '回款进度', to: '/payment/plan', key: 'payment-plan' },
-  { label: '风险项目', to: '/payment/risk', key: 'payment-risk' },
-  { label: '回款台账', to: '/ledger', key: 'ledger' },
 ]
 
 export const TOOL_LINKS: NavLink[] = [
