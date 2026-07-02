@@ -14,9 +14,8 @@ afterEach(() => vi.unstubAllGlobals())
 
 const stubs = {
   DashMetrics: { template: '<div class="dash-metrics"></div>' },
-  PaymentL4Table: { template: '<div class="pl4"><h3 class="pl4-title">回款数据（按 L4 服务组）</h3></div>' },
-  TrendCard: { template: '<div class="trend-card"></div>' },
-  OrgRanking: { template: '<div class="org-ranking"></div>' },
+  PaymentL4Table: { template: '<div class="pl4"><h3 class="pl4-title">回款数据</h3></div>' },
+  NoStageProjectsTable: { template: '<div class="nsp">无回款阶段数据项目</div>' },
 }
 
 function seedData() {
@@ -34,15 +33,15 @@ function seedData() {
 }
 
 describe('DashboardView', () => {
-  it('渲染指标 + 回款数据表格 + 趋势 + 排名', async () => {
+  it('渲染指标 + 回款数据表格 + 无回款阶段数据项目清单', async () => {
     seedData()
     const w = mount(DashboardView, { global: { stubs } })
     await flushPromises()
     expect(w.find('.dash-metrics').exists()).toBe(true)
     expect(w.find('.pl4').exists()).toBe(true)
-    expect(w.text()).toContain('回款数据（按 L4')
-    expect(w.find('.trend-card').exists()).toBe(true)
-    expect(w.find('.org-ranking').exists()).toBe(true)
+    expect(w.text()).toContain('回款数据')
+    expect(w.find('.nsp').exists()).toBe(true)
+    expect(w.text()).toContain('无回款阶段数据项目')
   })
 
   it('不含 TierStrip（金额档位组件不出现）', async () => {
@@ -55,23 +54,33 @@ describe('DashboardView', () => {
     expect(w.text()).not.toContain('万以下')
   })
 
-  it('TrendCard 与 OrgRanking 同在 .dash-grid 下', async () => {
+  it('删除 TrendCard/OrgRanking 两卡与 .dash-grid 两列容器', async () => {
     seedData()
     const w = mount(DashboardView, { global: { stubs } })
     await flushPromises()
-    const grid = w.find('.dash-grid')
-    expect(grid.exists()).toBe(true)
-    expect(grid.find('.trend-card').exists()).toBe(true)
-    expect(grid.find('.org-ranking').exists()).toBe(true)
+    expect(w.find('.dash-grid').exists()).toBe(false)
+    expect(w.find('.trend-card').exists()).toBe(false)
+    expect(w.find('.org-ranking').exists()).toBe(false)
+    expect(w.text()).not.toContain('服务组达成排名')
+    expect(w.text()).not.toContain('待回款金额')
   })
 
-  it('PaymentL4Table 在 .dash-block 区块内（整宽独占）', async () => {
+  it('PaymentL4Table 标题改为「回款数据」（不含「按 L4 服务组」）', async () => {
     seedData()
     const w = mount(DashboardView, { global: { stubs } })
     await flushPromises()
-    const block = w.find('.dash-block')
-    expect(block.exists()).toBe(true)
-    expect(block.find('.pl4').exists()).toBe(true)
+    expect(w.text()).toContain('回款数据')
+    expect(w.text()).not.toContain('回款数据（按 L4 服务组）')
+  })
+
+  it('PaymentL4Table 与 NoStageProjectsTable 均在各自 .dash-block 区块内（整宽独占）', async () => {
+    seedData()
+    const w = mount(DashboardView, { global: { stubs } })
+    await flushPromises()
+    const blocks = w.findAll('.dash-block')
+    expect(blocks.length).toBe(2)
+    expect(blocks[0].find('.pl4').exists()).toBe(true)
+    expect(blocks[1].find('.nsp').exists()).toBe(true)
   })
 
   it('渲染加载态', () => {
