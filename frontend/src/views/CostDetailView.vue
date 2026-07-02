@@ -20,6 +20,10 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { useDeferredMount } from '@/lib/useDeferredMount'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'CostDetailView' })
+useViewScrollMemory()
 
 const TABLE_ID = 'cost-detail'
 const data = useDataStore()

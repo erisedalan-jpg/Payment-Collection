@@ -22,6 +22,10 @@ import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import { useDeferredMount } from '@/lib/useDeferredMount'
+import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+
+defineOptions({ name: 'MilestoneView' })
+useViewScrollMemory()
 
 const data = useDataStore()
 const filter = useFilterStore()
