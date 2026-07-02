@@ -11,7 +11,8 @@ export function excelDate(v: unknown): string | null {
   if (n !== null && n > 40000 && n < 60000) {
     const d = new Date(Math.round((n - 25569) * 86400000))
     if (!isNaN(d.getTime())) {
-      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      // 用 UTC getter 读:序列号换算出的是 UTC 零点,与进程时区无关(避免 UTC-偏移环境回退一天)
+      return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0')
     }
   }
   return null
