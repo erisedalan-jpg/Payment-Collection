@@ -255,6 +255,17 @@ describe('projectPaymentRows / summaryByDim', () => {
   })
 })
 
+describe('projectPaymentRows projectLevel（3E，供 /payment/projects 表格化用）', () => {
+  it('取 pmisMap[pid].status.项目级别；缺失/空 → \'-\'', () => {
+    const rows = projectPaymentRows(
+      [proj({ projectId: 'A' }), proj({ projectId: 'B' })],
+      { A: { status: { 项目级别: 'P1' } } as ProjectPmis },
+    )
+    expect(rows.find((r) => r.projectId === 'A')!.projectLevel).toBe('P1')
+    expect(rows.find((r) => r.projectId === 'B')!.projectLevel).toBe('-')
+  })
+})
+
 describe('paymentNodeRows（扁平化 + 维度 join 到所属项目）', () => {
   const projects = [
     proj({ projectId: 'A', projectName: '甲', orgL4: '组1',

@@ -79,6 +79,7 @@ export interface PayProjectRow {
   projectManager: string
   orgL4: string
   dept: string
+  projectLevel: string
   stage: string
   tier: string
   progress: string
@@ -110,6 +111,7 @@ export function projectPaymentRows(
     const contract = pm?.contract ?? 0
     const dept = deriveDept(p)
     const tier = deriveTier(pm?.contract)
+    const projectLevel = String((pmisMap?.[p.projectId]?.status as Record<string, unknown> | undefined)?.['项目级别'] ?? '').trim() || '-'
 
     const rp = paymentPmisInRange(
       contract,
@@ -126,6 +128,7 @@ export function projectPaymentRows(
       projectManager: (p.projectManager ?? '').trim() || '未指定',
       orgL4: dept,
       dept,
+      projectLevel,
       stage: deriveStage(p.projectId, pmisMap),
       tier,
       progress,
