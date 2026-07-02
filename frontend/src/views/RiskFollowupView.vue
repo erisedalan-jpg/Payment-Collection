@@ -50,6 +50,10 @@ const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filt
 const currentRows = computed<RiskRow[]>(() => scopedRows.value)
 const rows = computed<RiskRow[]>(() => isCurrent.value ? currentRows.value : ((risk.archives[historyIdx.value]?.rows ?? []) as RiskRow[]))
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as RiskRow[])
+const pageSize = ref(50)
+const currentPage = ref(1)
+const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+watch(filtered, () => { currentPage.value = 1 })
 
 // —— 列模型:风险列(动态) + 项目列(固定) + 跟进列 ——
 const PROJECT_COLS: DataColumn[] = [
@@ -91,7 +95,7 @@ const ALL_COLUMNS = computed<DataColumn[]>(() => [...riskCols.value, ...PROJECT_
 const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
-const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户'])
+const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户', 'revConclusion', 'nextRevDate'])
 const prefs = useColumnPrefsDynamic(TABLE_ID, allKeys, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
@@ -168,7 +172,7 @@ function doExport() {
   exportOpen.value = false
 }
 
-defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, exportSel, allSelected, datasetOpts, toggleAllExport, allRows, scopedRows, hasScope, allKeys, prefs })
+defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, exportSel, allSelected, datasetOpts, toggleAllExport, allRows, scopedRows, hasScope, allKeys, prefs, FILTERABLE, filtered, paged, currentPage, pageSize })
 </script>
 
 <template>
@@ -194,7 +198,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
     <div v-if="!rows.length" class="kp-empty">暂无风险数据。</div>
     <div v-else-if="!ready" class="kp-defer"><el-skeleton :rows="10" animated /></div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
@@ -216,6 +220,12 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
           <span v-else>{{ (row as RiskRow).nextRevDate || '-' }}</span>
         </template>
       </DataTable>
+    </div>
+    <div v-if="ready && filtered.length" class="kp-pager">
+      <span class="u-num">共 {{ filtered.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        layout="sizes, prev, pager, next" size="small" background />
     </div>
 
     <ProgressEditModal v-model="editOpen" store="riskFollowup"
@@ -260,6 +270,8 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, scopeOpen, export
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .kp-label { font-size: var(--fs-1); color: var(--sub); }
 .kp-scroll { overflow-x: auto; }
+.kp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 .kp-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .kp-empty { padding: var(--sp-5); color: var(--mut); text-align: center; }
 .kp-defer { padding: var(--sp-4); min-height: 360px; }

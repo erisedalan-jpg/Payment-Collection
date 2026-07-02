@@ -52,6 +52,11 @@ const rows = computed<OppFollowupRow[]>(() =>
   isCurrent.value ? inScopeRows.value : ((oppf.archives[historyIdx.value]?.rows ?? []) as OppFollowupRow[]))
 const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as OppFollowupRow[])
 
+const pageSize = ref(50)
+const currentPage = ref(1)
+const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+watch(filtered, () => { currentPage.value = 1 })
+
 function oppToDataColumn(c: OppColumn): DataColumn {
   const base: DataColumn = { key: c.key, label: c.label, width: c.width, wrap: c.wrap, sortable: c.sortable }
   if (c.type === 'number')
@@ -172,7 +177,7 @@ defineExpose({ scopeOpen, mode, historyIdx, isCurrent, editOpen, editCtx, inScop
       {{ auth.isSuper ? '请点击「范围设置」定义重点商机跟进范围（默认：TOP1000 且 提前介入 且 重点商机 且 状态非赢单）。' : '暂无重点商机跟进。' }}
     </div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="filtered" :show-count="false">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
@@ -188,6 +193,13 @@ defineExpose({ scopeOpen, mode, historyIdx, isCurrent, editOpen, editCtx, inScop
             @click.stop="openEdit(row as OppFollowupRow, 'nextPlan')">{{ progCell(row as OppFollowupRow, 'nextPlan') }}</span>
         </template>
       </DataTable>
+    </div>
+
+    <div v-if="filtered.length" class="kp-pager">
+      <span class="u-num">共 {{ filtered.length }} 条</span>
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        layout="sizes, prev, pager, next" size="small" background />
     </div>
 
     <ProgressEditModal v-model="editOpen" store="oppFollowup"
@@ -239,4 +251,6 @@ defineExpose({ scopeOpen, mode, historyIdx, isCurrent, editOpen, editCtx, inScop
   font-size: var(--fs-1); border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 2px 10px; cursor: pointer; background: var(--card2); color: var(--accent); }
 .kp-archive-btn:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
+.kp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>
