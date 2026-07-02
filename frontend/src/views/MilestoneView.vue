@@ -16,11 +16,13 @@ import { STATUS_LIGHT, STATUS_DARK, MUTED_LIGHT, MUTED_DARK, CHART_LIGHT, CHART_
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
+import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import MilestoneDrillModal from '@/components/MilestoneDrillModal.vue'
 import MilestoneStatusModal from '@/components/MilestoneStatusModal.vue'
 import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
+import { tagMatch } from '@/lib/tagFilter'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 
@@ -54,6 +56,10 @@ const mps = computed(() => buildMilestoneProjects(
 // 剔除控件（镜像 /data：开关 + 标签多选，写 filter.setExclude，全局持久化）
 const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => filter.setExclude(v, filter.excludeTags) })
 const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
+
+// 下方三表标签筛选（含无标签）：仅作用于三表，不影响 KPI/6 图（均仍读 mps）
+const selectedTags = ref<string[]>([])
+const mpsFiltered = computed(() => mps.value.filter((m) => tagMatch(projectTags.assignments[m.projectId] ?? [], selectedTags.value)))
 
 // KPI
 const kpi = computed(() => statusKpis(mps.value))
@@ -218,7 +224,7 @@ const DETAIL_TABS = [
   { value: 'reminder', label: '到期提醒' },
   { value: 'plan', label: '在建里程碑计划' },
 ]
-defineExpose({ faGran, onNodeClick, nodeYear })
+defineExpose({ faGran, onNodeClick, nodeYear, mps, mpsFiltered, selectedTags })
 </script>
 
 <template>
@@ -278,10 +284,13 @@ defineExpose({ faGran, onNodeClick, nodeYear })
       <MilestoneStatusModal v-model="statusOpen" :title="statusTitle" :rows="statusRows" />
 
       <div class="mv-detail">
-        <SegToggle v-model="detailTab" :options="DETAIL_TABS" />
-        <MilestoneDelayedTab v-if="detailTab === 'delayed'" :projects="mps" :now="now" />
-        <MilestoneReminderTab v-else-if="detailTab === 'reminder'" :projects="mps" :now="now" />
-        <MilestonePlanTab v-else :projects="mps" />
+        <div class="mv-detail-tools">
+          <SegToggle v-model="detailTab" :options="DETAIL_TABS" />
+          <TagFilterSelect v-model="selectedTags" />
+        </div>
+        <MilestoneDelayedTab v-if="detailTab === 'delayed'" :projects="mpsFiltered" :now="now" />
+        <MilestoneReminderTab v-else-if="detailTab === 'reminder'" :projects="mpsFiltered" :now="now" />
+        <MilestonePlanTab v-else :projects="mpsFiltered" />
       </div>
       </template>
     </template>
@@ -301,5 +310,5 @@ defineExpose({ faGran, onNodeClick, nodeYear })
 .mv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .mv-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
 .mv-detail { margin-top: var(--sp-4); }
-.mv-detail > :first-child { margin-bottom: var(--sp-3); }
+.mv-detail-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 </style>

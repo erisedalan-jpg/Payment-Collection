@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import InsightView from './InsightView.vue'
 import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
+import { NO_TAG_VALUE } from '@/lib/tagFilter'
 
 let router: Router
 beforeEach(() => {
   setActivePinia(createPinia())
+  // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+  useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
   router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -87,6 +91,28 @@ describe('InsightView', () => {
     await w.find('[data-test="seg-pivot"]').trigger('click')
     await flushPromises()
     expect(w.findComponent({ name: 'PivotTable' }).exists()).toBe(true)  // 默认行维 stage
+  })
+
+  it('标签筛选:控件存在,选中标签后排名分组随之收窄(整页联动,含无标签)', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.assignments = { 'P-1': ['重点'] }   // P-2/P-3 无标签
+    const w = await mountView()
+    expect(w.find('[data-test="tag-filter"]').exists()).toBe(true)
+
+    await w.find('[data-test="seg-health"]').trigger('click')
+    expect(w.text()).toContain('共 2 条')   // 未筛选:风险(P-1)+健康(P-2,P-3) 两组
+
+    ;(w.vm as any).selectedTags = ['重点']
+    await flushPromises()
+    expect(w.text()).toContain('共 1 条')   // 只剩 P-1(风险) 一组
+
+    ;(w.vm as any).selectedTags = [NO_TAG_VALUE]
+    await flushPromises()
+    expect(w.text()).toContain('共 1 条')   // 只剩 P-2/P-3(均健康) 一组,不含 P-1
+    const groupRows = w.findAll('.el-table__row')
+    expect(groupRows).toHaveLength(1)
+    expect(groupRows[0].text()).toContain('健康')
   })
 
   it('空项目空态', async () => {
