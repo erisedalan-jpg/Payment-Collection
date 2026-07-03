@@ -1,4 +1,5 @@
 import json
+import pmis
 import snapshots as S
 import snapshots
 
@@ -13,7 +14,7 @@ def _pmis():
             "progress": {"项目阶段": "项目执行", "里程碑进度状态": "正常"},
             "status": {"项目状态": "实施中", "是否暂停": False, "评级": "C"},
             "risk": {"未关闭风险数": 2},
-            "cost": {"超支": False, "消耗比": 0.3},
+            "cost": {"项目超支": False, "交付超支": False, "消耗比": 0.3},
         },
     }
 
@@ -30,6 +31,18 @@ def _nodes():
              "expectedPayment": 300000, "unpaidAmount": 300000, "status": "正常实施中"},
         ]
     }
+
+
+class TestOverspendContract:
+    def test_overspend_reads_derive_cost_key(self):
+        # derive_cost 真实产物直喂 build_snapshot：剩余预算<0 → 项目超支 True → snapshot.overspend True
+        cost = pmis.derive_cost({"项目总预算（元）": "1000000", "项目核算（元）": "1200000",
+                                 "剩余预算（元）": "-200000"}, {})
+        assert cost["项目超支"] is True and "超支" not in cost  # 契约:旧键不存在
+        pmis_map = {"P-1": {"cost": cost}}
+        snap = snapshots.build_snapshot("2026-06-11",
+                                        [{"projectId": "P-1", "projectName": "甲"}], pmis_map, {})
+        assert snap["projects"]["P-1"]["overspend"] is True
 
 
 class TestBuildSnapshot:
