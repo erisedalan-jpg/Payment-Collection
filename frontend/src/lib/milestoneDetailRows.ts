@@ -50,7 +50,9 @@ export function reminderRange(now: Date, preset: ReminderPreset): { start: strin
   const b = reminderBounds(now)
   if (preset === 'd7') return { start: b.today, end: b.d7 }
   if (preset === 'quarter') return { start: b.qs, end: b.qe }
-  return { start: b.today, end: ymd(new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())) }
+  const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate()
+  const lastDayNextMonth = new Date(y, mo + 2, 0).getDate()
+  return { start: b.today, end: ymd(new Date(y, mo + 1, Math.min(d, lastDayNextMonth))) }
 }
 
 export interface ReminderRow {
