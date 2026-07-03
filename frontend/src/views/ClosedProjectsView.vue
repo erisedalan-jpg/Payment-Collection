@@ -57,11 +57,8 @@ const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 
-// 关列时清其表头筛选(不变式)
-function onToggle(key: string) {
-  if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
-  prefs.toggle(key)
-}
+// 关列时清其表头筛选(不变式)：collapsed into useColumnPrefs.makeToggle
+const onToggle = prefs.makeToggle(cf, TABLE_ID)
 
 const pageSize = ref(50)
 const currentPage = ref(1)

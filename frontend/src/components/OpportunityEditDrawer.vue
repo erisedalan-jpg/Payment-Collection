@@ -65,15 +65,19 @@ watch(() => [props.row, props.mode], () => rebuildForm(props.row))
 async function onSave() {
   const fields: Record<string, any> = {}
   OPP_FIELDS.forEach((k) => { fields[k] = form[k] })
-  if (props.mode === 'create') {
-    await store.create(fields)
-    ElMessage.success('已新增')
-  } else {
-    if (!props.row) return
-    await store.update(props.row.id, fields)
-    ElMessage.success('已保存')
+  try {
+    if (props.mode === 'create') {
+      await store.create(fields)
+      ElMessage.success('已新增')
+    } else {
+      if (!props.row) return
+      await store.update(props.row.id, fields)
+      ElMessage.success('已保存')
+    }
+    emit('update:modelValue', false)
+  } catch (e) {
+    ElMessage.error('保存失败: ' + (e as Error).message)
   }
-  emit('update:modelValue', false)
 }
 
 defineExpose({ form, onSave, optionsFor, l4Locked })

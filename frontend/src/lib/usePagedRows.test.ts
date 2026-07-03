@@ -19,4 +19,13 @@ describe('usePagedRows', () => {
     await nextTick()
     expect(currentPage.value).toBe(1)
   })
+  it('pageSize 调大后 currentPage 钳位不越界空页', async () => {
+    const src = ref(Array.from({ length: 30 }, (_, i) => i))
+    const { paged, currentPage, pageSize } = usePagedRows(src, 10)
+    currentPage.value = 3           // 第 3 页(21..30)
+    pageSize.value = 20             // 总页数变 2,第 3 页越界
+    await nextTick()
+    expect(currentPage.value).toBeLessThanOrEqual(2)
+    expect(paged.value.length).toBeGreaterThan(0)   // 不是空页
+  })
 })

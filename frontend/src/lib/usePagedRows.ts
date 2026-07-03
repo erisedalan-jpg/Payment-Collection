@@ -9,5 +9,9 @@ export function usePagedRows<T>(source: Ref<T[]> | ComputedRef<T[]>, size = 50) 
     return source.value.slice(start, start + pageSize.value)
   })
   watch(source, () => { currentPage.value = 1 })
+  watch(pageSize, () => {
+    const maxPage = Math.max(1, Math.ceil(source.value.length / pageSize.value))
+    if (currentPage.value > maxPage) currentPage.value = maxPage
+  })
   return { paged, currentPage, pageSize }
 }

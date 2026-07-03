@@ -105,6 +105,17 @@ describe('filter excludedIds（按标签全局排除）', () => {
     f.setExclude(true, [])
     expect(f.excludedIds).toEqual({})
   })
+  it('localStorage 中 pa_exclude_tags 损坏(非合法 JSON) → 回退空数组,不抛异常', () => {
+    localStorage.setItem('pa_exclude_tags', '{not valid json')
+    expect(() => useFilterStore()).not.toThrow()
+    const f = useFilterStore()
+    expect(f.excludeTags).toEqual([])
+  })
+  it('localStorage 中 pa_exclude_tags 是合法 JSON 但非数组 → 回退空数组', () => {
+    localStorage.setItem('pa_exclude_tags', '{"a":1}')
+    const f = useFilterStore()
+    expect(f.excludeTags).toEqual([])
+  })
 })
 
 describe('filteredPayNodes(3B)', () => {

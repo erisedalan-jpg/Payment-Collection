@@ -49,4 +49,24 @@ describe('useColumnPrefs', () => {
     p.reset()
     expect(p.visibleKeys.value).toEqual(['a', 'b', 'c'])
   })
+
+  it('makeToggle: 关列(当前可见)时先 cf.clearColumn 再 toggle 隐藏', () => {
+    const p = useColumnPrefs('t7', ALL, DEF)
+    const calls: Array<[string, string]> = []
+    const cf = { clearColumn: (id: string, key: string) => calls.push([id, key]) }
+    const onToggle = p.makeToggle(cf, 't7')
+    onToggle('a')                              // a 当前可见 → 关列
+    expect(calls).toEqual([['t7', 'a']])
+    expect(p.visibleKeys.value).toEqual(['b', 'c'])
+  })
+
+  it('makeToggle: 开列(当前不可见)时不调 cf.clearColumn，只 toggle 显示', () => {
+    const p = useColumnPrefs('t8', ALL, DEF)
+    const calls: Array<[string, string]> = []
+    const cf = { clearColumn: (id: string, key: string) => calls.push([id, key]) }
+    const onToggle = p.makeToggle(cf, 't8')
+    onToggle('d')                              // d 当前不可见 → 开列
+    expect(calls).toEqual([])
+    expect(p.visibleKeys.value).toEqual(['a', 'b', 'c', 'd'])
+  })
 })

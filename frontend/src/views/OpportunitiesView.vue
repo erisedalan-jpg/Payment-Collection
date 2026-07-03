@@ -9,6 +9,7 @@ import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { OPP_COLUMNS, DEFAULT_VISIBLE, FILTERABLE, recentUpdateOf } from '@/lib/opportunityColumns'
 import type { OppColumn } from '@/lib/opportunityColumns'
 import { exportRows } from '@/lib/exportXlsx'
+import { useExternalSort } from '@/lib/useExternalSort'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -41,10 +42,7 @@ const visibleColumns = computed(() =>
 )
 const pickerColumns = OPP_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 
-function onToggle(key: string) {
-  if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
-  prefs.toggle(key)
-}
+const onToggle = prefs.makeToggle(cf, TABLE_ID)
 
 // 派生注入：在过滤前注入 recentUpdate，使其可筛/可排/可导出
 const withDerived = computed(() =>
@@ -72,29 +70,9 @@ const filtered = computed(() => {
   )
 })
 
-// 全局排序
-const sortState = ref<{ prop: string; order: '' | 'asc' | 'desc' }>({ prop: '', order: '' })
-
-function onSortChange({ prop, order }: { prop: string | null; order: string | null }) {
-  sortState.value = {
-    prop: prop || '',
-    order: order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : '',
-  }
-}
-
-const sorted = computed(() => {
-  const { prop, order } = sortState.value
-  if (!prop || !order) return filtered.value
-  const dir = order === 'asc' ? 1 : -1
-  const col = OPP_COLUMNS.find((c) => c.key === prop)
-  const isNum = col?.type === 'number'
-  return [...filtered.value].sort((a, b) => {
-    const x = a[prop]
-    const y = b[prop]
-    if (isNum) return ((Number(x) || 0) - (Number(y) || 0)) * dir
-    return String(x ?? '').localeCompare(String(y ?? ''), 'zh') * dir
-  })
-})
+// 全局排序（数值键 = OPP_COLUMNS 中 type==='number' 的列，与原判定等价）
+const NUMERIC_KEYS = new Set(OPP_COLUMNS.filter((c) => c.type === 'number').map((c) => c.key))
+const { sortState, onSortChange, sorted } = useExternalSort(filtered, NUMERIC_KEYS)
 
 // 分页
 const pageSize = ref(50)

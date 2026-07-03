@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
@@ -10,12 +10,13 @@ import { buildKeyProjectRows, type KeyProjectRow } from '@/lib/keyProjects'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { withSortable } from '@/lib/columnSort'
+import { useFollowupPage } from '@/composables/useFollowupPage'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
-import Modal from '@/components/Modal.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ProgressEditModal from '@/components/ProgressEditModal.vue'
+import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 
@@ -37,27 +38,6 @@ onMounted(() => {
   if (!progress.loaded) progress.load()
 })
 
-// 数据集选择:当前数据 | 历史快照
-const mode = ref<'current' | 'history'>('current')
-const historyIdx = ref(0)
-const isCurrent = computed(() => mode.value === 'current')
-
-const datasetOpts = computed(() => [
-  { value: 'current', label: '当前数据' },
-  ...progress.archives.map((a, i) => ({ value: 'a' + i, label: a.archiveTime })),
-])
-const historyOpts = computed(() =>
-  progress.archives.map((a, i) => ({ value: i, label: a.archiveTime })),
-)
-
-// 进入历史/archives 变化时，默认指向最新快照
-watch(
-  () => [mode.value, progress.archives.length] as const,
-  () => {
-    if (mode.value === 'history') historyIdx.value = Math.max(0, progress.archives.length - 1)
-  },
-)
-
 const currentRows = computed<KeyProjectRow[]>(() =>
   buildKeyProjectRows(
     (data.data?.projects ?? []) as Project[],
@@ -66,15 +46,7 @@ const currentRows = computed<KeyProjectRow[]>(() =>
   ),
 )
 
-const rows = computed<KeyProjectRow[]>(() =>
-  isCurrent.value ? currentRows.value : ((progress.archives[historyIdx.value]?.rows ?? []) as KeyProjectRow[]),
-)
-const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as KeyProjectRow[])
-
-const pageSize = ref(50)
-const currentPage = ref(1)
-const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
-watch(filtered, () => { currentPage.value = 1 })
+const fp = useFollowupPage(progress, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as KeyProjectRow[])
 
 const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
@@ -109,7 +81,7 @@ function onToggle(key: string) {
 function progCell(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan'): string {
   const t = field === 'weekProgress' ? row.weekProgressEditTime : row.nextPlanEditTime
   const c = row[field]
-  if (!c) return isCurrent.value ? '点击填写' : '-'
+  if (!c) return fp.isCurrent.value ? '点击填写' : '-'
   return `${t}：${c}`
 }
 
@@ -126,25 +98,12 @@ const editCtx = reactive({
   initial: '',
 })
 function openEdit(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan') {
-  if (!isCurrent.value) return
+  if (!fp.isCurrent.value) return
   editCtx.projectId = row.projectId
   editCtx.projectName = row.projectName
   editCtx.field = field
   editCtx.initial = row[field] ?? ''
   editOpen.value = true
-}
-
-// 删除历史快照(超管)
-const delConfirm = ref(false)
-const deleting = ref(false)
-async function doDeleteArchive() {
-  deleting.value = true
-  try {
-    await progress.deleteArchive(historyIdx.value)
-    delConfirm.value = false
-    if (!progress.archives.length) mode.value = 'current'
-    else historyIdx.value = Math.min(historyIdx.value, progress.archives.length - 1)
-  } finally { deleting.value = false }
 }
 
 // 更新归档(超管)
@@ -155,27 +114,16 @@ async function doArchive() {
   try {
     await progress.archive(currentRows.value)
     archiveConfirm.value = false
-    mode.value = 'current'
+    fp.mode.value = 'current'
   } finally {
     archiving.value = false
   }
 }
 
 // 导出(超管):多选数据集 → 多 sheet
-const exportOpen = ref(false)
-const exportSel = ref<string[]>(['current'])
-const allSelected = computed(
-  () => exportSel.value.length > 0 && exportSel.value.length === datasetOpts.value.length,
-)
-const exportIndeterminate = computed(
-  () => exportSel.value.length > 0 && exportSel.value.length < datasetOpts.value.length,
-)
-function toggleAllExport(val: boolean) {
-  exportSel.value = val ? datasetOpts.value.map((o) => o.value) : []
-}
 function doExport() {
-  const sheets = exportSel.value.map((sel) => {
-    const opt = datasetOpts.value.find((o) => o.value === sel)
+  const sheets = fp.exportSel.value.map((sel) => {
+    const opt = fp.datasetOpts.value.find((o) => o.value === sel)
     const src: KeyProjectRow[] =
       sel === 'current'
         ? currentRows.value
@@ -183,8 +131,8 @@ function doExport() {
     const fr = applyColumnFilters(src, cf.tableFilters(TABLE_ID)) as KeyProjectRow[]
     return { name: (opt?.label ?? sel).replace(/[:\\/?\*\[\]]/g, '-'), rows: fr.map(exportRow) }
   })
-  exportSheets(`重点项目进展_${exportSel.value.length}集.xlsx`, sheets)
-  exportOpen.value = false
+  exportSheets(`重点项目进展_${fp.exportSel.value.length}集.xlsx`, sheets)
+  fp.exportOpen.value = false
 }
 function exportRow(r: KeyProjectRow): Record<string, unknown> {
   return {
@@ -206,7 +154,11 @@ function exportRow(r: KeyProjectRow): Record<string, unknown> {
 }
 
 // 暴露供测试
-defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSelected, datasetOpts, toggleAllExport })
+defineExpose({
+  editOpen, editCtx,
+  mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
+  exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
+})
 </script>
 
 <template>
@@ -214,13 +166,13 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
     <h2 class="kp-title">重点项目进展</h2>
     <div class="toolbar">
       <span class="kp-label">数据集</span>
-      <SegToggle v-model="mode" :options="[{ value: 'current', label: '当前数据' }, { value: 'history', label: '历史数据' }]" />
-      <el-select v-if="mode === 'history'" v-model="historyIdx" size="small" style="width: 200px"
+      <SegToggle v-model="fp.mode.value" :options="[{ value: 'current', label: '当前数据' }, { value: 'history', label: '历史数据' }]" />
+      <el-select v-if="fp.mode.value === 'history'" v-model="fp.historyIdx.value" size="small" style="width: 200px"
         :disabled="!progress.archives.length" placeholder="选择历史快照">
-        <el-option v-for="o in historyOpts" :key="o.value" :label="o.label" :value="o.value" />
+        <el-option v-for="o in fp.historyOpts.value" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>
-      <button v-if="auth.isSuper && mode === 'history' && progress.archives.length" class="kp-archive-btn"
-        @click="delConfirm = true">删除此历史</button>
+      <button v-if="auth.isSuper && fp.mode.value === 'history' && progress.archives.length" class="kp-archive-btn"
+        @click="fp.delConfirm.value = true">删除此历史</button>
       <ColumnPicker
         :columns="pickerColumns"
         :visible-keys="prefs.visibleKeys.value"
@@ -230,7 +182,7 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
         @reset="prefs.reset"
       />
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="archiveConfirm = true">更新（归档+清空）</button>
-      <button v-if="auth.isSuper" class="kp-export-btn" @click="exportOpen = true">导出</button>
+      <button v-if="auth.isSuper" class="kp-export-btn" @click="fp.exportOpen.value = true">导出</button>
       <el-button
         v-if="cf.hasFilters(TABLE_ID)"
         size="small"
@@ -239,36 +191,36 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
       >清除所有筛选</el-button>
     </div>
 
-    <div v-if="!rows.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
+    <div v-if="!fp.rows.value.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
-            <ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" />
+            <ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="fp.rows.value" />
           </span>
         </template>
         <template #cell-weekProgress="{ row }">
           <span
             class="kp-prog-cell"
-            :class="{ editable: isCurrent }"
+            :class="{ editable: fp.isCurrent.value }"
             @click.stop="openEdit(row as KeyProjectRow, 'weekProgress')"
           >{{ progCell(row as KeyProjectRow, 'weekProgress') }}</span>
         </template>
         <template #cell-nextPlan="{ row }">
           <span
             class="kp-prog-cell"
-            :class="{ editable: isCurrent }"
+            :class="{ editable: fp.isCurrent.value }"
             @click.stop="openEdit(row as KeyProjectRow, 'nextPlan')"
           >{{ progCell(row as KeyProjectRow, 'nextPlan') }}</span>
         </template>
       </DataTable>
     </div>
 
-    <div v-if="filtered.length" class="kp-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+    <div v-if="fp.filtered.value.length" class="kp-pager">
+      <span class="u-num">共 {{ fp.filtered.value.length }} 条</span>
+      <el-pagination v-model:current-page="fp.currentPage.value" v-model:page-size="fp.pageSize.value"
+        :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
 
@@ -280,59 +232,33 @@ defineExpose({ editOpen, editCtx, mode, historyIdx, isCurrent, exportSel, allSel
       :initial="editCtx.initial"
     />
 
-    <Modal v-model="delConfirm" title="删除历史快照" width="420px">
-      <div>将永久删除该条历史快照（{{ historyOpts[historyIdx]?.label }}），不可恢复。确认删除？</div>
-      <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
-        <button class="kp-cancel" @click="delConfirm = false">取消</button>
-        <button class="kp-archive-btn" :disabled="deleting" @click="doDeleteArchive">确认删除</button>
-      </div>
-    </Modal>
-
-    <Modal v-model="archiveConfirm" title="更新（归档）" width="420px">
-      <div>将把当前数据归档为历史快照，并清空两列进展（开始新一期）。确认更新？</div>
-      <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
-        <button class="kp-cancel" @click="archiveConfirm = false">取消</button>
-        <button class="kp-archive-btn" :disabled="archiving" @click="doArchive">确认更新</button>
-      </div>
-    </Modal>
-
-    <Modal v-model="exportOpen" title="导出数据集" width="420px">
-      <el-checkbox :model-value="allSelected" :indeterminate="exportIndeterminate"
-        @change="toggleAllExport($event as boolean)">全选</el-checkbox>
-      <el-checkbox-group v-model="exportSel">
-        <el-checkbox v-for="o in datasetOpts" :key="o.value" :value="o.value">{{ o.label }}</el-checkbox>
-      </el-checkbox-group>
-      <div style="margin-top: var(--gap-card)">
-        <button
-          class="kp-export-btn"
-          :disabled="!exportSel.length"
-          @click="doExport"
-        >导出 xlsx（{{ exportSel.length }} 个数据集，按当前列筛选）</button>
-      </div>
-    </Modal>
+    <FollowupModals
+      v-model:del-confirm="fp.delConfirm.value"
+      v-model:export-open="fp.exportOpen.value"
+      v-model:archive-open="archiveConfirm"
+      v-model:export-sel="fp.exportSel.value"
+      :history-label="fp.historyOpts.value[fp.historyIdx.value]?.label ?? ''"
+      :deleting="fp.deleting.value"
+      :archiving="archiving"
+      :retain="false"
+      :dataset-opts="fp.datasetOpts.value"
+      :all-selected="fp.allSelected.value"
+      :export-indeterminate="fp.exportIndeterminate.value"
+      :export-count="fp.exportSel.value.length"
+      @confirm-delete="fp.doDeleteArchive"
+      @confirm-archive="doArchive"
+      @do-export="doExport"
+      @toggle-all="fp.toggleAllExport"
+    >
+      <template #archive-body>
+        <div>将把当前数据归档为历史快照，并清空两列进展（开始新一期）。确认更新？</div>
+      </template>
+    </FollowupModals>
   </div>
 </template>
 
 <style scoped>
+@import '@/styles/followup.css';
 .key-projects-view { padding: var(--sp-4); }
-.kp-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.kp-label { font-size: var(--fs-1); color: var(--sub); }
-.kp-scroll { overflow-x: auto; }
-.kp-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
-.kp-empty { padding: var(--sp-5); color: var(--mut); text-align: center; }
-.kp-prog-cell { display: inline-block; white-space: pre-wrap; }
-.kp-prog-cell.editable { cursor: pointer; color: var(--accent); }
-.kp-archive-btn, .kp-export-btn, .kp-cancel {
-  font-size: var(--fs-1);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 2px 10px;
-  cursor: pointer;
-  background: var(--card2);
-  color: var(--accent);
-}
-.kp-archive-btn:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
-.kp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
-.kp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

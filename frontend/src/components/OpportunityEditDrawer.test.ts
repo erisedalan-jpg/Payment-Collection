@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessage } from 'element-plus'
 import OpportunityEditDrawer from './OpportunityEditDrawer.vue'
 import { useOpportunitiesStore } from '@/stores/opportunities'
 import { useAuthStore } from '@/stores/auth'
@@ -49,6 +49,14 @@ describe('OpportunityEditDrawer', () => {
     ;(w.vm as any).form.customer = '乙'
     await (w.vm as any).onSave(); await flushPromises()
     expect(spy).toHaveBeenCalledWith('opp-1', expect.objectContaining({ customer: '乙', l4: '小金融服务组' }))
+  })
+  it('保存失败(store.update 抛错) → ElMessage.error 提示,不关闭抽屉', async () => {
+    const w = mountD(); const s = useOpportunitiesStore()
+    vi.spyOn(s, 'update').mockRejectedValue(new Error('网络错误'))
+    const errSpy = vi.spyOn(ElMessage, 'error').mockImplementation(() => ({}) as any)
+    await (w.vm as any).onSave(); await flushPromises()
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('保存失败'))
+    expect(w.emitted('update:modelValue')).toBeFalsy()
   })
 })
 

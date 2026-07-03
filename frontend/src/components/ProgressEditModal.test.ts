@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessage } from 'element-plus'
 import ProgressEditModal from './ProgressEditModal.vue'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
@@ -32,5 +32,18 @@ describe('ProgressEditModal store 分流', () => {
     })
     await (w.vm as any).save()
     expect(kSpy).toHaveBeenCalledWith('P2', 'nextPlan', 'y')
+  })
+
+  it('保存失败(store.update 抛错) → ElMessage.error 提示,saving 复位', async () => {
+    const key = useProjectProgressStore()
+    vi.spyOn(key, 'update').mockRejectedValue(new Error('服务器错误'))
+    const errSpy = vi.spyOn(ElMessage, 'error').mockImplementation(() => ({}) as any)
+    const w = mount(ProgressEditModal, {
+      props: { modelValue: true, projectId: 'P3', projectName: '丙', field: 'nextPlan', initial: 'z' },
+      global: { plugins: [ElementPlus], stubs: { teleport: true } },
+    })
+    await (w.vm as any).save()
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('保存失败'))
+    expect((w.vm as any).saving).toBe(false)
   })
 })
