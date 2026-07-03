@@ -198,6 +198,15 @@ def _error_payload(code, message):
     return {"success": False, "code": code, "message": message}
 
 
+def _atomic_write_json(path, data):
+    """原子写 JSON:先写 .tmp 再 os.replace,避免并发/崩溃留半截坏文件。"""
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
 def _load_followup_records():
     """加载本地跟进记录"""
     if os.path.exists(FOLLOWUP_FILE):
@@ -210,9 +219,7 @@ def _load_followup_records():
 
 def _save_followup_records(records):
     """保存本地跟进记录"""
-    os.makedirs(os.path.dirname(FOLLOWUP_FILE), exist_ok=True)
-    with open(FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    _atomic_write_json(FOLLOWUP_FILE, records)
 
 # ── 项目标签库（2C，本地 JSON store，首次按 analysis_data.json 的 tagSeed 播种，此后本地为准、不回写云） ──
 PROJECT_TAGS_FILE = os.path.join(BASE_DIR, 'data', 'project_tags.json')
@@ -275,9 +282,7 @@ def _load_project_tags():
 
 def _save_project_tags(store):
     with _tags_lock:
-        os.makedirs(os.path.dirname(PROJECT_TAGS_FILE), exist_ok=True)
-        with open(PROJECT_TAGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(PROJECT_TAGS_FILE, store)
 
 
 # ── 重点项目进展(SP-2,本地 JSON store:current 可编 + archives 只读快照) ──
@@ -304,9 +309,7 @@ def _load_progress():
 
 def _save_progress(store):
     with _progress_lock:
-        os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
-        with open(PROGRESS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(PROGRESS_FILE, store)
 
 
 def _progress_apply_update(store, project_id, field, content, account, now):
@@ -360,9 +363,7 @@ def _load_temp_followup():
 
 def _save_temp_followup(store):
     with _temp_lock:
-        os.makedirs(os.path.dirname(TEMP_FOLLOWUP_FILE), exist_ok=True)
-        with open(TEMP_FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(TEMP_FOLLOWUP_FILE, store)
 
 
 # ── 重点商机跟进(/opportunities/key;V2.2.0):scope 条件 + current 进展 + archives 快照 ──
