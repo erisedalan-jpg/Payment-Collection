@@ -104,13 +104,36 @@ describe('buildPayBoardRows', () => {
     expect(a.expectedTotal).toBe(1_500_000)
     expect(a.actualTotal).toBe(1_000_000)
     expect(a.remainingTotal).toBe(500_000)
+    // A 完成率恒全时：A 全时流水 1_000_000 / 合同 2_000_000 = 0.5（不随区间变）
+    expect(a.paymentRatio).toBeCloseTo(0.5)
     const b = rows.find((r) => r.projectId === 'B')!
-    // B 节点 2024-06 不在范围，流水 2024-06 不在范围
+    // B 节点 2024-06 不在范围，流水 2024-06 不在范围 → 区间列(计划/已回/未收)清零
     expect(b.expectedTotal).toBe(0)
     expect(b.actualTotal).toBe(0)
     expect(b.remainingTotal).toBe(0)
-    // contract=1_000_000>0，actual=0 → paymentRatio=0（原为 null，分母改合同后不再 null）
-    expect(b.paymentRatio).toBeCloseTo(0)
+    // 但完成率恒全时口径(Option A)：B 全时流水 1_000_000 / 合同 1_000_000 = 1，不因区间收窄清零
+    expect(b.actualAll).toBe(1_000_000)
+    expect(b.paymentRatio).toBeCloseTo(1)
+  })
+
+  it('回归(真实 bug QAGD-XX-REDACTED)：流水全在选定区间外，完成率仍显全时口径而非 0%', () => {
+    // 合同 750_000，两笔流水均在 2025 年
+    const proj = [{
+      projectId: 'Z', projectName: '真实', projectManager: '王五', orgL4: '京津服务组',
+      payment: { relatedNodeCount: 2, expectedTotal: 525_000, actualTotal: 525_000, remainingTotal: 0, paymentRatio: 0.7, delayedCount: 0 },
+      paymentPmis: { contract: 750_000, actualTotal: 525_000, expectedTotal: 525_000, delayedCount: 0 },
+    }] as unknown as Project[]
+    const recs = { Z: { records: [rec(367_500, '2025-09-30'), rec(157_500, '2025-07-23')] } } as unknown as import('@/types/analysis').Paymentrecords
+    // 选定区间=本年度 2026，两笔流水均落区间外
+    const rows = buildPayBoardRows(proj, {}, {}, recs, '2026-01-01', '2026-12-31')
+    const z = rows.find((r) => r.projectId === 'Z')!
+    // 区间内已回款(actualTotal)确为 0——但完成率恒全时 = 525_000/750_000 = 0.7
+    expect(z.actualTotal).toBe(0)
+    expect(z.actualAll).toBe(525_000)
+    expect(z.paymentRatio).toBeCloseTo(0.7, 4)
+    // 分组 rate 同样全时
+    const g = groupPayBoard(rows, ['dept'])
+    expect(g[0].rate).toBeCloseTo(0.7, 4)
   })
 
   it('B 不含 pmisMap 条目：stage/industry 为「未指定」', () => {
@@ -180,19 +203,19 @@ describe('groupPayBoard（单维分桶 + 7 指标，口径收敛后 pendingSum=�
     expect(g2.rate).toBeNull()
   })
 
-  it('区间收窄后：B 指标清零，组1 的 pendingSum/rate 含 A+B 合同（合同静态传入）', () => {
+  it('区间收窄后：计划/未收随区间清零，但 actualSum/rate 恒全时(Option A)', () => {
     const rows = buildPayBoardRows(projects, pmisMap, paymentNodes, paymentRecords, '2024-01-01', '2024-04-30')
     const g = groupPayBoard(rows, ['dept'])
     const g1 = g.find((x) => x.key === '组1')!
-    // A: actual=1_000_000, expected=1_500_000, remaining=500_000, contract=2_000_000
-    // B: 区间内无节点无流水 → actual=0, expected=0, remaining=0; contract=1_000_000(静态)
-    expect(g1.actualSum).toBe(1_000_000)
+    // 完成率分子恒全时：A 全时流水 1_000_000 + B 全时流水 1_000_000 = 2_000_000（B 不因区间清零）
+    expect(g1.actualSum).toBe(2_000_000)
+    // 计划/未收仍随区间：A 节点 2024-03 在范围(expected=1_500_000/remaining=500_000)；B 节点 2024-06 出范围→0
     expect(g1.expectedSum).toBe(1_500_000)
     expect(g1.pendingSum).toBe(500_000)
     // contractSum = A.contract + B.contract = 2_000_000 + 1_000_000 = 3_000_000
     expect(g1.contractSum).toBe(3_000_000)
-    // rate = actual/contract = 1_000_000/3_000_000
-    expect(g1.rate).toBeCloseTo(1_000_000 / 3_000_000, 6)
+    // rate = 全时actual/contract = 2_000_000/3_000_000
+    expect(g1.rate).toBeCloseTo(2_000_000 / 3_000_000, 6)
   })
 
   it('默认按项目数降序', () => {
