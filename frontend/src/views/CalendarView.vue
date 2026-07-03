@@ -192,7 +192,7 @@ function clearFilters() {
 .cal-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
 .cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-4) var(--sp-3); text-align: center; }
 .cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
-.cd-val { font-size: var(--fs-5); font-weight: 800; color: var(--txt); }
+.cd-val { font-size: var(--fs-5); font-weight: 700; color: var(--txt); }
 .cd-val.danger { color: var(--danger-text); }
 .cd-val.paid { color: var(--ok-text); }
 .cd-val.pending { color: var(--warn-text); }
@@ -200,11 +200,11 @@ function clearFilters() {
 .cal-filterbar { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-4); }
 .cal-viewbar { margin-bottom: var(--sp-3); }
 .cal-nav { display: inline-flex; align-items: center; gap: var(--sp-2); }
-.cal-arrow { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); width: 28px; height: 28px; cursor: pointer; font-weight: 900; color: var(--sub); }
+.cal-arrow { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); width: 28px; height: 28px; cursor: pointer; font-weight: 700; color: var(--sub); }
 .cal-arrow:hover { background: var(--card2); color: var(--accent); }
 .cal-navlabel { font-size: var(--fs-2); font-weight: 700; color: var(--txt); min-width: 48px; text-align: center; }
 .cal-upcoming { margin-top: var(--sp-5); }
-.cal-up-title { font-size: var(--fs-4); font-weight: 800; color: var(--txt); margin-bottom: var(--sp-3); }
+.cal-up-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-3); }
 .cal-up-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
 .cal-up-panel { flex: 1; min-width: 320px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .cal-up-header { color: var(--warn-text); font-weight: 700; font-size: var(--fs-2); padding: var(--sp-2) var(--sp-3); }
