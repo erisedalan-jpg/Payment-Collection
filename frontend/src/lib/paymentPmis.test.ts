@@ -185,21 +185,23 @@ describe('projectPaymentRows / summaryByDim', () => {
     expect(summaryByDim(rows0, 'dept')[0].rate).toBeNull()
   })
 
-  it('区间过滤：只含区间内节点和流水', () => {
-    // 只取 2026-01 区间：A 的 nodesA[0](planDate 2026-01-01 ∈ [2026-01,2026-01])，B 的 nodesB[0]
+  it('区间收窄：节点/计划随区间，已回款/完成率恒全时', () => {
+    // 只取 2026-01 区间：节点侧(nodeCount/expectedTotal)按 planDate∈区间；已回款/完成率恒全时(全站统一口径)
     const rows = projectPaymentRows(ps, map, payNodes, payRec, '2026-01-01', '2026-01-31')
     const a = rows.find((r) => r.projectId === 'A')!
-    // A 2026-01区间内：nodes[0] expected=1_000_000; 流水100万; contract=2_000_000
+    // A 节点侧 2026-01：nodes[0] expected=1_000_000；已回款=全时流水100万；contract=2_000_000
     expect(a.nodeCount).toBe(1)
     expect(a.expectedTotal).toBe(1_000_000)
     expect(a.actualTotal).toBe(1_000_000)
-    // 分母改为合同 contract=2_000_000：1_000_000/2_000_000=0.5
     expect(a.paymentRatio).toBeCloseTo(1_000_000 / 2_000_000, 4)
     const b = rows.find((r) => r.projectId === 'B')!
-    // B 2026-01区间内：nodes[0] expected=500_000; 流水100万到账2026-02-05 不在区间 → actualTotal=0
+    // B 节点侧 2026-01：nodes[0] expected=500_000（计划随区间）
     expect(b.nodeCount).toBe(1)
     expect(b.expectedTotal).toBe(500_000)
-    expect(b.actualTotal).toBe(0)
+    // 已回款恒全时：B 流水100万到账2026-02-05 虽在所选区间外，仍全额计入 → actualTotal=1_000_000（原区间口径=0）
+    expect(b.actualTotal).toBe(1_000_000)
+    // 完成率恒全时 = 全时流水/合同 = 1_000_000/1_000_000 = 1（原区间口径=0）
+    expect(b.paymentRatio).toBeCloseTo(1, 4)
   })
 
   it('全部不变式：全部模式 actualTotal=Σ流水，summaryByDim.rate=Σactual/Σcontract', () => {

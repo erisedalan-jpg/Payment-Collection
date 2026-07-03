@@ -48,13 +48,10 @@ export function payDashSummary(
   const inScope = filterProjects(projects, opts)
   const totalAll = inScope.length
   const noStageCount = inScope.filter((p) => !(paymentNodes?.[p.projectId]?.length)).length
-  const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, start, end), 0)
-  // 完成率分母:选了日期区间时只算区间内有回款活动的项目合同(与分子同范围,避免窄区间下分母不缩、完成率被压低);
-  // 全部(start=end='')时保持 Σ全 inScope 合同不变(基线不动)。
-  const dateActive = !!(start || end)
-  const totalContract = inScope
-    .filter((p) => !dateActive || hasActivityInRange(paymentNodes?.[p.projectId], paymentRecords?.[p.projectId]?.records, start, end))
-    .reduce((s, p) => s + (p.paymentPmis?.contract ?? 0), 0)
+  // 已回款/完成率恒全时口径(CLAUDE.md 全站统一口径 Σ流水净额全加 ÷ Σ合同，与首页 computeKpis / L4 表 / board / 详情页一致)：
+  // 已回款=Σ全时流水(不随所选日期区间过滤)；完成率=已回款 ÷ Σ合同(全 inScope)。待回款/计划/延期/项目活动数仍随区间。
+  const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, '', ''), 0)
+  const totalContract = inScope.reduce((s, p) => s + (p.paymentPmis?.contract ?? 0), 0)
   const totalExpected = rows.reduce((s, r) => s + r.expectedPayment, 0)
   const totalRemaining = rows.reduce((s, r) => s + r.unpaidAmount, 0)
   const delayedPids = new Set(rows.filter((r) => r.status === '延期').map((r) => r.projectId))

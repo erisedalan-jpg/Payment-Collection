@@ -1,6 +1,9 @@
 import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis, PaymentRecordsEntry } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
-import { paymentPmisInRange } from './paymentRange'
+import { paymentPmisInRange, actualInRange } from './paymentRange'
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+const round4 = (n: number) => Math.round(n * 10000) / 10000
 
 // ── 阈值常量（集中定义，spec §2）──
 export const TIER_HIGH = 1_000_000
@@ -121,7 +124,16 @@ export function projectPaymentRows(
       end,
     )
 
-    const progress = deriveProgress(rp.contract, rp.paymentRatio)
+    // 已回款/完成率恒全时口径(全站统一口径 Σ流水全加÷合同，与 /insight/board、项目详情页一致)：
+    // 分子=Σ全时流水(actualInRange(records,'','')，不随所选日期区间过滤；无流水表退化 payment.actualTotal)；分母=合同。
+    // 计划回款(expectedTotal)/延期(delayedCount)/未收(remainingTotal)/节点计数(rp.*)仍随日期区间。
+    const actualAll = round2(
+      paymentRecords
+        ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
+        : Number(p.payment?.actualTotal ?? 0),
+    )
+    const ratioAll = rp.contract > 0 ? round4(actualAll / rp.contract) : null
+    const progress = deriveProgress(rp.contract, ratioAll)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -133,8 +145,8 @@ export function projectPaymentRows(
       tier,
       progress,
       contract: rp.contract,
-      actualTotal: rp.actualTotal,
-      paymentRatio: rp.paymentRatio,
+      actualTotal: actualAll,
+      paymentRatio: ratioAll,
       expectedTotal: rp.expectedTotal,
       remainingTotal: rp.remainingTotal,
       nodeCount: rp.nodeCount,
