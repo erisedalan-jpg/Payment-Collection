@@ -34,7 +34,7 @@ TOP_FILES = [
     "pmis.py", "projects.py", "collection_stages.py", "milestones.py", "profit.py",
     "snapshots.py", "data_history.py", "data_scope.py", "opportunities.py", "temp_followup.py",
     "manual_history.py",
-    "manual_import.py", "reset_super_password.py", "compare_payment_sources.py",
+    "manual_import.py", "reset_super_password.py",
     "conftest.py", "requirements.txt", "requirements-dev.txt", "ruff.toml",
     "verify.sh", "schema.json", "feature_list.json", "CLAUDE.md", "PROGRESS.md",
     "app_icon.ico", "app_logo.png",
