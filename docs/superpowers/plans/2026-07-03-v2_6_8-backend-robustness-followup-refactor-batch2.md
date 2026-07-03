@@ -887,7 +887,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Test: `tests/test_followup_txn.py`（新建，测助手）;回归网 = Task 8 + 既有 server 读写测试
 
 **Interfaces:**
-- Produces: `CustomHandler._followup_txn(self, lock, load_fn, mutate_fn, save_fn) -> tuple[bool, Any]`——`with lock: store=load_fn(); result=mutate_fn(store); save_fn(store)`；成功返回 `(True, result)`；`mutate_fn` 抛 `ValueError` 返回 `(False, <校验错误消息>)`（handler 转 400），其它异常返回 `(False, <内部错误>)`（handler 转 500）。**注意**：所有 store 的 `_save_*` 在本任务改为不自持锁（锁由 `_followup_txn` 的 `with lock` 统一持有，避免非重入 Lock 死锁）。
+- Produces: `CustomHandler._followup_txn(self, lock, load_fn, mutate_fn, save_fn) -> tuple[bool, Any]`——`with lock: store=load_fn(); result=mutate_fn(store); save_fn(store)`；成功返回 `(True, result)`；`mutate_fn` 抛 `ValueError` 返回 `(False, <校验错误消息>)`（handler 转 400），其它异常返回 `(False, <内部错误>)`（handler 转 500）。**关键设计（安全，勿改）**：把涉及的 per-store 锁从 `threading.Lock()` 改为 `threading.RLock()`（可重入），这样 `_followup_txn` 持锁跨 load→mutate→save 全程、而 `_save_*` 内部仍 `with _x_lock` 自锁时**可重入获取同一锁不死锁**。**不要移除 `_save_*` 的自持锁**——保留它可让"非经 txn 的直接 `_save_*` 调用方"（如管线/播种）仍受锁保护，零回归风险。`_save_followup_records` 原本无锁，为它新增 `_followup_records_lock = threading.RLock()` 并让其 save + 相关 txn 都用它。
 
 - [ ] **Step 1: Write the failing test（测助手）**
 
@@ -986,7 +986,7 @@ Expected: FAIL（`_followup_txn` 未定义）
 - progress：update(1150,上例)、archive(1174)、archive_delete(1192) → `_progress_lock`/`_load_progress`/`_progress_apply_*`/`_save_progress`
 - tags：`handle_tags_save`（约 1125） → `_tags_lock`/`_load_project_tags`/`_save_project_tags`
 
-**关键：去掉 4 个直写 `_save_*`（followup_records/tags/progress/temp）里可能残留的 `with _x_lock`**（若 Task 1 改后仍在函数内自锁）——锁改由 `_followup_txn` 的 `with lock` 统一持有，避免非重入 Lock 死锁。晚期 4 个原子 `_save_*`（opp/risk/paykey/opportunities）同样确认其内部**不再**自持对应 lock（把自持锁移除，锁语义上移到事务层）。逐个迁移后即时跑该套的测试。
+**关键（RLock 方案，安全）**：把 6 个 per-store 锁 `_tags_lock`/`_progress_lock`/`_temp_lock`/`_opp_followup_lock`/`_risk_lock`/`_paykey_lock` 的定义从 `threading.Lock()` 改为 `threading.RLock()`；新增 `_followup_records_lock = threading.RLock()`（followup_records 原本无锁）。**保留各 `_save_*` 内部的 `with _x_lock` 自锁不动**——RLock 可重入，`_followup_txn` 持锁 + `_save_*` 再取同一锁不会死锁，且非经 txn 的直接 save 调用方仍受保护（零锁移除回归）。逐套把写处理器的 `store=_load_x(); mutate; _save_x(store)` 收进 `self._followup_txn(_x_lock, _load_x, <apply lambda>, _save_x)`，迁完一套即跑该套端点测试再迁下一套。
 
 **archive_delete 特例**：`apply_archive_delete` 返回 `bool`（越界 False）。迁移时 mutate_fn 返回该 bool，`res is False` 时 handler 回 400「archiveIdx 超出范围」（非 500）——保持原语义，实现时对 archive_delete 处理器单独判 `res`。
 
