@@ -8,6 +8,8 @@ import { useProjectProgressStore } from './projectProgress'
 import { useOpportunitiesStore } from './opportunities'
 import { useTempFollowupStore } from './tempFollowup'
 import { useOpportunityFollowupStore } from './opportunityFollowup'
+import { useRiskFollowupStore } from './riskFollowup'
+import { usePaymentKeyFollowupStore } from './paymentKeyFollowup'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -24,6 +26,8 @@ export const useAuthStore = defineStore('auth', () => {
       useOpportunitiesStore().reset()
       useTempFollowupStore().reset()
       useOpportunityFollowupStore().reset()
+      useRiskFollowupStore().reset()
+      usePaymentKeyFollowupStore().reset()
     }
     return res
   }
@@ -38,6 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
     useOpportunitiesStore().reset()
     useTempFollowupStore().reset()
     useOpportunityFollowupStore().reset()
+    useRiskFollowupStore().reset()
+    usePaymentKeyFollowupStore().reset()
   }
   async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
     const res = await apiChangePassword(oldPassword, newPassword)

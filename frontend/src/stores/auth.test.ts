@@ -10,6 +10,8 @@ vi.mock('@/lib/auth', () => ({
 import { authenticate, fetchMe, logoutApi, changePassword } from '@/lib/auth'
 import { useAuthStore } from './auth'
 import { useDataStore } from './data'
+import { useRiskFollowupStore } from './riskFollowup'
+import { usePaymentKeyFollowupStore } from './paymentKeyFollowup'
 
 beforeEach(() => setActivePinia(createPinia()))
 afterEach(() => vi.clearAllMocks())
@@ -63,6 +65,37 @@ describe('stores/auth', () => {
     await s.fetchMe()
     await s.logout()
     expect(data.data).toBeNull()
+  })
+  it('login 成功后重置 riskFollowup / paymentKeyFollowup store(杜绝换账号沿用上一账号跟进缓存)', async () => {
+    ;(authenticate as any).mockResolvedValue({ ok: true, user: U })
+    const risk = useRiskFollowupStore()
+    risk.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
+    risk.loaded = true
+    const payKey = usePaymentKeyFollowupStore()
+    payKey.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
+    payKey.loaded = true
+    const s = useAuthStore()
+    await s.login('admin', 'wxtnb')
+    expect(risk.current).toEqual({})
+    expect(risk.loaded).toBe(false)
+    expect(payKey.current).toEqual({})
+    expect(payKey.loaded).toBe(false)
+  })
+  it('logout 后重置 riskFollowup / paymentKeyFollowup store', async () => {
+    ;(fetchMe as any).mockResolvedValue(U)
+    const risk = useRiskFollowupStore()
+    risk.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
+    risk.loaded = true
+    const payKey = usePaymentKeyFollowupStore()
+    payKey.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
+    payKey.loaded = true
+    const s = useAuthStore()
+    await s.fetchMe()
+    await s.logout()
+    expect(risk.current).toEqual({})
+    expect(risk.loaded).toBe(false)
+    expect(payKey.current).toEqual({})
+    expect(payKey.loaded).toBe(false)
   })
   it('changePassword 成功:更新 user 且 mustChangePassword 清零', async () => {
     ;(fetchMe as any).mockResolvedValue({ ...U, mustChangePassword: true })

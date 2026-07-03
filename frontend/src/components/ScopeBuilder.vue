@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { FIELD_CATALOG, projectMatches,
-  type ScopeFilter, type ScopeCondition, type FieldDef, type FieldLike } from '@/lib/tempScope'
+  type ScopeFilter, type ScopeGroup, type ScopeCondition, type FieldDef, type FieldLike } from '@/lib/tempScope'
 import { OP_LABEL, type ScopeOp } from '@/lib/scopeOps'
 
 const props = defineProps<{
@@ -24,11 +24,39 @@ const matchOf = (i: any, d: ScopeFilter) => (props.matchFn ?? projectMatches)(i,
 
 const GROUP_LABEL: Record<string, string> = { project: '项目级', paymentNode: '回款节点', milestone: '里程碑明细' }
 
+// v-for 稳定 key：group/condition 增删会 splice 数组，数组索引作 key 会让 Vue 复用错位的 DOM/组件实例
+// （如 el-select 内部搜索态），故本地给每个 group/condition 挂一个仅供渲染用的 _uid，保存时剔除。
+type UiCondition = ScopeCondition & { _uid: number }
+type UiGroup = Omit<ScopeGroup, 'conditions'> & { conditions: UiCondition[]; _uid: number }
+type UiScopeFilter = Omit<ScopeFilter, 'groups'> & { groups: UiGroup[] }
+
+let uidSeq = 0
+function nextUid(): number { return ++uidSeq }
+
 function clone(s: ScopeFilter): ScopeFilter {
   return JSON.parse(JSON.stringify(s ?? { combinator: 'AND', groups: [] }))
 }
-const draft = ref<ScopeFilter>(clone(props.initial))
-watch(() => props.modelValue, (v) => { if (v) draft.value = clone(props.initial) })
+function toUi(s: ScopeFilter): UiScopeFilter {
+  return {
+    combinator: s.combinator,
+    groups: (s.groups ?? []).map((g) => ({
+      combinator: g.combinator,
+      _uid: nextUid(),
+      conditions: (g.conditions ?? []).map((c) => ({ ...c, _uid: nextUid() })),
+    })),
+  }
+}
+function fromUi(s: UiScopeFilter): ScopeFilter {
+  return {
+    combinator: s.combinator,
+    groups: s.groups.map((g) => ({
+      combinator: g.combinator,
+      conditions: g.conditions.map(({ _uid: _drop, ...rest }) => rest),
+    })),
+  }
+}
+const draft = ref<UiScopeFilter>(toUi(clone(props.initial)))
+watch(() => props.modelValue, (v) => { if (v) draft.value = toUi(clone(props.initial)) })
 
 function defFor(c: ScopeCondition): FieldLike | undefined {
   if (SINGLE.value) return CATALOG.value.find((f) => f.key === c.field)
@@ -85,14 +113,14 @@ function candidates(c: ScopeCondition): string[] {
   return candidatesMap.value[(SINGLE.value ? '' : (c.group ?? '') + '::') + c.field] ?? []
 }
 
-function addGroup() { draft.value.groups.push({ combinator: 'AND', conditions: [] }) }
+function addGroup() { draft.value.groups.push({ combinator: 'AND', conditions: [], _uid: nextUid() }) }
 function removeGroup(gi: number) { draft.value.groups.splice(gi, 1) }
 function addCondition(gi: number) {
   if (SINGLE.value) {
     const first = CATALOG.value[0]
-    draft.value.groups[gi].conditions.push({ field: first?.key ?? '', op: stableOpsForKind(first?.kind ?? 'enum')[0], values: [] })
+    draft.value.groups[gi].conditions.push({ field: first?.key ?? '', op: stableOpsForKind(first?.kind ?? 'enum')[0], values: [], _uid: nextUid() })
   } else {
-    draft.value.groups[gi].conditions.push({ group: 'project', field: 'orgL4', op: 'in', values: [] })
+    draft.value.groups[gi].conditions.push({ group: 'project', field: 'orgL4', op: 'in', values: [], _uid: nextUid() })
   }
 }
 function removeCondition(gi: number, ci: number) { draft.value.groups[gi].conditions.splice(ci, 1) }
@@ -109,7 +137,7 @@ function onFieldChange(c: ScopeCondition) {
 
 const matchCount = computed(() => props.inputs.filter((i) => matchOf(i, draft.value)).length)
 
-function onSave() { emit('save', clone(draft.value)); emit('update:modelValue', false) }
+function onSave() { emit('save', fromUi(draft.value)); emit('update:modelValue', false) }
 function onCancel() { emit('update:modelValue', false) }
 
 defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCondition, onSave, candidates, kindOf, SINGLE })
@@ -127,7 +155,7 @@ defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCon
       <el-button size="small" type="primary" plain data-test="sb-add-group" @click="addGroup">添加组</el-button>
     </div>
 
-    <div v-for="(g, gi) in draft.groups" :key="gi" class="sb-group">
+    <div v-for="(g, gi) in draft.groups" :key="g._uid" class="sb-group">
       <div class="sb-group-head">
         <span class="sb-label">组 {{ gi + 1 }} · 条件之间</span>
         <el-radio-group v-model="g.combinator" size="small">
@@ -138,7 +166,7 @@ defineExpose({ draft, matchCount, addGroup, addCondition, removeGroup, removeCon
         <el-button size="small" text type="danger" @click="removeGroup(gi)">删除组</el-button>
       </div>
 
-      <div v-for="(c, ci) in g.conditions" :key="ci" class="sb-cond">
+      <div v-for="(c, ci) in g.conditions" :key="c._uid" class="sb-cond">
         <el-select v-if="!SINGLE" v-model="c.group" size="small" style="width: 110px" @change="onGroupChange(c)">
           <el-option v-for="(lbl, gk) in GROUP_LABEL" :key="gk" :label="lbl" :value="gk" />
         </el-select>
