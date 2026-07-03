@@ -85,7 +85,12 @@ export function buildScopeInputs(
         openRisks: pr?.openRisks ?? 0,
         finalAcceptDate: String(prog.终验时间 ?? '').slice(0, 10),
       },
-      nodes: (paymentNodes?.[p.projectId] ?? []) as any[],
+      nodes: (paymentNodes?.[p.projectId] ?? []).map((n: any) => ({
+        ...n,
+        expectedPayment: typeof n.expectedPayment === 'number' ? n.expectedPayment / 10000 : n.expectedPayment,
+        receivedAmount: typeof n.receivedAmount === 'number' ? n.receivedAmount / 10000 : n.receivedAmount,
+        unpaidAmount: typeof n.unpaidAmount === 'number' ? n.unpaidAmount / 10000 : n.unpaidAmount,
+      })) as any[],
       milestones: (milestones?.[p.projectId] ?? []) as any[],
     }
   })

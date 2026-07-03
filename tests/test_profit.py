@@ -93,6 +93,14 @@ class TestLoadProfit:
         assert pp == {}
         assert stats["direct"]["provided"] is False
 
+    def test_budget_matched_dedup_and_skip_empty(self, tmp_path, monkeypatch):
+        # 构造 budget 有重复 pid + 空 pid;direct/bridge 空
+        rows = [{"项目编号": "P1"}, {"项目编号": "P1"}, {"项目编号": ""}]
+        monkeypatch.setattr(P, "read_csv_rows",
+                            lambda p: rows if str(p).endswith(P.config.BUDGET_FILE) else [])
+        _out, stats = P.load_profit(str(tmp_path), {"P1"})
+        assert stats["budget"]["matched"] == 1   # P1 去重计 1,空 pid 不计
+
 
 class TestPaymentRecords:
     def test_group_and_summary(self, tmp_path):

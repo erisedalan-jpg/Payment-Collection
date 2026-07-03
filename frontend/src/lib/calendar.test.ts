@@ -106,3 +106,28 @@ describe('calYearHeat', () => {
     expect(h[1].count).toBe(1)
   })
 })
+
+function node(p: any) {
+  return { projectId: 'P1', projectName: '甲', stage: '初验款', planDate: '2026-07-03', status: '待回款',
+    dept: 'A组', orgL3_1: '', projectManager: '张三', unpaidAmount: 0, receivedAmount: 0,
+    expectedPayment: 0, actualDate: '', payRatio: null, actualRatio: null, tier: '', projStage: '', progress: '', ...p }
+}
+const noFilter = { orgL3_1: '', orgL4: '', pm: '' }
+
+describe('calUpcoming 本地日界', () => {
+  it('东八区上午 10 点,今日到期节点仍在 up15', () => {
+    const now = new Date('2026-07-03T10:00:00') // 本地时间
+    const r = calUpcoming([node({ planDate: '2026-07-03' })], noFilter, now)
+    expect(r.up15.length).toBe(1)
+  })
+})
+
+describe('calDashboardStats 当月已回款范围', () => {
+  it('项目节点在他月但本月有流水,mActual 计入', () => {
+    const now = new Date('2026-07-03T10:00:00')
+    const nodes = [node({ projectId: 'P1', planDate: '2026-09-30' })] // 节点在 9 月
+    const records = { P1: { records: [{ date: '2026-07-10', amount: 200000 }] } } as any
+    const r = calDashboardStats(nodes, noFilter, now, records)
+    expect(r.mActual).toBe(200000)
+  })
+})

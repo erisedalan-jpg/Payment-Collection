@@ -30,6 +30,7 @@ const health = computed(() => healthSummary(projects.value))
 const band = computed(() => paymentBand(
   paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis),
   new Date(),
+  projects.value,
   filter.payRecordsAll,
   filter.dateStart,
   filter.dateEnd,

@@ -1,4 +1,5 @@
 import json
+import pmis
 import snapshots as S
 import snapshots
 
@@ -13,7 +14,7 @@ def _pmis():
             "progress": {"项目阶段": "项目执行", "里程碑进度状态": "正常"},
             "status": {"项目状态": "实施中", "是否暂停": False, "评级": "C"},
             "risk": {"未关闭风险数": 2},
-            "cost": {"超支": False, "消耗比": 0.3},
+            "cost": {"项目超支": False, "交付超支": False, "消耗比": 0.3},
         },
     }
 
@@ -30,6 +31,18 @@ def _nodes():
              "expectedPayment": 300000, "unpaidAmount": 300000, "status": "正常实施中"},
         ]
     }
+
+
+class TestOverspendContract:
+    def test_overspend_reads_derive_cost_key(self):
+        # derive_cost 真实产物直喂 build_snapshot：剩余预算<0 → 项目超支 True → snapshot.overspend True
+        cost = pmis.derive_cost({"项目总预算（元）": "1000000", "项目核算（元）": "1200000",
+                                 "剩余预算（元）": "-200000"}, {})
+        assert cost["项目超支"] is True and "超支" not in cost  # 契约:旧键不存在
+        pmis_map = {"P-1": {"cost": cost}}
+        snap = snapshots.build_snapshot("2026-06-11",
+                                        [{"projectId": "P-1", "projectName": "甲"}], pmis_map, {})
+        assert snap["projects"]["P-1"]["overspend"] is True
 
 
 class TestBuildSnapshot:
@@ -255,7 +268,7 @@ class TestDiffNodes:
         })
         cur = _snap("2026-06-11", {"P-1": _proj()}, {
             "P-1|a#0": _node(node="a", status="延期"),
-            "P-1|b#0": _node(node="b", status="已全额回款", actual=500000),
+            "P-1|b#0": _node(node="b", status="已回款", actual=500000),
             "P-1|c#0": _node(node="c", planDate="2026-06-30"),
         })
         types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
@@ -281,6 +294,20 @@ class TestDiffNodes:
         cur = _snap("2026-06-11", {"P-1": _proj()}, {})
         types = {e["type"] for e in snapshots.diff_snapshots(prev, cur)}
         assert "回款节点移除" in types
+
+
+class TestPaymentCompleteEvent:
+    def test_status_to_paid_emits_complete_event(self):
+        # 换源后 stage_status 取值域为 {已回款,部分回款,质保期,延期,待回款}("已全额回款"不再出现)
+        base = [{"projectId": "P-1", "projectName": "甲"}]
+        nodes_a = {"P-1": [{"stage": "初验款", "planDate": "2026-03-31", "receivedAmount": 0,
+                            "expectedPayment": 500000, "unpaidAmount": 500000, "status": "待回款"}]}
+        nodes_b = {"P-1": [{"stage": "初验款", "planDate": "2026-03-31", "receivedAmount": 500000,
+                            "expectedPayment": 500000, "unpaidAmount": 0, "status": "已回款"}]}
+        snap_a = snapshots.build_snapshot("2026-06-01", base, {}, nodes_a)
+        snap_b = snapshots.build_snapshot("2026-06-11", base, {}, nodes_b)
+        evs = snapshots.diff_snapshots(snap_a, snap_b)
+        assert any(e["type"] == "回款完成" for e in evs)
 
 
 class TestAppendEvents:

@@ -223,14 +223,14 @@ describe('payOrgRanking', () => {
     expect(r[1].achievementRate).toBeCloseTo(500 / 2500)
   })
 
-  it('区间 2026-01-01~2026-06-30: 只计 P1 节点(计划日 2026-02-01)和 P1 流水(到账日 2026-02-10)', () => {
+  it('区间 2026-01-01~2026-06-30: 计划节点按区间(只计 P1);已回款恒全时(V2.6.7 起 P1/P2 流水均计入)', () => {
     const r = payOrgRanking(projects, paymentNodes, paymentRecords, '2026-01-01', '2026-06-30', 'actualTotal')
     const a = r.find((o) => o.org === 'A组')!
     const b = r.find((o) => o.org === 'B组')!
     expect(a.expectedTotal).toBe(1000)   // 节点计划日在区间内
-    expect(a.actualTotal).toBe(800)      // 流水到账日在区间内
+    expect(a.actualTotal).toBe(800)      // 已回款恒全时
     expect(b.expectedTotal).toBe(0)      // 节点计划日 2026-08-01 不在区间
-    expect(b.actualTotal).toBe(0)        // 流水到账日 2026-08-05 不在区间
+    expect(b.actualTotal).toBe(500)      // 已回款恒全时,即使流水到账日 2026-08-05 不在所选区间
   })
 
   it('全部不变式: start=end="" 时计划=Σ全节点、已回=Σ全流水', () => {
@@ -255,7 +255,7 @@ describe('payOrgRanking', () => {
     }
   })
 
-  it('区间口径分母(对齐S8): 选日期区间时达成率分母只算区间内有活动项目的合同', () => {
+  it('达成率分母恒全量合同(V2.6.7 起不再随区间收窄到"区间内有活动项目",对齐 payDashSummary 全站口径)', () => {
     // A组两项目同组: PA 区间内有活动(2026-02), PB 区间外(2026-08); 合同各 1000
     const projects2 = [
       { projectId: 'PA', orgL4: 'A组', paymentPmis: { contract: 1000 } },
@@ -271,8 +271,23 @@ describe('payOrgRanking', () => {
     } as any
     const r = payOrgRanking(projects2, nodes2, recs2, '2026-01-01', '2026-06-30', 'actualTotal')
     const a = r.find((o) => o.org === 'A组')!
-    expect(a.actualTotal).toBe(600)                    // 只 PA 区间流水
-    expect(a.achievementRate).toBeCloseTo(600 / 1000)  // 分母只含 PA 合同 1000, 不含区间外 PB
+    expect(a.actualTotal).toBe(1300)                    // PA+PB 流水恒全时计入(不受所选区间限制)
+    expect(a.contractTotal).toBe(2000)                  // 分母=全量合同(PA+PB),不再按区间活动筛选
+    expect(a.achievementRate).toBeCloseTo(1300 / 2000)  // 65%
+  })
+})
+
+describe('payOrgRanking 恒全时口径', () => {
+  const projects = [{ projectId: 'P1', orgL4: 'A组', paymentPmis: { contract: 1000000 } }] as any
+  const paymentNodes = { P1: [{ planDate: '2026-02-01', expectedPayment: 500000, status: '待回款' }] } as any
+  // 2025 年到账流水:区间口径(本年度)会漏,全时口径应计入
+  const paymentRecords = { P1: { records: [{ date: '2025-06-01', amount: 500000 }] } } as any
+
+  it('已回款/达成率取全时,即使日期区间为 2026 年', () => {
+    const r = payOrgRanking(projects, paymentNodes, paymentRecords, '2026-01-01', '2026-12-31', 'achievementRate')
+    expect(r[0].actualTotal).toBe(500000)          // 全时含 2025 流水
+    expect(r[0].contractTotal).toBe(1000000)       // 全量合同
+    expect(r[0].achievementRate).toBeCloseTo(0.5)  // 50%
   })
 })
 
@@ -346,5 +361,19 @@ describe('payDashboard 整体项目数/无回款阶段', () => {
     const rows = noStageProjects(projects, paymentNodes, OPTS)
     expect(rows.map((r) => r.projectId)).toEqual(['B', 'C'])
     expect(rows[0]).toMatchObject({ projectId: 'B', projectName: 'B名', projectManager: '张', orgL4: 'X', contractWan: 100 })
+  })
+})
+
+describe('除零回退 null', () => {
+  it('无合同的服务组 achievementRate 为 null', () => {
+    const projects = [{ projectId: 'P1', orgL4: 'A组', paymentPmis: { contract: 0 } }] as any
+    const paymentRecords = { P1: { records: [{ date: '2026-05-01', amount: 100000 }] } } as any
+    const r = payOrgRanking(projects, {}, paymentRecords, '', '', 'achievementRate')
+    expect(r[0].achievementRate).toBeNull()
+  })
+  it('payDashSummary 无合同时 rate 为 null', () => {
+    const projects = [{ projectId: 'P1', paymentPmis: { contract: 0 } }] as any
+    const s = payDashSummary([], projects, { viewMode: 'global', viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} } as any)
+    expect(s.rate).toBeNull()
   })
 })

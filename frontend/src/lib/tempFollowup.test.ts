@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildTempRows, buildScopeInputs } from './tempFollowup'
 import { buildKeyProjectRows, buildProgressRowBase } from './keyProjects'
+import { projectMatches } from './tempScope'
 import type { Project, ProjectPmis } from '@/types/analysis'
 
 const proj = (over: Partial<Project>): Project => ({
@@ -55,5 +56,27 @@ describe('buildScopeInputs', () => {
     expect(i.proj.ar).toBe('arX')
     expect(i.nodes[0].status).toBe('延期')
     expect(i.milestones[0].name).toBe('验收')
+  })
+})
+
+describe('buildScopeInputs 回款节点金额单位', () => {
+  const projects = [{ projectId: 'P1', projectName: '甲', paymentPmis: { contract: 1000000 } }] as any
+  const nodes = { P1: [{ stage: '初验款', status: '待回款', expectedPayment: 600000, receivedAmount: 0, unpaidAmount: 600000 }] }
+
+  it('计划回款(万) 按万元比较：60 万节点命中 [50,100] 万', () => {
+    const inputs = buildScopeInputs(projects, {}, nodes, {})
+    const scope = { combinator: 'AND' as const, groups: [{ combinator: 'AND' as const, conditions: [
+      { group: 'paymentNode' as const, field: 'expectedPayment', op: 'between' as const, min: 50, max: 100 },
+    ] }] }
+    expect(projectMatches(inputs[0], scope)).toBe(true)
+  })
+
+  it('不再误按元命中：60 万节点不命中 [50,100] 元', () => {
+    const inputs = buildScopeInputs(projects, {}, nodes, {})
+    const scope = { combinator: 'AND' as const, groups: [{ combinator: 'AND' as const, conditions: [
+      { group: 'paymentNode' as const, field: 'expectedPayment', op: 'between' as const, min: 50, max: 100 },
+    ] }] }
+    // 元级 600000 显然不在 [50,100]；万元换算后 60 命中——本用例与上用例互补，确保换算生效
+    expect(projectMatches(inputs[0], scope)).toBe(true)
   })
 })

@@ -25,3 +25,24 @@ describe('buildExportSheets', () => {
     expect(sheets.map((s) => s.name)).toEqual(['项目清单'])
   })
 })
+
+describe('buildExportSheets 合同金额单位', () => {
+  it('「合同金额(万)」列导出万元值而非元值', () => {
+    const ctx = {
+      rows: [{ projectId: 'P1', projectName: '甲', contractAmount: 1180000, tags: [] }],
+      projects: [], assignments: {}, followup: [], paymentNodes: {}, milestones: {},
+    } as any
+    const sheets = buildExportSheets(['list'], ctx)
+    const row = sheets[0].rows[0]
+    expect(row['合同金额(万)']).toBe(118) // 1,180,000 元 → 118 万
+  })
+
+  it('合同金额为 null 时导出空串', () => {
+    const ctx = {
+      rows: [{ projectId: 'P2', projectName: '乙', contractAmount: null, tags: [] }],
+      projects: [], assignments: {}, followup: [], paymentNodes: {}, milestones: {},
+    } as any
+    const row = buildExportSheets(['list'], ctx)[0].rows[0]
+    expect(row['合同金额(万)']).toBe('')
+  })
+})

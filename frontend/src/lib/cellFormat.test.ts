@@ -50,3 +50,12 @@ describe('formatCellValue', () => {
     expect(formatCellValue('a\nb', 'remarks')).toBe('a b')
   })
 })
+
+describe('formatCellValue 金额列不误判为日期', () => {
+  it("expectedPayment='45000' 走金额格式化而非日期", () => {
+    expect(formatCellValue('45000', 'expectedPayment')).not.toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+  it('日期列仍解析 Excel 序列号', () => {
+    expect(formatCellValue('45000', 'planDate')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})

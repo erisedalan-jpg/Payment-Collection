@@ -2,6 +2,12 @@ import type { PayNodeRow } from './paymentPmis'
 import type { Paymentrecords } from '@/types/analysis'
 import { actualInRange } from './paymentRange'
 
+/** 把 'YYYY-MM-DD' 解析为本地零点(避免 new Date('YYYY-MM-DD') 的 UTC 偏移)。 */
+function localDay(s: string): Date {
+  const [y, m, d] = String(s).slice(0, 10).split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1)
+}
+
 /** 排除已回款节点(日历只关心未结清的)。 */
 export function calExcludePaid(nodes: PayNodeRow[]): PayNodeRow[] {
   return nodes.filter((n) => n.status !== '已回款')
@@ -40,20 +46,19 @@ export function calDashboardStats(nodes: PayNodeRow[], f: CalFilters, now: Date,
   const lastDay = new Date(nowY, nowM + 1, 0).getDate()
   const monthEnd = `${nowY}-${MM}-${String(lastDay).padStart(2, '0')}`
   let mRem = 0, mCnt = 0, up = 0, del = 0
-  const seenPids = new Set<string>()
   for (const n of ns) {
     const pd = n.planDate
     if (!pd || pd.length < 10) continue
     const py = parseInt(pd.substring(0, 4)), pmo = parseInt(pd.substring(5, 7)) - 1
-    const diff = Math.ceil((new Date(pd.substring(0, 10)).getTime() - now.getTime()) / 86400000)
+    const diff = Math.ceil((localDay(pd).getTime() - now.getTime()) / 86400000)
     if (diff >= 0 && diff <= 7 && n.status !== '已回款') up++
     if (n.status === '延期') del++
-    if (py === nowY && pmo === nowM) { mCnt++; mRem += n.unpaidAmount; seenPids.add(n.projectId) }
+    if (py === nowY && pmo === nowM) { mCnt++; mRem += n.unpaidAmount }
   }
+  // 当月已回款:对当前过滤后节点所属全部项目求当月流水(不仅当月有节点的项目)
+  const scopePids = new Set(ns.map((n) => n.projectId))
   let mAct = 0
-  for (const pid of seenPids) {
-    mAct += actualInRange(paymentRecords?.[pid]?.records, monthStart, monthEnd)
-  }
+  for (const pid of scopePids) mAct += actualInRange(paymentRecords?.[pid]?.records, monthStart, monthEnd)
   return { mRemaining: mRem, mActual: mAct, upcoming7: up, mCount: mCnt, delayed: del }
 }
 
@@ -147,11 +152,12 @@ export interface CalUpcoming { up15: PayNodeRow[]; up30: PayNodeRow[] }
 /** up15=[now,now+15] 未结清；up30=(now,now+30] 未结清(已排已回款)。 */
 export function calUpcoming(naguanNodes: PayNodeRow[], f: CalFilters, now: Date): CalUpcoming {
   const all = applyCalFilters(calExcludePaid(naguanNodes.filter((n) => n.planDate)), f)
-  const d15 = new Date(now.getTime() + 15 * 864e5)
-  const d30 = new Date(now.getTime() + 30 * 864e5)
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const d15 = new Date(t0.getTime() + 15 * 864e5)
+  const d30 = new Date(t0.getTime() + 30 * 864e5)
   const byDate = (a: PayNodeRow, b: PayNodeRow) => String(a.planDate || '').localeCompare(String(b.planDate || ''))
-  const up15 = all.filter((n) => { const d = new Date(n.planDate); return d >= now && d <= d15 }).sort(byDate)
-  const up30 = all.filter((n) => { const d = new Date(n.planDate); return d > d15 && d <= d30 }).sort(byDate)
+  const up15 = all.filter((n) => { const d = localDay(String(n.planDate)); return d >= t0 && d <= d15 }).sort(byDate)
+  const up30 = all.filter((n) => { const d = localDay(String(n.planDate)); return d > d15 && d <= d30 }).sort(byDate)
   return { up15, up30 }
 }
 
