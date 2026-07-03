@@ -66,7 +66,7 @@ function onClick(ds: string) {
           </div>
           <div v-if="c.count > 0" class="cd-meta">
             <span>{{ c.count }}笔</span>
-            <span class="cd-amt">{{ fmtWan(c.remaining) }}万</span>
+            <span class="cd-amt u-num">{{ fmtWan(c.remaining) }}万</span>
           </div>
         </div>
       </div>

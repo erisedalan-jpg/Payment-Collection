@@ -123,7 +123,7 @@ function clearFilters() {
     <div class="cal-dash">
       <div v-for="c in DASH" :key="c.label" class="cd-card">
         <div class="cd-label">{{ c.label }}</div>
-        <div class="cd-val" :class="c.cls">{{ c.value }}</div>
+        <div class="cd-val u-num" :class="c.cls">{{ c.value }}</div>
       </div>
     </div>
 

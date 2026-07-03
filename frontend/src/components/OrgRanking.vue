@@ -62,8 +62,8 @@ function rateColor(r: number | null): string {
         <span class="rank-bar-wrap">
           <span class="rank-bar" :style="{ width: ((o.actualTotal / maxActual) * 100).toFixed(1) + '%', background: rateColor(o.achievementRate) }" />
         </span>
-        <span class="rank-amount">{{ fmtWan(o.actualTotal) }} 万</span>
-        <span class="rank-rate" :style="{ color: rateColor(o.achievementRate) }">{{ pct(o.achievementRate) }}</span>
+        <span class="rank-amount u-num">{{ fmtWan(o.actualTotal) }} 万</span>
+        <span class="rank-rate u-num" :style="{ color: rateColor(o.achievementRate) }">{{ pct(o.achievementRate) }}</span>
       </div>
       <div v-if="!ranked.length" class="or-empty">暂无数据</div>
     </div>
