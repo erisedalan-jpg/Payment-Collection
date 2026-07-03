@@ -7,6 +7,9 @@ vi.mock('element-plus', () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+  ElMessageBox: {
+    confirm: vi.fn().mockResolvedValue('confirm'),
+  },
 }))
 
 vi.mock('@/lib/followupApi', () => ({
@@ -59,11 +62,22 @@ describe('FollowupRecords', () => {
     expect(followupApi.list).toHaveBeenCalledTimes(2)
   })
   it('删除走 confirm + remove', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { ElMessageBox } = await import('element-plus')
+    ;(ElMessageBox.confirm as any).mockResolvedValueOnce('confirm')
     const w = mountRecords()
     await flushPromises()
     await (w.vm as any).onDelete({ 记录编号: 'FU-2' })
     await flushPromises()
     expect(followupApi.remove).toHaveBeenCalledWith('FU-2')
+  })
+
+  it('取消删除确认时不调用 remove', async () => {
+    const { ElMessageBox } = await import('element-plus')
+    ;(ElMessageBox.confirm as any).mockRejectedValueOnce('cancel')
+    const w = mountRecords()
+    await flushPromises()
+    await (w.vm as any).onDelete({ 记录编号: 'FU-2' })
+    await flushPromises()
+    expect(followupApi.remove).not.toHaveBeenCalled()
   })
 })

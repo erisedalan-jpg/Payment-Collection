@@ -21,13 +21,28 @@ describe('AppHeader', () => {
   })
 
   it('stop button calls /api/stop after confirm', async () => {
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
+    const { ElMessageBox } = await import('element-plus')
+    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as any)
     const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'stopping' }) })
     vi.stubGlobal('fetch', f)
     const wrapper = mount(AppHeader)
     await wrapper.get('[data-test="stop-server"]').trigger('click')
+    await flushPromises()
     expect(f).toHaveBeenCalled()
     expect(f.mock.calls[0][0]).toBe('/api/stop')
+    confirmSpy.mockRestore()
+  })
+
+  it('stop button does not call /api/stop when confirm is cancelled', async () => {
+    const { ElMessageBox } = await import('element-plus')
+    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'stopping' }) })
+    vi.stubGlobal('fetch', f)
+    const wrapper = mount(AppHeader)
+    await wrapper.get('[data-test="stop-server"]').trigger('click')
+    await flushPromises()
+    expect(f).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
   })
 })
 
