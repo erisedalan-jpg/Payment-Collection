@@ -90,11 +90,14 @@ function isoDate(d: Date): string {
 }
 
 /** 回款重点带——now 注入便于测试;收款阶段节点级口径。
+ * projects 可选:传入时 yearActual 改为遍历项目集(排除异常)汇总流水，与 computeKpis 同源，
+ * 含无收款节点项目的流水；未传时退化到按节点项目去重的旧逻辑(向后兼容)。
  * paymentRecords/start/end 可选:传入时 yearActual=Σ流水∈[start,end]；全部(start=end='')时含空日期记录。
  * 计划侧(yearExpected/monthPending/delayedTop)按 inRange(planDate,start,end) 过滤；全部时含空计划日节点。*/
 export function paymentBand(
   rows: PayNodeRow[],
   now: Date,
+  projects?: Project[],
   paymentRecords?: Record<string, PaymentRecordsEntry>,
   start = '',
   end = '',
@@ -109,11 +112,26 @@ export function paymentBand(
   const planInScope = (planDate: string): boolean =>
     hasRange ? inRange(planDate, start, end) : planDate.startsWith(year)
 
-  // yearActual：若传入 paymentRecords 则按流水求和，否则退化节点 receivedAmount 之和
+  // yearActual：优先按 projects 遍历(排除异常，含无收款节点项目流水，与 computeKpis 同源)；
+  // 否则若传入 paymentRecords 则退化按节点项目去重求和；否则退化节点 receivedAmount 之和
   // hasRange 时：流水∈[start,end]；无区间时：流水 date.startsWith(year)，与计划侧年度口径对齐
   let yearActual = 0
-  if (paymentRecords) {
-    // 按项目 id 去重求和（rows 含多节点，流水应按项目级聚合）
+  if (paymentRecords && projects) {
+    // 遍历项目集(排除异常)，与 computeKpis 同源：含无收款节点项目的流水
+    for (const p of projects) {
+      if (isAnomalous(p)) continue
+      const records = paymentRecords[p.projectId]?.records
+      if (hasRange) {
+        yearActual += actualInRange(records, start, end)
+      } else {
+        yearActual += (records ?? []).reduce(
+          (s, r) => s + (String(r.date ?? '').startsWith(year) ? Number(r.amount ?? 0) : 0),
+          0,
+        )
+      }
+    }
+  } else if (paymentRecords) {
+    // 旧退化路径(无 projects)：按节点项目去重求和（rows 含多节点，流水应按项目级聚合）
     const seen = new Set<string>()
     for (const n of rows) {
       if (!seen.has(n.projectId)) {
