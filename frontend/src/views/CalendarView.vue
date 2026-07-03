@@ -123,7 +123,7 @@ function clearFilters() {
     <div class="cal-dash">
       <div v-for="c in DASH" :key="c.label" class="cd-card">
         <div class="cd-label">{{ c.label }}</div>
-        <div class="cd-val" :class="c.cls">{{ c.value }}</div>
+        <div class="cd-val u-num" :class="c.cls">{{ c.value }}</div>
       </div>
     </div>
 
@@ -187,27 +187,27 @@ function clearFilters() {
 </template>
 
 <style scoped>
-.cal-view { padding: 16px; }
-.cal-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 14px; }
-.cal-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 14px; }
-.cd-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 10px; text-align: center; }
-.cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: 4px; }
-.cd-val { font-size: var(--fs-5); font-weight: 800; color: var(--txt); }
-.cd-val.danger { color: var(--danger); }
-.cd-val.paid { color: var(--c-paid); }
-.cd-val.pending { color: var(--c-pending); }
+.cal-view { padding: var(--sp-4); }
+.cal-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-4); }
+.cal-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
+.cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-4) var(--sp-3); text-align: center; }
+.cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
+.cd-val { font-size: var(--fs-5); font-weight: 700; color: var(--txt); }
+.cd-val.danger { color: var(--danger-text); }
+.cd-val.paid { color: var(--ok-text); }
+.cd-val.pending { color: var(--warn-text); }
 .cd-val.accent { color: var(--accent); }
-.cal-filterbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-.cal-viewbar { margin-bottom: 12px; }
-.cal-nav { display: inline-flex; align-items: center; gap: 6px; }
-.cal-arrow { border: 1px solid var(--line); background: var(--card); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-weight: 900; color: var(--sub); }
+.cal-filterbar { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-4); }
+.cal-viewbar { margin-bottom: var(--sp-3); }
+.cal-nav { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.cal-arrow { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); width: 28px; height: 28px; cursor: pointer; font-weight: 700; color: var(--sub); }
 .cal-arrow:hover { background: var(--card2); color: var(--accent); }
 .cal-navlabel { font-size: var(--fs-2); font-weight: 700; color: var(--txt); min-width: 48px; text-align: center; }
-.cal-upcoming { margin-top: 22px; }
-.cal-up-title { font-size: var(--fs-4); font-weight: 800; color: var(--txt); margin-bottom: 12px; }
-.cal-up-row { display: flex; gap: 16px; flex-wrap: wrap; }
-.cal-up-panel { flex: 1; min-width: 320px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.cal-up-header { color: var(--on-accent); font-weight: 700; font-size: var(--fs-2); padding: 8px 12px; }
-.cal-up-header.pending { background: var(--c-pending); }
-.cal-up-header.accent { background: var(--accent); }
+.cal-upcoming { margin-top: var(--sp-5); }
+.cal-up-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-3); }
+.cal-up-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+.cal-up-panel { flex: 1; min-width: 320px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.cal-up-header { color: var(--warn-text); font-weight: 700; font-size: var(--fs-2); padding: var(--sp-2) var(--sp-3); }
+.cal-up-header.pending { background: var(--warn-bg); }
+.cal-up-header.accent { background: var(--card2); color: var(--accent); }
 </style>

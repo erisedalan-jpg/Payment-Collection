@@ -92,7 +92,7 @@ function clear() {
     :persistent="false"
   >
     <template #reference>
-      <span class="cf-icon" :class="{ active }" title="列筛选" @click.stop>&#9660;</span>
+      <span class="cf-icon" :class="{ active }" title="列筛选" v-activate @click.stop>&#9660;</span>
     </template>
     <div v-if="visible" class="cf-inner">
       <div class="cf-title">
@@ -127,10 +127,10 @@ function clear() {
   justify-content: center;
   width: 16px;
   height: 16px;
-  margin-left: 3px;
-  border-radius: 3px;
+  margin-left: var(--sp-1);
+  border-radius: var(--r-sm);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--fs-1);
   color: var(--mut);
   vertical-align: middle;
 }
@@ -140,9 +140,9 @@ function clear() {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .cf-title {
-  font-size: 12px;
+  font-size: var(--fs-1);
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-2);
   color: var(--txt);
 }
 .cf-count {
@@ -151,15 +151,15 @@ function clear() {
 }
 .cf-all {
   border-bottom: 1px solid var(--line);
-  margin: 6px 0;
-  padding-bottom: 4px;
+  margin: var(--sp-2) 0;
+  padding-bottom: var(--sp-1);
 }
 .cf-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  padding: 2px 0;
+  gap: var(--sp-1);
+  font-size: var(--fs-1);
+  padding: var(--sp-1) 0;
   cursor: pointer;
 }
 .cf-list {
@@ -174,7 +174,7 @@ function clear() {
 }
 .cf-actions {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 </style>

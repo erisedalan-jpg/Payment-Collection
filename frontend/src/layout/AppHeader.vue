@@ -2,6 +2,7 @@
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { api } from '@/api/client'
 import { APP_VERSION } from '@/version'
 import DisplaySettings from '@/components/DisplaySettings.vue'
@@ -11,7 +12,11 @@ const auth = useAuthStore()
 const router = useRouter()
 
 async function stopServer() {
-  if (!confirm('确认停止本地服务？停止后页面将无法继续使用。')) return
+  try {
+    await ElMessageBox.confirm('确认停止本地服务？停止后页面将无法继续使用。', '确认', { type: 'warning' })
+  } catch {
+    return
+  }
   try {
     await api.get('/api/stop')
   } catch {

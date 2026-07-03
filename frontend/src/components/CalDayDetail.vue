@@ -22,7 +22,7 @@ defineProps<{ title: string; groups: CalListGroup[] }>()
 
 <style scoped>
 .cdd { margin-top: 18px; }
-.cdd-title { font-size: var(--fs-4); font-weight: 800; color: var(--txt); margin-bottom: 8px; }
+.cdd-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: 8px; }
 .cdd-empty { color: var(--mut); text-align: center; padding: 20px; }
 .cdd-group { margin-bottom: 14px; }
 .cdd-head { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 8px 12px; border-left: 3px solid var(--line); background: var(--card2); font-size: var(--fs-2); }

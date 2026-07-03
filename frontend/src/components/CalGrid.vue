@@ -66,7 +66,7 @@ function onClick(ds: string) {
           </div>
           <div v-if="c.count > 0" class="cd-meta">
             <span>{{ c.count }}笔</span>
-            <span class="cd-amt">{{ fmtWan(c.remaining) }}万</span>
+            <span class="cd-amt u-num">{{ fmtWan(c.remaining) }}万</span>
           </div>
         </div>
       </div>
@@ -77,9 +77,9 @@ function onClick(ds: string) {
 <style scoped>
 .cal-grid-row { display: flex; gap: 16px; flex-wrap: wrap; }
 .cal-month { flex: 1; min-width: 300px; }
-.cal-month-title { text-align: center; font-size: var(--fs-3); font-weight: 800; color: var(--txt); margin-bottom: 8px; }
+.cal-month-title { text-align: center; font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin-bottom: 8px; }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-1); color: var(--sub); margin-bottom: 4px; }
-.cal-weekdays .wkend { color: var(--c-pending); }
+.cal-weekdays .wkend { color: var(--warn-text); }
 .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-day {
   --sc: var(--mut);
@@ -88,7 +88,7 @@ function onClick(ds: string) {
   flex-direction: column;
   justify-content: space-between;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 4px 6px;
   font-size: var(--fs-2);
   color: var(--txt);
