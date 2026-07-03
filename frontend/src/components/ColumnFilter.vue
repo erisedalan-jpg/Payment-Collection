@@ -92,7 +92,7 @@ function clear() {
     :persistent="false"
   >
     <template #reference>
-      <span class="cf-icon" :class="{ active }" title="列筛选" @click.stop>&#9660;</span>
+      <span class="cf-icon" :class="{ active }" title="列筛选" v-activate @click.stop>&#9660;</span>
     </template>
     <div v-if="visible" class="cf-inner">
       <div class="cf-title">

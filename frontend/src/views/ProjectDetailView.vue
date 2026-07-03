@@ -320,7 +320,7 @@ const originInfo = computed(() => [
 
           <section class="pd-tags">
             <span class="pdt-label">项目标签</span>
-            <span v-for="t in myTags" :key="t" class="tag-chip">{{ t }}<span class="tag-x" @click="removeOne(t)">✕</span></span>
+            <span v-for="t in myTags" :key="t" class="tag-chip">{{ t }}<span class="tag-x" v-activate @click="removeOne(t)">✕</span></span>
             <span v-if="!myTags.length" class="pdt-empty">未打标签</span>
             <el-select v-model="addInput" size="small" filterable allow-create default-first-option
                        placeholder="加标签" style="width: 150px" @change="addOne">

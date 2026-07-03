@@ -45,6 +45,7 @@ function onCard(action?: string) {
   <div class="dash-metrics u-grid-auto">
     <div v-for="m in metrics" :key="m.k" class="dm-card" :class="{ 'dm-card--link': m.action }"
       :data-test="m.action === 'nodes' ? 'pay-nodes-card' : m.action === 'delayed' ? 'pay-delayed-card' : m.action === 'projects' ? 'pay-projects-card' : undefined"
+      v-activate="!!m.action"
       @click="onCard(m.action)">
       <div class="dm-k">{{ m.k }}</div>
       <div class="dm-v u-num" :class="m.cls">{{ m.v }}</div>

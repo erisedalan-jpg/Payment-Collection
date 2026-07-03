@@ -96,4 +96,39 @@ describe('DashMetrics', () => {
     await w.find('[data-test="pay-nodes-card"]').trigger('click')
     expect(push).toHaveBeenCalledWith('/payment/nodes')
   })
+
+  it('可点卡片键盘可达: role/tabindex 齐全, Enter/Space 触发 onCard 下钻', async () => {
+    const ds = useDataStore()
+    ds.data = {
+      meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
+      rawNodes: [], displayColumns: {}, followupRecords: {},
+      projects: [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } }],
+      projectPmis: {},
+      paymentNodes: { P1: [
+        { stage: '到货款', planDate: '2026-02-01', actualDate: '', payRatio: 0.6, expectedPayment: 1000000, receivedAmount: 600000, unpaidAmount: 400000, status: '部分回款' },
+      ] },
+      paymentRecords: {
+        P1: { total: 800000, count: 1, records: [{ date: '2026-02-10', amount: 800000 }] },
+      },
+    } as any
+    const w = mount(DashMetrics)
+
+    const projectsCard = w.get('[data-test="pay-projects-card"]')
+    expect(projectsCard.attributes('role')).toBe('button')
+    expect(projectsCard.attributes('tabindex')).toBe('0')
+
+    await projectsCard.trigger('keydown', { key: 'Enter' })
+    expect(push).toHaveBeenCalledWith('/projects')
+
+    push.mockReset()
+    const delayedCard = w.get('[data-test="pay-delayed-card"]')
+    await delayedCard.trigger('keydown', { key: ' ' })
+    expect(push).toHaveBeenCalledWith('/projects?riskCategory=回款延期')
+
+    // 无 action 的卡片(如「已回款」)不应被赋予 role=button/tabindex
+    const paidCard = w.findAll('.dm-card').find((c) => c.text().includes('已回款'))
+    expect(paidCard).toBeTruthy()
+    expect(paidCard!.attributes('role')).toBeUndefined()
+    expect(paidCard!.attributes('tabindex')).toBeUndefined()
+  })
 })
