@@ -55,7 +55,7 @@ def stage_status(category: str, plan_date: str, actual_ratio: float, today: str)
     已回款(>=1) / 部分回款(0<ar<1) / 质保期(质保金且未收) / 延期(计划<今天且未收) / 待回款。"""
     ar = actual_ratio or 0.0
     if ar >= 1:
-        return "已回款"
+        return config.STAGE_STATUS_PAID
     if ar > 0:
         return "部分回款"
     if category == "质保金":
