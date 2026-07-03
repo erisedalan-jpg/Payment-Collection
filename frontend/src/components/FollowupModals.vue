@@ -35,18 +35,17 @@ const emit = defineEmits<{
       </div>
     </Modal>
 
-    <Modal v-if="!retain" v-model="archiveOpen" title="更新（归档）" width="420px">
-      <div>将把当前数据归档为历史快照，并清空两列进展（开始新一期）。确认更新？</div>
+    <Modal
+      v-model="archiveOpen"
+      :title="retain ? '归档（留存跟进）' : '更新（归档）'"
+      :width="retain ? '460px' : '420px'"
+    >
+      <slot name="archive-body">
+        <div>归档当前数据为历史快照。确认归档？</div>
+      </slot>
       <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
         <button class="kp-cancel" @click="archiveOpen = false">取消</button>
-        <button class="kp-archive-btn" :disabled="archiving" @click="emit('confirmArchive')">确认更新</button>
-      </div>
-    </Modal>
-    <Modal v-else v-model="archiveOpen" title="归档（留存跟进）" width="460px">
-      <div>将当前风险跟进快照归档为历史；已填写的跟进动作 / rev结论 / 下次rev时间<strong>保留不清空</strong>（下次「更新数据」后按风险编码重新挂到最新风险上）。确认归档？</div>
-      <div style="margin-top: var(--gap-card); display: flex; justify-content: flex-end; gap: var(--sp-2)">
-        <button class="kp-cancel" @click="archiveOpen = false">取消</button>
-        <button class="kp-archive-btn" :disabled="archiving" @click="emit('confirmArchive')">确认归档</button>
+        <button class="kp-archive-btn" :disabled="archiving" @click="emit('confirmArchive')">{{ retain ? '确认归档' : '确认更新' }}</button>
       </div>
     </Modal>
 

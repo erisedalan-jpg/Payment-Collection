@@ -6,7 +6,7 @@ import FollowupModals from './FollowupModals.vue'
 afterEach(() => { document.body.innerHTML = '' })
 
 describe('FollowupModals', () => {
-  it('retain=false 归档文案含清空;retain=true 含留存', async () => {
+  it('retain 切归档 Modal 标题/宽度/确认按钮(正文改由 slot,不再随 retain 变)', async () => {
     const w = mount(FollowupModals, {
       props: {
         delConfirm: false, exportOpen: false, archiveOpen: true, historyLabel: 't',
@@ -18,10 +18,39 @@ describe('FollowupModals', () => {
       attachTo: document.body,
     })
     await flushPromises()
-    expect(document.body.textContent).toContain('清空')
+    // retain=false: 清空版标题/按钮/宽度 + 通用默认正文(未传 slot)
+    expect(document.body.textContent).toContain('更新（归档）')
+    expect(document.body.textContent).toContain('确认更新')
+    expect(document.body.textContent).toContain('归档当前数据为历史快照')
+    expect(document.body.innerHTML).toContain('420px')
+
     await w.setProps({ retain: true })
     await flushPromises()
-    expect(document.body.textContent).toContain('留存')
+    // retain=true: 留存版标题/按钮/宽度
+    expect(document.body.textContent).toContain('归档（留存跟进）')
+    expect(document.body.textContent).toContain('确认归档')
+    expect(document.body.innerHTML).toContain('460px')
+    w.unmount()
+  })
+
+  it('#archive-body slot 覆盖默认正文;retain 仍切标题', async () => {
+    const w = mount(FollowupModals, {
+      props: {
+        delConfirm: false, exportOpen: false, archiveOpen: true, historyLabel: 't',
+        deleting: false, archiving: false, retain: true,
+        datasetOpts: [{ value: 'current', label: '当前' }], exportSel: ['current'],
+        allSelected: true, exportIndeterminate: false, exportCount: 1,
+      },
+      slots: { 'archive-body': '<div>页面自定义归档文案XYZ</div>' },
+      global: { plugins: [ElementPlus] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    // slot 内容渲染,默认正文被覆盖
+    expect(document.body.textContent).toContain('页面自定义归档文案XYZ')
+    expect(document.body.textContent).not.toContain('归档当前数据为历史快照')
+    // retain=true 仍切标题
+    expect(document.body.textContent).toContain('归档（留存跟进）')
     w.unmount()
   })
 
