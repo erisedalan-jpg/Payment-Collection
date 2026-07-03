@@ -4,11 +4,14 @@
 PMIS 缺失要优雅降级,不抛错、不阻断回款主流程。"""
 from __future__ import annotations
 import datetime
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import config
+
+logger = logging.getLogger(__name__)
 
 
 def parse_pmis_money(val) -> Optional[float]:
@@ -73,7 +76,9 @@ def read_pmis_sheet(path: str) -> List[Dict[str, Any]]:
         all_rows = list(ws.iter_rows(values_only=True))
         wb.close()
     except Exception:
-        # 文件损坏/加密/格式异常等不应阻断回款主流程,降级为空表
+        # 文件损坏/加密/格式异常等不应阻断回款主流程,降级为空表;
+        # 但须留痕区分"没给文件"(上面 exists 分支)与"给了但读不了",否则漂移会整体静默错数
+        logger.warning("PMIS 表读取失败(可能损坏/加密): %s", path)
         return []
     hr = config.PMIS_HEADER_ROW
     if len(all_rows) < hr:
