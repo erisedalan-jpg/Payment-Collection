@@ -5,7 +5,10 @@ import ElementPlus from 'element-plus'
 import ColumnFilter from './ColumnFilter.vue'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 
-beforeEach(() => setActivePinia(createPinia()))
+beforeEach(() => {
+  setActivePinia(createPinia())
+  document.body.innerHTML = '' // 清掉上个用例 teleport 到 body 的弹层残留
+})
 
 function mountCF() {
   return mount(ColumnFilter, {
@@ -19,6 +22,21 @@ describe('ColumnFilter', () => {
     const w = mountCF()
     expect(w.find('.cf-icon').exists()).toBe(true)
     expect(w.find('.cf-icon.active').exists()).toBe(false)
+  })
+  // 性能护栏(V2.6.6):弹层内容必须惰性——未打开不得把整列唯一值选项预渲染进 body
+  // (el-popover persistent 默认 true 会挂载即渲染并永驻 body,多页多列叠加致全站卡慢)
+  it('未打开时不渲染选项列表(不污染 body)', () => {
+    mountCF()
+    expect(document.body.querySelector('.cf-list')).toBeNull()
+  })
+  it('打开渲染选项列表,关闭即销毁', async () => {
+    const w = mountCF()
+    ;(w.vm as any).visible = true
+    await w.vm.$nextTick()
+    expect(document.body.querySelector('.cf-list')).not.toBeNull()
+    ;(w.vm as any).visible = false
+    await w.vm.$nextTick()
+    expect(document.body.querySelector('.cf-list')).toBeNull()
   })
   it('该列有筛选时图标高亮', async () => {
     const s = useCrossFilterStore()

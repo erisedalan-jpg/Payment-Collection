@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, KeepAlive } from 'vue'
 import AppLayout from './AppLayout.vue'
 
 beforeEach(() => {
@@ -101,6 +101,18 @@ describe('AppLayout keep-alive 包裹', () => {
     await flushPromises()
     expect(w.find('.app-main').exists()).toBe(true)
     expect(w.find('.normal-page').exists()).toBe(true)
+  })
+
+  // V2.6.6 性能护栏:菜单进入 bump token 产生的旧实例是永不可复用的死缓存,
+  // 返回判定只有单一 armed 槽 → 最多只需最近 1 个缓存实例;max=2(留 1 余量)防死实例囤积
+  it('keep-alive 缓存上限为 2(防死实例累积)', async () => {
+    const router = makeKeepAliveRouter()
+    router.push('/projects'); await router.isReady()
+    const w = mount(AppLayout, { global: { plugins: [router], stubs: keepAliveStubs } })
+    await flushPromises()
+    const ka = w.findComponent(KeepAlive)
+    expect(ka.exists()).toBe(true)
+    expect(Number(ka.props('max'))).toBe(2)
   })
 
   it('全屏路由裸渲染、无 .app-main', async () => {
