@@ -79,7 +79,7 @@ function onClick(ds: string) {
 .cal-month { flex: 1; min-width: 300px; }
 .cal-month-title { text-align: center; font-size: var(--fs-3); font-weight: 800; color: var(--txt); margin-bottom: 8px; }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-1); color: var(--sub); margin-bottom: 4px; }
-.cal-weekdays .wkend { color: var(--c-pending); }
+.cal-weekdays .wkend { color: var(--warn-text); }
 .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-day {
   --sc: var(--mut);

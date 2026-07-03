@@ -60,9 +60,9 @@ function onCard(action?: string) {
 .dm-card--link:hover { background: var(--hover-tint); }
 .dm-k { font-size: var(--fs-1); color: var(--mut); }
 .dm-v { font-size: var(--fs-5); font-weight: 800; margin-top: 4px; color: var(--txt); }
-.dm-v.paid { color: var(--c-paid); }
-.dm-v.remain { color: var(--c-remaining); }
-.dm-v.pending { color: var(--c-pending); }
-.dm-v.danger { color: var(--danger); }
+.dm-v.paid { color: var(--ok-text); }
+.dm-v.remain { color: var(--danger-text); }
+.dm-v.pending { color: var(--warn-text); }
+.dm-v.danger { color: var(--danger-text); }
 .dm-sub { display: block; color: var(--accent); font-size: var(--fs-1); padding: 4px 0 0; }
 </style>

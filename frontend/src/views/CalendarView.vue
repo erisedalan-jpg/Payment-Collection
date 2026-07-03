@@ -194,8 +194,8 @@ function clearFilters() {
 .cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: 4px; }
 .cd-val { font-size: var(--fs-5); font-weight: 800; color: var(--txt); }
 .cd-val.danger { color: var(--danger); }
-.cd-val.paid { color: var(--c-paid); }
-.cd-val.pending { color: var(--c-pending); }
+.cd-val.paid { color: var(--ok-text); }
+.cd-val.pending { color: var(--warn-text); }
 .cd-val.accent { color: var(--accent); }
 .cal-filterbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .cal-viewbar { margin-bottom: 12px; }
