@@ -88,7 +88,7 @@ function onClick(ds: string) {
   flex-direction: column;
   justify-content: space-between;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 4px 6px;
   font-size: var(--fs-2);
   color: var(--txt);
