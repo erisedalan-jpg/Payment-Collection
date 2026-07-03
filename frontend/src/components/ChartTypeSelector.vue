@@ -63,10 +63,12 @@ function toggle(type: string) {
   line-height: var(--lh-base);
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+/* 选中=抬起 chip(淡底深字,符合三态规范;弃旧"实底+小号白字") */
 .cts-b.on {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--card);
+  color: var(--accent);
   font-weight: 700;
+  box-shadow: var(--shadow-1);
 }
 .cts-b:not(.on):hover {
   background: var(--hover-tint);
