@@ -31,7 +31,7 @@ export interface PayDashSummary {
   totalExpected: number
   totalActual: number
   totalRemaining: number
-  rate: number
+  rate: number | null
   delayedProjects: number
 }
 
@@ -62,7 +62,7 @@ export function payDashSummary(
     totalAll,
     noStageCount,
     totalExpected, totalActual, totalRemaining,
-    rate: totalContract > 0 ? totalActual / totalContract : 0,
+    rate: totalContract > 0 ? totalActual / totalContract : null,
     delayedProjects: delayedPids.size,
   }
 }
@@ -111,7 +111,7 @@ export interface OrgRank {
   expectedTotal: number
   actualTotal: number
   actualTotalWan: number
-  achievementRate: number
+  achievementRate: number | null
   contractTotal: number
 }
 
@@ -136,8 +136,8 @@ export function payOrgRanking(
     m[org].contractTotal += p.paymentPmis?.contract ?? 0
   }
   return Object.values(m)
-    .map((o) => ({ ...o, achievementRate: o.contractTotal > 0 ? o.actualTotal / o.contractTotal : 0, actualTotalWan: o.actualTotal / 10000 }))
-    .sort((a, b) => b[sortBy] - a[sortBy])
+    .map((o) => ({ ...o, achievementRate: o.contractTotal > 0 ? o.actualTotal / o.contractTotal : null, actualTotalWan: o.actualTotal / 10000 }))
+    .sort((a, b) => (Number(b[sortBy] ?? -1)) - (Number(a[sortBy] ?? -1)))
 }
 
 export interface PeriodSeries {
