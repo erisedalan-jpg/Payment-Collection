@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { followupApi, type FollowupRecord, type FollowupFormData } from '@/lib/followupApi'
 import FollowupRecordForm from './FollowupRecordForm.vue'
 
@@ -72,7 +72,11 @@ async function onSubmit(data: FollowupFormData) {
 async function onDelete(r: FollowupRecord) {
   const id = r['记录编号'] || ''
   if (!id) return
-  if (!window.confirm(`确定要删除此跟进记录吗？\n\n记录编号: ${id}\n删除后无法恢复。`)) return
+  try {
+    await ElMessageBox.confirm(`确定要删除此跟进记录吗？\n\n记录编号: ${id}\n删除后无法恢复。`, '确认', { type: 'warning' })
+  } catch {
+    return
+  }
   try {
     const res = await followupApi.remove(id)
     ElMessage.success(res.message || '已删除')
