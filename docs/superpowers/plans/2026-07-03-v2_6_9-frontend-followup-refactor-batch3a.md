@@ -312,7 +312,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 **每页迁移动作（通用模式）**：
 1. 引入 `const fp = useFollowupPage(<该页store>, filtered)`，用 `fp.mode/historyIdx/isCurrent/datasetOpts/historyOpts/paged/currentPage/pageSize/delConfirm/deleting/doDeleteArchive/exportOpen/exportSel/allSelected/exportIndeterminate/toggleAllExport` **替换该页本地同名 ref/computed/函数**（删掉被替换的本地定义）。
-2. 模板里删除/导出/归档三个 Modal 换成 `<FollowupModals ... />`（绑 fp 的态 + `retain`=该页是否留存 + `@confirmDelete="fp.doDeleteArchive"` `@confirmArchive="doArchive"` `@doExport="doExport"` `@toggleAll="fp.toggleAllExport"`）。
+2. 模板里删除/导出/归档三个 Modal 换成 `<FollowupModals ... />`（绑 fp 的态 + `retain`=该页是否留存 + `@confirmDelete="fp.doDeleteArchive"` `@confirmArchive="doArchive"` `@doExport="doExport"` `@toggleAll="fp.toggleAllExport"`）。**归档 Modal 正文用具名 slot 传该页原文**：`<template #archive-body>` 里放该页原归档确认 Modal 的正文文案（Key/Temp/Opp 清空版原文；Risk/PaymentKey 留存版原文，如 Risk="风险跟进快照…风险编码…"、PaymentKey="回款重点跟进快照…项目编号…"）——`retain` 只驱动标题/宽度，正文各页原文经 slot 传入保证字节等价。
 3. `<style scoped>` 删掉 `.kp-*` 规则，改 `<style scoped>` 顶部 `@import '@/styles/followup.css';`（保留该页根 class 与独有规则如 Risk 的 `.kp-defer`）。
 4. **保留该页独有**：列定义、范围引擎(ScopeBuilder)、cell 编辑(progCell/openEdit/onDateChange/editCtx)、doArchive(行集)、onRow、样板(scrollMemory 等)。
 
