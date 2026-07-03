@@ -118,10 +118,13 @@ def count_parse_errors(input_dir: str) -> Dict[str, int]:
             v = (r.get(col) or "").strip()
             if v and not _ms_to_date(v):
                 errors["date"] += 1
-        for col in ("回款比例", "实际比例"):
-            v = (r.get(col) or "").strip()
-            if v and _pct(v) is None:
-                errors["ratio"] += 1
+        # 回款比例:_row_to_node 用 _pct 解析(payRatio)
+        rr = (r.get("回款比例") or "").strip()
+        if rr and _pct(rr) is None:
+            errors["ratio"] += 1
+        # 实际比例:_row_to_node 用 _num 解析(actualRatio),故用 _num_ok 判失败对齐真实降级
+        if not _num_ok(r.get("实际比例")):
+            errors["ratio"] += 1
     return errors
 
 

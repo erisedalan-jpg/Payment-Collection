@@ -129,5 +129,22 @@ def test_count_parse_errors_counts_bad_cells_not_blanks(tmp_path):
     assert errs == {"amount": 1, "date": 1, "ratio": 1}
 
 
+def test_count_parse_errors_actual_ratio_uses_num_parser(tmp_path):
+    """实际比例 由 _row_to_node 用 _num 解析(actualRatio),故计数须用 _num_ok 判失败对齐:
+    "90%" 会被真实 _num 静默降级为 0(真错),必须计入;而 _pct("90%")=0.9 会漏报。
+    回款比例 仍由 _pct 解析,"90%" 对它是合法(=0.9),不计。"""
+    p = str(tmp_path)
+    _write_csv(os.path.join(p, "collection_stages.csv"), [
+        {  # 实际比例="90%":_num 解析失败(真降级为0)→ 应计 ratio；回款比例="90%":_pct 合法不计
+            "项目编号": "X1", "回款类型": "终验款", "阶段名称": "终验款", "回款比例": "90%",
+            "回款金额": "900000", "计划回款时间": "1782057600000",
+            "实际回款时间": "", "实际比例": "90%", "已收金额": "0", "未收金额": "900000",
+        },
+    ])
+    errs = CS.count_parse_errors(p)
+    assert errs["ratio"] == 1   # 仅 实际比例="90%" 计入(回款比例="90%" 对 _pct 合法)
+    assert errs["amount"] == 0 and errs["date"] == 0
+
+
 def test_count_parse_errors_missing_file_returns_zeros(tmp_path):
     assert CS.count_parse_errors(str(tmp_path)) == {"amount": 0, "date": 0, "ratio": 0}
