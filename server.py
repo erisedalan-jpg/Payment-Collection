@@ -129,6 +129,19 @@ reprocess_state = {"running": False, "progress": 0, "message": ""}
 # PMIS 在线下载流水线状态(独立于 reprocess)
 download_state = {"running": False, "progress": 0, "message": ""}
 
+# 运行槽占用锁：reprocess/download 检查-置位需原子化，防并发 TOCTOU 双触发
+_run_state_lock = threading.Lock()
+
+
+def _acquire_run_slot(state, lock, payload):
+    """原子占用运行槽:忙→False(不动 state);空→置位 payload 并 True。防 reprocess/download TOCTOU。"""
+    with lock:
+        if state.get("running"):
+            return False
+        state.clear()
+        state.update(payload)
+        return True
+
 # 子进程引用（用于停止更新时终止）
 active_process = None
 
@@ -1796,10 +1809,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if history_state.get("running") or reprocess_state.get("running"):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再下载"})
             return
-        if download_state.get("running"):
+        if not _acquire_run_slot(download_state, _run_state_lock,
+                                  {"running": True, "progress": 0, "message": "启动下载..."}):
             self._json_response(download_state)
             return
-        download_state = {"running": True, "progress": 0, "message": "启动下载..."}
         threading.Thread(target=run_download, daemon=True).start()
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
@@ -1819,10 +1832,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if history_state.get("running") or download_state.get("running"):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
             return
-        if reprocess_state.get("running"):
+        if not _acquire_run_slot(reprocess_state, _run_state_lock,
+                                  {"running": True, "progress": 0, "message": "启动更新..."}):
             self._json_response(reprocess_state)
             return
-        reprocess_state = {"running": True, "progress": 0, "message": "启动更新..."}
         threading.Thread(target=run_reprocess, daemon=True).start()
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
