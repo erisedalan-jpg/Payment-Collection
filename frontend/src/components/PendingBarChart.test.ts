@@ -1,7 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
 import PendingBarChart from './PendingBarChart.vue'
 import ChartBox from '@/charts/ChartBox.vue'
+import { useSettingsStore } from '@/stores/settings'
+import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  localStorage.clear()
+  document.documentElement.className = ''
+})
 
 describe('PendingBarChart', () => {
   it('builds a stacked bar option with 3 tier series and passes it to ChartBox', () => {
@@ -23,7 +32,7 @@ describe('PendingBarChart', () => {
     expect(option.xAxis.data).toEqual(['2026-Q1', '2026-Q2'])
     expect(option.series[0].data).toEqual([100, 0])
   })
-  it('assigns tier colors in order (danger/warn/ok)', () => {
+  it('assigns tier colors in order (danger/warn/ok) from STATUS_LIGHT under light theme', () => {
     const wrapper = mount(PendingBarChart, {
       props: {
         categories: ['Q1'],
@@ -35,9 +44,28 @@ describe('PendingBarChart', () => {
       },
     })
     const option = wrapper.findComponent(ChartBox).props('option') as any
-    expect(option.series[0].itemStyle.color).toBe('#c8161d')
-    expect(option.series[1].itemStyle.color).toBe('#f9d46c')
-    expect(option.series[2].itemStyle.color).toBe('#6ecc54')
+    expect(option.series[0].itemStyle.color).toBe(STATUS_LIGHT.danger)
+    expect(option.series[1].itemStyle.color).toBe(STATUS_LIGHT.warn)
+    expect(option.series[2].itemStyle.color).toBe(STATUS_LIGHT.ok)
+  })
+
+  it('assigns tier colors from STATUS_DARK under dark theme (danger 随主题变 #d34947)', () => {
+    useSettingsStore().setTheme('dark')
+    const wrapper = mount(PendingBarChart, {
+      props: {
+        categories: ['Q1'],
+        series: [
+          { tier: '100万以上', data: [1] },
+          { tier: '50-100万', data: [2] },
+          { tier: '50万以下', data: [3] },
+        ],
+      },
+    })
+    const option = wrapper.findComponent(ChartBox).props('option') as any
+    expect(option.series[0].itemStyle.color).toBe(STATUS_DARK.danger)
+    expect(option.series[0].itemStyle.color).toBe('#d34947')
+    expect(option.series[1].itemStyle.color).toBe(STATUS_DARK.warn)
+    expect(option.series[2].itemStyle.color).toBe(STATUS_DARK.ok)
   })
 
   it('横滑容器 .pbc-scroll 存在', () => {
