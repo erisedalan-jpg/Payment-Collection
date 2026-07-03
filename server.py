@@ -1810,6 +1810,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._json_response({"success": True, "sessionPreview": preview, "message": "Cookie 已更新"})
 
+    def _sse_write(self, text):
+        """SSE 推送一段文本;客户端断开→返回 False 不抛(供循环 break)。"""
+        try:
+            self.wfile.write(text.encode('utf-8'))
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return False
+
     def handle_pmis_download(self):
         """GET /api/pmis/download - 服务器端跑 PMIS 下载流水线,SSE 流式进度。超管专属。"""
         global download_state
@@ -1827,8 +1836,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         while True:
-            self.wfile.write(f"data: {json.dumps(download_state, ensure_ascii=False)}\n\n".encode('utf-8'))
-            self.wfile.flush()
+            if not self._sse_write(f"data: {json.dumps(download_state, ensure_ascii=False)}\n\n"):
+                break
             if download_state["progress"] >= 100 or not download_state["running"]:
                 break
             time.sleep(0.5)
@@ -1850,8 +1859,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         while True:
-            self.wfile.write(f"data: {json.dumps(reprocess_state)}\n\n".encode('utf-8'))
-            self.wfile.flush()
+            if not self._sse_write(f"data: {json.dumps(reprocess_state)}\n\n"):
+                break
             if reprocess_state["progress"] >= 100 or not reprocess_state["running"]:
                 break
             time.sleep(0.5)
