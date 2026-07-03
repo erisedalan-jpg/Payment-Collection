@@ -159,6 +159,9 @@ ERR_INTERNAL = "internal_error"       # 其它内部错误
 ERR_AUTH = "auth_failed"              # 登录鉴权失败
 ERR_FORBIDDEN = "forbidden"           # 权限不足(非超管)
 
+MAX_JSON_BODY = 16 * 1024 * 1024      # JSON body 上限(16MB),防超大请求撑爆内存
+MAX_UPLOAD_BODY = 512 * 1024 * 1024   # 文件上传 body 上限(512MB,xlsx 留余量)
+
 _AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me')
 
 
@@ -1728,8 +1731,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
             return
-        length = int(self.headers.get('Content-Length', 0))
-        if length <= 0:
+        body = self._read_body_bytes(MAX_UPLOAD_BODY)
+        if body is None:
+            self._send_json(413, _error_payload(ERR_VALIDATION, "请求体缺失或超出大小上限"))
+            return
+        if len(body) == 0:
             # 空内容不落地,避免写出 0 字节坏文件却报成功
             self.send_response(400)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -1737,7 +1743,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
             return
-        body = self.rfile.read(length)
         pmis_dir = os.path.join(BASE_DIR, 'input', config.PMIS_DIRNAME)
         os.makedirs(pmis_dir, exist_ok=True)
         with open(os.path.join(pmis_dir, name), 'wb') as f:
@@ -1759,8 +1764,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
             return
-        length = int(self.headers.get('Content-Length', 0))
-        if length <= 0:
+        body = self._read_body_bytes(MAX_UPLOAD_BODY)
+        if body is None:
+            self._send_json(413, _error_payload(ERR_VALIDATION, "请求体缺失或超出大小上限"))
+            return
+        if len(body) == 0:
             # 空内容不落地,避免写出 0 字节坏文件却报成功
             self.send_response(400)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -1768,7 +1776,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
             return
-        body = self.rfile.read(length)
         input_dir = os.path.join(BASE_DIR, 'input')
         os.makedirs(input_dir, exist_ok=True)
         with open(os.path.join(input_dir, name), 'wb') as f:
@@ -1989,12 +1996,24 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         return account
 
     def _read_json_body(self):
-        """读 POST JSON body;失败返回 None(调用方负责报 400)。"""
+        """读 POST JSON body;失败或超出 MAX_JSON_BODY 返回 None(调用方负责报 400)。"""
         try:
             n = int(self.headers.get('Content-Length', 0))
+            if n < 0 or n > MAX_JSON_BODY:
+                return None
             return json.loads(self.rfile.read(n).decode('utf-8'))
         except Exception:
             return None
+
+    def _read_body_bytes(self, max_bytes):
+        """读裸 body 字节;Content-Length 非法/负/超 max_bytes → None。"""
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+        except (TypeError, ValueError):
+            return None
+        if n < 0 or n > max_bytes:
+            return None
+        return self.rfile.read(n)
 
     def handle_admin_accounts_list(self):
         if self._require_super() is None:
