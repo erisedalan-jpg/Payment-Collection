@@ -75,10 +75,7 @@ const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 
-function onToggle(key: string) {
-  if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
-  prefs.toggle(key)
-}
+const onToggle = prefs.makeToggle(cf, TABLE_ID)
 
 // KPI 深链 → 列枚举写 crossFilter(并确保列可见) / 特殊项写本地态
 function qval(v: unknown): string | null {

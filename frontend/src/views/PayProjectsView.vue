@@ -16,6 +16,7 @@ import { applyColumnFilters } from '@/lib/crossFilter'
 import { tagMatch } from '@/lib/tagFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePagedRows } from '@/lib/usePagedRows'
+import { useExternalSort } from '@/lib/useExternalSort'
 import { exportRows } from '@/lib/exportXlsx'
 
 defineOptions({ name: 'PayProjectsView' })
@@ -88,24 +89,7 @@ const filtered = computed(() => {
 })
 
 // 表头排序（custom，跨页排全集）
-const sortState = ref<{ prop: string; order: '' | 'asc' | 'desc' }>({ prop: '', order: '' })
-function onSortChange({ prop, order }: { prop: string | null; order: string | null }) {
-  sortState.value = {
-    prop: prop || '',
-    order: order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : '',
-  }
-}
-const sorted = computed(() => {
-  const { prop, order } = sortState.value
-  if (!prop || !order) return filtered.value
-  const dir = order === 'asc' ? 1 : -1
-  const isNum = NUMERIC_KEYS.has(prop)
-  return [...filtered.value].sort((a, b) => {
-    const x = (a as any)[prop], y = (b as any)[prop]
-    if (isNum) return ((Number(x) || 0) - (Number(y) || 0)) * dir
-    return String(x ?? '').localeCompare(String(y ?? ''), 'zh') * dir
-  })
-})
+const { sortState, onSortChange, sorted } = useExternalSort(filtered, NUMERIC_KEYS)
 
 const { paged, currentPage, pageSize } = usePagedRows(sorted, 50)
 

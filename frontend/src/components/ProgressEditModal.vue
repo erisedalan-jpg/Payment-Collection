@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import Modal from './Modal.vue'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
@@ -40,11 +41,13 @@ async function save() {
     await (activeStore.value as { update: (id: string, field: string, content: string) => Promise<unknown> })
       .update(props.projectId, props.field, text.value)
     emit('update:modelValue', false)
+  } catch (e) {
+    ElMessage.error('保存失败: ' + (e as Error).message)
   } finally {
     saving.value = false
   }
 }
-defineExpose({ save, text })
+defineExpose({ save, text, saving })
 </script>
 
 <template>
