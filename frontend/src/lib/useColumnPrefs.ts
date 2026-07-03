@@ -26,12 +26,26 @@ function saveKeys(viewKey: string, keys: string[]): void {
   }
 }
 
+/** cf 只需具备 clearColumn(tableId, key)；宽松结构类型，不绑定具体 store 实现(crossFilter store 满足此形状)。 */
+export interface ColumnClearer {
+  clearColumn: (tableId: string, key: string) => void
+}
+
 export interface ColumnPrefs {
   visibleKeys: Ref<string[]>
   toggle: (key: string) => void
   moveUp: (key: string) => void
   moveDown: (key: string) => void
   reset: () => void
+  /** 「关列清筛选」不变式：key 当前可见(即将被隐藏)时先 cf.clearColumn 清其表头筛选，再 toggle。 */
+  makeToggle: (cf: ColumnClearer, tableId: string) => (key: string) => void
+}
+
+function buildMakeToggle(visibleKeys: Ref<string[]>, toggle: (key: string) => void): ColumnPrefs['makeToggle'] {
+  return (cf, tableId) => (key) => {
+    if (visibleKeys.value.includes(key)) cf.clearColumn(tableId, key)
+    toggle(key)
+  }
 }
 
 export function useColumnPrefs(viewKey: string, allKeys: string[], defaultVisible: string[]): ColumnPrefs {
@@ -69,7 +83,7 @@ export function useColumnPrefs(viewKey: string, allKeys: string[], defaultVisibl
   function reset() {
     set(defaultVisible.filter((k) => allKeys.includes(k)))
   }
-  return { visibleKeys, toggle, moveUp, moveDown, reset }
+  return { visibleKeys, toggle, moveUp, moveDown, reset, makeToggle: buildMakeToggle(visibleKeys, toggle) }
 }
 
 /** 动态列版本:allKeys 为 Ref(数据异步到达后变化)。首次非空时从 localStorage 懒加载。 */
@@ -104,5 +118,5 @@ export function useColumnPrefsDynamic(
     if (i >= 0 && i < visibleKeys.value.length - 1) { const n = [...visibleKeys.value]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; set(n) }
   }
   function reset() { set(defaultVisible.filter((k) => allKeys.value.includes(k))) }
-  return { visibleKeys, toggle, moveUp, moveDown, reset }
+  return { visibleKeys, toggle, moveUp, moveDown, reset, makeToggle: buildMakeToggle(visibleKeys, toggle) }
 }

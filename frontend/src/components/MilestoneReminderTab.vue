@@ -65,10 +65,7 @@ const visibleColumns = computed(() =>
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 const FILTERABLE = new Set(['projectType', 'manager', 'orgL3', 'orgL4', 'node', 'done', 'linked', 'priorityLabel'])
 
-function onToggle(key: string) {
-  if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
-  prefs.toggle(key)
-}
+const onToggle = prefs.makeToggle(cf, TABLE_ID)
 
 const pageSize = ref(50)
 const currentPage = ref(1)
