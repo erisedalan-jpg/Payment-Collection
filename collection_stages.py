@@ -90,6 +90,41 @@ def _row_to_node(row: Dict[str, str], today: str) -> Dict[str, Any]:
     }
 
 
+def _num_ok(v: Any) -> bool:
+    """判定一个金额单元格是否"可解析"：留空视为合法(不计失败),
+    能 float() 解析视为合法,否则(如千分位逗号/非数字文本)判定为解析失败。"""
+    s = (v or "").strip()
+    if not s:
+        return True
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
+def count_parse_errors(input_dir: str) -> Dict[str, int]:
+    """治理告警:逐行扫描收款台账 CSV,统计"非空白但无法解析"的单元格数,
+    分金额/日期/比例三类;PMIS 导出格式漂移会让 _num/_ms_to_date/_pct 静默降级
+    为 0/''/None,此计数让漂移在 dataQuality 里可见,而不改变现有解析口径。
+    缺文件 → 全 0(与 load_collection_stages 的"缺文件→{}"降级一致)。"""
+    rows = profit.read_csv_rows(os.path.join(input_dir, config.COLLECTION_STAGES_FILE))
+    errors = {"amount": 0, "date": 0, "ratio": 0}
+    for r in rows:
+        for col in ("回款金额", "已收金额"):
+            if not _num_ok(r.get(col)):
+                errors["amount"] += 1
+        for col in ("计划回款时间", "实际回款时间"):
+            v = (r.get(col) or "").strip()
+            if v and not _ms_to_date(v):
+                errors["date"] += 1
+        for col in ("回款比例", "实际比例"):
+            v = (r.get(col) or "").strip()
+            if v and _pct(v) is None:
+                errors["ratio"] += 1
+    return errors
+
+
 def load_collection_stages(input_dir: str, today: str) -> Dict[str, List[Dict[str, Any]]]:
     """读 CSV → {项目编号: [node,...]};每组按 planDate 升序(空排末尾)。缺文件 → {}。"""
     rows = profit.read_csv_rows(os.path.join(input_dir, config.COLLECTION_STAGES_FILE))

@@ -402,6 +402,9 @@ def main():
     _today = datetime.now().strftime("%Y-%m-%d")
     collection_stages = collection_mod.load_collection_stages(
         os.path.join(BASE_DIR, "input"), _today)
+    # 治理告警:收款台账逐单元格解析失败计数(金额/日期/比例),PMIS 导出格式漂移可见化;
+    # 不改变 load_collection_stages 本身的静默降级口径,仅并入 dataQuality 供治理页展示。
+    collection_parse_errors = collection_mod.count_parse_errors(os.path.join(BASE_DIR, "input"))
 
     # === 9b. 摄取 PMIS 项目域(在建全量 + 已关闭∩回款),按 projectId join ===
     print("[INFO] 摄取 PMIS 项目域数据...")
@@ -497,6 +500,7 @@ def main():
                 dirty.append({"type": "回款比例>1", "projectId": _pid,
                               "field": "actualRatio", "value": r})
     data_quality["dirty"] = dirty
+    data_quality["collectionParseErrors"] = collection_parse_errors
 
     # === 10. 构建最终数据 ===
     final_data = {
