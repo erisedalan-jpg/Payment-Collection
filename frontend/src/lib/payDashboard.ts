@@ -31,7 +31,7 @@ export interface PayDashSummary {
   totalExpected: number
   totalActual: number
   totalRemaining: number
-  rate: number
+  rate: number | null
   delayedProjects: number
 }
 
@@ -62,7 +62,7 @@ export function payDashSummary(
     totalAll,
     noStageCount,
     totalExpected, totalActual, totalRemaining,
-    rate: totalContract > 0 ? totalActual / totalContract : 0,
+    rate: totalContract > 0 ? totalActual / totalContract : null,
     delayedProjects: delayedPids.size,
   }
 }
@@ -111,11 +111,11 @@ export interface OrgRank {
   expectedTotal: number
   actualTotal: number
   actualTotalWan: number
-  achievementRate: number
+  achievementRate: number | null
   contractTotal: number
 }
 
-/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款=Σ流水(到账日∈R)；达成率=已回/合同（paymentPmis.contract）。sortBy 降序全量(组件自行 slice)。 */
+/** 服务组(L4)达成排名。计划=Σ节点 expectedPayment(计划日∈R)；已回款/达成率恒全时口径(全站统一 Σ流水全加 ÷ Σ合同，对齐 payDashSummary/computeKpis)；sortBy 降序全量(组件自行 slice)。 */
 export function payOrgRanking(
   projects: Project[],
   paymentNodes: Record<string, PaymentNodePmis[]> | undefined,
@@ -124,8 +124,7 @@ export function payOrgRanking(
   end: string,
   sortBy: 'actualTotal' | 'achievementRate',
 ): OrgRank[] {
-  // 达成率分母:选了日期区间时只算区间内有回款活动的项目合同(与分子同范围);全部时含全部合同(基线不变)。对齐 payDashSummary(S8)。
-  const dateActive = !!(start || end)
+  // 已回款/达成率恒全时口径(全站统一 Σ流水全加 ÷ Σ合同,对齐 payDashSummary/computeKpis);计划侧 expectedTotal 仍随区间。
   const m: Record<string, OrgRank> = {}
   for (const p of projects) {
     const org = (p.orgL4 ?? '').trim() || '未指定'
@@ -133,14 +132,12 @@ export function payOrgRanking(
     for (const n of paymentNodes?.[p.projectId] ?? []) {
       if (inRange(n.planDate || '', start, end)) m[org].expectedTotal += Number(n.expectedPayment ?? 0)
     }
-    m[org].actualTotal += actualInRange(paymentRecords?.[p.projectId]?.records, start, end)
-    if (!dateActive || hasActivityInRange(paymentNodes?.[p.projectId], paymentRecords?.[p.projectId]?.records, start, end)) {
-      m[org].contractTotal += p.paymentPmis?.contract ?? 0
-    }
+    m[org].actualTotal += actualInRange(paymentRecords?.[p.projectId]?.records, '', '')
+    m[org].contractTotal += p.paymentPmis?.contract ?? 0
   }
   return Object.values(m)
-    .map((o) => ({ ...o, achievementRate: o.contractTotal > 0 ? o.actualTotal / o.contractTotal : 0, actualTotalWan: o.actualTotal / 10000 }))
-    .sort((a, b) => b[sortBy] - a[sortBy])
+    .map((o) => ({ ...o, achievementRate: o.contractTotal > 0 ? o.actualTotal / o.contractTotal : null, actualTotalWan: o.actualTotal / 10000 }))
+    .sort((a, b) => (Number(b[sortBy] ?? -1)) - (Number(a[sortBy] ?? -1)))
 }
 
 export interface PeriodSeries {

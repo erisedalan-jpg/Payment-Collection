@@ -29,7 +29,7 @@ const metrics = computed(() => {
     { k: '回款节点数', v: String(s.relatedNodeCount), cls: '', action: 'nodes' },
     { k: '已回款(万)', v: fmtWan(s.totalActual), cls: 'paid' },
     { k: '待回款(万)', v: fmtWan(s.totalRemaining), cls: 'remain' },
-    { k: '完成率', v: pct(s.rate), cls: s.rate >= 0.8 ? 'paid' : s.rate >= 0.5 ? 'pending' : 'danger' },
+    { k: '完成率', v: pct(s.rate), cls: (s.rate ?? 0) >= 0.8 ? 'paid' : (s.rate ?? 0) >= 0.5 ? 'pending' : 'danger' },
     { k: '延期项目数', v: String(s.delayedProjects), cls: 'danger', action: 'delayed' },
   ]
 })

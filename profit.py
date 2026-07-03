@@ -118,7 +118,9 @@ def load_profit(input_dir: str, keep_ids: Set[str]
     budget_matched = 0
     for r in budget:
         pid = str(r.get("项目编号") or "").strip()
-        if pid in keep_ids:
+        if not pid:
+            continue
+        if pid in keep_ids and pid not in budget_map:
             budget_matched += 1
         budget_map[pid] = _budget_versions(r)
 

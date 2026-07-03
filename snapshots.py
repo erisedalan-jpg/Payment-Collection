@@ -54,7 +54,7 @@ def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[
             "paused": bool(st.get("是否暂停")),
             "rating": st.get("评级"),
             "openRisks": int(risk.get("未关闭风险数") or 0),
-            "overspend": bool(cost.get("超支")),
+            "overspend": bool(cost.get("项目超支")),
             "costRatio": cost.get("消耗比"),
             "overspendAmount": overspend_amount((project_profit or {}).get(pid)),
             "deliveryOver": bool(cats),
@@ -214,7 +214,7 @@ def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
             if sb == config.STATUS_DELAYED:
                 evs.append(_ev(d, "延期发生", "payment", pid, pname,
                                f"「{node}」{sa or '-'} → 延期", prev=sa, curr=sb, tone="danger"))
-            elif sb == config.STATUS_FULL_PAID:
+            elif sb == "已回款":
                 evs.append(_ev(d, "回款完成", "payment", pid, pname,
                                f"「{node}」已全额回款", prev=sa, curr=sb))
         if (a.get("planDate") or "") != (b.get("planDate") or ""):

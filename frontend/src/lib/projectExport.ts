@@ -34,7 +34,11 @@ export function buildExportSheets(
       name: '项目清单',
       rows: ctx.rows.map((r) => {
         const o: Record<string, unknown> = {}
-        for (const [k, label] of LIST_COLS) o[label] = r[k] ?? ''
+        for (const [k, label] of LIST_COLS) {
+          const raw = r[k]
+          if (k === 'contractAmount') o[label] = typeof raw === 'number' ? raw / 10000 : (raw ?? '')
+          else o[label] = raw ?? ''
+        }
         o['标签'] = (r.tags ?? []).join('、')
         return o
       }),
