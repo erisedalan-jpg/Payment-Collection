@@ -56,11 +56,11 @@ function onCard(action?: string) {
 
 <style scoped>
 .dash-metrics { --col-min: 130px; }
-.dm-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.dm-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
 .dm-card--link { cursor: pointer; }
 .dm-card--link:hover { background: var(--hover-tint); }
 .dm-k { font-size: var(--fs-1); color: var(--mut); }
-.dm-v { font-size: var(--fs-5); font-weight: 800; margin-top: 4px; color: var(--txt); }
+.dm-v { font-size: var(--fs-5); font-weight: 700; margin-top: 4px; color: var(--txt); }
 .dm-v.paid { color: var(--ok-text); }
 .dm-v.remain { color: var(--danger-text); }
 .dm-v.pending { color: var(--warn-text); }

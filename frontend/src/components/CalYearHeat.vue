@@ -39,7 +39,7 @@ function bg(rem: number): string {
 .cyh { margin-bottom: 14px; }
 .cyh-title { font-size: var(--fs-2); font-weight: 700; color: var(--txt); margin-bottom: 6px; }
 .cyh-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
-.cyh-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border: 1px solid var(--line); border-radius: 8px; color: var(--txt); }
+.cyh-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--txt); }
 .cyh-cell.hot { cursor: pointer; }
 .cyh-cell.hot:hover { border-color: var(--accent); }
 .cyh-cell.active { box-shadow: 0 0 0 2px var(--accent) inset; }

@@ -67,6 +67,6 @@ defineExpose({ save, text, saving })
 .pem-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-3); }
 .pem-cancel, .pem-save { font-size: var(--fs-1); border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 4px var(--sp-3); cursor: pointer; background: var(--card2); color: var(--txt); }
-.pem-save { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pem-save { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .pem-save:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
 </style>
