@@ -101,3 +101,50 @@ def test_unpaid_derived_not_from_csv_column():
 
 def test_load_missing_file_returns_empty(tmp_path):
     assert CS.load_collection_stages(str(tmp_path), "2026-06-16") == {}
+
+
+def test_count_parse_errors_counts_bad_cells_not_blanks(tmp_path):
+    """PMIS 导出格式漂移会让 _num/_ms_to_date/_pct 静默降级为 0/''/None；
+    count_parse_errors 须把"非空白但解析失败"的单元格计入对应类别,
+    合法留空(未回款阶段常见)不应误计。"""
+    p = str(tmp_path)
+    _write_csv(os.path.join(p, "collection_stages.csv"), [
+        {  # 全部合法(部分列留空但合法,不应计入)
+            "项目编号": "X1", "回款类型": "终验款", "阶段名称": "终验款", "回款比例": "90.00%",
+            "回款金额": "900000", "关联日期": "20", "计划回款时间": "1782057600000",
+            "实际回款时间": "", "实际比例": "", "已收金额": "900000", "未收金额": "0",
+        },
+        {  # 三类各一处解析失败(金额/日期/比例列各命中一个坏值,另一列合法或留空)
+            "项目编号": "X1", "回款类型": "预付款", "阶段名称": "预付款", "回款比例": "xx%%",
+            "回款金额": "abc", "关联日期": "0", "计划回款时间": "notdate",
+            "实际回款时间": "", "实际比例": "", "已收金额": "100", "未收金额": "0",
+        },
+        {  # 全部留空(合法:该阶段尚未发生),不应计入任何失败
+            "项目编号": "X1", "回款类型": "质保金", "阶段名称": "质保金", "回款比例": "",
+            "回款金额": "", "关联日期": "", "计划回款时间": "",
+            "实际回款时间": "", "实际比例": "", "已收金额": "", "未收金额": "",
+        },
+    ])
+    errs = CS.count_parse_errors(p)
+    assert errs == {"amount": 1, "date": 1, "ratio": 1}
+
+
+def test_count_parse_errors_actual_ratio_uses_num_parser(tmp_path):
+    """实际比例 由 _row_to_node 用 _num 解析(actualRatio),故计数须用 _num_ok 判失败对齐:
+    "90%" 会被真实 _num 静默降级为 0(真错),必须计入;而 _pct("90%")=0.9 会漏报。
+    回款比例 仍由 _pct 解析,"90%" 对它是合法(=0.9),不计。"""
+    p = str(tmp_path)
+    _write_csv(os.path.join(p, "collection_stages.csv"), [
+        {  # 实际比例="90%":_num 解析失败(真降级为0)→ 应计 ratio；回款比例="90%":_pct 合法不计
+            "项目编号": "X1", "回款类型": "终验款", "阶段名称": "终验款", "回款比例": "90%",
+            "回款金额": "900000", "计划回款时间": "1782057600000",
+            "实际回款时间": "", "实际比例": "90%", "已收金额": "0", "未收金额": "900000",
+        },
+    ])
+    errs = CS.count_parse_errors(p)
+    assert errs["ratio"] == 1   # 仅 实际比例="90%" 计入(回款比例="90%" 对 _pct 合法)
+    assert errs["amount"] == 0 and errs["date"] == 0
+
+
+def test_count_parse_errors_missing_file_returns_zeros(tmp_path):
+    assert CS.count_parse_errors(str(tmp_path)) == {"amount": 0, "date": 0, "ratio": 0}

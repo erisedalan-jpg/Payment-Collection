@@ -129,6 +129,19 @@ reprocess_state = {"running": False, "progress": 0, "message": ""}
 # PMIS 在线下载流水线状态(独立于 reprocess)
 download_state = {"running": False, "progress": 0, "message": ""}
 
+# 运行槽占用锁：reprocess/download 检查-置位需原子化，防并发 TOCTOU 双触发
+_run_state_lock = threading.Lock()
+
+
+def _acquire_run_slot(state, lock, payload):
+    """原子占用运行槽:忙→False(不动 state);空→置位 payload 并 True。防 reprocess/download TOCTOU。"""
+    with lock:
+        if state.get("running"):
+            return False
+        state.clear()
+        state.update(payload)
+        return True
+
 # 子进程引用（用于停止更新时终止）
 active_process = None
 
@@ -145,6 +158,9 @@ ERR_NOT_FOUND = "not_found"           # 记录不存在
 ERR_INTERNAL = "internal_error"       # 其它内部错误
 ERR_AUTH = "auth_failed"              # 登录鉴权失败
 ERR_FORBIDDEN = "forbidden"           # 权限不足(非超管)
+
+MAX_JSON_BODY = 16 * 1024 * 1024      # JSON body 上限(16MB),防超大请求撑爆内存
+MAX_UPLOAD_BODY = 512 * 1024 * 1024   # 文件上传 body 上限(512MB,xlsx 留余量)
 
 _AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me')
 
@@ -198,6 +214,18 @@ def _error_payload(code, message):
     return {"success": False, "code": code, "message": message}
 
 
+def _atomic_write_json(path, data):
+    """原子写 JSON:先写 .tmp 再 os.replace,避免并发/崩溃留半截坏文件。"""
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+_followup_records_lock = threading.RLock()
+
+
 def _load_followup_records():
     """加载本地跟进记录"""
     if os.path.exists(FOLLOWUP_FILE):
@@ -210,9 +238,8 @@ def _load_followup_records():
 
 def _save_followup_records(records):
     """保存本地跟进记录"""
-    os.makedirs(os.path.dirname(FOLLOWUP_FILE), exist_ok=True)
-    with open(FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    with _followup_records_lock:
+        _atomic_write_json(FOLLOWUP_FILE, records)
 
 # ── 项目标签库（2C，本地 JSON store，首次按 analysis_data.json 的 tagSeed 播种，此后本地为准、不回写云） ──
 PROJECT_TAGS_FILE = os.path.join(BASE_DIR, 'data', 'project_tags.json')
@@ -238,7 +265,7 @@ def _load_analysis_cached():
         return _analysis_cache['data']
 
 
-_tags_lock = threading.Lock()
+_tags_lock = threading.RLock()
 
 
 def _build_initial_tags():
@@ -275,15 +302,13 @@ def _load_project_tags():
 
 def _save_project_tags(store):
     with _tags_lock:
-        os.makedirs(os.path.dirname(PROJECT_TAGS_FILE), exist_ok=True)
-        with open(PROJECT_TAGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(PROJECT_TAGS_FILE, store)
 
 
 # ── 重点项目进展(SP-2,本地 JSON store:current 可编 + archives 只读快照) ──
 PROGRESS_FILE = os.path.join(BASE_DIR, 'data', 'project_progress.json')
 PROGRESS_FIELDS = ('weekProgress', 'nextPlan')
-_progress_lock = threading.Lock()
+_progress_lock = threading.RLock()
 
 
 def _load_progress():
@@ -304,9 +329,7 @@ def _load_progress():
 
 def _save_progress(store):
     with _progress_lock:
-        os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
-        with open(PROGRESS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(PROGRESS_FILE, store)
 
 
 def _progress_apply_update(store, project_id, field, content, account, now):
@@ -338,7 +361,7 @@ def _progress_apply_archive_delete(store, idx) -> bool:
 
 # ── 临时重点跟进(/projects/temp;V2.1.0):scope 条件 + current 进展 + archives 快照 ──
 TEMP_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'temp_followup.json')
-_temp_lock = threading.Lock()
+_temp_lock = threading.RLock()
 
 
 def _load_temp_followup():
@@ -360,14 +383,12 @@ def _load_temp_followup():
 
 def _save_temp_followup(store):
     with _temp_lock:
-        os.makedirs(os.path.dirname(TEMP_FOLLOWUP_FILE), exist_ok=True)
-        with open(TEMP_FOLLOWUP_FILE, 'w', encoding='utf-8') as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(TEMP_FOLLOWUP_FILE, store)
 
 
 # ── 重点商机跟进(/opportunities/key;V2.2.0):scope 条件 + current 进展 + archives 快照 ──
 OPP_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'opportunity_followup.json')
-_opp_followup_lock = threading.Lock()
+_opp_followup_lock = threading.RLock()
 
 
 def _load_opportunity_followup():
@@ -398,7 +419,7 @@ def _save_opportunity_followup(store):
 
 # ── 风险跟进(/risk;V2.3.0):scope 条件 + current 跟进 + archives 快照(归档不清空 current) ──
 RISK_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'risk_followup.json')
-_risk_lock = threading.Lock()
+_risk_lock = threading.RLock()
 
 
 def _load_risk_followup():
@@ -429,7 +450,7 @@ def _save_risk_followup(store):
 
 # ── 回款重点跟进(/payment/key;V2.6.1):scope 条件 + current 跟进 + archives 快照(归档不清空 current) ──
 PAYKEY_FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'payment_key_followup.json')
-_paykey_lock = threading.Lock()
+_paykey_lock = threading.RLock()
 
 
 def _load_paykey_followup():
@@ -1132,11 +1153,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(tags, list) or not isinstance(assignments, dict):
             self._json_response(_error_payload(ERR_VALIDATION, "tags 须为数组、assignments 须为对象"))
             return
-        try:
-            _save_project_tags({"version": 1, "tags": tags, "assignments": assignments})
-            self._json_response({"success": True})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存标签失败: {e}"))
+
+        def _apply(s):
+            s['version'] = 1
+            s['tags'] = tags
+            s['assignments'] = assignments
+            return True
+
+        ok, res = self._followup_txn(_tags_lock, _load_project_tags, _apply, _save_project_tags)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL,
+                                           res or "保存标签失败"))
+            return
+        self._json_response({"success": True})
 
     def handle_progress_get(self):
         """GET /api/progress — 返回重点项目进展 {current, archives}。"""
@@ -1162,14 +1192,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
-        try:
-            store = _load_progress()
-            rec = _progress_apply_update(store, pid, field, str(data.get('content') or ''),
-                                         account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_progress(store)
-            self._json_response({"success": True, "record": rec})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ok, res = self._followup_txn(
+            _progress_lock, _load_progress,
+            lambda s: _progress_apply_update(s, pid, field, str(data.get('content') or ''), account, now),
+            _save_progress)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存进展失败")); return
+        self._json_response({"success": True, "record": res})
 
     def handle_progress_archive(self):
         """POST /api/progress/archive {rows} — 冻结当前为历史快照并清空 current。超管专属(由 _authz_gate 拦)。"""
@@ -1181,13 +1212,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
-        try:
-            store = _load_progress()
-            _progress_apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_progress(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        def _apply(s):
+            _progress_apply_archive(s, rows, now)
+            return s.get("archives", [])
+
+        ok, res = self._followup_txn(_progress_lock, _load_progress, _apply, _save_progress)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
+        self._json_response({"success": True, "archives": res})
 
     def handle_progress_archive_delete(self):
         """POST /api/progress/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -1197,14 +1232,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
-        try:
-            store = _load_progress()
-            if not _progress_apply_archive_delete(store, idx):
-                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
-            _save_progress(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+        holder = {}
+
+        def _apply(s):
+            deleted = _progress_apply_archive_delete(s, idx)
+            holder['archives'] = s.get("archives", [])
+            return deleted
+
+        ok, res = self._followup_txn(_progress_lock, _load_progress, _apply, _save_progress)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "删除快照失败")); return
+        if res is False:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+        self._json_response({"success": True, "archives": holder.get("archives", [])})
 
     def handle_temp_followup_get(self):
         """GET /api/temp-followup — {scope, current, archives}。任意登录用户(普通管理员需 scope 在前端算命中集)。"""
@@ -1225,13 +1266,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
-        try:
-            store = _load_temp_followup()
-            store['scope'] = _temp.normalize_scope(data)
-            _save_temp_followup(store)
-            self._json_response({"success": True, "scope": store['scope']})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+        def _apply(s):
+            s['scope'] = _temp.normalize_scope(data)
+            return s['scope']
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存范围失败")); return
+        self._json_response({"success": True, "scope": res})
 
     def handle_temp_followup_update(self):
         """POST /api/temp-followup/update {projectId, field, content} — 编辑单格进展。任意登录用户。"""
@@ -1248,14 +1292,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
-        try:
-            store = _load_temp_followup()
-            rec = _temp.apply_update(store, pid, field, str(data.get('content') or ''),
-                                     account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_temp_followup(store)
-            self._json_response({"success": True, "record": rec})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ok, res = self._followup_txn(
+            _temp_lock, _load_temp_followup,
+            lambda s: _temp.apply_update(s, pid, field, str(data.get('content') or ''), account, now),
+            _save_temp_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存进展失败")); return
+        self._json_response({"success": True, "record": res})
 
     def handle_temp_followup_archive(self):
         """POST /api/temp-followup/archive {rows} — 冻结当前为快照并清空 current。超管专属。"""
@@ -1267,13 +1312,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
-        try:
-            store = _load_temp_followup()
-            _temp.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_temp_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        def _apply(s):
+            _temp.apply_archive(s, rows, now)
+            return s.get("archives", [])
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
+        self._json_response({"success": True, "archives": res})
 
     def handle_temp_followup_archive_delete(self):
         """POST /api/temp-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -1283,14 +1332,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
-        try:
-            store = _load_temp_followup()
-            if not _temp.apply_archive_delete(store, idx):
-                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
-            _save_temp_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+        holder = {}
+
+        def _apply(s):
+            deleted = _temp.apply_archive_delete(s, idx)
+            holder['archives'] = s.get("archives", [])
+            return deleted
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "删除快照失败")); return
+        if res is False:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+        self._json_response({"success": True, "archives": holder.get("archives", [])})
 
     def handle_opportunity_followup_get(self):
         """GET /api/opportunity-followup — {scope, current, archives}。任意登录用户。"""
@@ -1311,13 +1366,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
-        try:
-            store = _load_opportunity_followup()
-            store['scope'] = _oppf.normalize_scope(data)
-            _save_opportunity_followup(store)
-            self._json_response({"success": True, "scope": store['scope']})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+        def _apply(s):
+            s['scope'] = _oppf.normalize_scope(data)
+            return s['scope']
+
+        ok, res = self._followup_txn(_opp_followup_lock, _load_opportunity_followup, _apply, _save_opportunity_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存范围失败")); return
+        self._json_response({"success": True, "scope": res})
 
     def handle_opportunity_followup_update(self):
         """POST /api/opportunity-followup/update {oppId, field, content} — 编辑单格进展。任意登录用户。"""
@@ -1334,14 +1392,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
-        try:
-            store = _load_opportunity_followup()
-            rec = _oppf.apply_update(store, oid, field, str(data.get('content') or ''),
-                                     account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_opportunity_followup(store)
-            self._json_response({"success": True, "record": rec})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存进展失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ok, res = self._followup_txn(
+            _opp_followup_lock, _load_opportunity_followup,
+            lambda s: _oppf.apply_update(s, oid, field, str(data.get('content') or ''), account, now),
+            _save_opportunity_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存进展失败")); return
+        self._json_response({"success": True, "record": res})
 
     def handle_opportunity_followup_archive(self):
         """POST /api/opportunity-followup/archive {rows} — 冻结当前为快照并清空 current。超管专属。"""
@@ -1353,13 +1412,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
-        try:
-            store = _load_opportunity_followup()
-            _oppf.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_opportunity_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        def _apply(s):
+            _oppf.apply_archive(s, rows, now)
+            return s.get("archives", [])
+
+        ok, res = self._followup_txn(_opp_followup_lock, _load_opportunity_followup, _apply, _save_opportunity_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
+        self._json_response({"success": True, "archives": res})
 
     def handle_opportunity_followup_archive_delete(self):
         """POST /api/opportunity-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -1369,14 +1432,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
-        try:
-            store = _load_opportunity_followup()
-            if not _oppf.apply_archive_delete(store, idx):
-                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
-            _save_opportunity_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+        holder = {}
+
+        def _apply(s):
+            deleted = _oppf.apply_archive_delete(s, idx)
+            holder['archives'] = s.get("archives", [])
+            return deleted
+
+        ok, res = self._followup_txn(_opp_followup_lock, _load_opportunity_followup, _apply, _save_opportunity_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "删除快照失败")); return
+        if res is False:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+        self._json_response({"success": True, "archives": holder.get("archives", [])})
 
     def handle_risk_followup_get(self):
         """GET /api/risk-followup — {scope, current, archives}。任意登录用户(范围/筛选前端算)。"""
@@ -1397,13 +1466,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
-        try:
-            store = _load_risk_followup()
-            store['scope'] = _riskfu.normalize_scope(data)
-            _save_risk_followup(store)
-            self._json_response({"success": True, "scope": store['scope']})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+        def _apply(s):
+            s['scope'] = _riskfu.normalize_scope(data)
+            return s['scope']
+
+        ok, res = self._followup_txn(_risk_lock, _load_risk_followup, _apply, _save_risk_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存范围失败")); return
+        self._json_response({"success": True, "scope": res})
 
     def handle_risk_followup_update(self):
         """POST /api/risk-followup/update {riskKey, field, content} — 编辑跟进单格。任意登录用户。"""
@@ -1420,14 +1492,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not rk or field not in _riskfu.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "riskKey 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
-        try:
-            store = _load_risk_followup()
-            rec = _riskfu.apply_update(store, rk, field, str(data.get('content') or ''),
-                                       account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_risk_followup(store)
-            self._json_response({"success": True, "record": rec})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存跟进失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ok, res = self._followup_txn(
+            _risk_lock, _load_risk_followup,
+            lambda s: _riskfu.apply_update(s, rk, field, str(data.get('content') or ''), account, now),
+            _save_risk_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存跟进失败")); return
+        self._json_response({"success": True, "record": res})
 
     def handle_risk_followup_archive(self):
         """POST /api/risk-followup/archive {rows} — 归档快照,保留 current。超管专属。"""
@@ -1439,13 +1512,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
-        try:
-            store = _load_risk_followup()
-            _riskfu.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_risk_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        def _apply(s):
+            _riskfu.apply_archive(s, rows, now)
+            return s.get("archives", [])
+
+        ok, res = self._followup_txn(_risk_lock, _load_risk_followup, _apply, _save_risk_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
+        self._json_response({"success": True, "archives": res})
 
     def handle_risk_followup_archive_delete(self):
         """POST /api/risk-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -1455,14 +1532,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
-        try:
-            store = _load_risk_followup()
-            if not _riskfu.apply_archive_delete(store, idx):
-                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
-            _save_risk_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+        holder = {}
+
+        def _apply(s):
+            deleted = _riskfu.apply_archive_delete(s, idx)
+            holder['archives'] = s.get("archives", [])
+            return deleted
+
+        ok, res = self._followup_txn(_risk_lock, _load_risk_followup, _apply, _save_risk_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "删除快照失败")); return
+        if res is False:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+        self._json_response({"success": True, "archives": holder.get("archives", [])})
 
     def handle_paykey_followup_get(self):
         """GET /api/payment-key-followup — {scope, current, archives}。任意登录用户(范围/筛选前端算)。"""
@@ -1483,13 +1566,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
-        try:
-            store = _load_paykey_followup()
-            store['scope'] = _paykey.normalize_scope(data)
-            _save_paykey_followup(store)
-            self._json_response({"success": True, "scope": store['scope']})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存范围失败: {e}"))
+
+        def _apply(s):
+            s['scope'] = _paykey.normalize_scope(data)
+            return s['scope']
+
+        ok, res = self._followup_txn(_paykey_lock, _load_paykey_followup, _apply, _save_paykey_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存范围失败")); return
+        self._json_response({"success": True, "scope": res})
 
     def handle_paykey_followup_update(self):
         """POST /api/payment-key-followup/update {projectId, field, content} — 编辑跟进单格。任意登录用户。"""
@@ -1506,14 +1592,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not pid or field not in _paykey.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
-        try:
-            store = _load_paykey_followup()
-            rec = _paykey.apply_update(store, pid, field, str(data.get('content') or ''),
-                                       account, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_paykey_followup(store)
-            self._json_response({"success": True, "record": rec})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"保存跟进失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ok, res = self._followup_txn(
+            _paykey_lock, _load_paykey_followup,
+            lambda s: _paykey.apply_update(s, pid, field, str(data.get('content') or ''), account, now),
+            _save_paykey_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存跟进失败")); return
+        self._json_response({"success": True, "record": res})
 
     def handle_paykey_followup_archive(self):
         """POST /api/payment-key-followup/archive {rows} — 归档快照,保留 current。超管专属。"""
@@ -1525,13 +1612,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
-        try:
-            store = _load_paykey_followup()
-            _paykey.apply_archive(store, rows, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            _save_paykey_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"归档失败: {e}"))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        def _apply(s):
+            _paykey.apply_archive(s, rows, now)
+            return s.get("archives", [])
+
+        ok, res = self._followup_txn(_paykey_lock, _load_paykey_followup, _apply, _save_paykey_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
+        self._json_response({"success": True, "archives": res})
 
     def handle_paykey_followup_archive_delete(self):
         """POST /api/payment-key-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -1541,14 +1632,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
-        try:
-            store = _load_paykey_followup()
-            if not _paykey.apply_archive_delete(store, idx):
-                self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
-            _save_paykey_followup(store)
-            self._json_response({"success": True, "archives": store.get("archives", [])})
-        except Exception as e:
-            self._json_response(_error_payload(ERR_INTERNAL, f"删除快照失败: {e}"))
+        holder = {}
+
+        def _apply(s):
+            deleted = _paykey.apply_archive_delete(s, idx)
+            holder['archives'] = s.get("archives", [])
+            return deleted
+
+        ok, res = self._followup_txn(_paykey_lock, _load_paykey_followup, _apply, _save_paykey_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "删除快照失败")); return
+        if res is False:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
+        self._json_response({"success": True, "archives": holder.get("archives", [])})
 
     # ── 商机管理处理器(V2.0.0) ──
 
@@ -1714,8 +1811,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
             return
-        length = int(self.headers.get('Content-Length', 0))
-        if length <= 0:
+        body = self._read_body_bytes(MAX_UPLOAD_BODY)
+        if body is None:
+            self._send_json(413, _error_payload(ERR_VALIDATION, "请求体缺失或超出大小上限"))
+            return
+        if len(body) == 0:
             # 空内容不落地,避免写出 0 字节坏文件却报成功
             self.send_response(400)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -1723,7 +1823,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
             return
-        body = self.rfile.read(length)
         pmis_dir = os.path.join(BASE_DIR, 'input', config.PMIS_DIRNAME)
         os.makedirs(pmis_dir, exist_ok=True)
         with open(os.path.join(pmis_dir, name), 'wb') as f:
@@ -1745,8 +1844,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": f"非法文件名: {name}"}, ensure_ascii=False).encode('utf-8'))
             return
-        length = int(self.headers.get('Content-Length', 0))
-        if length <= 0:
+        body = self._read_body_bytes(MAX_UPLOAD_BODY)
+        if body is None:
+            self._send_json(413, _error_payload(ERR_VALIDATION, "请求体缺失或超出大小上限"))
+            return
+        if len(body) == 0:
             # 空内容不落地,避免写出 0 字节坏文件却报成功
             self.send_response(400)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -1754,7 +1856,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
             return
-        body = self.rfile.read(length)
         input_dir = os.path.join(BASE_DIR, 'input')
         os.makedirs(input_dir, exist_ok=True)
         with open(os.path.join(input_dir, name), 'wb') as f:
@@ -1789,16 +1890,25 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._json_response({"success": True, "sessionPreview": preview, "message": "Cookie 已更新"})
 
+    def _sse_write(self, text):
+        """SSE 推送一段文本;客户端断开→返回 False 不抛(供循环 break)。"""
+        try:
+            self.wfile.write(text.encode('utf-8'))
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return False
+
     def handle_pmis_download(self):
         """GET /api/pmis/download - 服务器端跑 PMIS 下载流水线,SSE 流式进度。超管专属。"""
         global download_state
         if history_state.get("running") or reprocess_state.get("running"):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再下载"})
             return
-        if download_state.get("running"):
+        if not _acquire_run_slot(download_state, _run_state_lock,
+                                  {"running": True, "progress": 0, "message": "启动下载..."}):
             self._json_response(download_state)
             return
-        download_state = {"running": True, "progress": 0, "message": "启动下载..."}
         threading.Thread(target=run_download, daemon=True).start()
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
@@ -1806,8 +1916,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         while True:
-            self.wfile.write(f"data: {json.dumps(download_state, ensure_ascii=False)}\n\n".encode('utf-8'))
-            self.wfile.flush()
+            if not self._sse_write(f"data: {json.dumps(download_state, ensure_ascii=False)}\n\n"):
+                break
             if download_state["progress"] >= 100 or not download_state["running"]:
                 break
             time.sleep(0.5)
@@ -1818,10 +1928,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if history_state.get("running") or download_state.get("running"):
             self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
             return
-        if reprocess_state.get("running"):
+        if not _acquire_run_slot(reprocess_state, _run_state_lock,
+                                  {"running": True, "progress": 0, "message": "启动更新..."}):
             self._json_response(reprocess_state)
             return
-        reprocess_state = {"running": True, "progress": 0, "message": "启动更新..."}
         threading.Thread(target=run_reprocess, daemon=True).start()
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
@@ -1829,8 +1939,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         while True:
-            self.wfile.write(f"data: {json.dumps(reprocess_state)}\n\n".encode('utf-8'))
-            self.wfile.flush()
+            if not self._sse_write(f"data: {json.dumps(reprocess_state)}\n\n"):
+                break
             if reprocess_state["progress"] >= 100 or not reprocess_state["running"]:
                 break
             time.sleep(0.5)
@@ -1975,12 +2085,41 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         return account
 
     def _read_json_body(self):
-        """读 POST JSON body;失败返回 None(调用方负责报 400)。"""
+        """读 POST JSON body;失败或超出 MAX_JSON_BODY 返回 None(调用方负责报 400)。"""
         try:
             n = int(self.headers.get('Content-Length', 0))
+            if n < 0 or n > MAX_JSON_BODY:
+                return None
             return json.loads(self.rfile.read(n).decode('utf-8'))
         except Exception:
             return None
+
+    def _followup_txn(self, lock, load_fn, mutate_fn, save_fn):
+        """事务:锁内 load→mutate→原子 save。ValueError→(False,校验消息 str,handler 判 400);
+        其它异常→(False,False,handler 判 500)——故意用 False 而非 None:非 None(调用方
+        可判定"确有错误")、非 str(不会被 isinstance(res, str) 误判成校验错误)、falsy(经
+        `res or "默认消息"` 兜底为安全默认文案,不把内部异常细节透出到 API 响应)。"""
+        try:
+            with lock:
+                store = load_fn()
+                result = mutate_fn(store)
+                save_fn(store)
+            return True, result
+        except ValueError as e:
+            return False, str(e)
+        except Exception as e:  # noqa: BLE001
+            logger.error("followup txn 失败: %s", e, exc_info=True)
+            return False, False
+
+    def _read_body_bytes(self, max_bytes):
+        """读裸 body 字节;Content-Length 非法/负/超 max_bytes → None。"""
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+        except (TypeError, ValueError):
+            return None
+        if n < 0 or n > max_bytes:
+            return None
+        return self.rfile.read(n)
 
     def handle_admin_accounts_list(self):
         if self._require_super() is None:

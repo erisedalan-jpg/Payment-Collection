@@ -28,6 +28,9 @@ NODE_STATUSES = [
     STATUS_FULL_PAID, STATUS_DELAYED, STATUS_ON_TIME,
 ]
 
+# ── collection_stages.stage_status 取值域常量(换源后 5 态之一;供 snapshots 事件判定共享,消除裸字面量软耦合) ──
+STAGE_STATUS_PAID = "已回款"
+
 # ── 项目健康度:里程碑进度状态的"滞后类"关键词(命中任一即进度异常,取值域实测:正常/延期/严重延期/超期未发布) ──
 MILESTONE_DELAYED_KEYWORDS = ("滞后", "延期", "超期")
 
