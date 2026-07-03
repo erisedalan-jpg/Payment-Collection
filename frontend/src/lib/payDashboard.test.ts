@@ -363,3 +363,17 @@ describe('payDashboard 整体项目数/无回款阶段', () => {
     expect(rows[0]).toMatchObject({ projectId: 'B', projectName: 'B名', projectManager: '张', orgL4: 'X', contractWan: 100 })
   })
 })
+
+describe('除零回退 null', () => {
+  it('无合同的服务组 achievementRate 为 null', () => {
+    const projects = [{ projectId: 'P1', orgL4: 'A组', paymentPmis: { contract: 0 } }] as any
+    const paymentRecords = { P1: { records: [{ date: '2026-05-01', amount: 100000 }] } } as any
+    const r = payOrgRanking(projects, {}, paymentRecords, '', '', 'achievementRate')
+    expect(r[0].achievementRate).toBeNull()
+  })
+  it('payDashSummary 无合同时 rate 为 null', () => {
+    const projects = [{ projectId: 'P1', paymentPmis: { contract: 0 } }] as any
+    const s = payDashSummary([], projects, { viewMode: 'global', viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} } as any)
+    expect(s.rate).toBeNull()
+  })
+})

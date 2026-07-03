@@ -37,7 +37,8 @@ const ranked = computed(() => {
 })
 const maxActual = computed(() => Math.max(1, ...ranked.value.map((o) => o.actualTotal)))
 
-function rateColor(r: number): string {
+function rateColor(r: number | null): string {
+  if (r == null) return 'var(--mut)'
   return r >= 0.45 ? 'var(--c-paid)' : r >= 0.3 ? 'var(--c-pending)' : 'var(--danger)'
 }
 </script>
