@@ -16,10 +16,6 @@ export function cfFormatValue(key: string, val: unknown): string {
     if (ed) return ed
     if (typeof val === 'string' && /^\d{4}-\d{2}/.test(val)) return val.slice(0, 10)
   }
-  if (typeof val === 'string' && /^\d{4,5}$/.test(val)) {
-    const ed = excelDate(val)
-    if (ed) return ed
-  }
   if (val === true || val === 'true') return '是'
   if (val === false || val === 'false') return '否'
   if (RATIO_KEYS.has(key)) return pct(val)

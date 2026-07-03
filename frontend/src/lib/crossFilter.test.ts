@@ -12,6 +12,12 @@ describe('cfFormatValue', () => {
   })
 })
 
+describe('cfFormatValue 非日期列不误判为日期', () => {
+  it("金额列 '45000' 不转日期", () => {
+    expect(cfFormatValue('projectAmount', '45000')).not.toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
 describe('cfUniqueValues', () => {
   it('去重并按展示值升序（空值排末位）', () => {
     const rows = [{ orgL4: '北京' }, { orgL4: '上海' }, { orgL4: '北京' }, { orgL4: '' }]

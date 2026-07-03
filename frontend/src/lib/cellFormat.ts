@@ -31,10 +31,6 @@ export function formatCellValue(value: unknown, key: string): string {
     if (ed) return ed
     if (typeof v === 'string' && /^\d{4}-\d{2}/.test(v)) return v.slice(0, 10)
   }
-  if (typeof v === 'string' && /^\d{4,5}$/.test(v)) {
-    const ed = excelDate(v)
-    if (ed) return ed
-  }
   if (AMOUNT_KEYS.has(key)) return fmtYuan(v as number)
   if (RATIO_KEYS.has(key)) return pct(v)
   if (BOOL_KEYS.has(key)) return v === true || v === 'true' || v === '是' ? '是' : '否'
