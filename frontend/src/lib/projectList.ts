@@ -65,7 +65,10 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       projectId: p.projectId,
       projectName: p.projectName || '-',
       customer: p.customer || '-',
-      contractAmount: typeof customer.合同总额 === 'number' ? customer.合同总额 : null,
+      // 合同金额：本项目 PMIS 合同总额优先；售前服务类本合同恒空→回退原项目合同(paymentPmis.contract 已由后端 fromOrigin 映射原项目)。
+      contractAmount: typeof customer.合同总额 === 'number'
+        ? customer.合同总额
+        : (p.isPresale && typeof p.paymentPmis?.contract === 'number' ? p.paymentPmis.contract : null),
       projectLevel: status.项目级别 || '-',
       projectType: status.项目类型 || '-',
       projectManager: p.projectManager || '-',
