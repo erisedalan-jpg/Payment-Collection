@@ -91,15 +91,15 @@ function submit() {
 </template>
 
 <style scoped>
-.frf { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 8px; }
-.frf-title { font-weight: 700; font-size: 13px; color: var(--txt); margin-bottom: 8px; }
-.frf-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.frf { background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-3); margin-top: var(--sp-2); }
+.frf-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
+.frf-row { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); font-size: var(--fs-1); }
 .frf-row label { width: 84px; flex-shrink: 0; color: var(--sub); }
-.frf-row input, .frf-row select, .frf-row textarea { flex: 1; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; box-sizing: border-box; }
+.frf-row input, .frf-row select, .frf-row textarea { flex: 1; padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-1); box-sizing: border-box; }
 .frf-row input[readonly] { background: var(--card2); color: var(--mut); cursor: default; }
-.frf-hint { font-size: 11px; color: var(--mut); margin: 2px 0 6px 92px; }
-.frf-error { color: var(--danger); font-size: 12px; margin: 4px 0; }
-.frf-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.frf-btn { border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 4px 14px; font-size: 12px; cursor: pointer; color: var(--sub); }
+.frf-hint { font-size: var(--fs-1); color: var(--mut); margin: var(--sp-1) 0 var(--sp-2) 92px; }
+.frf-error { color: var(--danger); font-size: var(--fs-1); margin: var(--sp-1) 0; }
+.frf-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+.frf-btn { border: 1px solid var(--line2); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-4); font-size: var(--fs-1); cursor: pointer; color: var(--sub); }
 .frf-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

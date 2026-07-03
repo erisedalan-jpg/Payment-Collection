@@ -32,9 +32,9 @@ const emit = defineEmits<{ 'item-click': [number] }>()
 .mg-card--clickable:hover { background: var(--hover-tint); }
 .mg-k { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
 .mg-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight); }
-.mg-v.ok { color: var(--ok); }
-.mg-v.warn { color: var(--warn); }
-.mg-v.danger { color: var(--danger); }
+.mg-v.ok { color: var(--ok-text); }
+.mg-v.warn { color: var(--warn-text); }
+.mg-v.danger { color: var(--danger-text); }
 .mg-v.mut { color: var(--mut); }
 .mg-sub { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-1); }
 </style>

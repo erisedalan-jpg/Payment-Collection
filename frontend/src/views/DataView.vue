@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
@@ -88,11 +89,19 @@ const { versions: historyVersions, preRollback: historyPre, source: historySourc
   useDataHistory({ onChange: () => { data.reload(); loadFileStatus() } })
 function fmtMB(bytes?: number) { return bytes ? (bytes / 1048576).toFixed(1) + ' MB' : '-' }
 async function onRollback(id: string) {
-  if (!window.confirm(`确定回滚到 ${id}？将用该版本覆盖当前数据与源数据，当前状态会先备份可撤销。`)) return
+  try {
+    await ElMessageBox.confirm(`确定回滚到 ${id}？将用该版本覆盖当前数据与源数据，当前状态会先备份可撤销。`, '确认', { type: 'warning' })
+  } catch {
+    return
+  }
   await doRollback(id)
 }
 async function onUndoRollback() {
-  if (!window.confirm('确定撤销上次回滚，恢复回滚前的状态？')) return
+  try {
+    await ElMessageBox.confirm('确定撤销上次回滚，恢复回滚前的状态？', '确认', { type: 'warning' })
+  } catch {
+    return
+  }
   await doUndo()
 }
 
@@ -130,8 +139,16 @@ async function onManRollback(id: string) {
 const clearState = ref('')
 const clearing = ref(false)
 async function onClear() {
-  if (!window.confirm('确定要清空所有数据吗？此操作不可撤销!')) return
-  if (!window.confirm('再次确认：是否清空所有数据？')) return
+  try {
+    await ElMessageBox.confirm('确定要清空所有数据吗？此操作不可撤销!', '确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await ElMessageBox.confirm('再次确认：是否清空所有数据？', '确认', { type: 'warning' })
+  } catch {
+    return
+  }
   clearing.value = true
   data.clearBusinessData()
   try { await api.get('/api/clear-data'); clearState.value = '已清空(含数据文件)' }

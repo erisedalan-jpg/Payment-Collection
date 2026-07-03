@@ -45,6 +45,7 @@ function onCard(action?: string) {
   <div class="dash-metrics u-grid-auto">
     <div v-for="m in metrics" :key="m.k" class="dm-card" :class="{ 'dm-card--link': m.action }"
       :data-test="m.action === 'nodes' ? 'pay-nodes-card' : m.action === 'delayed' ? 'pay-delayed-card' : m.action === 'projects' ? 'pay-projects-card' : undefined"
+      v-activate="!!m.action"
       @click="onCard(m.action)">
       <div class="dm-k">{{ m.k }}</div>
       <div class="dm-v u-num" :class="m.cls">{{ m.v }}</div>
@@ -55,14 +56,14 @@ function onCard(action?: string) {
 
 <style scoped>
 .dash-metrics { --col-min: 130px; }
-.dm-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.dm-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
 .dm-card--link { cursor: pointer; }
 .dm-card--link:hover { background: var(--hover-tint); }
 .dm-k { font-size: var(--fs-1); color: var(--mut); }
-.dm-v { font-size: var(--fs-5); font-weight: 800; margin-top: 4px; color: var(--txt); }
-.dm-v.paid { color: var(--c-paid); }
-.dm-v.remain { color: var(--c-remaining); }
-.dm-v.pending { color: var(--c-pending); }
-.dm-v.danger { color: var(--danger); }
+.dm-v { font-size: var(--fs-5); font-weight: 700; margin-top: 4px; color: var(--txt); }
+.dm-v.paid { color: var(--ok-text); }
+.dm-v.remain { color: var(--danger-text); }
+.dm-v.pending { color: var(--warn-text); }
+.dm-v.danger { color: var(--danger-text); }
 .dm-sub { display: block; color: var(--accent); font-size: var(--fs-1); padding: 4px 0 0; }
 </style>

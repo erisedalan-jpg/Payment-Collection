@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import type { PeriodSeries } from '@/lib/payDashboard'
+import { useSettingsStore } from '@/stores/settings'
+import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 
 const props = defineProps<{
   categories: string[]
@@ -9,7 +11,10 @@ const props = defineProps<{
   height?: string
 }>()
 
-const COLORS = ['#c8161d', '#f9d46c', '#6ecc54']
+const settings = useSettingsStore()
+const dark = computed(() => settings.theme === 'dark')
+const sc = computed(() => (dark.value ? STATUS_DARK : STATUS_LIGHT))
+const COLORS = computed(() => [sc.value.danger, sc.value.warn, sc.value.ok])
 
 const option = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -21,7 +26,7 @@ const option = computed(() => ({
     type: 'bar',
     stack: 'a',
     data: s.data,
-    itemStyle: { color: COLORS[i % COLORS.length] },
+    itemStyle: { color: COLORS.value[i % COLORS.value.length] },
   })),
 }))
 </script>

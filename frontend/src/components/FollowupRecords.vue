@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { followupApi, type FollowupRecord, type FollowupFormData } from '@/lib/followupApi'
 import FollowupRecordForm from './FollowupRecordForm.vue'
 
@@ -72,7 +72,11 @@ async function onSubmit(data: FollowupFormData) {
 async function onDelete(r: FollowupRecord) {
   const id = r['记录编号'] || ''
   if (!id) return
-  if (!window.confirm(`确定要删除此跟进记录吗？\n\n记录编号: ${id}\n删除后无法恢复。`)) return
+  try {
+    await ElMessageBox.confirm(`确定要删除此跟进记录吗？\n\n记录编号: ${id}\n删除后无法恢复。`, '确认', { type: 'warning' })
+  } catch {
+    return
+  }
   try {
     const res = await followupApi.remove(id)
     ElMessage.success(res.message || '已删除')
@@ -148,22 +152,22 @@ defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
 </template>
 
 <style scoped>
-.fr { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-.fr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.fr-title { font-weight: 700; font-size: 12px; color: var(--txt); }
-.fr-addbtn { background: var(--accent); color: var(--on-accent); border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
-.fr-record, .fr-expanded { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+.fr { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--line); }
+.fr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); }
+.fr-title { font-weight: 700; font-size: var(--fs-1); color: var(--txt); }
+.fr-addbtn { background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-1); cursor: pointer; }
+.fr-record, .fr-expanded { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); }
 .fr-expanded { border-color: var(--accent); }
-.fr-meta { display: flex; gap: 10px; font-size: 11px; color: var(--mut); margin-bottom: 4px; }
-.fr-content { font-size: 13px; color: var(--txt); white-space: pre-wrap; }
-.fr-footer { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 11px; }
+.fr-meta { display: flex; gap: var(--sp-3); font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
+.fr-content { font-size: var(--fs-2); color: var(--txt); white-space: pre-wrap; }
+.fr-footer { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); font-size: var(--fs-1); }
 .fr-status { color: var(--accent); }
 .fr-next { color: var(--mut); }
-.fr-link { border: none; background: none; cursor: pointer; font-size: 11px; }
+.fr-link { border: none; background: none; cursor: pointer; font-size: var(--fs-1); }
 .fr-link.edit { color: var(--accent); margin-left: auto; }
 .fr-link.del { color: var(--danger); }
-.fr-history { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 6px; }
-.fr-hist-label { font-size: 10px; color: var(--mut); }
-.fr-hist-btn { border: 1px solid var(--accent); color: var(--accent); background: var(--card); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+.fr-history { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; margin-bottom: var(--sp-2); }
+.fr-hist-label { font-size: var(--fs-1); color: var(--mut); }
+.fr-hist-btn { border: 1px solid var(--accent); color: var(--accent); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-1); cursor: pointer; }
 .fr-hist-btn.active { background: var(--accent); color: var(--on-accent); }
 </style>

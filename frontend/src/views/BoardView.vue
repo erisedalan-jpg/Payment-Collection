@@ -301,15 +301,15 @@ defineExpose({ drillOpen, dimKey, activeChart, pieRenderable })
 </template>
 
 <style scoped>
-.board-view { padding: 16px; }
-.bv-hint { padding: 24px; color: var(--mut); }
-.bv-toolbar { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 12px; }
-.bv-ctl { display: flex; align-items: center; gap: 8px; }
+.board-view { padding: var(--sp-4); }
+.bv-hint { padding: var(--sp-5); color: var(--mut); }
+.bv-toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-bottom: var(--sp-3); }
+.bv-ctl { display: flex; align-items: center; gap: var(--sp-2); }
 .bv-ctl-label { font-size: var(--fs-1); color: var(--mut); }
-.bv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: 12px; }
-.bv-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.bv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
+.bv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-4); margin-bottom: var(--sp-3); }
 .bv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
-.bv-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0 0 10px; }
+.bv-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .bv-danger { color: var(--danger); font-weight: 700; }
-.bv-empty { color: var(--mut); padding: 16px; text-align: center; }
+.bv-empty { color: var(--mut); padding: var(--sp-4); text-align: center; }
 </style>
