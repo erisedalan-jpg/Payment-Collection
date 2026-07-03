@@ -25,7 +25,9 @@ const includeList = KEEPALIVE_COMPONENTS as unknown as string[]
       <main class="app-main">
         <FilterBar v-if="showFilter" />
         <router-view v-slot="{ Component, route: r }">
-          <keep-alive :include="includeList" :max="10" :key="cacheKey">
+          <!-- max=2:菜单进入 bump token 后旧实例=永不可复用死缓存;返回判定仅单一 armed 槽,
+               最多只需最近 1 个缓存(+1 余量)。实测 max=10 时死实例囤 205MB 堆/13万游离节点。 -->
+          <keep-alive :include="includeList" :max="2" :key="cacheKey">
             <component :is="Component" :key="viewKey(r.name)" />
           </keep-alive>
         </router-view>

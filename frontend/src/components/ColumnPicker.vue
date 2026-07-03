@@ -22,7 +22,8 @@ const hidden = computed(() => props.columns.filter((c) => !props.visibleKeys.inc
 </script>
 
 <template>
-  <el-popover trigger="click" :width="260" placement="bottom-end" popper-class="colpick-pop">
+  <!-- persistent=false:弹层内容只在打开期间渲染,不预挂 body(同 ColumnFilter 性能护栏) -->
+  <el-popover trigger="click" :width="260" placement="bottom-end" popper-class="colpick-pop" :persistent="false">
     <template #reference>
       <button class="colpick-btn" type="button">选列 ▾</button>
     </template>

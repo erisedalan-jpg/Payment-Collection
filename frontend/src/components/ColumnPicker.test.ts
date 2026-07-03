@@ -13,11 +13,18 @@ function mountPicker() {
   })
 }
 
+
+// persistent=false 后弹层内容在 open 定时器(setTimeout 0)触发后才渲染,点开需等一个宏任务
+async function openPicker(w: ReturnType<typeof mountPicker>) {
+  await w.find('.colpick-btn').trigger('click')
+  await new Promise((r) => setTimeout(r, 0))
+  await w.vm.$nextTick()
+}
+
 describe('ColumnPicker', () => {
   it('渲染可见(勾选)与隐藏(未勾选)分区', async () => {
     const w = mountPicker()
-    await w.find('.colpick-btn').trigger('click')
-    await w.vm.$nextTick()
+    await openPicker(w)
     const text = document.body.textContent || ''
     expect(text).toContain('A列')
     expect(text).toContain('C列') // 隐藏列也列出
@@ -26,8 +33,7 @@ describe('ColumnPicker', () => {
 
   it('点隐藏列复选框 emit toggle(key)', async () => {
     const w = mountPicker()
-    await w.find('.colpick-btn').trigger('click')
-    await w.vm.$nextTick()
+    await openPicker(w)
     // 取所有 colpick-row，第3行是 C列(隐藏列)
     const rows = document.querySelectorAll('.colpick-row')
     expect(rows.length).toBe(3)
@@ -42,8 +48,7 @@ describe('ColumnPicker', () => {
 
   it('点上移箭头 emit move-up(key)', async () => {
     const w = mountPicker()
-    await w.find('.colpick-btn').trigger('click')
-    await w.vm.$nextTick()
+    await openPicker(w)
     // 第2行(B列)的↑箭头点击 → emit move-up('b')
     const rows = document.querySelectorAll('.colpick-row')
     const bRow = rows[1] as HTMLElement
@@ -56,8 +61,7 @@ describe('ColumnPicker', () => {
 
   it('点下移箭头 emit move-down(key)', async () => {
     const w = mountPicker()
-    await w.find('.colpick-btn').trigger('click')
-    await w.vm.$nextTick()
+    await openPicker(w)
     // 第1行(A列)的↓箭头点击 → emit move-down('a')
     const rows = document.querySelectorAll('.colpick-row')
     const aRow = rows[0] as HTMLElement
@@ -72,8 +76,7 @@ describe('ColumnPicker', () => {
 
   it('点恢复默认 emit reset', async () => {
     const w = mountPicker()
-    await w.find('.colpick-btn').trigger('click')
-    await w.vm.$nextTick()
+    await openPicker(w)
     const resetBtn = document.querySelector('.colpick-reset') as HTMLElement
     resetBtn.click()
     await w.vm.$nextTick()
@@ -83,8 +86,7 @@ describe('ColumnPicker', () => {
 
   it('首行↑箭头禁用，末可见行↓箭头禁用', async () => {
     const w = mountPicker()
-    await w.find('.colpick-btn').trigger('click')
-    await w.vm.$nextTick()
+    await openPicker(w)
     const rows = document.querySelectorAll('.colpick-row')
     // A列(首行)：第一个箭头↑应禁用
     const aArrows = rows[0].querySelectorAll('.colpick-arrow')

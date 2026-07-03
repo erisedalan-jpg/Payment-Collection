@@ -80,17 +80,21 @@ function clear() {
 </script>
 
 <template>
+  <!-- 性能护栏(V2.6.6):persistent=false + v-if —— 弹层内容(整列唯一值选项,可达数百项)
+       只在打开期间存在;el-popover persistent 默认 true 会挂载即渲染并永驻 body,
+       多页多列(9页×最多7列)+keep-alive 缓存叠加出数万隐藏节点,拖慢全站样式/布局重算。 -->
   <el-popover
     v-model:visible="visible"
     trigger="click"
     :width="240"
     placement="bottom-start"
     popper-class="cf-popover"
+    :persistent="false"
   >
     <template #reference>
       <span class="cf-icon" :class="{ active }" title="列筛选" @click.stop>&#9660;</span>
     </template>
-    <div class="cf-inner">
+    <div v-if="visible" class="cf-inner">
       <div class="cf-title">
         列筛选 <span class="cf-count">({{ visibleUniques.length }}个值)</span>
       </div>
