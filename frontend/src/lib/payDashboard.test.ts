@@ -73,17 +73,17 @@ describe('payDashSummary', () => {
     expect(s.totalProjects).toBe(2)
   })
 
-  it('区间口径: start/end 过滤, 已回款只计区间内流水, 项目数=有活动项目', () => {
-    // 区间 2026-01-01~2026-06-30: P1 流水(2026-02-10)在内, P2 流水(2026-08-05)不在
+  it('区间收窄：已回款恒全时(不随区间)、项目活动数=区间内有活动', () => {
+    // 区间 2026-01-01~2026-06-30：已回款/完成率恒全时(全站统一口径)，不随区间；仅项目活动数按区间
     const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '2026-01-01', '2026-06-30')
-    expect(s.totalActual).toBe(700)           // 只有 P1 的流水
-    expect(s.totalProjects).toBe(1)           // 只有 P1 有活动(节点 planDate 2026-02-01 在区间内)
+    expect(s.totalActual).toBe(900)           // 全时=P1:700 + P2:200（不因区间收窄丢掉 P2 的 200）
+    expect(s.totalProjects).toBe(1)           // 项目活动数仍按区间：只有 P1 有活动(节点 2026-02-01 在区间内)
   })
 
-  it('区间口径分母(S8): 选了日期区间时分母只算区间内有活动项目的合同', () => {
-    // 区间 2026-01-01~2026-06-30: 仅 P1 有活动(节点/流水均在区间); P2(节点 2026-08-01、流水 2026-08-05)无区间活动→其合同不计入分母
+  it('完成率恒全时：区间收窄不改分子分母(全站统一口径 Σ流水全加÷Σ合同)', () => {
+    // 替代旧 S8 区间自洢分母口径：完成率= Σ全时流水(900) ÷ Σ全 inScope 合同(2200)，不随区间
     const s = payDashSummary(rows, projects, opts, paymentRecords, paymentNodes, '2026-01-01', '2026-06-30')
-    expect(s.rate).toBeCloseTo(700 / 1200)    // 分子=P1 区间流水 700, 分母=P1 合同 1200(不含 P2 的 1000)
+    expect(s.rate).toBeCloseTo(900 / 2200)
   })
 
   it('全部口径不变式: start=end="" 时 totalActual=Σ全流水(inScope)', () => {

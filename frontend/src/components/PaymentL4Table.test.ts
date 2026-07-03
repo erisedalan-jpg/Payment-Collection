@@ -116,7 +116,8 @@ describe('PaymentL4Table', () => {
 
   it('区间联动：setPreset(all) 与 setPreset(year) 下数据行不同', async () => {
     // seed() 中所有节点/流水日期均在 2026，无法体现区间变化。
-    // 追加 P3（orgL4='组A'），其节点和流水仅在 2025，在 year(2026) 区间内应被过滤掉。
+    // 追加 P3（orgL4='组A'），其节点仅在 2025。已回款/完成率恒全时(不随区间)，
+    // 但节点列(回款节点数/完成节点数等)按 planDate∈区间——P3 的 2025 节点在 year(2026) 下被排除，故行文本仍不同。
     seed()
     const dataStore = useDataStore()
     // seed() 保证 data 及其子字段已填充；用 any 绕过可选字段的 TS 收窄
@@ -151,7 +152,7 @@ describe('PaymentL4Table', () => {
     // 取 组A 行的文本（包含 actualSum 与 nodeSum 汇总数字）
     const textAll = wAll.text()
 
-    // year(2026) 区间：P3 仅有 2025 节点/流水，应被排除 → 组A 行数值更小
+    // year(2026) 区间：P3 的 2025 节点被排除(回款节点数/完成节点等更小)；已回款/完成率恒全时不变 → 组A 行文本仍不同
     filter.setPreset('year')
     const wYear = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
