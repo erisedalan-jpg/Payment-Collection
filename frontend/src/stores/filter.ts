@@ -9,6 +9,19 @@ import { filterPayNodes } from '@/lib/payDashboard'
 const EXCLUDE_ON_KEY = 'pa_exclude_on'
 const EXCLUDE_TAGS_KEY = 'pa_exclude_tags'
 
+function loadExcludeTags(): string[] {
+  try {
+    const raw = localStorage.getItem(EXCLUDE_TAGS_KEY)
+    if (raw) {
+      const v = JSON.parse(raw)
+      if (Array.isArray(v)) return v as string[]
+    }
+  } catch {
+    /* localStorage 不可用/损坏 → 空 */
+  }
+  return []
+}
+
 export const useFilterStore = defineStore('filter', () => {
   const data = useDataStore()
 
@@ -49,7 +62,7 @@ export const useFilterStore = defineStore('filter', () => {
 
   const projectTags = useProjectTagsStore()
   const excludeOn = ref(localStorage.getItem(EXCLUDE_ON_KEY) === 'true')
-  const excludeTags = ref<string[]>(JSON.parse(localStorage.getItem(EXCLUDE_TAGS_KEY) || '[]'))
+  const excludeTags = ref<string[]>(loadExcludeTags())
 
   const excludedIds = computed<Record<string, boolean>>(() => {
     if (!excludeOn.value || excludeTags.value.length === 0) return {}

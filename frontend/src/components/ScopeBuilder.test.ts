@@ -65,4 +65,56 @@ describe('ScopeBuilder 默认(temp 三子表)行为不回归', () => {
     expect(payload.combinator).toBe('AND')
     expect(Array.isArray(payload.groups)).toBe(true)
   })
+  it('onSave 导出的 scope 不含内部渲染用的 _uid 字段(不混入保存数据)', () => {
+    const initial = { combinator: 'AND' as const, groups: [{ combinator: 'AND' as const, conditions: [] }] }
+    const w = mountSB({ inputs: [inp({ proj: { orgL4: '银行服务组' } })], initial })
+    ;(w.vm as any).addCondition(0)
+    ;(w.vm as any).addGroup()
+    ;(w.vm as any).onSave()
+    const payload = w.emitted('save')![0][0] as any
+    expect(JSON.stringify(payload)).not.toContain('_uid')
+    for (const g of payload.groups) {
+      expect(g._uid).toBeUndefined()
+      for (const c of g.conditions) expect(c._uid).toBeUndefined()
+    }
+  })
+})
+
+describe('ScopeBuilder group/condition 稳定 uid(v-for key,防 splice 后错位)', () => {
+  const inp = (over: Partial<ScopeProjectInput>): ScopeProjectInput => ({ id: 'P', proj: {}, nodes: [], milestones: [], ...over })
+
+  it('addGroup 两次后各组 _uid 唯一;removeGroup(0) 后剩余组 _uid 保持不变', () => {
+    const w = mountSB({ inputs: [inp({})], initial: { combinator: 'AND', groups: [] } })
+    ;(w.vm as any).addGroup()
+    ;(w.vm as any).addGroup()
+    const draft = (w.vm as any).draft
+    expect(draft.groups.length).toBe(2)
+    const uid0 = draft.groups[0]._uid
+    const uid1 = draft.groups[1]._uid
+    expect(uid0).toBeDefined()
+    expect(uid1).toBeDefined()
+    expect(uid0).not.toBe(uid1)
+    ;(w.vm as any).removeGroup(0)
+    expect(draft.groups.length).toBe(1)
+    // splice 后剩下的组还是原来那个对象(uid 未因数组重排而改变/重新分配)
+    expect(draft.groups[0]._uid).toBe(uid1)
+  })
+
+  it('addCondition 两次后各条件 _uid 唯一;removeCondition(0,0) 后剩余条件 _uid 保持不变', () => {
+    const w = mountSB({
+      inputs: [inp({})],
+      initial: { combinator: 'AND', groups: [{ combinator: 'AND', conditions: [] }] },
+    })
+    ;(w.vm as any).addCondition(0)
+    ;(w.vm as any).addCondition(0)
+    const draft = (w.vm as any).draft
+    const uid0 = draft.groups[0].conditions[0]._uid
+    const uid1 = draft.groups[0].conditions[1]._uid
+    expect(uid0).toBeDefined()
+    expect(uid1).toBeDefined()
+    expect(uid0).not.toBe(uid1)
+    ;(w.vm as any).removeCondition(0, 0)
+    expect(draft.groups[0].conditions.length).toBe(1)
+    expect(draft.groups[0].conditions[0]._uid).toBe(uid1)
+  })
 })
