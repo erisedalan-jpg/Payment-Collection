@@ -214,7 +214,7 @@ def diff_snapshots(prev: dict, cur: dict) -> List[dict]:
             if sb == config.STATUS_DELAYED:
                 evs.append(_ev(d, "延期发生", "payment", pid, pname,
                                f"「{node}」{sa or '-'} → 延期", prev=sa, curr=sb, tone="danger"))
-            elif sb == "已回款":
+            elif sb == config.STAGE_STATUS_PAID:
                 evs.append(_ev(d, "回款完成", "payment", pid, pname,
                                f"「{node}」已全额回款", prev=sa, curr=sb))
         if (a.get("planDate") or "") != (b.get("planDate") or ""):

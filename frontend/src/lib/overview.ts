@@ -90,7 +90,8 @@ function isoDate(d: Date): string {
 }
 
 /** 回款重点带——now 注入便于测试;收款阶段节点级口径。
- * projects 可选:传入时 yearActual 改为遍历项目集(排除异常)汇总流水，与 computeKpis 同源，
+ * projects 可选:传入时 yearActual 改为遍历项目集(排除异常)汇总流水，
+ * 共享项目集与异常排除;年度分子仍按本年(startsWith(year))过滤,与 /payment 已回款(全时)口径不同，
  * 含无收款节点项目的流水；未传时退化到按节点项目去重的旧逻辑(向后兼容)。
  * paymentRecords/start/end 可选:传入时 yearActual=Σ流水∈[start,end]；全部(start=end='')时含空日期记录。
  * 计划侧(yearExpected/monthPending/delayedTop)按 inRange(planDate,start,end) 过滤；全部时含空计划日节点。*/
@@ -112,12 +113,14 @@ export function paymentBand(
   const planInScope = (planDate: string): boolean =>
     hasRange ? inRange(planDate, start, end) : planDate.startsWith(year)
 
-  // yearActual：优先按 projects 遍历(排除异常，含无收款节点项目流水，与 computeKpis 同源)；
+  // yearActual：优先按 projects 遍历(排除异常，含无收款节点项目流水；共享项目集与异常排除，
+  // 年度分子仍按本年过滤，与 computeKpis 全时口径不同)；
   // 否则若传入 paymentRecords 则退化按节点项目去重求和；否则退化节点 receivedAmount 之和
   // hasRange 时：流水∈[start,end]；无区间时：流水 date.startsWith(year)，与计划侧年度口径对齐
   let yearActual = 0
   if (paymentRecords && projects) {
-    // 遍历项目集(排除异常)，与 computeKpis 同源：含无收款节点项目的流水
+    // 遍历项目集(排除异常)，共享项目集与异常排除(与 computeKpis 相同)：含无收款节点项目的流水；
+    // 年度分子仍按本年(startsWith(year))过滤，与 /payment 已回款(全时)口径不同
     for (const p of projects) {
       if (isAnomalous(p)) continue
       const records = paymentRecords[p.projectId]?.records
