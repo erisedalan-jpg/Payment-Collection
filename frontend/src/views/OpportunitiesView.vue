@@ -42,10 +42,7 @@ const visibleColumns = computed(() =>
 )
 const pickerColumns = OPP_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 
-function onToggle(key: string) {
-  if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
-  prefs.toggle(key)
-}
+const onToggle = prefs.makeToggle(cf, TABLE_ID)
 
 // 派生注入：在过滤前注入 recentUpdate，使其可筛/可排/可导出
 const withDerived = computed(() =>
