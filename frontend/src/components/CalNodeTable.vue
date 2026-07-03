@@ -33,7 +33,7 @@ const pd = useProjectDetailStore()
         <tr v-for="(n, i) in rows" :key="i" v-activate class="cnt-row" @click="pd.open(n.projectId)">
           <td>{{ n.projectId }}</td>
           <td :title="n.projectName || ''">{{ n.projectName || '-' }}</td>
-          <td class="r remain">{{ fmtYuan(n.unpaidAmount) }}</td>
+          <td class="r remain u-num">{{ fmtYuan(n.unpaidAmount) }}</td>
           <td>{{ n.tier }}</td>
           <td>{{ n.dept || '-' }}</td>
           <td>{{ n.projectManager || '-' }}</td>
@@ -41,8 +41,8 @@ const pd = useProjectDetailStore()
           <td>{{ n.stage || '-' }}</td>
           <td>{{ n.planDate || '-' }}</td>
           <td>{{ fmtRatio(n.actualRatio, '待上报') }}</td>
-          <td class="r">{{ fmtYuan(n.expectedPayment) }}</td>
-          <td class="r">{{ fmtYuan(n.receivedAmount) }}</td>
+          <td class="r u-num">{{ fmtYuan(n.expectedPayment) }}</td>
+          <td class="r u-num">{{ fmtYuan(n.receivedAmount) }}</td>
         </tr>
       </tbody>
     </table>
@@ -64,7 +64,7 @@ const pd = useProjectDetailStore()
   text-overflow: ellipsis;
 }
 .cnt-table th { background: var(--card2); color: var(--sub); font-weight: 600; }
-.cnt-table th.r, .cnt-table td.r { text-align: right; font-family: var(--font-mono, monospace); }
+.cnt-table th.r, .cnt-table td.r { text-align: right; }
 .cnt-table td.remain { color: var(--danger); }
 .cnt-row { cursor: pointer; }
 .cnt-row:hover { background: var(--card2); }
