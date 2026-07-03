@@ -40,15 +40,7 @@ const hasScope = computed(() => risk.scope.groups.some((g) => g.conditions.lengt
 const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filter((r) => riskRowMatches(r, risk.scope)) : allRows.value)
 const currentRows = computed<RiskRow[]>(() => scopedRows.value)
 
-// fp 内部(usePagedRows)对 filtered 建 watch 会在构造期同步取一次初值,
-// 此刻 `const fp = ...` 尚未完成赋值(TDZ);用 fpRef 兜底——未就绪时按其初始态(current)取值,行为等价。
-let fpRef: ReturnType<typeof useFollowupPage<RiskRow>> | undefined
-const rows = computed<RiskRow[]>(() =>
-  (!fpRef || fpRef.isCurrent.value) ? currentRows.value : ((risk.archives[fpRef.historyIdx.value]?.rows ?? []) as RiskRow[]))
-const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as RiskRow[])
-
-const fp = useFollowupPage(risk, filtered)
-fpRef = fp
+const fp = useFollowupPage(risk, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as RiskRow[])
 
 // —— 列模型:风险列(动态) + 项目列(固定) + 跟进列 ——
 const PROJECT_COLS: DataColumn[] = [
@@ -154,8 +146,8 @@ defineExpose({
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
-  allRows, scopedRows, hasScope, allKeys, prefs, FILTERABLE, filtered,
-  paged: fp.paged, currentPage: fp.currentPage, pageSize: fp.pageSize,
+  allRows, scopedRows, hasScope, allKeys, prefs, FILTERABLE,
+  filtered: fp.filtered, paged: fp.paged, currentPage: fp.currentPage, pageSize: fp.pageSize,
 })
 </script>
 
@@ -179,14 +171,14 @@ defineExpose({
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
-    <div v-if="!rows.length" class="kp-empty">暂无风险数据。</div>
+    <div v-if="!fp.rows.value.length" class="kp-empty">暂无风险数据。</div>
     <div v-else-if="!ready" class="kp-defer"><el-skeleton :rows="10" animated /></div>
     <div v-else class="kp-scroll">
       <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
-            <ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" />
+            <ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="fp.rows.value" />
           </span>
         </template>
         <template #cell-followAction="{ row }">
@@ -206,10 +198,10 @@ defineExpose({
         </template>
       </DataTable>
     </div>
-    <div v-if="ready && filtered.length" class="kp-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
+    <div v-if="ready && fp.filtered.value.length" class="kp-pager">
+      <span class="u-num">共 {{ fp.filtered.value.length }} 条</span>
       <el-pagination v-model:current-page="fp.currentPage.value" v-model:page-size="fp.pageSize.value"
-        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
 

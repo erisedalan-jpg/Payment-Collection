@@ -80,6 +80,28 @@ describe('RiskFollowupView', () => {
     await w.vm.$nextTick()
     expect(w.text()).toContain('删除此历史')
   })
+  it('重访场景(store+data 挂载前已 load)下,切到历史模式 paged/filtered 显示归档行而非当前数据(V2.6.9 C1 回归)', async () => {
+    // seed() 让 data.data 与 risk.loaded 在 mount 前就绪 → onMounted 里 data.load()/risk.load() 守卫短路不再触发,
+    // currentRows 构造后不会再因异步数据到达而失效一次——旧 fpRef 兜底写法下 isCurrent/historyIdx 永远不会被
+    // rows 计算属性登记为依赖,切换历史模式后表格仍停留在当前数据。
+    seed(true)
+    const risk = useRiskFollowupStore()
+    risk.archives = [{
+      archiveTime: '2026-06-01 10:00',
+      rows: [{ riskKey: 'ARCHIVED::FX-9', 风险编码: 'FX-9', 风险名称: '已归档风险', 项目名称: '归档项目' }],
+    }] as any
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    // 挂载后默认当前模式:显示 2 条实时风险(FX-1/FX-2)
+    expect(vm.paged.length).toBe(2)
+    vm.mode = 'history'
+    vm.historyIdx = 0
+    await w.vm.$nextTick()
+    expect(vm.filtered.length).toBe(1)
+    expect(vm.paged.length).toBe(1)
+    expect(vm.paged[0].riskKey).toBe('ARCHIVED::FX-9')
+  })
   it('客户列存在于 ALL_COLUMNS 但不在默认可见 16 列', async () => {
     seed()
     const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })

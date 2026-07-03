@@ -51,15 +51,7 @@ const inScopeIds = computed(() => new Set(
 const currentRows = computed<TempRow[]>(() =>
   buildTempRows(projects.value, pmisMap.value, temp.current, inScopeIds.value))
 
-// fp 内部(usePagedRows)对 filtered 建 watch 会在构造期同步取一次初值,
-// 此刻 `const fp = ...` 尚未完成赋值(TDZ);用 fpRef 兜底——未就绪时按其初始态(current)取值,行为等价。
-let fpRef: ReturnType<typeof useFollowupPage<TempRow>> | undefined
-const rows = computed<TempRow[]>(() =>
-  (!fpRef || fpRef.isCurrent.value) ? currentRows.value : ((temp.archives[fpRef.historyIdx.value]?.rows ?? []) as TempRow[]))
-const filtered = computed(() => applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as TempRow[])
-
-const fp = useFollowupPage(temp, filtered)
-fpRef = fp
+const fp = useFollowupPage(temp, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as TempRow[])
 
 const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
@@ -188,7 +180,7 @@ defineExpose({
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
-    <div v-if="!rows.length" class="kp-empty">
+    <div v-if="!fp.rows.value.length" class="kp-empty">
       {{ auth.isSuper ? '请点击「范围设置」定义临时跟进范围。' : '暂无临时重点跟进项目。' }}
     </div>
     <div v-else class="kp-scroll">
@@ -196,7 +188,7 @@ defineExpose({
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
-            <ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" />
+            <ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="fp.rows.value" />
           </span>
         </template>
         <template #cell-weekProgress="{ row }">
@@ -210,10 +202,10 @@ defineExpose({
       </DataTable>
     </div>
 
-    <div v-if="filtered.length" class="kp-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
+    <div v-if="fp.filtered.value.length" class="kp-pager">
+      <span class="u-num">共 {{ fp.filtered.value.length }} 条</span>
       <el-pagination v-model:current-page="fp.currentPage.value" v-model:page-size="fp.pageSize.value"
-        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+        :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
 
