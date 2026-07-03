@@ -194,8 +194,8 @@ defineExpose({ baseProjects })
 .ov-acard-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
 .ov-acard-name { font-size: var(--fs-2); font-weight: 600; color: var(--txt); }
 .ov-acard-count { font-size: var(--fs-4); font-weight: 700; }
-.ov-acard-count--danger { color: var(--danger); }
-.ov-acard-count--warn { color: var(--warn); }
+.ov-acard-count--danger { color: var(--danger-text); }
+.ov-acard-count--warn { color: var(--warn-text); }
 .ov-acard-count--mut { color: var(--mut); }
 .ov-acard-blurb { font-size: var(--fs-1); color: var(--sub); margin-top: var(--sp-1); }
 .ov-acard-ops { display: flex; align-items: center; justify-content: space-between; margin-top: var(--sp-2); }

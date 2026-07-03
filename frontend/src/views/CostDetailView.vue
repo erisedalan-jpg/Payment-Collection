@@ -236,8 +236,8 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 .cd-card-h { font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
 .cd-card-h--row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .cd-th { display: inline-flex; align-items: center; }
-.cd-red { color: var(--danger); font-weight: 600; }
-.cd-green { color: var(--ok); }
+.cd-red { color: var(--danger-text); font-weight: 600; }
+.cd-green { color: var(--ok-text); }
 .cd-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .cd-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
 .cd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
