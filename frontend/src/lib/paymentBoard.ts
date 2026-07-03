@@ -1,7 +1,10 @@
 import type { Project, ProjectPmis, Paymentnodes, Paymentrecords } from '@/types/analysis'
 import type { CrossMatrix, PivotResult, PivotRow, PivotCol } from './pivot'
 import { deriveTier, deriveProgress, deriveDept, deriveStage } from './paymentPmis'
-import { paymentPmisInRange } from './paymentRange'
+import { paymentPmisInRange, actualInRange } from './paymentRange'
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+const round4 = (n: number) => Math.round(n * 10000) / 10000
 
 // 回款看板透视(/board,2B):镜像 projectPivot(/insight 项目级透视),复用 lib/pivot 泛型结构类型;
 // 数据底座改用 PMIS 项目级指标(paymentPmis),回款节点域 lib/pivot 不动。
@@ -30,6 +33,8 @@ export interface PayBoardRow {
   tags: string[]
   contract: number
   actualTotal: number
+  /** 全时流水累计(Σ payment_records，不随所选日期区间过滤)——完成率分子恒用此值(见 paymentRatio) */
+  actualAll: number
   expectedTotal: number
   remainingTotal: number
   delayedCount: number
@@ -61,7 +66,16 @@ export function buildPayBoardRows(
       start,
       end,
     )
-    const progress = deriveProgress(rp.contract, rp.paymentRatio)
+    // 完成率恒全时口径(与 /overview computeKpis、项目详情页、CLAUDE.md 全站统一口径一致)：
+    // 分子 = Σ全时流水(payment_records，start=end=''，不随所选日期区间过滤)；无流水表时退化 payment.actualTotal。
+    // 分母 = 合同(paymentPmis.contract)。计划回款/延期/未收(rp.*)仍随区间。
+    const actualAll = round2(
+      paymentRecords
+        ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
+        : Number(p.payment?.actualTotal ?? 0),
+    )
+    const ratioAll = rp.contract > 0 ? round4(actualAll / rp.contract) : null
+    const progress = deriveProgress(rp.contract, ratioAll)
     return {
       projectId: p.projectId,
       projectName: p.projectName || p.projectId,
@@ -79,10 +93,11 @@ export function buildPayBoardRows(
       tags: tagAssignments?.[p.projectId] ?? [],
       contract: rp.contract,
       actualTotal: rp.actualTotal,
+      actualAll,
       expectedTotal: rp.expectedTotal,
       remainingTotal: rp.remainingTotal,
       delayedCount: rp.delayedCount,
-      paymentRatio: rp.paymentRatio,
+      paymentRatio: ratioAll,
       projectAmount: rp.contract,
       paymentStatus: progress,
     }
@@ -140,7 +155,8 @@ export interface PayBoardGroup {
 
 function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoardGroup {
   const contractSum = grows.reduce((s, r) => s + r.contract, 0)
-  const actualSum = grows.reduce((s, r) => s + r.actualTotal, 0)
+  // 分组完成率(rate)分子恒全时(actualAll)，与行级 paymentRatio 同口径；计划/未收仍随区间
+  const actualSum = grows.reduce((s, r) => s + r.actualAll, 0)
   const expectedSum = grows.reduce((s, r) => s + r.expectedTotal, 0)
   return {
     key,
