@@ -52,6 +52,13 @@ describe('buildReminderRows / reminderStat (含已完成)', () => {
   })
 })
 
+describe('reminderRange m1 月末钳位', () => {
+  it('1 月 31 日 → end 落在 2 月末而非 3 月初', () => {
+    const { end } = reminderRange(new Date('2026-01-31T10:00:00'), 'm1')
+    expect(end.startsWith('2026-02')).toBe(true)
+  })
+})
+
 describe('buildDelayedRows', () => {
   const now = new Date(2026, 2, 10) // 2026-03-10
   it('仅非正常项目;延期节点=planDate<今且未完成的去重节点名', () => {
