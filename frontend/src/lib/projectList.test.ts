@@ -73,6 +73,28 @@ describe('buildProjectRows', () => {
     expect(r.isPresale).toBe(true)
     expect(r.hasClosed).toBe(true)
   })
+  it('售前项目本合同为空 → 合同金额回退原项目合同(paymentPmis.contract)', () => {
+    // 售前服务类本项目 customer.合同总额 恒空；paymentPmis.contract 已由后端回退为原项目合同
+    const [r] = buildProjectRows(
+      [proj({ projectId: 'QAX-SF', isPresale: true, relatedClosedId: 'OLD-1', paymentPmis: { contract: 1_180_000 } as any })],
+      {},
+    )
+    expect(r.contractAmount).toBe(1_180_000)
+  })
+  it('售前但原项目合同缺失(paymentPmis.contract 无值) → 仍为 null(显 -)', () => {
+    const [r] = buildProjectRows(
+      [proj({ projectId: 'QAX-SF2', isPresale: true, relatedClosedId: 'OLD-2', paymentPmis: {} as any })],
+      {},
+    )
+    expect(r.contractAmount).toBeNull()
+  })
+  it('非售前不回退：本合同空且非售前 → null(即便有 paymentPmis.contract)', () => {
+    const [r] = buildProjectRows(
+      [proj({ projectId: 'QAX-ND', isPresale: false, paymentPmis: { contract: 999 } as any })],
+      {},
+    )
+    expect(r.contractAmount).toBeNull()
+  })
   it('从 Project 取 top1000/quadrant', () => {
     const [r] = buildProjectRows([proj({ top1000: '是', quadrant: 'M1 战略核心区' } as Partial<Project>)], {})
     expect(r.top1000).toBe('是')
