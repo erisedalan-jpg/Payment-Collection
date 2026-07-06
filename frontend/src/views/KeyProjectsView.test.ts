@@ -136,6 +136,7 @@ describe('KeyProjectsView', () => {
     a.user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['projects-key'], allowedL4: [] }
     const w = await mountView()
     expect(w.text()).toContain('共 51 条')
+    expect(w.text()).toContain('合同金额合计')
     expect(w.find('.el-pagination').exists()).toBe(true)
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
   })

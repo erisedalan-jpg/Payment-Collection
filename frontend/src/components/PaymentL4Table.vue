@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
-import { projectPaymentRows, summaryByDim, filterProjects } from '@/lib/paymentPmis'
+import { projectPaymentRows, summaryByDim, filterProjects, l4SummaryRow } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 
@@ -44,6 +44,25 @@ const COLUMNS: DataColumn[] = [
   { key: 'reachedSum', label: '完成节点数', width: 100, sortable: true, num: true },
   { key: 'reachedRatio', label: '完成节点比例', width: 110, sortable: true, num: true, formatter: (v) => fmtRatio(v as number | null) },
 ]
+
+const totals = computed(() => l4SummaryRow(rows.value))
+function summaryMethod({ columns }: { columns: { property: string }[] }): string[] {
+  const t = totals.value
+  const disp: Record<string, string> = {
+    value: '合计',
+    projectCount: String(t.projectCount),
+    contractSum: fmtWan(t.contractSum),
+    actualSum: fmtWan(t.actualSum),
+    rate: fmtRatio(t.rate),
+    delayedProjectCount: String(t.delayedProjectCount),
+    delayedNodeSum: String(t.delayedNodeSum),
+    delayedAmountSum: fmtWan(t.delayedAmountSum),
+    nodeSum: String(t.nodeSum),
+    reachedSum: String(t.reachedSum),
+    reachedRatio: fmtRatio(t.reachedRatio),
+  }
+  return columns.map((c) => disp[c.property] ?? '')
+}
 </script>
 
 <template>
@@ -51,7 +70,7 @@ const COLUMNS: DataColumn[] = [
     <h3 class="pl4-title">回款数据</h3>
     <div v-if="!rows.length" class="pl4-empty">暂无数据</div>
     <div v-else class="pl4-scroll">
-      <DataTable :columns="COLUMNS" :rows="rows" :show-count="false" />
+      <DataTable :columns="COLUMNS" :rows="rows" :show-count="false" :show-summary="true" :summary-method="summaryMethod" />
     </div>
   </div>
 </template>
