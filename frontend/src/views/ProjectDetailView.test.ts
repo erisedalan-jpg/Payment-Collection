@@ -321,6 +321,22 @@ describe('ProjectDetailView', () => {
     expect(w.find('.pd-badge.over-warn').exists()).toBe(false)
   })
 
+  it('售前无原项目预算 → 显「未获取原项目预算」徽标、不显超支徽标', async () => {
+    seed()
+    const ds = useDataStore()
+    // P-2 为售前项目，relatedClosedId='OLD-9'；seed 中 OLD-9 的 projectPmis 无 cost.总预算 字段 → 原项目总预算=0
+    // 额外挂总体超支与交付超支金额，验证：若无 noOrigBudget 判定，本会渲染超支徽标；有判定后应被中性徽标替代
+    ;(ds.data as any).projects[1].overspendAmount = 60000
+    ;(ds.data as any).projects[1].deliveryCosts = [
+      { 类别: '交付外包服务成本', 预算金额: 100, 实际发生: 200, 剩余预算: -100, 消耗率: 2 },
+    ]
+    const w = await mountAt('/project/P-2')
+    expect(w.text()).toContain('未获取原项目预算')
+    expect(w.text()).not.toContain('总体预算超支')
+    expect(w.text()).not.toContain('交付外包服务成本超支')
+    expect(w.find('.pd-badge.mut').exists()).toBe(true)
+  })
+
   it('回款 tab:PMIS 回款摘要与节点表(2A)', async () => {
     seed()
     const ds = useDataStore()
