@@ -3,7 +3,8 @@ import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis, Payment
 import {
   TIER_HIGH, TIER_MID, deriveTier, deriveProgress, deriveDept, deriveStage,
   rateColorPmis, PAY_FACET_DIMS, filterProjects, projectPaymentRows, summaryByDim,
-  paymentNodeRows, nodeSummary, progressBuckets, pmisRiskGroups,
+  paymentNodeRows, nodeSummary, progressBuckets, pmisRiskGroups, l4SummaryRow,
+  type DimSummary,
 } from './paymentPmis'
 
 const pm = (o: Partial<ProjectPaymentPmis>): ProjectPaymentPmis => ({ ...o })
@@ -413,5 +414,45 @@ describe('paymentNodeRows 硬排除（orgL4 空）', () => {
     const projects = [{ projectId: 'X', projectName: '空', orgL4: '' } as any]
     const nodes = { X: [{ stage: '阶段1', planDate: '2026-01-01', expectedPayment: 100, receivedAmount: 0, unpaidAmount: 100, status: '待回款' } as any] }
     expect(paymentNodeRows(nodes, projects).length).toBe(0)
+  })
+})
+
+describe('l4SummaryRow 回款数据表总计', () => {
+  const mk = (o: Partial<DimSummary>): DimSummary => ({
+    value: 'X', projectCount: 0, contractSum: 0, actualSum: 0, rate: null,
+    delayedNodeSum: 0, remainingSum: 0, nodeSum: 0, reachedSum: 0,
+    delayedProjectCount: 0, delayedAmountSum: 0, ...o,
+  })
+
+  it('计数/金额列求和，比率列按口径重算(非百分比相加)', () => {
+    const rows: DimSummary[] = [
+      mk({ value: 'A', projectCount: 2, contractSum: 1_000_000, actualSum: 600_000, rate: 0.6, delayedNodeSum: 1, nodeSum: 4, reachedSum: 2, delayedProjectCount: 1, delayedAmountSum: 50_000 }),
+      mk({ value: 'B', projectCount: 3, contractSum: 3_000_000, actualSum: 900_000, rate: 0.3, delayedNodeSum: 2, nodeSum: 6, reachedSum: 3, delayedProjectCount: 2, delayedAmountSum: 150_000 }),
+    ]
+    const t = l4SummaryRow(rows)
+    expect(t.projectCount).toBe(5)
+    expect(t.contractSum).toBe(4_000_000)
+    expect(t.actualSum).toBe(1_500_000)
+    expect(t.rate).toBeCloseTo(0.375)          // 1_500_000/4_000_000，不是 0.6+0.3
+    expect(t.delayedProjectCount).toBe(3)
+    expect(t.delayedNodeSum).toBe(3)
+    expect(t.delayedAmountSum).toBe(200_000)
+    expect(t.nodeSum).toBe(10)
+    expect(t.reachedSum).toBe(5)
+    expect(t.reachedRatio).toBeCloseTo(0.5)     // 5/10
+  })
+
+  it('分母为 0 时比率为 null', () => {
+    const t = l4SummaryRow([mk({ contractSum: 0, actualSum: 0, nodeSum: 0, reachedSum: 0 })])
+    expect(t.rate).toBeNull()
+    expect(t.reachedRatio).toBeNull()
+  })
+
+  it('空输入 → 全 0、两比率 null', () => {
+    const t = l4SummaryRow([])
+    expect(t.contractSum).toBe(0)
+    expect(t.projectCount).toBe(0)
+    expect(t.rate).toBeNull()
+    expect(t.reachedRatio).toBeNull()
   })
 })
