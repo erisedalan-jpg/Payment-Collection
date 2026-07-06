@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis, Event, MilestoneItem, PaymentRecordsEntry, ProjectProfit } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
+import { noOriginBudget } from '@/lib/costAnalysis'
 import { fmtWan, fmtRatio, fmtYuan } from '@/lib/format'
 import { formatCellValue } from '@/lib/cellFormat'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -70,6 +71,7 @@ const deliveryOverBadges = computed(() =>
     .filter((c) => DELIVERY_OVER_CATS.includes(c.类别) && c.预算金额 != null && c.实际发生 != null && c.实际发生 > c.预算金额)
     .map((c) => c.类别),
 )
+const noOrigBudget = computed(() => p.value ? noOriginBudget(p.value, (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>) : false)
 
 const metrics = computed(() => [
   { k: '完工进展', v: fmtRatio(m.value.progress?.完工进展) },
@@ -289,8 +291,13 @@ const originInfo = computed(() => [
             <span v-if="rating" class="pd-badge rating">评级 {{ rating }}</span>
             <span v-if="p.isPresale" class="pd-badge origin" title="含已关闭原项目信息">原项目</span>
             <HealthBadge :overall="p.health?.overall || '无数据'" />
-            <span v-if="overBudget" class="pd-badge" :class="`over-${overBudget.level}`">总体预算超支 {{ fmtWan(overBudget.amount) }}万</span>
-            <span v-for="cat in deliveryOverBadges" :key="cat" class="pd-badge over-danger">{{ cat }}超支</span>
+            <template v-if="noOrigBudget">
+              <span class="pd-badge mut">未获取原项目预算</span>
+            </template>
+            <template v-else>
+              <span v-if="overBudget" class="pd-badge" :class="`over-${overBudget.level}`">总体预算超支 {{ fmtWan(overBudget.amount) }}万</span>
+              <span v-for="cat in deliveryOverBadges" :key="cat" class="pd-badge over-danger">{{ cat }}超支</span>
+            </template>
           </div>
           <div class="pd-meta">
             <span>编号 <b>{{ p.projectId }}</b></span>
@@ -437,6 +444,7 @@ const originInfo = computed(() => [
 .pd-badge.origin { background: var(--selected-tint); color: var(--accent); }
 .pd-badge.over-danger { background: var(--danger-bg); color: var(--danger-text); }
 .pd-badge.over-warn { background: var(--warn-bg); color: var(--warn-text); }
+.pd-badge.mut { background: var(--card2); color: var(--mut); }
 .pd-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4); font-size: var(--fs-2); color: var(--sub); margin-bottom: var(--sp-3); }
 .pd-meta b { color: var(--txt); }
 .pd-metrics { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
