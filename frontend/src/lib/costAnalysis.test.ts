@@ -200,3 +200,24 @@ describe('buildCostRows 售前预算回退原项目 + 超支布尔', () => {
     expect(r.deliveryOverspend).toBe(false)
   })
 })
+
+describe('buildCostRows — 风险派生列', () => {
+  it('riskLevel/openRisks/riskMajorCats(去重去空,含已关闭)', () => {
+    const projects = [{ projectId: 'WS5', orgL4: 'D1', deliveryCosts: [] }] as any
+    const pmis = { WS5: { cost: {}, status: {}, team: {},
+      risk: { 最高等级: '高', 未关闭风险数: 2 },
+      riskRecords: [{ 风险大类: '进度' }, { 风险大类: '成本' }, { 风险大类: '进度' }, { 风险大类: '' }] } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.riskLevel).toBe('高')
+    expect(r.openRisks).toBe(2)
+    expect(r.riskMajorCats).toEqual(['进度', '成本'])
+  })
+  it('无风险数据 → riskLevel=无 / openRisks=0 / riskMajorCats=[]', () => {
+    const projects = [{ projectId: 'WS6', orgL4: 'D1', deliveryCosts: [] }] as any
+    const pmis = { WS6: { cost: {}, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.riskLevel).toBe('无')
+    expect(r.openRisks).toBe(0)
+    expect(r.riskMajorCats).toEqual([])
+  })
+})

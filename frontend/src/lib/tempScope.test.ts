@@ -22,6 +22,7 @@ describe('FIELD_CATALOG', () => {
     expect(new Set(projKeys).size).toBe(projKeys.length)
     expect(projKeys).toContain('orgL4')
     expect(projKeys).toContain('contractWan')
+    expect(projKeys).toContain('riskReasons')
   })
 })
 
@@ -40,6 +41,13 @@ describe('projectMatches', () => {
     const fn = scope({ groups: [{ combinator: 'AND', conditions: [
       { group: 'project', field: 'orgL4', op: 'notIn', values: ['小金融服务组'] }] }] })
     expect(projectMatches(inp({ proj: { orgL4: '银行服务组' } }), fn)).toBe(true)
+  })
+
+  it('project 关注原因(数组 enum) in / notIn', () => {
+    const f = scope({ groups: [{ combinator: 'AND', conditions: [
+      { group: 'project', field: 'riskReasons', op: 'in', values: ['回款延期'] }] }] })
+    expect(projectMatches(inp({ proj: { riskReasons: ['回款延期', '里程碑滞后'] } }), f)).toBe(true)
+    expect(projectMatches(inp({ proj: { riskReasons: ['数据异常'] } }), f)).toBe(false)
   })
 
   it('project number between (含端点) / notBetween', () => {

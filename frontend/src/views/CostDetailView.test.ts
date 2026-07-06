@@ -79,8 +79,8 @@ describe('CostDetailView 明细表', () => {
       expect(fmt(2000000)).toBe('2,000,000')
       expect(fmt(2000000)).not.toContain('¥')
     }
-    // 全列(除序号)可排序 + 可筛选
-    expect(cols.filter((c) => c.key !== '_seq').every((c) => c.sortable === true)).toBe(true)
+    // 全列(除序号、除展示型数组列 riskMajorCats)可排序
+    expect(cols.filter((c) => c.key !== '_seq' && c.key !== 'riskMajorCats').every((c) => c.sortable === true)).toBe(true)
   })
 
   it('交付部门剩余/交付外包剩余 取自 deliveryCosts(同 /project/:id 源)', () => {

@@ -78,6 +78,7 @@ export function buildScopeInputs(
         isPresale: yn(!!pr?.isPresale),
         tags: pr?.tags ?? [],
         milestoneStatus: String(prog.里程碑进度状态 ?? '-'),
+        riskReasons: (pr?.riskReasons ?? []).map((r) => r.category),
         contractWan: typeof contract === 'number' ? Math.round(contract / 1000) / 10 : null,
         progress: pr?.progress ?? null,
         costRatio: pr?.costRatio ?? null,
