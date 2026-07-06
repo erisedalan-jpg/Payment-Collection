@@ -191,6 +191,13 @@ def main():
     for p in dept_projects:
         p["overspendAmount"] = profit_mod.overspend_amount(project_profit.get(p["projectId"]))
 
+    # 成本预算口径兜底:PMIS总预算 与 损益预算成本 分歧时改用损益预算成本并重算,分歧清单入数据质量告警
+    # 必须在 9f 的 compute_health 之前:health 的 costAbnormal/overall 派生自 cost.消耗比/项目超支,reconcile 须先改好 cost
+    budget_mismatches = pmis.reconcile_cost_budget(project_pmis, project_profit)
+    data_quality["budgetSourceMismatch"] = {"count": len(budget_mismatches), "items": budget_mismatches}
+    if budget_mismatches:
+        print(f"  [INFO] 预算口径分歧 {len(budget_mismatches)} 个项目,已改用损益预算成本并入数据质量告警")
+
     # === 9f. 系统核心口径回款(3A):收款阶段台账 collection_stages.csv;售前回退原项目 ===
     def _pmis_contract(_pid):
         return ((project_pmis.get(_pid) or {}).get("customer") or {}).get("合同总额")
@@ -227,12 +234,6 @@ def main():
                               "field": "actualRatio", "value": r})
     data_quality["dirty"] = dirty
     data_quality["collectionParseErrors"] = collection_parse_errors
-
-    # 成本预算口径兜底:PMIS总预算 与 损益预算成本 分歧时改用损益预算成本并重算,分歧清单入数据质量告警
-    budget_mismatches = pmis.reconcile_cost_budget(project_pmis, project_profit)
-    data_quality["budgetSourceMismatch"] = {"count": len(budget_mismatches), "items": budget_mismatches}
-    if budget_mismatches:
-        print(f"  [INFO] 预算口径分歧 {len(budget_mismatches)} 个项目,已改用损益预算成本并入数据质量告警")
 
     # === 10. 构建最终数据 ===
     final_data = {
