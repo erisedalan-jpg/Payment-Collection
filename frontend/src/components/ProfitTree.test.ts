@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import ProfitTree from './ProfitTree.vue'
 
 const ROWS = [
@@ -35,5 +35,12 @@ describe('ProfitTree', () => {
     const w = mount(ProfitTree, { props: { rows: ROWS } })
     const row1 = w.findAll('tbody tr').find((tr) => tr.text().includes('项目收入'))!
     expect(row1.find('button.pt-toggle').exists()).toBe(false)
+  })
+
+  it('剩余<0 的非比率行单元格挂 .pt-neg(红字)', async () => {
+    const rows = [{ code: 'X', name: '成本', level: 1, budget: 100, estimate: 100, final: 100, actual: 120, remaining: -20, rate: 1.2 }] as any
+    const w = mount(ProfitTree, { props: { rows } })
+    await flushPromises()
+    expect(w.find('.pt-neg').exists()).toBe(true)
   })
 })
