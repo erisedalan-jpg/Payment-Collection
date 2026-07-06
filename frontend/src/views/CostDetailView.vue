@@ -120,9 +120,12 @@ const DETAIL_COLS: DataColumn[] = [
   { key: 'deliveryDeptRemaining', label: '交付部门剩余(元)', width: 140, num: true, sortable: true, formatter: num0 },
   { key: 'deliveryOutsourceRemaining', label: '交付外包剩余(元)', width: 140, num: true, sortable: true, formatter: num0 },
   { key: 'deliveryStatus', label: '交付成本状态', width: 130, sortable: true },
+  { key: 'riskLevel', label: '项目风险', width: 110, sortable: true,
+    formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
+  { key: 'riskMajorCats', label: '风险大类', width: 180, wrap: true },
 ]
-// 全列(除序号)可列头多选筛选
-const FILTERABLE = new Set(DETAIL_COLS.map((c) => c.key).filter((k) => k !== '_seq'))
+// 全列(除序号)可列头多选筛选;riskMajorCats 为数组列,不进列头筛选(整体 String 化会破坏筛选)
+const FILTERABLE = new Set(DETAIL_COLS.map((c) => c.key).filter((k) => k !== '_seq' && k !== 'riskMajorCats'))
 // 数值列(排序按数值,余按中文 localeCompare)
 const NUMERIC_KEYS = new Set(['amount', 'totalBudget', 'actualCost', 'remaining', 'deliveryDeptRemaining', 'deliveryOutsourceRemaining'])
 
@@ -169,6 +172,8 @@ function onExport() {
     总预算: r.totalBudget, 已核算: r.actualCost, 剩余预算: r.remaining,
     交付部门剩余: r.deliveryDeptRemaining, 交付外包剩余: r.deliveryOutsourceRemaining,
     交付成本状态: r.deliveryStatus,
+    项目风险: r.openRisks ? `${r.riskLevel}(${r.openRisks})` : r.riskLevel,
+    风险大类: r.riskMajorCats.join('、'),
   })))
 }
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
@@ -216,6 +221,12 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
             <template #cell-status="{ value }"><StatusBadge :label="value" :tone="TONE[value]" /></template>
             <template #cell-remaining="{ row, value }"><span class="u-num" :class="row.remaining < 0 ? 'cd-red' : 'cd-green'">{{ num0(value) }}</span></template>
             <template #cell-deliveryStatus="{ value }"><StatusBadge :label="value" :tone="DELIVERY_TONE[value]" /></template>
+            <template #cell-riskMajorCats="{ value }">
+              <span v-if="!value || !value.length" class="cd-mut">-</span>
+              <span v-else class="cd-majorcats">
+                <span v-for="c in value" :key="c" class="cd-majorcat">{{ c }}</span>
+              </span>
+            </template>
           </DataTable>
         </div>
         <div class="cd-pager">
@@ -246,4 +257,6 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 .cd-scroll { overflow-x: auto; }
 .cd-link { color: var(--accent); cursor: pointer; }
 .cd-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.cd-majorcats { display: flex; flex-direction: column; gap: 2px; }
+.cd-mut { color: var(--mut); }
 </style>
