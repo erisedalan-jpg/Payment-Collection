@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildRiskRows, riskRowMatches } from './riskRows'
+import { buildRiskRows, riskRowMatches, RISK_SCOPE_CATALOG } from './riskRows'
 import type { ScopeFilter } from './tempScope'
 
 const projects = [
@@ -70,5 +70,53 @@ describe('riskRowMatches(单表两级 AND/OR)', () => {
     ] }
     expect(riskRowMatches(rows.find((r) => r.riskKey === 'P1::FX-2')!, scope)).toBe(false) // 已关闭 且 一组
     expect(riskRowMatches(rows.find((r) => r.riskKey === 'P2::FX-9')!, scope)).toBe(true)  // 未关闭
+  })
+})
+
+describe('buildRiskRows — 项目级 scope 字段(补齐 /projects 列)', () => {
+  const projects = [
+    { projectId: 'P1', projectName: '甲', orgL4: '一组', paymentPmis: { contract: 2_000_000 },
+      payment: { relatedNodeCount: 1, delayedCount: 0, remainingTotal: 0, actualTotal: 100, paymentRatio: 0.5 },
+      health: { overall: '关注' }, top1000: '是', quadrant: 'Q1', overspendAmount: 8000 },
+  ] as any
+  const pmis = { P1: {
+    status: { 项目级别: 'P1', 项目类型: '实施', 项目状态: '实施中' },
+    progress: { 项目阶段: '交付', 完工进展: 0.6 },
+    risk: { 最高等级: '高', 未关闭风险数: 3 },
+    cost: { 消耗比: 0.9 },
+    riskRecords: [{ 风险编码: 'FX-1', 风险状态: '未关闭', 项目编号: 'P1' }],
+  } } as any
+
+  it('风险行挂项目级字段(取自 ProjectRow)', () => {
+    const r = buildRiskRows(projects, pmis, {})[0]
+    expect(r['项目阶段']).toBe('交付')
+    expect(r['完工进展']).toBe(0.6)
+    expect(r['项目最高风险等级']).toBe('高')
+    expect(r['未关闭风险数']).toBe(3)
+    expect(r['预算消耗比']).toBe(0.9)
+    expect(r['回款完成率']).toBe(0.5)
+    expect(r['健康度']).toBe('关注')
+    expect(r['TOP1000']).toBe('是')
+    expect(r['象限']).toBe('Q1')
+    expect(Array.isArray(r['关注原因'])).toBe(true)
+    expect(r['关注原因']).toContain('总成本超支大于5000') // overspendAmount 8000 > 5000
+  })
+
+  it('RISK_SCOPE_CATALOG 含新增 11 个项目级字段', () => {
+    const keys = RISK_SCOPE_CATALOG.map((f) => f.key)
+    for (const k of ['项目阶段', '完工进展', '项目最高风险等级', '未关闭风险数', '预算消耗比',
+      '回款完成率', '健康度', '关注原因', '回款状态', 'TOP1000', '象限']) {
+      expect(keys).toContain(k)
+    }
+  })
+
+  it('riskRowMatches 新字段:关注原因(数组enum) / 完工进展(number区间)', () => {
+    const r = buildRiskRows(projects, pmis, {})[0]
+    const catScope: ScopeFilter = { combinator: 'AND', groups: [{ combinator: 'AND',
+      conditions: [{ field: '关注原因', op: 'in', values: ['总成本超支大于5000'] }] }] }
+    expect(riskRowMatches(r, catScope)).toBe(true)
+    const numScope: ScopeFilter = { combinator: 'AND', groups: [{ combinator: 'AND',
+      conditions: [{ field: '完工进展', op: 'between', min: 0.5, max: 0.7 }] }] }
+    expect(riskRowMatches(r, numScope)).toBe(true)
   })
 })
