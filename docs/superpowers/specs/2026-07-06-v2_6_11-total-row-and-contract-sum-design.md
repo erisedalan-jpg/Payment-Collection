@@ -8,7 +8,7 @@
 
 - **纯前端展示层**：不改 `preprocess_data.py`/`pmis.py`/schema，不动任何回款/成本口径的分子分母来源，不新增页面/pageKey/依赖。
 - **诉求1**：`/payment` 的「回款数据」表（`PaymentL4Table.vue`，L4组汇总）底部固定一行总计。计数/金额列 = Σ 表内各行；两列比率列**按口径重算**（不是把百分比相加）。总计行由 Element Plus `el-table` 原生 `show-summary` 渲染，天然固定表底、不参与排序。
-- **诉求2**：四跟进页在页脚「共X条」前显示「合同金额合计 X 万」，取 `Σ contractWan`（当前已过滤、分页前的全量行），随列筛选/范围/数据集切换自动变化。
+- **诉求2**：四跟进页在页脚「共X条」前显示「合同金额合计 X 万」（四页标签统一），对当前已过滤、分页前的全量行按 `projectId` 去重后求和合同金额（万），随列筛选/范围/数据集切换自动变化。三页一行一项目、去重为恒等；`/risk` 一行一条风险、按项目去重每项目只计一次（用户钦定）。
 - **升级**：纯前端 dist，**无需点「更新数据」**（不改 preprocess，`analysis_data.json` 不变）。
 
 ## 2. 诉求1：回款数据表总计行
@@ -117,37 +117,53 @@ function summaryMethod({ columns }: { columns: { property: string }[] }): string
 </div>
 ```
 - `fp.filtered` = 应用列筛选/范围/数据集（当前 vs 历史）后的**全量行、分页前**（`useFollowupPage.ts:35`）。
-- 各页行均含 `contractWan: number | null`（万元，`Math.round(contract/1000)/10`；`contract` = `paymentPmis.contract`，售前回退原项目）：
-  - `/projects/key` → `keyProjects.ts:55`
-  - `/payment/key` → `paymentKeyFollowup.ts:49`
-  - `/projects/temp` → `tempFollowup.ts:81`（行为 `{ proj: { contractWan } }` 结构，见 3.3 注意）
-  - `/risk` → 行同样带 `contractWan`（拍平风险行，字段随项目）
+- **行粒度与金额字段两类（关键差异）**：
+  - **一行一个项目**的三页，金额字段为顶层 `contractWan: number | null`（万元，`Math.round(contract/1000)/10`，`contract = paymentPmis.contract`，售前回退原项目）：`/projects/key`(`keyProjects.ts:55`) / `/payment/key`(`paymentKeyFollowup.ts:49`) / `/projects/temp`(`TempRow extends KeyProjectRow`，`tempFollowup.ts`)。
+  - **一行一条风险记录**的 `/risk`：`buildRiskRows` 按 项目×风险记录 拍平（`riskRows.ts:37`），同一项目有多条风险即多行；金额字段为中文键 **`项目金额`**（万元，`Math.round(paymentPmis.contract/1000)/10`，`riskRows.ts:43`——与 `contractWan` **同源同公式**，仅列名不同，列标签「项目金额(万)」）。「共N条」= 风险条数。
+- **四页行均有顶层 `projectId`**：`keyProjects.ts:14` / `paymentKeyFollowup.ts:12` / `TempRow` 继承 / `riskRows.ts:39`——去重求和以此为键。
 
-### 3.2 纯函数 `sumContractWan`
-新增 `frontend/src/lib/followupTotals.ts`：
+### 3.2 纯函数 `sumDistinctContractWan`
+新增 `frontend/src/lib/followupTotals.ts`。语义统一为「**当前筛选后所见的不同项目，各取一次金额（万）求和**」——三页一行一项目时去重为恒等，`/risk` 一项目多行时每项目只计一次（用户钦定）：
 ```ts
-/** 求和跟进页行的合同金额（万元，跳过 null，空集=0）。 */
-export function sumContractWan(rows: { contractWan: number | null }[]): number {
-  return rows.reduce((s, r) => s + (r.contractWan ?? 0), 0)
+/** 跟进页页脚合同金额合计：按 projectId 去重后，对每个项目取一次 valueKey(万) 数值求和。
+ *  - key/temp/payment-key：valueKey='contractWan'，行本就一项目一行，去重为恒等。
+ *  - risk：valueKey='项目金额'，一项目多条风险 → 每项目只计一次。
+ *  跳过非数值（null/undefined）；无 projectId 的行各自独立计入；空集=0。 */
+export function sumDistinctContractWan(rows: Array<Record<string, unknown>>, valueKey: string): number {
+  const seen = new Set<string>()
+  let sum = 0
+  for (const r of rows) {
+    const id = String(r.projectId ?? '')
+    if (id) {
+      if (seen.has(id)) continue
+      seen.add(id)
+    }
+    const v = r[valueKey]
+    if (typeof v === 'number') sum += v
+  }
+  return sum
 }
 ```
-- 跳过 `null`；空数组 → 0。
 
 ### 3.3 各页接线
-每页 `<script setup>` 加：
+三页（`/projects/key`、`/projects/temp`、`/payment/key`）`<script setup>` 加：
 ```ts
-import { sumContractWan } from '@/lib/followupTotals'
+import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
-const contractTotal = computed(() => sumContractWan(fp.filtered.value as { contractWan: number | null }[]))
+const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as Array<Record<string, unknown>>, 'contractWan'))
 ```
-页脚 `.kp-pager` 内的计数 span 改为（**保留「共 N 条」子串**，仅前置）：
+`/risk` 页 valueKey 改为 `'项目金额'`：
+```ts
+const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as Array<Record<string, unknown>>, '项目金额'))
+```
+四页页脚 `.kp-pager` 内的计数 span 统一改为（**保留「共 N 条」子串，仅前置；四页标签统一「合同金额合计」**）：
 ```html
 <span class="u-num">合同金额合计 {{ fmt(contractTotal, 1) }} 万 · 共 {{ fp.filtered.value.length }} 条</span>
 ```
 - `fmt(n, 1)`（`format.ts:2`）= 千分位、固定 1 位小数，例：`合同金额合计 12,345.6 万 · 共 120 条`。
 - 因 `fp.filtered` 随列筛选/范围/数据集变化，合计值随之联动。
 
-**四页行对象顶层均有 `contractWan`（已确认）**：`KeyProjectRow`（`keyProjects.ts:16`）定义 `contractWan: number | null`；`TempRow extends KeyProjectRow`（`tempFollowup.ts:6`）、`PaymentKeyRow`（`paymentKeyFollowup.ts:13`）、`/risk` 拍平行同样在顶层带 `contractWan`；四页列定义均为 `{ key: 'contractWan' }` 且 formatter 生效，证明顶层可直接取值。故四页一律 `sumContractWan(fp.filtered.value)`，无需字段路径特判。（`tempScope.ts` 中的 `{ proj: { contractWan } }` 是范围引擎输入的中间态，与表格行无关。）
+**`/risk` 去重语义（用户钦定）**：`/risk` 一行一条风险，`共 N 条`=风险条数；合同金额合计按 `projectId` 去重、每项目的 `项目金额` 只计一次，故其合计对应的是「不同项目数」的合同额、通常 < N（与另三页 1 项目 1 行、合计对应 N 个项目不同）。这是刻意选择，非缺陷。
 
 ## 4. 影响面
 
@@ -163,7 +179,7 @@ const contractTotal = computed(() => sumContractWan(fp.filtered.value as { contr
    - `rate` = Σactual/Σcontract（重算，非百分比相加）；`reachedRatio` = Σreached/Σnode；
    - `contractSum=0` → `rate=null`；`nodeSum=0` → `reachedRatio=null`；
    - 空输入 → 全 0、两比率 `null`。
-2. `followupTotals.test.ts`（新）`sumContractWan`：正常求和、跳过 `null`、空集=0、全 `null`=0。
+2. `followupTotals.test.ts`（新）`sumDistinctContractWan`：三页形态（每行唯一 projectId + `contractWan`）正常求和、跳过 `null`、空集=0；`/risk` 形态（同一 projectId 多行 + `项目金额`）每项目只计一次、不同项目相加、`valueKey='项目金额'` 生效；无 `projectId` 行各自独立计入。
 3. `DataTable.test.ts` 加：`showSummary=true` + `summaryMethod` 时渲染汇总行、含预期总计文本；`showSummary` 默认关时不渲染汇总行。
 
 **视图侧：** 四页各加一条轻断言 `expect(w.text()).toContain('合同金额合计')`（仅验标签出现，不绑定具体金额，避免脆弱）。既有 `共 N 条` 断言保持不变、应仍通过。
