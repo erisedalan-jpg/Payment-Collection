@@ -131,12 +131,12 @@ export function costL4Dist(rows: CostRow[]): CostL4Dist[] {
   return Object.values(m).sort((a, b) => a.orgL4.localeCompare(b.orgL4))
 }
 
-export interface CostL4Summary { orgL4: string; total: number; normal: number; under5k: number; over5k: number; over5kRatio: number; contractTotal: number; remainingTotal: number; deliveryDeptRemaining: number; deliveryOutsourceRemaining: number }
+export interface CostL4Summary { orgL4: string; total: number; normal: number; under5k: number; over5k: number; noOriginBudget: number; over5kRatio: number; contractTotal: number; remainingTotal: number; deliveryDeptRemaining: number; deliveryOutsourceRemaining: number }
 export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
   const m: Record<string, CostL4Summary> = {}
   for (const r of rows) {
     const d = r.orgL4 || '未知'
-    if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, over5kRatio: 0, contractTotal: 0, remainingTotal: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 }
+    if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, noOriginBudget: 0, over5kRatio: 0, contractTotal: 0, remainingTotal: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 }
     m[d].total++
     m[d].contractTotal += r.amount
     m[d].remainingTotal += r.remaining
@@ -145,6 +145,7 @@ export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
     if (r.status === '未超支') m[d].normal++
     else if (r.status === '超支不足5k') m[d].under5k++
     else if (r.status === '超支大于5k') m[d].over5k++
+    else if (r.status === '未获取原项目预算') m[d].noOriginBudget++
   }
   return Object.values(m)
     .map((s) => ({ ...s, over5kRatio: s.total > 0 ? +((s.over5k / s.total) * 100).toFixed(1) : 0 }))

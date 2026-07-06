@@ -255,3 +255,16 @@ describe('buildCostRows — 风险派生列', () => {
     expect(r.riskMajorCats).toEqual([])
   })
 })
+
+describe('costL4Summary — 未获取原项目预算列', () => {
+  const row = (o: Partial<any>) => ({ orgL4: 'D1', status: '未超支', amount: 0, remaining: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0, ...o })
+  it('未获取原项目预算单列计数，total=四类之和，超支占比分母仍全量', () => {
+    const rows = [row({ status: '未超支' }), row({ status: '超支大于5k' }),
+      row({ status: '未获取原项目预算' }), row({ status: '未获取原项目预算' })] as any
+    const s = costL4Summary(rows).find((x) => x.orgL4 === 'D1')!
+    expect(s.noOriginBudget).toBe(2)
+    expect(s.total).toBe(4)
+    expect(s.normal + s.under5k + s.over5k + s.noOriginBudget).toBe(s.total)
+    expect(s.over5kRatio).toBe(25)
+  })
+})
