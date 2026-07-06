@@ -19,6 +19,8 @@ import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useDeferredMount } from '@/lib/useDeferredMount'
+import { sumDistinctContractWan } from '@/lib/followupTotals'
+import { fmt } from '@/lib/format'
 
 const TABLE_ID = 'risk-followup'
 const data = useDataStore()
@@ -41,6 +43,7 @@ const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filt
 const currentRows = computed<RiskRow[]>(() => scopedRows.value)
 
 const fp = useFollowupPage(risk, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as RiskRow[])
+const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as Array<Record<string, unknown>>, '项目金额'))
 
 // —— 列模型:风险列(动态) + 项目列(固定) + 跟进列 ——
 const PROJECT_COLS: DataColumn[] = [
@@ -199,7 +202,7 @@ defineExpose({
       </DataTable>
     </div>
     <div v-if="ready && fp.filtered.value.length" class="kp-pager">
-      <span class="u-num">共 {{ fp.filtered.value.length }} 条</span>
+      <span class="u-num">合同金额合计 {{ fmt(contractTotal, 1) }} 万 · 共 {{ fp.filtered.value.length }} 条</span>
       <el-pagination v-model:current-page="fp.currentPage.value" v-model:page-size="fp.pageSize.value"
         :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
