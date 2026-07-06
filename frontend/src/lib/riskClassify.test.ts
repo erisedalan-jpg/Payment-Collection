@@ -114,7 +114,7 @@ describe('classifyProjects', () => {
       health: '风险',
       riskReasons: [
         { category: '回款延期', detail: '3个延期节点', tone: 'warn' },
-        { category: '总成本超支', detail: '超支 2.0 万', tone: 'danger' },
+        { category: '总成本超支大于5000', detail: '超支 2.0 万', tone: 'danger' },
       ],
     })
     const result = classifyProjects([row])
@@ -153,7 +153,7 @@ describe('classifyProjects', () => {
 
   it('总成本超支/交付成本超支 都计入首页「成本超支」桶', () => {
     const rows = [
-      { projectId: 'A', projectName: '甲', health: '健康', isAnomalous: false, riskReasons: [{ category: '总成本超支', detail: '超支 1.0 万', tone: 'danger' }] },
+      { projectId: 'A', projectName: '甲', health: '健康', isAnomalous: false, riskReasons: [{ category: '总成本超支大于5000', detail: '超支 1.0 万', tone: 'danger' }] },
       { projectId: 'B', projectName: '乙', health: '健康', isAnomalous: false, riskReasons: [{ category: '交付成本超支', detail: '交付人工超支', tone: 'danger' }] },
     ] as any
     const res = classifyProjects(rows)
@@ -164,7 +164,7 @@ describe('classifyProjects', () => {
   it('同一项目同时命中 总成本超支+交付成本超支 时「成本超支」桶去重计 1', () => {
     const rows = [
       { projectId: 'X', projectName: '丙', health: '健康', isAnomalous: false, riskReasons: [
-        { category: '总成本超支', detail: '超支 3.0 万', tone: 'danger' },
+        { category: '总成本超支大于5000', detail: '超支 3.0 万', tone: 'danger' },
         { category: '交付成本超支', detail: '交付人工超支', tone: 'danger' },
       ] },
     ] as any
@@ -180,7 +180,7 @@ describe('classifyProjects', () => {
   // 不同项目各命中一类时仍分别计数(去重只针对同一 projectId,不误并不同项目)
   it('总成本超支(项目A)+交付成本超支(项目B) 仍计 2(去重不跨项目)', () => {
     const rows = [
-      { projectId: 'A', projectName: '甲', health: '健康', isAnomalous: false, riskReasons: [{ category: '总成本超支', detail: '项目超支', tone: 'danger' }] },
+      { projectId: 'A', projectName: '甲', health: '健康', isAnomalous: false, riskReasons: [{ category: '总成本超支大于5000', detail: '项目超支', tone: 'danger' }] },
       { projectId: 'B', projectName: '乙', health: '健康', isAnomalous: false, riskReasons: [{ category: '交付成本超支', detail: '交付人工超支', tone: 'danger' }] },
     ] as any
     const res = classifyProjects(rows)

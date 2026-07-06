@@ -1,4 +1,4 @@
-import type { RiskReason } from './riskReasons'
+import { TOTAL_OVERSPEND_CATS, type RiskReason } from './riskReasons'
 
 export interface RiskClassEntry {
   category: string
@@ -53,7 +53,7 @@ export function classifyProjects(projects: InputRow[]): RiskClassEntry[] {
   )
 
   // 总/交付成本超支 remap 回「成本超支」桶（首页不拆桶）
-  const COST_SPLIT = new Set(['总成本超支', '交付成本超支'])
+  const COST_SPLIT = new Set<string>([...TOTAL_OVERSPEND_CATS, '交付成本超支'])
 
   function pushUnique(cat: string, projectId: string, projectName: string, detail: string) {
     const bucket = buckets.get(cat)

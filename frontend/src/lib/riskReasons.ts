@@ -2,7 +2,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from '@/lib/anomaly'
 
 /** 关注/风险原因的分类枚举 */
-export type RiskCategory = '回款延期' | '里程碑滞后' | '总成本超支' | '交付成本超支' | '风险未闭环' | '数据异常'
+export type RiskCategory = '回款延期' | '里程碑滞后' | '总成本超支大于5000' | '总成本超支小于5000' | '交付成本超支' | '风险未闭环' | '数据异常'
 
 /** 单条关注/风险原因 */
 export interface RiskReason {
@@ -13,6 +13,9 @@ export interface RiskReason {
   /** pill 配色三态，对应设计令牌状态色 */
   tone: 'warn' | 'danger' | 'mut'
 }
+
+/** 「总成本超支」两档 category（按 overspendAmount 是否 > 5000 元拆分）。判定「是否总成本超支」的消费方须用此常量，勿散写字面量。 */
+export const TOTAL_OVERSPEND_CATS = ['总成本超支大于5000', '总成本超支小于5000'] as const
 
 /** 里程碑滞后关键词 */
 const MILESTONE_LAG_KEYWORDS = ['滞后', '延期', '超期']
@@ -45,12 +48,14 @@ export function riskReasons(project: Project, pmis?: ProjectPmis): RiskReason[] 
     out.push({ category: '里程碑滞后', detail: msStatus, tone: 'warn' })
   }
 
-  // 3. 总成本超支(整体预算维度):overspendAmount > 0 优先；否则 PMIS 项目超支 flag 或消耗比 > 1
+  // 3. 总成本超支(整体预算维度):overspendAmount > 0 优先；否则 PMIS 项目超支 flag 或消耗比 > 1；
+  //    再按 overspendAmount 是否 > 5000 元拆「大于5000/小于5000」两档(与 costdetail 卡「超支大于5000」同阈值)。
   const over = project.overspendAmount ?? 0
+  const overCat: RiskCategory = over > 5000 ? '总成本超支大于5000' : '总成本超支小于5000'
   if (over > 0) {
-    out.push({ category: '总成本超支', detail: `超支 ${(over / 10000).toFixed(1)} 万`, tone: 'danger' })
+    out.push({ category: overCat, detail: `超支 ${(over / 10000).toFixed(1)} 万`, tone: 'danger' })
   } else if ((pmis?.cost?.['项目超支']) || ((pmis?.cost?.['消耗比'] ?? 0) > 1)) {
-    out.push({ category: '总成本超支', detail: '项目超支', tone: 'danger' })
+    out.push({ category: overCat, detail: '项目超支', tone: 'danger' })
   }
   // 3b. 交付成本超支(交付部门人工成本):PMIS 现成布尔 flag
   if (pmis?.cost?.['交付超支'] === true) {
