@@ -125,6 +125,7 @@ describe('RiskFollowupView', () => {
     await flushPromises()
     expect(w.find('.kp-pager').exists()).toBe(true)
     expect(w.text()).toContain('共 55 条')
+    expect(w.text()).toContain('合同金额合计')
     expect(w.find('.el-pagination').exists()).toBe(true)
     const bodyRows = w.findAll('tbody tr')
     expect(bodyRows.length).toBeLessThanOrEqual(50)
