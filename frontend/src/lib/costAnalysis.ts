@@ -19,6 +19,7 @@ export interface CostRow {
   deliveryDeptRemaining: number; deliveryOutsourceRemaining: number
   deliveryStatus: DeliveryStatus
   totalOverspend: boolean; deliveryOverspend: boolean; overspendAmount: number
+  riskLevel: string; openRisks: number; riskMajorCats: string[]
 }
 
 /** 全部主域项目装配成本行(明细表用)。
@@ -30,6 +31,11 @@ export interface CostRow {
 export function buildCostRows(projects: Project[], pmis: Record<string, ProjectPmis>): CostRow[] {
   return projects.map((p) => {
     const m = (pmis[p.projectId] ?? {}) as any
+    const risk = (m.risk ?? {}) as Record<string, any>
+    const riskMajorCats = [...new Set(
+      ((m.riskRecords ?? []) as Record<string, any>[])
+        .map((rr) => String(rr['风险大类'] ?? '').trim()).filter((sv) => sv !== ''),
+    )]
     const cost = m.cost ?? {}
     const dc = p.deliveryCosts ?? []
     const findRem = (cat: string) => Number(dc.find((c: any) => c.类别 === cat)?.剩余预算 ?? 0)
@@ -82,6 +88,9 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
       totalOverspend,
       deliveryOverspend: cats.includes('交付成本超支'),
       overspendAmount,
+      riskLevel: String(risk.最高等级 ?? '') || '无',
+      openRisks: Number(risk.未关闭风险数 ?? 0),
+      riskMajorCats,
     }
   })
 }

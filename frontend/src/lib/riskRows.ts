@@ -2,6 +2,7 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { leafMatch, type FieldKind } from './scopeOps'
 import type { ScopeFilter, ScopeCondition, ScopeGroup, FieldLike } from './tempScope'
+import { buildProjectRows } from './projectList'
 
 export interface RiskFollowRecord {
   followAction?: string; followActionEditTime?: string; followActionEditBy?: string
@@ -24,12 +25,14 @@ export function buildRiskRows(
   current: Record<string, RiskFollowRecord>,
 ): RiskRow[] {
   const out: RiskRow[] = []
+  const prMap = new Map(buildProjectRows(projects, pmisMap).map((r) => [r.projectId, r]))
   for (const p of projects) {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     const recs = (m.riskRecords ?? []) as Record<string, any>[]
     if (!recs.length) continue
     const contract = (p.paymentPmis as Record<string, any> | null | undefined)?.contract
     const status = m.status ?? {}
+    const pr = prMap.get(p.projectId)
     for (const rr of recs) {
       const riskCode = s(rr['风险编码'])
       const riskKey = `${p.projectId}::${riskCode}`
@@ -46,6 +49,17 @@ export function buildRiskRows(
         'L4组织': p.orgL4 ?? '',
         '项目类型': s(status['项目类型']),
         '项目状态': s(status['项目状态']),
+        '项目阶段': pr?.stage ?? '-',
+        '完工进展': pr?.progress ?? null,
+        '项目最高风险等级': pr?.riskLevel ?? '无',
+        '未关闭风险数': pr?.openRisks ?? 0,
+        '预算消耗比': pr?.costRatio ?? null,
+        '回款完成率': pr?.paymentRatio ?? null,
+        '健康度': pr?.health ?? '无数据',
+        '关注原因': (pr?.riskReasons ?? []).map((r) => r.category),
+        '回款状态': pr?.paymentStatus ?? '-',
+        'TOP1000': pr?.top1000 ?? '否',
+        '象限': pr?.quadrant ?? '',
         riskKey,
         followAction: follow.followAction, followActionEditTime: follow.followActionEditTime, followActionEditBy: follow.followActionEditBy,
         revConclusion: follow.revConclusion, revConclusionEditTime: follow.revConclusionEditTime, revConclusionEditBy: follow.revConclusionEditBy,
@@ -84,4 +98,15 @@ export const RISK_SCOPE_CATALOG: FieldLike[] = [
   { key: '项目类型', label: '项目类型', kind: 'enum' as FieldKind },
   { key: '项目状态', label: '项目状态', kind: 'enum' as FieldKind },
   { key: '项目金额', label: '项目金额(万)', kind: 'number' as FieldKind },
+  { key: '项目阶段', label: '项目阶段', kind: 'enum' as FieldKind },
+  { key: '完工进展', label: '完工进展', kind: 'number' as FieldKind },
+  { key: '项目最高风险等级', label: '项目最高风险等级', kind: 'enum' as FieldKind },
+  { key: '未关闭风险数', label: '未关闭风险数', kind: 'number' as FieldKind },
+  { key: '预算消耗比', label: '预算消耗比', kind: 'number' as FieldKind },
+  { key: '回款完成率', label: '回款完成率', kind: 'number' as FieldKind },
+  { key: '健康度', label: '健康度', kind: 'enum' as FieldKind },
+  { key: '关注原因', label: '关注原因', kind: 'enum' as FieldKind },
+  { key: '回款状态', label: '回款状态', kind: 'enum' as FieldKind },
+  { key: 'TOP1000', label: 'TOP1000', kind: 'enum' as FieldKind },
+  { key: '象限', label: '象限', kind: 'enum' as FieldKind },
 ]
