@@ -54,6 +54,7 @@ describe('buildScopeInputs', () => {
     expect(i.proj.paused).toBe('否')
     expect(i.proj.contractWan).toBe(200) // 2_000_000/10000
     expect(i.proj.ar).toBe('arX')
+    expect(Array.isArray(i.proj.riskReasons)).toBe(true)
     expect(i.nodes[0].status).toBe('延期')
     expect(i.milestones[0].name).toBe('验收')
   })

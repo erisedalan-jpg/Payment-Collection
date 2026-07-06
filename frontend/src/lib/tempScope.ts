@@ -54,6 +54,7 @@ export const FIELD_CATALOG: FieldDef[] = [
   { group: 'project', key: 'isPresale', label: '是否售前', kind: 'enum' },
   { group: 'project', key: 'tags', label: '标签', kind: 'enum' },
   { group: 'project', key: 'milestoneStatus', label: '里程碑进度状态', kind: 'enum' },
+  { group: 'project', key: 'riskReasons', label: '关注原因', kind: 'enum' },
   { group: 'project', key: 'contractWan', label: '合同金额(万)', kind: 'number' },
   { group: 'project', key: 'progress', label: '完工进展', kind: 'number' },
   { group: 'project', key: 'costRatio', label: '预算消耗比', kind: 'number' },
