@@ -131,10 +131,10 @@ describe('buildHealthReport', () => {
     expect(r.sources.find((s) => s.key === 'pmis')!.subs[0]).toContain('主题 1/2 可用')
   })
 
-  it('导出文件名只挂在指定六类目', () => {
+  it('导出文件名只挂在指定七类目', () => {
     const r = buildHealthReport(makeData())
     expect(r.alerts.filter((a) => a.exportName).map((a) => a.key).sort())
-      .toEqual(['backfill', 'l4Missing', 'managerNotInOrg', 'originMissing', 'presaleUnmapped', 'unmatched'])
+      .toEqual(['backfill', 'budgetMismatch', 'l4Missing', 'managerNotInOrg', 'originMissing', 'presaleUnmapped', 'unmatched'])
   })
 
   it('orgL4 空项目进 l4Missing 告警组', () => {
@@ -171,6 +171,28 @@ describe('buildHealthReport', () => {
     expect(r.alerts.find((a) => a.key === 'missing-msClosed')!.severity).toBe('mid')
     expect(r.alerts.find((a) => a.key === 'missing-budget')!.severity).toBe('mid')
     expect(r.verdict).toBe('yellow')
+  })
+
+  it('budgetSourceMismatch → 生成预算口径分歧告警组', () => {
+    const d = makeData()
+    ;(d.dataQuality as any).budgetSourceMismatch = {
+      count: 1,
+      items: [{ projectId: 'P-1', pmisBudget: 5640, profitBudget: 7728.5, diff: -2088.5 }],
+    }
+    const r = buildHealthReport(d)
+    const g = r.alerts.find((a) => a.key === 'budgetMismatch')
+    expect(g).toBeTruthy()
+    expect(g!.count).toBe(1)
+    expect(g!.rows).toHaveLength(1)
+    expect((g!.rows[0] as any).projectId).toBe('P-1')
+    expect(g!.columns.map((c) => c.key)).toContain('profitBudget')
+  })
+
+  it('无 budgetSourceMismatch → 告警组存在但 count=0(沉底)', () => {
+    const r = buildHealthReport(makeData())
+    const g = r.alerts.find((a) => a.key === 'budgetMismatch')
+    expect(g).toBeTruthy()
+    expect(g!.count).toBe(0)
   })
 })
 
