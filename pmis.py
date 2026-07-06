@@ -112,6 +112,42 @@ def derive_cost(status_row: Dict[str, Any], center_row: Dict[str, Any]) -> Dict[
             "成本状态": (status_row.get("成本状态") or None)}
 
 
+def reconcile_cost_budget(status_pmis: Dict[str, Dict[str, Any]],
+                          project_profit: Optional[Dict[str, Dict[str, Any]]],
+                          tol: float = 1.0) -> List[Dict[str, Any]]:
+    """成本预算口径兜底:当 PMIS「项目总预算」与损益表「预算成本」分歧
+    (两值皆存在 且 损益预算成本>0 且 |差|>tol 元)时,把成本口径分母改用损益预算成本,
+    并连带重算 剩余预算/消耗比/项目超支(只动分母,核算不变);成本状态/交付超支 不动。
+    一致的/单边数据/无损益的项目保持原样。就地修改 status_pmis[pid]["cost"],
+    返回分歧清单供数据质量告警。"""
+    mismatches: List[Dict[str, Any]] = []
+    if not project_profit:
+        return mismatches
+    for pid, dims in status_pmis.items():
+        cost = dims.get("cost")
+        if not cost:
+            continue
+        pmis_total = cost.get("总预算")
+        profit_budget = ((project_profit.get(pid) or {}).get("summary") or {}).get("预算成本")
+        if pmis_total is None or profit_budget is None or profit_budget <= 0:
+            continue
+        if abs(pmis_total - profit_budget) <= tol:
+            continue
+        used = cost.get("核算")
+        remain = (profit_budget - used) if used is not None else None
+        cost["总预算"] = profit_budget
+        cost["剩余预算"] = remain
+        cost["消耗比"] = (used / profit_budget) if used is not None else None
+        cost["项目超支"] = (remain is not None and remain < 0)
+        mismatches.append({
+            "projectId": pid,
+            "pmisBudget": pmis_total,
+            "profitBudget": profit_budget,
+            "diff": round(pmis_total - profit_budget, 2),
+        })
+    return mismatches
+
+
 def derive_risk(risk_recs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """汇总风险记录:记录数、最高等级、闭环率。"""
     n = len(risk_recs)

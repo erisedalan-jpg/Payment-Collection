@@ -414,3 +414,91 @@ class TestPmisDateToStr:
     def test_none_and_empty(self):
         assert M._pmis_date_to_str(None) is None
         assert M._pmis_date_to_str("") is None
+
+
+def _cost(总预算, 核算, 剩余预算, 消耗比, 项目超支, 成本状态="绿色预警"):
+    return {"总预算": 总预算, "核算": 核算, "剩余预算": 剩余预算, "消耗比": 消耗比,
+            "项目超支": 项目超支, "交付超支": False, "成本状态": 成本状态}
+
+
+def test_reconcile_覆盖分歧项目并重算_只动分母():
+    pp = {"P1": {"cost": _cost(5640.0, 5037.0, 603.0, 0.893, False)}}
+    profit = {"P1": {"summary": {"预算成本": 7728.5}}}
+    out = M.reconcile_cost_budget(pp, profit)
+    c = pp["P1"]["cost"]
+    assert c["总预算"] == 7728.5
+    assert c["剩余预算"] == 2691.5            # 7728.5 - 5037.0
+    assert abs(c["消耗比"] - 5037.0 / 7728.5) < 1e-9
+    assert c["项目超支"] is False
+    assert c["核算"] == 5037.0                # 分子不变
+    assert c["成本状态"] == "绿色预警"          # PMIS 文本不变
+    assert c["交付超支"] is False
+    assert out == [{"projectId": "P1", "pmisBudget": 5640.0, "profitBudget": 7728.5, "diff": -2088.5}]
+
+
+def test_reconcile_超支翻转():
+    # PMIS: 核算205041>总预算192006 → 原超支;改用损益预算206357后 剩余>0 → 不超支
+    pp = {"P2": {"cost": _cost(192006.4, 205041.2, -13034.8, 1.068, True)}}
+    profit = {"P2": {"summary": {"预算成本": 206356.6}}}
+    M.reconcile_cost_budget(pp, profit)
+    c = pp["P2"]["cost"]
+    assert c["总预算"] == 206356.6
+    assert c["项目超支"] is False
+    assert abs(c["剩余预算"] - (206356.6 - 205041.2)) < 1e-9
+
+
+def test_reconcile_一致项目与容差内不变():
+    before_eq = _cost(100000.0, 60000.0, 40000.0, 0.6, False)
+    before_tol = _cost(100000.0, 60000.0, 40000.0, 0.6, False)
+    pp = {"EQ": {"cost": dict(before_eq)}, "TOL": {"cost": dict(before_tol)}}
+    profit = {"EQ": {"summary": {"预算成本": 100000.0}},      # 差 0
+              "TOL": {"summary": {"预算成本": 100000.5}}}      # 差 0.5 ≤ 1
+    out = M.reconcile_cost_budget(pp, profit)
+    assert pp["EQ"]["cost"] == before_eq
+    assert pp["TOL"]["cost"] == before_tol
+    assert out == []
+
+
+def test_reconcile_单边数据不变():
+    before = _cost(5640.0, 5037.0, 603.0, 0.893, False)
+    pp = {"NOPROF": {"cost": dict(before)}, "NOBUDGET": {"cost": dict(before)}}
+    profit = {"NOPROF": {"summary": {}},                       # 无 预算成本
+              "NOBUDGET": {"summary": {"预算成本": None}}}       # 预算成本 None
+    out = M.reconcile_cost_budget(pp, profit)
+    assert pp["NOPROF"]["cost"] == before
+    assert pp["NOBUDGET"]["cost"] == before
+    assert out == []
+
+
+def test_reconcile_损益预算非正数不覆盖():
+    before = _cost(5000.0, 3000.0, 2000.0, 0.6, False)
+    pp = {"ZERO": {"cost": dict(before)}}
+    profit = {"ZERO": {"summary": {"预算成本": 0.0}}}           # 差>1 但 ≤0 → 守卫跳过
+    out = M.reconcile_cost_budget(pp, profit)
+    assert pp["ZERO"]["cost"] == before
+    assert out == []
+
+
+def test_reconcile_核算None安全():
+    pp = {"NULLUSED": {"cost": _cost(5640.0, None, None, None, False)}}
+    profit = {"NULLUSED": {"summary": {"预算成本": 7728.5}}}
+    out = M.reconcile_cost_budget(pp, profit)
+    c = pp["NULLUSED"]["cost"]
+    assert c["总预算"] == 7728.5
+    assert c["剩余预算"] is None
+    assert c["消耗比"] is None
+    assert c["项目超支"] is False
+    assert out[0]["projectId"] == "NULLUSED"
+
+
+def test_reconcile_无损益数据返回空且不改():
+    before = _cost(5640.0, 5037.0, 603.0, 0.893, False)
+    pp = {"P1": {"cost": dict(before)}}
+    assert M.reconcile_cost_budget(pp, None) == []
+    assert pp["P1"]["cost"] == before
+
+
+def test_reconcile_无cost维度不崩():
+    pp = {"NOCOST": {}}                                        # 项目无 cost 键
+    profit = {"NOCOST": {"summary": {"预算成本": 7728.5}}}
+    assert M.reconcile_cost_budget(pp, profit) == []
