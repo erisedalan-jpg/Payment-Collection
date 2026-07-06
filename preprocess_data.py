@@ -228,6 +228,12 @@ def main():
     data_quality["dirty"] = dirty
     data_quality["collectionParseErrors"] = collection_parse_errors
 
+    # 成本预算口径兜底:PMIS总预算 与 损益预算成本 分歧时改用损益预算成本并重算,分歧清单入数据质量告警
+    budget_mismatches = pmis.reconcile_cost_budget(project_pmis, project_profit)
+    data_quality["budgetSourceMismatch"] = {"count": len(budget_mismatches), "items": budget_mismatches}
+    if budget_mismatches:
+        print(f"  [INFO] 预算口径分歧 {len(budget_mismatches)} 个项目,已改用损益预算成本并入数据质量告警")
+
     # === 10. 构建最终数据 ===
     final_data = {
         "meta": {
