@@ -119,3 +119,34 @@ describe('DataTable fixed 列', () => {
     expect(w.html()).toContain('fixed')
   })
 })
+
+describe('DataTable show-summary', () => {
+  const cols: DataColumn[] = [
+    { key: 'name', label: '名称' },
+    { key: 'amount', label: '金额', num: true },
+  ]
+  const rows2 = [{ name: 'A', amount: 100 }, { name: 'B', amount: 200 }]
+
+  it('showSummary + summaryMethod 渲染表底汇总行', async () => {
+    const w = mount(DataTable, {
+      props: {
+        columns: cols, rows: rows2, showCount: false, showSummary: true,
+        summaryMethod: ({ columns }: { columns: { property: string }[] }) =>
+          columns.map((c) => (c.property === 'name' ? '合计' : c.property === 'amount' ? '300' : '')),
+      },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    expect(w.text()).toContain('合计')
+    expect(w.text()).toContain('300')
+  })
+
+  it('默认(showSummary 未传)不渲染汇总行', async () => {
+    const w = mount(DataTable, {
+      props: { columns: cols, rows: rows2, showCount: false },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    expect(w.text()).not.toContain('合计')
+  })
+})
