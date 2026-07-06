@@ -90,6 +90,7 @@ const L4_COLS: DataColumn[] = [
   { key: 'normal', label: '未超支', width: 90, num: true, sortable: true },
   { key: 'under5k', label: '超支不足5k', width: 110, num: true, sortable: true },
   { key: 'over5k', label: '超支大于5k', width: 110, num: true, sortable: true },
+  { key: 'noOriginBudget', label: '未获取原项目预算', width: 130, num: true, sortable: true },
   { key: 'over5kRatio', label: '超支占比', width: 100, num: true, sortable: true },
   { key: 'contractTotal', label: '合同总额(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
   { key: 'remainingTotal', label: '剩余预算(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
