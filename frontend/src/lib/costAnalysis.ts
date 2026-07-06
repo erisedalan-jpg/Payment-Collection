@@ -1,5 +1,5 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
-import { riskReasons } from './riskReasons'
+import { riskReasons, TOTAL_OVERSPEND_CATS } from './riskReasons'
 
 export type CostStatus = '超支大于5k' | '超支不足5k' | '未超支'
 
@@ -62,7 +62,7 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
 
     // 超支判定:复用 riskReasons(售前/异常按自身,与 /projects、首页、卡「总成本超支」同源)
     const cats = riskReasons(p, m as ProjectPmis).map((rr) => rr.category)
-    const totalOverspend = cats.includes('总成本超支')
+    const totalOverspend = cats.some((c) => (TOTAL_OVERSPEND_CATS as readonly string[]).includes(c))
 
     return {
       projectId: p.projectId,
