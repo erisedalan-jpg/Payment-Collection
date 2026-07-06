@@ -25,8 +25,11 @@ const props = withDefaults(
     /** 外部排序模式：sortable 列渲染为 el-table 'custom'(不内部排序、仅发 sort-change),
      * 由父级对全量数据排序后再传分页切片。默认 false=保持原内置布尔排序(排当前 rows)。 */
     externalSort?: boolean
+    /** opt-in 表底汇总行(el-table 原生 show-summary，恒在表底、不随排序移动)；默认关，不影响既有调用方 */
+    showSummary?: boolean
+    summaryMethod?: (ctx: { columns: { property: string }[]; data: Record<string, any>[] }) => string[]
   }>(),
-  { showCount: true, clickable: false, externalSort: false },
+  { showCount: true, clickable: false, externalSort: false, showSummary: false },
 )
 
 const emit = defineEmits<{
@@ -52,6 +55,8 @@ function onSortChange(e: { prop: string | null; order: string | null }) {
       :row-class-name="props.clickable ? 'dt-clickable-row' : ''"
       @row-click="(row: Record<string, any>) => emit('row-click', row)"
       @sort-change="onSortChange"
+      :show-summary="props.showSummary"
+      :summary-method="props.summaryMethod"
     >
       <el-table-column
         v-for="col in props.columns"

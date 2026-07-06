@@ -202,6 +202,39 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
     .sort((a, b) => b.contractSum - a.contractSum)
 }
 
+export interface L4SummaryTotals {
+  projectCount: number
+  contractSum: number
+  actualSum: number
+  rate: number | null
+  delayedProjectCount: number
+  delayedNodeSum: number
+  delayedAmountSum: number
+  nodeSum: number
+  reachedSum: number
+  reachedRatio: number | null
+}
+
+/** 回款数据表(L4汇总)总计行：计数/金额列 Σ；两比率列按口径重算(Σ分子÷Σ分母，分母0→null)。 */
+export function l4SummaryRow(rows: DimSummary[]): L4SummaryTotals {
+  const contractSum = rows.reduce((s, r) => s + r.contractSum, 0)
+  const actualSum = rows.reduce((s, r) => s + r.actualSum, 0)
+  const nodeSum = rows.reduce((s, r) => s + r.nodeSum, 0)
+  const reachedSum = rows.reduce((s, r) => s + r.reachedSum, 0)
+  return {
+    projectCount: rows.reduce((s, r) => s + r.projectCount, 0),
+    contractSum,
+    actualSum,
+    rate: contractSum > 0 ? actualSum / contractSum : null,       // Σ已回款 ÷ Σ合同
+    delayedProjectCount: rows.reduce((s, r) => s + r.delayedProjectCount, 0),
+    delayedNodeSum: rows.reduce((s, r) => s + r.delayedNodeSum, 0),
+    delayedAmountSum: rows.reduce((s, r) => s + r.delayedAmountSum, 0),
+    nodeSum,
+    reachedSum,
+    reachedRatio: nodeSum > 0 ? reachedSum / nodeSum : null,      // Σ完成节点 ÷ Σ回款节点
+  }
+}
+
 // ── 节点级回款行（扁平化 + 维度 join）──
 export interface PayNodeRow {
   projectId: string
