@@ -62,7 +62,7 @@ const kpiItems = computed(() => {
     { k: '成本统计项目数', v: String(k.total), clickable: true },
     { k: '未超支', v: String(k.notOverspent), cls: 'ok', clickable: true },
     { k: '总成本超支数', v: String(k.totalOverspend), sub: `超支大于5000: ${k.totalOverspendOver5k}`, cls: 'danger', clickable: true },
-    { k: '交付成本超支数', v: String(k.deliveryOverspend), cls: 'danger', clickable: true },
+    { k: '交付成本超支数', v: String(k.deliveryOverspend), sub: `未获取原项目预算: ${k.noOriginBudget}`, cls: 'danger', clickable: true },
   ]
 })
 
@@ -90,6 +90,7 @@ const L4_COLS: DataColumn[] = [
   { key: 'normal', label: '未超支', width: 90, num: true, sortable: true },
   { key: 'under5k', label: '超支不足5k', width: 110, num: true, sortable: true },
   { key: 'over5k', label: '超支大于5k', width: 110, num: true, sortable: true },
+  { key: 'noOriginBudget', label: '未获取原项目预算', width: 130, num: true, sortable: true },
   { key: 'over5kRatio', label: '超支占比', width: 100, num: true, sortable: true },
   { key: 'contractTotal', label: '合同总额(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
   { key: 'remainingTotal', label: '剩余预算(万)', width: 120, num: true, sortable: true, formatter: (v) => fmtWan(v) },
@@ -129,8 +130,8 @@ const FILTERABLE = new Set(DETAIL_COLS.map((c) => c.key).filter((k) => k !== '_s
 // 数值列(排序按数值,余按中文 localeCompare)
 const NUMERIC_KEYS = new Set(['amount', 'totalBudget', 'actualCost', 'remaining', 'deliveryDeptRemaining', 'deliveryOutsourceRemaining'])
 
-const TONE: Record<string, string> = { 未超支: 'ok', 超支不足5k: 'warn', 超支大于5k: 'danger' }
-const DELIVERY_TONE: Record<string, string> = { 未超支: 'ok', 交付预算超支: 'warn', 交付外包超支: 'warn', 原厂外包均超支: 'danger' }
+const TONE: Record<string, string> = { 未超支: 'ok', 超支不足5k: 'warn', 超支大于5k: 'danger', 未获取原项目预算: 'mut' }
+const DELIVERY_TONE: Record<string, string> = { 未超支: 'ok', 交付预算超支: 'warn', 交付外包超支: 'warn', 原厂外包均超支: 'danger', 未获取原项目预算: 'mut' }
 
 const detailCardRef = ref<HTMLElement | null>(null)
 const fKw = ref('')
@@ -152,7 +153,7 @@ const filtered = computed(() => {
   const tagged = colFiltered.filter((x) => tagMatch(projectTags.assignments[x.projectId] ?? [], selectedTags.value))
   const kw = fKw.value.trim()
   let r = kw ? tagged.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : tagged
-  if (kpiFilter.value === 'notOverspent') r = r.filter((x) => !x.totalOverspend && !x.deliveryOverspend)
+  if (kpiFilter.value === 'notOverspent') r = r.filter((x) => !x.totalOverspend && !x.deliveryOverspend && !x.noOriginBudget)
   else if (kpiFilter.value === 'totalOverspend') r = r.filter((x) => x.totalOverspend)
   else if (kpiFilter.value === 'deliveryOverspend') r = r.filter((x) => x.deliveryOverspend)
   return [...r].sort((a, b) => a.orgL4.localeCompare(b.orgL4) || a.projectId.localeCompare(b.projectId))

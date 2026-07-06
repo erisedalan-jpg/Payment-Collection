@@ -1,7 +1,7 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { riskReasons, TOTAL_OVERSPEND_CATS } from './riskReasons'
 
-export type CostStatus = '超支大于5k' | '超支不足5k' | '未超支'
+export type CostStatus = '超支大于5k' | '超支不足5k' | '未超支' | '未获取原项目预算'
 
 /** 成本状态三档(与卡「总成本超支数」/首页/projects 同源 riskReasons 口径):
  *  未超支 = 非总成本超支;超支再按 overspendAmount 是否 > 5000 分档(与卡「超支大于5000」子项一致)。
@@ -9,6 +9,13 @@ export type CostStatus = '超支大于5k' | '超支不足5k' | '未超支'
 export function costStatusOf(totalOverspend: boolean, overspendAmount: number): CostStatus {
   if (!totalOverspend) return '未超支'
   return overspendAmount > 5000 ? '超支大于5k' : '超支不足5k'
+}
+
+/** 售前服务类且原项目(relatedClosedId)总预算=0(含原项目缺失)→未获取原项目预算。与 buildCostRows presale totalBudget 同口径。 */
+export function noOriginBudget(p: Project, pmis: Record<string, ProjectPmis>): boolean {
+  if (!p.isPresale) return false
+  const oc = (p.relatedClosedId && pmis[p.relatedClosedId]) ? ((pmis[p.relatedClosedId] as any).cost ?? {}) : {}
+  return Number(oc.总预算 ?? 0) === 0
 }
 
 export interface CostRow {
@@ -20,6 +27,7 @@ export interface CostRow {
   deliveryStatus: DeliveryStatus
   totalOverspend: boolean; deliveryOverspend: boolean; overspendAmount: number
   riskLevel: string; openRisks: number; riskMajorCats: string[]
+  noOriginBudget: boolean
 }
 
 /** 全部主域项目装配成本行(明细表用)。
@@ -31,6 +39,7 @@ export interface CostRow {
 export function buildCostRows(projects: Project[], pmis: Record<string, ProjectPmis>): CostRow[] {
   return projects.map((p) => {
     const m = (pmis[p.projectId] ?? {}) as any
+    const noOrig = noOriginBudget(p, pmis)
     const risk = (m.risk ?? {}) as Record<string, any>
     const riskMajorCats = [...new Set(
       ((m.riskRecords ?? []) as Record<string, any>[])
@@ -67,7 +76,7 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
     }
 
     // 超支判定:复用 riskReasons(售前/异常按自身,与 /projects、首页、卡「总成本超支」同源)
-    const cats = riskReasons(p, m as ProjectPmis).map((rr) => rr.category)
+    const cats = riskReasons(p, m as ProjectPmis, noOrig).map((rr) => rr.category)
     const totalOverspend = cats.some((c) => (TOTAL_OVERSPEND_CATS as readonly string[]).includes(c))
 
     return {
@@ -80,27 +89,29 @@ export function buildCostRows(projects: Project[], pmis: Record<string, ProjectP
       manager: (p.projectManager ?? '').trim(),
       amount: Number(p.paymentPmis?.contract ?? 0),
       // 成本状态与超支判定同源 riskReasons(不看 remaining;剩余预算仅金额展示)
-      status: costStatusOf(totalOverspend, overspendAmount),
+      status: noOrig ? '未获取原项目预算' : costStatusOf(totalOverspend, overspendAmount),
       totalBudget, actualCost, remaining,
       deliveryDeptRemaining: deptRem,
       deliveryOutsourceRemaining: outRem,
-      deliveryStatus: deliveryStatusOf(deptRem, outRem),
+      deliveryStatus: noOrig ? '未获取原项目预算' : deliveryStatusOf(deptRem, outRem),
       totalOverspend,
       deliveryOverspend: cats.includes('交付成本超支'),
       overspendAmount,
       riskLevel: String(risk.最高等级 ?? '') || '无',
       openRisks: Number(risk.未关闭风险数 ?? 0),
       riskMajorCats,
+      noOriginBudget: noOrig,
     }
   })
 }
 
-export interface CostKpis { total: number; notOverspent: number; totalOverspend: number; totalOverspendOver5k: number; deliveryOverspend: number }
+export interface CostKpis { total: number; notOverspent: number; totalOverspend: number; totalOverspendOver5k: number; deliveryOverspend: number; noOriginBudget: number }
 /** 成本卡计数(不剔 XS):总数=全部行;未超支=两维度皆否;总/交付超支沿用 riskReasons 派生布尔;大于5000=overspendAmount>5000。 */
 export function costKpis(rows: CostRow[]): CostKpis {
-  const k: CostKpis = { total: 0, notOverspent: 0, totalOverspend: 0, totalOverspendOver5k: 0, deliveryOverspend: 0 }
+  const k: CostKpis = { total: 0, notOverspent: 0, totalOverspend: 0, totalOverspendOver5k: 0, deliveryOverspend: 0, noOriginBudget: 0 }
   for (const r of rows) {
     k.total++
+    if (r.noOriginBudget) { k.noOriginBudget++; continue }
     if (!r.totalOverspend && !r.deliveryOverspend) k.notOverspent++
     if (r.totalOverspend) { k.totalOverspend++; if (r.overspendAmount > 5000) k.totalOverspendOver5k++ }
     if (r.deliveryOverspend) k.deliveryOverspend++
@@ -120,12 +131,12 @@ export function costL4Dist(rows: CostRow[]): CostL4Dist[] {
   return Object.values(m).sort((a, b) => a.orgL4.localeCompare(b.orgL4))
 }
 
-export interface CostL4Summary { orgL4: string; total: number; normal: number; under5k: number; over5k: number; over5kRatio: number; contractTotal: number; remainingTotal: number; deliveryDeptRemaining: number; deliveryOutsourceRemaining: number }
+export interface CostL4Summary { orgL4: string; total: number; normal: number; under5k: number; over5k: number; noOriginBudget: number; over5kRatio: number; contractTotal: number; remainingTotal: number; deliveryDeptRemaining: number; deliveryOutsourceRemaining: number }
 export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
   const m: Record<string, CostL4Summary> = {}
   for (const r of rows) {
     const d = r.orgL4 || '未知'
-    if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, over5kRatio: 0, contractTotal: 0, remainingTotal: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 }
+    if (!m[d]) m[d] = { orgL4: d, total: 0, normal: 0, under5k: 0, over5k: 0, noOriginBudget: 0, over5kRatio: 0, contractTotal: 0, remainingTotal: 0, deliveryDeptRemaining: 0, deliveryOutsourceRemaining: 0 }
     m[d].total++
     m[d].contractTotal += r.amount
     m[d].remainingTotal += r.remaining
@@ -134,13 +145,14 @@ export function costL4Summary(rows: CostRow[]): CostL4Summary[] {
     if (r.status === '未超支') m[d].normal++
     else if (r.status === '超支不足5k') m[d].under5k++
     else if (r.status === '超支大于5k') m[d].over5k++
+    else if (r.status === '未获取原项目预算') m[d].noOriginBudget++
   }
   return Object.values(m)
     .map((s) => ({ ...s, over5kRatio: s.total > 0 ? +((s.over5k / s.total) * 100).toFixed(1) : 0 }))
     .sort((a, b) => a.orgL4.localeCompare(b.orgL4))
 }
 
-export type DeliveryStatus = '未超支' | '交付预算超支' | '交付外包超支' | '原厂外包均超支'
+export type DeliveryStatus = '未超支' | '交付预算超支' | '交付外包超支' | '原厂外包均超支' | '未获取原项目预算'
 
 /** 交付成本状态:由交付部门剩余、交付外包剩余两列判定。<0=超支,≥0=不超支(含 =0)。 */
 export function deliveryStatusOf(deptRemain: number, outsourceRemain: number): DeliveryStatus {

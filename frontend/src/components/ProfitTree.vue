@@ -31,7 +31,7 @@ const money = (r: ProfitRow, v: number | null | undefined) => (isRateRow(r) ? fm
         <td class="u-num">{{ money(r, r.estimate) }}</td>
         <td class="u-num">{{ money(r, r.final) }}</td>
         <td class="u-num">{{ money(r, r.actual) }}</td>
-        <td class="u-num">{{ money(r, r.remaining) }}</td>
+        <td class="u-num" :class="{ 'pt-neg': !isRateRow(r) && (r.remaining ?? 0) < 0 }">{{ money(r, r.remaining) }}</td>
         <td class="u-num">{{ fmtRatio(r.rate) }}</td>
       </tr>
     </tbody>
@@ -48,4 +48,6 @@ const money = (r: ProfitRow, v: number | null | undefined) => (isRateRow(r) ? fm
 .pt-l3 { color: var(--sub); }
 .pt-toggle { background: none; border: none; cursor: pointer; color: var(--mut); padding: 0 var(--sp-1); transition: transform var(--dur-1) var(--ease); display: inline-block; }
 .pt-toggle:not(.open) { transform: rotate(-90deg); }
+/* 特异性须压过 .pt-table td(color:--txt),否则红字被覆盖不生效 */
+.pt-table td.pt-neg { color: var(--danger-text); }
 </style>

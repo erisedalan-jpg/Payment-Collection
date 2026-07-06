@@ -1,6 +1,7 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
 import { riskReasons, TOTAL_OVERSPEND_CATS, type RiskReason } from './riskReasons'
+import { noOriginBudget } from './costAnalysis'
 import { tagMatch } from './tagFilter'
 
 // 项目清单行：projects[](P1 主域) join projectPmis[id] 的扁平展示模型
@@ -90,7 +91,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       overspend: cost.项目超支 === true,
       tags: assignments?.[p.projectId] ?? [],
       isAnomalous: isAnomalous(p),
-      riskReasons: riskReasons(p, pmisMap[p.projectId]),
+      riskReasons: riskReasons(p, pmisMap[p.projectId], noOriginBudget(p, pmisMap)),
     }
   })
 }
