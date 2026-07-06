@@ -220,3 +220,23 @@ describe('riskReasons — 组合：多类同时命中时顺序', () => {
     expect(categories.indexOf('交付成本超支')).toBeLessThan(categories.indexOf('风险未闭环'))
   })
 })
+
+describe('riskReasons — 未获取原项目预算(第3参)', () => {
+  it('noOrigBudget=true → 产未获取原项目预算(mut)、不产总/交付成本超支;其它原因仍在', () => {
+    const p = baseProject({ overspendAmount: 12000,
+      payment: { delayedCount: 1, relatedNodeCount: 2, actualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
+    const pmis = basePmis({ cost: { 交付超支: true } })
+    const cats = riskReasons(p, pmis, true).map((x) => x.category)
+    expect(cats).toContain('未获取原项目预算')
+    expect(cats).not.toContain('总成本超支大于5000')
+    expect(cats).not.toContain('总成本超支小于5000')
+    expect(cats).not.toContain('交付成本超支')
+    expect(cats).toContain('回款延期')
+    expect(riskReasons(p, pmis, true).find((x) => x.category === '未获取原项目预算')!.tone).toBe('mut')
+  })
+  it('noOrigBudget=false(默认) → 走原超支逻辑', () => {
+    const p = baseProject({ overspendAmount: 12000 })
+    expect(riskReasons(p).some((x) => x.category === '总成本超支大于5000')).toBe(true)
+    expect(riskReasons(p).some((x) => x.category === '未获取原项目预算')).toBe(false)
+  })
+})

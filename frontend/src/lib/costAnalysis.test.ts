@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { costStatusOf, buildCostRows, costKpis, costL4Dist, costL4Summary, deliveryStatusOf } from './costAnalysis'
+import { costStatusOf, buildCostRows, costKpis, costL4Dist, costL4Summary, deliveryStatusOf, noOriginBudget } from './costAnalysis'
 
 describe('costStatusOf(riskReasons 口径:totalOverspend + overspendAmount)', () => {
   it('未超支=非总成本超支;超支按 overspendAmount 是否 > 5000 分档', () => {
@@ -46,7 +46,7 @@ function cr(o: Partial<any> = {}): any {
 }
 
 describe('costKpis 五值(不剔任何行)', () => {
-  const mk = (o: Partial<any>) => ({ totalOverspend: false, deliveryOverspend: false, overspendAmount: 0, ...o })
+  const mk = (o: Partial<any>) => ({ totalOverspend: false, deliveryOverspend: false, overspendAmount: 0, noOriginBudget: false, ...o })
   it('total=全部行;未超支=两维度皆否;总超支/大于5000/交付超支', () => {
     const rows = [
       mk({}),                                             // 未超支
@@ -62,6 +62,40 @@ describe('costKpis 五值(不剔任何行)', () => {
     expect(k.totalOverspend).toBe(3)     // 三行 totalOverspend
     expect(k.totalOverspendOver5k).toBe(2) // 8000、9000
     expect(k.deliveryOverspend).toBe(2)  // 两行 deliveryOverspend
+  })
+})
+
+describe('noOriginBudget 谓词', () => {
+  const pmis = { ORG: { cost: { 总预算: 100 } }, ORG0: { cost: { 总预算: 0 } } } as any
+  it('售前+原项目总预算=0→true;>0→false;非售前→false;售前无原项目→true', () => {
+    expect(noOriginBudget({ isPresale: true, relatedClosedId: 'ORG0' } as any, pmis)).toBe(true)
+    expect(noOriginBudget({ isPresale: true, relatedClosedId: 'ORG' } as any, pmis)).toBe(false)
+    expect(noOriginBudget({ isPresale: false, relatedClosedId: 'ORG0' } as any, pmis)).toBe(false)
+    expect(noOriginBudget({ isPresale: true } as any, pmis)).toBe(true)
+  })
+})
+
+describe('buildCostRows — 未获取原项目预算', () => {
+  it('售前无原项目预算 → 状态/交付状态=未获取原项目预算、两超支false、noOriginBudget=true', () => {
+    const projects = [{ projectId: 'SF-N', isPresale: true, orgL4: 'D1', overspendAmount: 894277, deliveryCosts: [] }] as any
+    const pmis = { 'SF-N': { cost: {}, status: {}, team: {} } } as any
+    const r = buildCostRows(projects, pmis)[0]
+    expect(r.noOriginBudget).toBe(true)
+    expect(r.status).toBe('未获取原项目预算')
+    expect(r.deliveryStatus).toBe('未获取原项目预算')
+    expect(r.totalOverspend).toBe(false)
+    expect(r.deliveryOverspend).toBe(false)
+  })
+})
+
+describe('costKpis — 未获取原项目预算计数', () => {
+  const mk = (o: Partial<any>) => ({ totalOverspend: false, deliveryOverspend: false, overspendAmount: 0, noOriginBudget: false, ...o })
+  it('noOriginBudget 计数 + notOverspent 排除', () => {
+    const rows = [mk({ noOriginBudget: true }), mk({}), mk({ totalOverspend: true, overspendAmount: 8000 })] as any
+    const k = costKpis(rows)
+    expect(k.noOriginBudget).toBe(1)
+    expect(k.notOverspent).toBe(1)
+    expect(k.totalOverspend).toBe(1)
   })
 })
 
@@ -158,16 +192,16 @@ describe('buildCostRows 售前预算回退原项目 + 超支布尔', () => {
     expect(r.actualCost).toBe(50)      // 原核算 0 + 售前自身核算 50
     expect(r.remaining).toBe(-50)      // 0 − 50(理论值为负,忠实"售前成本挂原项目")
   })
-  it('售前超支(overspendAmount>0)无原项目 → 剩余=−超支额(负)、已核算=超支额(非0)、成本状态=超支', () => {
-    // 实测线上:37 个售前超支只在 overspendAmount(实际成本−原剩余预算),PMIS cost 全空、原项目也缺。
+  it('售前无原项目预算(overspendAmount>0) → 未获取原项目预算(不计超支)、剩余=−超支额、已核算=超支额', () => {
     const projects = [{ projectId: 'WSGF-SF-X', isPresale: true, orgL4: 'D1', overspendAmount: 894277, deliveryCosts: [] }] as any
-    const pmis = { 'WSGF-SF-X': { cost: {}, status: {}, team: {} } } as any // 无 relatedClosedId、PMIS 成本空
+    const pmis = { 'WSGF-SF-X': { cost: {}, status: {}, team: {} } } as any
     const r = buildCostRows(projects, pmis)[0]
-    expect(r.totalOverspend).toBe(true)    // 卡口径:overspendAmount>0
-    expect(r.status).toBe('超支大于5k')     // 成本状态与卡一致
-    expect(r.totalBudget).toBe(0)          // 原项目缺 → 0
-    expect(r.remaining).toBe(-894277)      // 剩余=−超支额(负),消除"剩余≥0但超支"
-    expect(r.actualCost).toBe(894277)      // 已核算=总预算0+超支额(含现项目实际成本,超支必非0)
+    expect(r.noOriginBudget).toBe(true)
+    expect(r.totalOverspend).toBe(false)
+    expect(r.status).toBe('未获取原项目预算')
+    expect(r.totalBudget).toBe(0)
+    expect(r.remaining).toBe(-894277)
+    expect(r.actualCost).toBe(894277)
   })
   it('售前超支且有原项目 → 剩余=−超支额、已核算=原总预算+超支额', () => {
     const projects = [{ projectId: 'SF-O', isPresale: true, relatedClosedId: 'ORG', orgL4: 'D1', overspendAmount: 2839986, deliveryCosts: [] }] as any
