@@ -112,43 +112,54 @@ describe('riskReasons — 里程碑滞后', () => {
   })
 })
 
-describe('riskReasons — 成本超支拆分', () => {
-  it('overspendAmount > 0 命中总成本超支', () => {
+describe('riskReasons — 总成本超支按 5000 拆两档', () => {
+  it('overspendAmount > 5000 → 总成本超支大于5000(detail 显万)', () => {
     const p = baseProject({ overspendAmount: 12000 })
-    const result = riskReasons(p)
-    const r = result.find((x) => x.category === '总成本超支')
+    const r = riskReasons(p).find((x) => x.category === '总成本超支大于5000')
     expect(r).toBeTruthy()
     expect(r!.detail).toContain('1.2')
   })
-  it('PMIS 项目超支 flag 命中总成本超支(无 overspendAmount 时)', () => {
+  it('0 < overspendAmount ≤ 5000 → 总成本超支小于5000', () => {
+    const p = baseProject({ overspendAmount: 3000 })
+    const r = riskReasons(p).find((x) => x.category === '总成本超支小于5000')
+    expect(r).toBeTruthy()
+    expect(r!.detail).toContain('0.3')
+  })
+  it('overspendAmount = 5000(边界,严格 >)→ 小于5000', () => {
+    const p = baseProject({ overspendAmount: 5000 })
+    expect(riskReasons(p).some((x) => x.category === '总成本超支小于5000')).toBe(true)
+    expect(riskReasons(p).some((x) => x.category === '总成本超支大于5000')).toBe(false)
+  })
+  it('PMIS 项目超支 flag(无 overspendAmount)→ 小于5000(detail 项目超支)', () => {
     const p = baseProject({})
     const pmis = { cost: { 项目超支: true } } as any
-    expect(riskReasons(p, pmis).some((x) => x.category === '总成本超支')).toBe(true)
+    const r = riskReasons(p, pmis).find((x) => x.category === '总成本超支小于5000')
+    expect(r).toBeTruthy()
+    expect(r!.detail).toBe('项目超支')
+  })
+  it('消耗比>1 且 overspendAmount=0 且项目超支 false → 小于5000', () => {
+    const p = baseProject({ overspendAmount: 0 })
+    const pmis = basePmis({ cost: { 项目超支: false, 消耗比: 1.1 } })
+    expect(riskReasons(p, pmis).some((x) => x.category === '总成本超支小于5000')).toBe(true)
   })
   it('cost.交付超支===true 命中交付成本超支', () => {
     const p = baseProject({})
     const pmis = { cost: { 交付超支: true } } as any
     expect(riskReasons(p, pmis).some((x) => x.category === '交付成本超支')).toBe(true)
   })
-  it('总/交付可同时出现', () => {
+  it('总(某档)/交付可同时出现', () => {
     const p = baseProject({ overspendAmount: 5000 })
     const pmis = { cost: { 交付超支: true } } as any
     const cats = riskReasons(p, pmis).map((x) => x.category)
-    expect(cats).toContain('总成本超支')
+    expect(cats).toContain('总成本超支小于5000')
     expect(cats).toContain('交付成本超支')
   })
-
-  it('overspendAmount ≤ 0、项目超支 false、消耗比 < 1 均不命中总成本超支', () => {
+  it('overspendAmount ≤ 0、项目超支 false、消耗比 < 1 → 两档均不命中', () => {
     const p = baseProject({ overspendAmount: 0 })
     const pmis = basePmis({ cost: { 项目超支: false, 消耗比: 0.8 } })
-    const result = riskReasons(p, pmis)
-    expect(result.some((r) => r.category === '总成本超支')).toBe(false)
-  })
-  it('消耗比>1 且 overspendAmount=0 且项目超支 false → 命中总成本超支', () => {
-    const p = baseProject({ overspendAmount: 0 })
-    const pmis = basePmis({ cost: { 项目超支: false, 消耗比: 1.1 } })
-    const result = riskReasons(p, pmis)
-    expect(result.some((r) => r.category === '总成本超支')).toBe(true)
+    const cats = riskReasons(p, pmis).map((x) => x.category)
+    expect(cats).not.toContain('总成本超支大于5000')
+    expect(cats).not.toContain('总成本超支小于5000')
   })
 })
 
@@ -199,13 +210,13 @@ describe('riskReasons — 组合：多类同时命中时顺序', () => {
     const categories = result.map((r) => r.category)
     expect(categories).toContain('回款延期')
     expect(categories).toContain('里程碑滞后')
-    expect(categories).toContain('总成本超支')
+    expect(categories).toContain('总成本超支小于5000')
     expect(categories).toContain('交付成本超支')
     expect(categories).toContain('风险未闭环')
     // 顺序验证
     expect(categories.indexOf('回款延期')).toBeLessThan(categories.indexOf('里程碑滞后'))
-    expect(categories.indexOf('里程碑滞后')).toBeLessThan(categories.indexOf('总成本超支'))
-    expect(categories.indexOf('总成本超支')).toBeLessThan(categories.indexOf('交付成本超支'))
+    expect(categories.indexOf('里程碑滞后')).toBeLessThan(categories.indexOf('总成本超支小于5000'))
+    expect(categories.indexOf('总成本超支小于5000')).toBeLessThan(categories.indexOf('交付成本超支'))
     expect(categories.indexOf('交付成本超支')).toBeLessThan(categories.indexOf('风险未闭环'))
   })
 })

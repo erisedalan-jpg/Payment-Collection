@@ -1,6 +1,6 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
-import { riskReasons, type RiskReason } from './riskReasons'
+import { riskReasons, TOTAL_OVERSPEND_CATS, type RiskReason } from './riskReasons'
 import { tagMatch } from './tagFilter'
 
 // 项目清单行：projects[](P1 主域) join projectPmis[id] 的扁平展示模型
@@ -40,7 +40,7 @@ export interface ProjectFilters {
   paused: string   // '' | 'yes'
   overspend: string // '' | 'yes'
   tags: string[]
-  riskCategory: string  // '' 或 '回款延期'|'里程碑滞后'|'总成本超支'|'交付成本超支'|'风险未闭环'|'数据异常'|'健康度低'
+  riskCategory: string  // '' 或 '回款延期'|'里程碑滞后'|'总成本超支大于5000'|'总成本超支小于5000'|'交付成本超支'|'风险未闭环'|'数据异常'|'健康度低'
 }
 
 /** 项目级回款状态四态：无节点 / 延期 / 已回清 / 回款中。
@@ -109,7 +109,7 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
       if (f.riskCategory === '健康度低') {
         if (!['关注', '风险'].includes(r.health)) return false
       } else if (f.riskCategory === '成本超支') {
-        if (!r.riskReasons.some(rr => rr.category === '总成本超支' || rr.category === '交付成本超支')) return false
+        if (!r.riskReasons.some(rr => rr.category === '交付成本超支' || (TOTAL_OVERSPEND_CATS as readonly string[]).includes(rr.category))) return false
       } else {
         if (!r.riskReasons.some(rr => rr.category === f.riskCategory)) return false
       }
