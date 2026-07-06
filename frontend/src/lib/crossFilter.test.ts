@@ -47,13 +47,13 @@ describe('applyColumnFilters', () => {
 
 describe('crossFilter — riskReasons 多值(按类别)', () => {
   const rows = [
-    { projectId: 'A', riskReasons: [{ category: '回款延期' }, { category: '总成本超支' }] },
+    { projectId: 'A', riskReasons: [{ category: '回款延期' }, { category: '总成本超支大于5000' }] },
     { projectId: 'B', riskReasons: [{ category: '交付成本超支' }] },
     { projectId: 'C', riskReasons: [] },
   ] as any[]
   it('唯一值=摊平后的各类别', () => {
     const u = cfUniqueValues(rows, 'riskReasons').map((x) => x.display)
-    expect(u).toContain('回款延期'); expect(u).toContain('总成本超支'); expect(u).toContain('交付成本超支')
+    expect(u).toContain('回款延期'); expect(u).toContain('总成本超支大于5000'); expect(u).toContain('交付成本超支')
   })
   it('筛选「交付成本超支」只留 B', () => {
     const res = applyColumnFilters(rows, { riskReasons: { value: ['交付成本超支'] } })
