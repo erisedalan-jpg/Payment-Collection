@@ -151,6 +151,12 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
     columns: [{ key: 'type', label: '类型' }, { key: 'projectId', label: '项目编号' }, { key: 'field', label: '字段' }, { key: 'value', label: '值' }],
     rows: dirty })
 
+  const budgetMismatch = ((dq as any)?.budgetSourceMismatch?.items ?? []) as Record<string, unknown>[]
+  alerts.push({ key: 'budgetMismatch', label: '预算口径分歧：总预算≠损益预算成本', severity: 'mid', count: budgetMismatch.length,
+    columns: [{ key: 'projectId', label: '项目编号' }, { key: 'pmisBudget', label: 'PMIS总预算' },
+              { key: 'profitBudget', label: '损益预算成本' }, { key: 'diff', label: '差额' }],
+    rows: budgetMismatch, exportName: '预算口径分歧.xlsx' })
+
   const anomalies = anomalyRows(data.projects ?? [])
   alerts.push({ key: 'l4Missing', label: '回款排除：服务组 L4 缺失', severity: 'mid', count: anomalies.length,
     columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' }, { key: 'reason', label: '原因' }],
