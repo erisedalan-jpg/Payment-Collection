@@ -297,6 +297,15 @@ describe('ProjectsView', () => {
     localStorage.clear()
   })
 
+  it('签约单位列默认隐藏,不在默认表头', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.text()).not.toContain('签约单位')
+    const vm: any = w.findComponent({ name: 'ProjectsView' }).vm
+    expect(vm.ALL_COLUMNS.map((c: any) => c.key)).toContain('signUnit')
+  })
+
   it('orgL4 空项目渲染「数据异常」标记，正常项目不渲染', async () => {
     const ds = useDataStore()
     ds.data = {
