@@ -241,7 +241,8 @@ def _save_followup_records(records):
     with _followup_records_lock:
         _atomic_write_json(FOLLOWUP_FILE, records)
 
-# ── 项目标签库（2C，本地 JSON store，首次按 analysis_data.json 的 tagSeed 播种，此后本地为准、不回写云） ──
+# ── 项目标签库（2C，本地 JSON store，首次按 analysis_data.json 的 tagSeed 播种"标签库 vocab"，
+#    规则派生的 per-project 挂载不落 assignments、由前端运行期合并；此后本地为准、不回写云） ──
 PROJECT_TAGS_FILE = os.path.join(BASE_DIR, 'data', 'project_tags.json')
 ANALYSIS_FILE = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
 
@@ -269,7 +270,10 @@ _tags_lock = threading.RLock()
 
 
 def _build_initial_tags():
-    """首次播种：读 analysis_data.json 的 tagSeed，标签库=实际出现的白名单项(按白名单序)。"""
+    """首次播种：读 analysis_data.json 的 tagSeed，标签库(vocab)=实际出现的白名单项(按白名单序)。
+    规则派生标签(tagSeed，如签约单位=佳杰)**只用于生成标签库 vocab、不写入 assignments**——
+    per-project 挂载由前端运行期合并 tagSeed 供应，保证签约单位纠正后自动回收、不被固化为手动标签
+    (与「规则不写 project_tags.json」的设计一致；否则全新部署/文件丢失时会把规则标签冻结成手动)。"""
     seed = {}
     try:
         with open(ANALYSIS_FILE, 'r', encoding='utf-8') as f:
@@ -280,7 +284,7 @@ def _build_initial_tags():
     for tags in seed.values():
         appeared.update(tags)
     vocab = [{"name": n} for n in config.TAG_SEED_WHITELIST if n in appeared]
-    return {"version": 1, "tags": vocab, "assignments": seed}
+    return {"version": 1, "tags": vocab, "assignments": {}}
 
 
 def _load_project_tags():

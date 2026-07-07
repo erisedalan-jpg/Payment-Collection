@@ -3,7 +3,9 @@ import os
 import server
 
 
-def test_load_tags_seeds_from_analysis(tmp_path, monkeypatch):
+def test_load_tags_seeds_vocab_not_assignments(tmp_path, monkeypatch):
+    """首次播种只生成标签库 vocab；规则派生的 tagSeed 不写入 assignments
+    (per-project 挂载由前端运行期合并,保证签约单位纠正后自动回收、不固化)。"""
     tags_file = tmp_path / "project_tags.json"
     analysis_file = tmp_path / "analysis_data.json"
     analysis_file.write_text(json.dumps({
@@ -15,8 +17,11 @@ def test_load_tags_seeds_from_analysis(tmp_path, monkeypatch):
     store = server._load_project_tags()
     assert store["version"] == 1
     assert {t["name"] for t in store["tags"]} == {"BH项目", "框架合同", "佳杰"}
-    assert store["assignments"]["A"] == ["BH项目"]
+    assert store["assignments"] == {}          # 规则标签不落 assignments
     assert os.path.exists(str(tags_file))
+    # 落盘文件本身也不含规则 per-project 挂载
+    on_disk = json.loads(tags_file.read_text(encoding="utf-8"))
+    assert on_disk["assignments"] == {}
 
 
 def test_load_tags_local_wins(tmp_path, monkeypatch):
@@ -46,10 +51,11 @@ def test_load_tags_empty_seed_not_persisted(tmp_path, monkeypatch):
     assert store["tags"] == [] and store["assignments"] == {}
     assert not os.path.exists(str(tags_file))  # 空种子不落盘
 
-    # 之后 analysis 有了 tagSeed → 再次 load 应正常播种并落盘
+    # 之后 analysis 有了 tagSeed → 再次 load 应播种"标签库 vocab"并落盘(但 assignments 仍空)
     analysis_file.write_text(json.dumps({"tagSeed": {"A": ["BH项目"]}}, ensure_ascii=False), encoding="utf-8")
     store2 = server._load_project_tags()
-    assert store2["assignments"]["A"] == ["BH项目"]
+    assert {t["name"] for t in store2["tags"]} == {"BH项目"}
+    assert store2["assignments"] == {}
     assert os.path.exists(str(tags_file))
 
 
