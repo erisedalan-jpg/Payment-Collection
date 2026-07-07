@@ -150,7 +150,7 @@ function onKpiClick(i: number) {
 // 列头多选筛选 → 标签筛选(含无标签) → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
-  const tagged = colFiltered.filter((x) => tagMatch(projectTags.assignments[x.projectId] ?? [], selectedTags.value))
+  const tagged = colFiltered.filter((x) => tagMatch(projectTags.tagsOf(x.projectId), selectedTags.value))
   const kw = fKw.value.trim()
   let r = kw ? tagged.filter((x) => x.projectId.includes(kw) || x.projectName.includes(kw)) : tagged
   if (kpiFilter.value === 'notOverspent') r = r.filter((x) => !x.totalOverspend && !x.deliveryOverspend && !x.noOriginBudget)

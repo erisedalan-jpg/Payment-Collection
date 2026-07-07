@@ -238,3 +238,8 @@ def test_closed_projects_default_empty():
     base = {"meta": {"lastUpdate": "x", "totalProjects": 0, "totalPaymentNodes": 0}}
     m = schema.AnalysisData.model_validate(base)
     assert m.closedProjects == []   # 默认空(不传不报错)
+
+
+def test_project_has_sign_unit_field():
+    import schema
+    assert "signUnit" in schema.Project.model_fields

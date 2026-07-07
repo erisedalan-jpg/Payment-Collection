@@ -36,7 +36,7 @@ onMounted(() => {
 })
 
 const rows = computed(() =>
-  buildProjectRows((data.data?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.assignments))
+  buildProjectRows((data.data?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.effectiveAssignments))
 
 // 工具栏特殊筛选(非列枚举)
 const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' })
@@ -61,6 +61,7 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'health', label: '健康度', width: 96 },
   { key: 'riskReasons', label: '关注原因', width: 220 },
   { key: 'paymentStatus', label: '回款状态', width: 100 },
+  { key: 'signUnit', label: '签约单位', width: 180, sortable: true },
   { key: 'tags', label: '标签', width: 160, formatter: (v) => (Array.isArray(v) && v.length ? v.join('、') : '') },
   { key: 'top1000', label: 'TOP1000', width: 90 },
   { key: 'quadrant', label: '象限', width: 140 },
@@ -68,7 +69,7 @@ const ALL_COLUMNS: DataColumn[] = [
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
-const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons'])
+const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit'])
 
 const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
@@ -127,7 +128,7 @@ async function doExport() {
   const sheets = buildExportSheets(exScope.value, {
     rows: filtered.value,
     projects: (data.data?.projects ?? []) as any,
-    assignments: projectTags.assignments,
+    assignments: projectTags.effectiveAssignments,
     followup: fu as any,
     paymentNodes: (data.data?.paymentNodes ?? {}) as any,
     milestones: (data.data?.projectMilestones ?? {}) as any,

@@ -215,6 +215,13 @@ def effective_customer(is_presale: bool, own_fc: str, orig_fc: str, project_name
     return parse_presale_customer_from_name(project_name)
 
 
+def effective_sign_unit(is_presale: bool, own_su: str, orig_su: str) -> str:
+    """有效签约单位(单一来源):非售前=本项目签约单位;售前=原项目签约单位,空则空串。"""
+    if not is_presale:
+        return own_su or ""
+    return orig_su or ""
+
+
 def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_l4s: set,
                    mapping: List[Dict[str, str]], delivery_rows: List[Dict[str, Any]],
                    top1000_map: Optional[Dict[str, Dict[str, str]]] = None) -> List[Dict[str, Any]]:
@@ -254,6 +261,9 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
         own_fc = str(customer.get("最终客户") or "").strip()
         orig_fc = str(((project_pmis.get(related_closed) or {}).get("customer") or {}).get("最终客户") or "").strip()
         final_customer = effective_customer(is_presale, own_fc, orig_fc, name)
+        own_su = str(customer.get("签约单位") or "").strip()
+        orig_su = str(((project_pmis.get(related_closed) or {}).get("customer") or {}).get("签约单位") or "").strip()
+        sign_unit = effective_sign_unit(is_presale, own_su, orig_su)
         t1 = top1000_map.get(final_customer) if final_customer else None
         top1000 = "是" if (t1 and t1.get("level") == config.TOP1000_LEVEL) else "否"
         quadrant = (t1.get("quad") if t1 else "") or ""
@@ -271,6 +281,7 @@ def build_projects(project_pmis: Dict[str, Dict[str, Any]], org_names: set, org_
             "top1000": top1000,
             "quadrant": quadrant,
             "customer": final_customer,
+            "signUnit": sign_unit,
         })
     out.sort(key=lambda p: p["projectId"])
     return out

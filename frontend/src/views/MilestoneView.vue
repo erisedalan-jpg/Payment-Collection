@@ -59,7 +59,7 @@ const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[])
 
 // 下方三表标签筛选（含无标签）：仅作用于三表，不影响 KPI/6 图（均仍读 mps）
 const selectedTags = ref<string[]>([])
-const mpsFiltered = computed(() => mps.value.filter((m) => tagMatch(projectTags.assignments[m.projectId] ?? [], selectedTags.value)))
+const mpsFiltered = computed(() => mps.value.filter((m) => tagMatch(projectTags.tagsOf(m.projectId), selectedTags.value)))
 
 // KPI
 const kpi = computed(() => statusKpis(mps.value))

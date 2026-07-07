@@ -32,7 +32,7 @@ const selectedTags = ref<string[]>([])
 
 const rows = computed(() => {
   const ps = ((data.data?.projects ?? []) as Project[])
-    .filter((p) => tagMatch(projectTags.assignments[p.projectId] ?? [], selectedTags.value))
+    .filter((p) => tagMatch(projectTags.tagsOf(p.projectId), selectedTags.value))
   return buildInsightRows(ps, (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 })
 
