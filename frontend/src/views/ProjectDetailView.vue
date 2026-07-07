@@ -26,6 +26,8 @@ onMounted(() => {
 const pid = computed(() => String(route.params.id || ''))
 const manualTags = computed(() => projectTags.manualTagsOf(pid.value))
 const seedTags = computed(() => projectTags.seedTagsOf(pid.value))
+// 展示去重:与规则标签同名的手动标签只显示只读的规则版(规则已使其永久),避免同名两枚 chip
+const manualOnlyTags = computed(() => manualTags.value.filter((t) => !seedTags.value.includes(t)))
 const addInput = ref('')
 function assignExisting(name: string) {
   if (!manualTags.value.includes(name)) {
@@ -328,9 +330,9 @@ const originInfo = computed(() => [
 
           <section class="pd-tags">
             <span class="pdt-label">项目标签</span>
-            <span v-for="t in manualTags" :key="'m-' + t" class="tag-chip">{{ t }}<span class="tag-x" v-activate @click="removeOne(t)">✕</span></span>
+            <span v-for="t in manualOnlyTags" :key="'m-' + t" class="tag-chip">{{ t }}<span class="tag-x" v-activate @click="removeOne(t)">✕</span></span>
             <span v-for="t in seedTags" :key="'s-' + t" class="tag-chip tag-chip-rule" title="按签约单位自动标记,不可手动删除">{{ t }}</span>
-            <span v-if="!manualTags.length && !seedTags.length" class="pdt-empty">未打标签</span>
+            <span v-if="!manualOnlyTags.length && !seedTags.length" class="pdt-empty">未打标签</span>
             <el-select v-model="addInput" size="small" filterable allow-create default-first-option
                        placeholder="加标签" style="width: 150px" @change="addOne">
               <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />

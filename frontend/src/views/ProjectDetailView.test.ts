@@ -489,4 +489,22 @@ describe('ProjectDetailView', () => {
     expect(tags.assignments['P-1']).toEqual([])
     expect(tags.assignments['P-1']).not.toContain('佳杰')
   })
+
+  it('手动与规则同名(佳杰)时只显示一枚只读 chip,不重复', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).tagSeed = { 'P-1': ['佳杰'] }
+    const tags = useProjectTagsStore()
+    tags.assignments = { 'P-1': ['BH项目', '佳杰'] } as any
+    tags.loaded = true
+    const w = await mountAt('/project/P-1')
+    const pdTags = w.find('.pd-tags')
+    // 佳杰 只出现一次(只读版),不出现可删版
+    expect(pdTags.findAll('.tag-chip').filter((c) => c.text().includes('佳杰')).length).toBe(1)
+    const jj = pdTags.findAll('.tag-chip').find((c) => c.text().includes('佳杰'))!
+    expect(jj.classes()).toContain('tag-chip-rule')
+    expect(jj.find('.tag-x').exists()).toBe(false)
+    // 可删的 .tag-x 只剩 BH项目 一个
+    expect(pdTags.findAll('.tag-x').length).toBe(1)
+  })
 })
