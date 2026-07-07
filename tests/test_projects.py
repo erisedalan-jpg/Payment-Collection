@@ -481,3 +481,34 @@ class TestBuildProjectsPresaleTop1000:
         assert out[0]["isPresale"] is False
         assert out[0]["top1000"] == "是"
         assert out[0]["quadrant"] == "M1 战略核心区"
+
+
+def test_effective_sign_unit():
+    from projects import effective_sign_unit
+    assert effective_sign_unit(False, "本单位", "原单位") == "本单位"   # 非售前取本项目
+    assert effective_sign_unit(True, "", "原单位") == "原单位"          # 售前本空→原项目
+    assert effective_sign_unit(True, "本单位", "原单位") == "原单位"    # 售前恒取原项目(本值不覆盖)
+    assert effective_sign_unit(False, "", "") == ""
+    assert effective_sign_unit(True, "", "") == ""
+
+
+class TestBuildProjectsSignUnit:
+    """签约单位回退单一来源(Project.signUnit):非售前=本项目签约单位;售前=原项目签约单位(本项目该字段应为空)。"""
+
+    def test_non_presale_uses_own_sign_unit(self):
+        p = _pm_active("实施甲", "佘海龙")
+        p["customer"]["签约单位"] = "本项目签约单位"
+        out = P.build_projects({"SS-1": p}, {"佘海龙"}, set(), [], [])
+        assert out[0]["signUnit"] == "本项目签约单位"
+
+    def test_presale_falls_back_to_original_sign_unit(self):
+        sf = _pm_active("售前甲", "佘海龙", project_type="售前服务类")
+        sf["customer"]["签约单位"] = ""  # 售前本项目该字段应为空,以验证回退
+        ss = {**_pm_active("原项目甲", "佘海龙"), "source": "已关闭"}
+        ss["customer"]["签约单位"] = "原项目签约单位"
+        ppm = {"SF-1": sf, "SS-99": ss}
+        mapping = [{"current": "SF-1", "owner": "x", "closed": "SS-99"}]
+        out = P.build_projects(ppm, {"佘海龙"}, set(), mapping, [])
+        sf_out = next(p for p in out if p["projectId"] == "SF-1")
+        assert sf_out["isPresale"] is True
+        assert sf_out["signUnit"] == "原项目签约单位"

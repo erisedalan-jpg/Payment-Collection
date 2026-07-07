@@ -111,6 +111,7 @@ export type Overall = string;
 export type Top1000 = string;
 export type Quadrant = string;
 export type Customer = string;
+export type Signunit = string;
 export type Projects = Project[];
 export type Projectid1 = string;
 export type Projectname1 = string;
@@ -338,6 +339,7 @@ export interface Project {
   top1000?: Top1000;
   quadrant?: Quadrant;
   customer?: Customer;
+  signUnit?: Signunit;
   [k: string]: unknown;
 }
 export interface ProjectPayment {
