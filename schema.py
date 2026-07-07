@@ -180,6 +180,7 @@ class Project(_Base):
     top1000: str = "否"        # TOP1000.xlsx:是否 TOP1000 大客户(按最终客户匹配)
     quadrant: str = ""         # TOP1000.xlsx:客户象限(M1/M2/M3/M4),未匹配为空
     customer: str = ""        # 有效客户(单一来源):非售前=本项目最终客户;售前=原项目最终客户,空则项目名解析
+    signUnit: str = ""        # 有效签约单位(单一来源):非售前=本项目签约单位;售前=原项目签约单位
 
 
 class ClosedProjectCloseInfo(_Base):
