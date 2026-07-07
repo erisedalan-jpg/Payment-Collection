@@ -67,7 +67,7 @@ const selectedTags = ref<string[]>([])
 // 列头多选筛选 → 标签筛选
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
-  return colFiltered.filter((r) => tagMatch(tags.assignments[r.projectId] ?? [], selectedTags.value))
+  return colFiltered.filter((r) => tagMatch(tags.tagsOf(r.projectId), selectedTags.value))
 })
 
 // 表头排序（custom，跨页排全集）

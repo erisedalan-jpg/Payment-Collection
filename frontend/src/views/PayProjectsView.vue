@@ -83,7 +83,7 @@ const selectedTags = ref<string[]>([])
 // 列头多选筛选 → 标签筛选 → 关键词搜索
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
-  const tagged = colFiltered.filter((r) => tagMatch(tags.assignments[r.projectId] ?? [], selectedTags.value))
+  const tagged = colFiltered.filter((r) => tagMatch(tags.tagsOf(r.projectId), selectedTags.value))
   const k = kw.value.trim()
   return k ? tagged.filter((r) => r.projectId.includes(k) || r.projectName.includes(k)) : tagged
 })
