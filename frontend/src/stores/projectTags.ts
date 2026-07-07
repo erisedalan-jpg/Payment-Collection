@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { getTags, saveTags, type TagDef } from '@/lib/projectTagsApi'
+import { useDataStore } from '@/stores/data'
 
 export const useProjectTagsStore = defineStore('projectTags', () => {
   const tags = ref<TagDef[]>([])
@@ -8,8 +9,23 @@ export const useProjectTagsStore = defineStore('projectTags', () => {
   const loaded = ref(false)
   const saving = ref(false)
 
+  const dataStore = useDataStore()
+  // 规则派生标签(只读):来自 analysis_data.json 的 tagSeed(签约单位规则),不写回标签文件
+  const seed = computed<Record<string, string[]>>(() => dataStore.data?.tagSeed ?? {})
+
   const activeTags = computed(() => tags.value.filter((t) => !t.disabled))
-  const tagsOf = (pid: string): string[] => assignments.value[pid] ?? []
+  const manualTagsOf = (pid: string): string[] => assignments.value[pid] ?? []
+  const seedTagsOf = (pid: string): string[] => seed.value[pid] ?? []
+  // 合并去重:手动 ∪ 规则。用于全站展示/筛选/导出
+  const tagsOf = (pid: string): string[] => [...new Set([...manualTagsOf(pid), ...seedTagsOf(pid)])]
+  const effectiveAssignments = computed<Record<string, string[]>>(() => {
+    const out: Record<string, string[]> = {}
+    for (const [pid, names] of Object.entries(assignments.value)) out[pid] = [...names]
+    for (const [pid, names] of Object.entries(seed.value)) {
+      out[pid] = [...new Set([...(out[pid] ?? []), ...names])]
+    }
+    return out
+  })
 
   async function load() {
     const r = await getTags()
@@ -48,12 +64,14 @@ export const useProjectTagsStore = defineStore('projectTags', () => {
   async function save() {
     saving.value = true
     try {
+      // 只写手动 assignments,规则 seed 不落文件
       await saveTags({ tags: tags.value, assignments: assignments.value })
     } finally {
       saving.value = false
     }
   }
 
-  return { tags, assignments, loaded, saving, activeTags, tagsOf,
+  return { tags, assignments, loaded, saving, seed, activeTags,
+           effectiveAssignments, tagsOf, manualTagsOf, seedTagsOf,
            load, addTag, renameTag, disableTag, setProjectTags, toggleTag, save }
 })
