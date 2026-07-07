@@ -45,3 +45,16 @@ def test_backfill_final_acceptance():
     assert project_pmis["A"]["progress"]["终验时间"] == "2026-07-01"
     assert project_pmis["B"]["progress"]["终验时间"] == "2026-08-01"
     assert project_pmis["C"]["progress"]["终验时间"] is None  # 无里程碑 + 自动建 progress 键
+
+
+def test_derive_sign_unit_tag_seed():
+    from preprocess_data import derive_sign_unit_tag_seed
+    rows = [
+        {"projectId": "A", "signUnit": "上海伟仕佳杰科技有限公司"},
+        {"projectId": "B", "signUnit": "别家公司"},
+        {"projectId": "C", "signUnit": ""},
+        {"projectId": "D"},  # 无 signUnit 键
+        {"projectId": "E", "signUnit": " 上海伟仕佳杰科技有限公司 "},  # 前后空格 trim 后命中
+    ]
+    seed = derive_sign_unit_tag_seed(rows)
+    assert seed == {"A": ["佳杰"], "E": ["佳杰"]}

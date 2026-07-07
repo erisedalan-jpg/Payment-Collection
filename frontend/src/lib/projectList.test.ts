@@ -105,6 +105,15 @@ describe('buildProjectRows', () => {
     expect(r.top1000).toBe('否')
     expect(r.quadrant).toBe('')
   })
+  it('buildProjectRows 带出 signUnit(占位 -)', () => {
+    const rows = buildProjectRows(
+      [{ projectId: 'P1', signUnit: '上海伟仕佳杰科技有限公司' } as any,
+       { projectId: 'P2' } as any],
+      {},
+    )
+    expect(rows[0].signUnit).toBe('上海伟仕佳杰科技有限公司')
+    expect(rows[1].signUnit).toBe('-')
+  })
 })
 
 // Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags/riskCategory）

@@ -24,11 +24,14 @@ onMounted(() => {
 })
 
 const pid = computed(() => String(route.params.id || ''))
-const myTags = computed(() => projectTags.tagsOf(pid.value))
+const manualTags = computed(() => projectTags.manualTagsOf(pid.value))
+const seedTags = computed(() => projectTags.seedTagsOf(pid.value))
+// 展示去重:与规则标签同名的手动标签只显示只读的规则版(规则已使其永久),避免同名两枚 chip
+const manualOnlyTags = computed(() => manualTags.value.filter((t) => !seedTags.value.includes(t)))
 const addInput = ref('')
 function assignExisting(name: string) {
-  if (!myTags.value.includes(name)) {
-    projectTags.setProjectTags(pid.value, [...myTags.value, name])
+  if (!manualTags.value.includes(name)) {
+    projectTags.setProjectTags(pid.value, [...manualTags.value, name])
     projectTags.save()
   }
 }
@@ -40,7 +43,7 @@ function addOne() {
   addInput.value = ''
 }
 function removeOne(name: string) {
-  projectTags.setProjectTags(pid.value, myTags.value.filter((t) => t !== name))
+  projectTags.setProjectTags(pid.value, manualTags.value.filter((t) => t !== name))
   projectTags.save()
 }
 
@@ -305,7 +308,7 @@ const originInfo = computed(() => [
             <span>客户 <b>{{ p.customer || '-' }}</b></span>
             <span>TOP1000大客户 <b>{{ p.top1000 || '否' }}</b></span>
             <span>象限 <b>{{ p.quadrant || '-' }}</b></span>
-            <span>签约单位 <b>{{ m.customer?.签约单位 || '-' }}</b></span>
+            <span>签约单位 <b>{{ p.signUnit || '-' }}</b></span>
             <span>合同总额(万) <b class="u-num">{{ fmtWan(m.customer?.合同总额) }}</b></span>
             <span>项目经理 <b>{{ p.projectManager || '-' }}</b></span>
             <span>服务组 <b>{{ p.orgL4 || '-' }}</b></span>
@@ -327,8 +330,9 @@ const originInfo = computed(() => [
 
           <section class="pd-tags">
             <span class="pdt-label">项目标签</span>
-            <span v-for="t in myTags" :key="t" class="tag-chip">{{ t }}<span class="tag-x" v-activate @click="removeOne(t)">✕</span></span>
-            <span v-if="!myTags.length" class="pdt-empty">未打标签</span>
+            <span v-for="t in manualOnlyTags" :key="'m-' + t" class="tag-chip">{{ t }}<span class="tag-x" v-activate @click="removeOne(t)">✕</span></span>
+            <span v-for="t in seedTags" :key="'s-' + t" class="tag-chip tag-chip-rule" title="按签约单位自动标记,不可手动删除">{{ t }}</span>
+            <span v-if="!manualOnlyTags.length && !seedTags.length" class="pdt-empty">未打标签</span>
             <el-select v-model="addInput" size="small" filterable allow-create default-first-option
                        placeholder="加标签" style="width: 150px" @change="addOne">
               <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
@@ -470,6 +474,7 @@ const originInfo = computed(() => [
 .pdt-label { font-size: var(--fs-2); color: var(--sub); }
 .pdt-empty { font-size: var(--fs-1); color: var(--mut); }
 .tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
+.tag-chip-rule { background: var(--card2); color: var(--mut); }
 .tag-x { cursor: pointer; color: var(--mut); }
 .tag-x:hover { color: var(--danger-text); }
 </style>

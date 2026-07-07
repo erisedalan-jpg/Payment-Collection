@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProjectTagsStore } from './projectTags'
+import { useDataStore } from '@/stores/data'
 
 vi.mock('@/lib/projectTagsApi', () => ({
   getTags: vi.fn(async () => ({ tags: [{ name: 'BH项目' }, { name: '框架合同' }], assignments: { A: ['BH项目'] } })),
@@ -51,5 +52,33 @@ describe('projectTags store', () => {
     const s = useProjectTagsStore(); await s.load()
     await s.save()
     expect(saveTags).toHaveBeenCalledWith({ tags: s.tags, assignments: s.assignments })
+  })
+
+  it('effectiveAssignments/tagsOf 合并 seed, manualTagsOf/seedTagsOf 分离', () => {
+    const data = useDataStore(); data.$patch({ data: { tagSeed: { A: ['佳杰'] } } as any })
+    const s = useProjectTagsStore()
+    s.assignments = { A: ['BH项目'], B: ['框架合同'] }
+    expect([...s.tagsOf('A')].sort()).toEqual(['BH项目', '佳杰'])
+    expect(s.manualTagsOf('A')).toEqual(['BH项目'])
+    expect(s.seedTagsOf('A')).toEqual(['佳杰'])
+    expect([...s.effectiveAssignments.A].sort()).toEqual(['BH项目', '佳杰'])
+    expect(s.effectiveAssignments.B).toEqual(['框架合同'])
+    expect(s.tagsOf('B')).toEqual(['框架合同'])
+  })
+
+  it('seed 与手动同名去重(不重复)', () => {
+    const data = useDataStore(); data.$patch({ data: { tagSeed: { A: ['佳杰'] } } as any })
+    const s = useProjectTagsStore()
+    s.assignments = { A: ['佳杰'] }
+    expect(s.tagsOf('A')).toEqual(['佳杰'])
+    expect(s.effectiveAssignments.A).toEqual(['佳杰'])
+  })
+
+  it('save 只写手动 assignments,不含 seed', async () => {
+    const data = useDataStore(); data.$patch({ data: { tagSeed: { A: ['佳杰'] } } as any })
+    const s = useProjectTagsStore()
+    s.assignments = { A: ['BH项目'] }
+    await s.save()
+    expect(saveTags).toHaveBeenCalledWith({ tags: s.tags, assignments: { A: ['BH项目'] } })
   })
 })
