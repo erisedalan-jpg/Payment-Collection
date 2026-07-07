@@ -458,4 +458,35 @@ describe('ProjectDetailView', () => {
     // 值取自 project.合同编号
     expect(meta.text()).toContain('HT-2026-001')
   })
+
+  it('售前项目签约单位显示回退后的 signUnit(非本项目 PMIS 的 m.customer.签约单位)', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[1].signUnit = '上海伟仕佳杰科技有限公司'
+    const w = await mountAt('/project/P-2')
+    const meta = w.find('.pd-meta')
+    expect(meta.text()).toContain('上海伟仕佳杰科技有限公司')
+  })
+
+  it('规则标签(seed)只读展示,无删除入口;删手动标签不写入 seed', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).tagSeed = { 'P-1': ['佳杰'] }
+    const tags = useProjectTagsStore()
+    tags.assignments = { 'P-1': ['BH项目'] } as any
+    tags.loaded = true
+    const w = await mountAt('/project/P-1')
+    // 两个标签都显示
+    expect(w.text()).toContain('佳杰')
+    expect(w.text()).toContain('BH项目')
+    // 规则标签只读:只有手动标签(BH项目)带删除入口,佳杰所在 chip 无 .tag-x
+    expect(w.findAll('.tag-x').length).toBe(1)
+    const ruleChip = w.findAll('.tag-chip-rule').find((c) => c.text().includes('佳杰'))
+    expect(ruleChip).toBeTruthy()
+    expect(ruleChip!.find('.tag-x').exists()).toBe(false)
+    // 删除手动标签(BH项目)后,写入的 assignments 不含规则标签「佳杰」
+    await w.find('.tag-x').trigger('click')
+    expect(tags.assignments['P-1']).toEqual([])
+    expect(tags.assignments['P-1']).not.toContain('佳杰')
+  })
 })
