@@ -63,7 +63,7 @@ const boardRows = computed(() =>
     filter.payRecordsAll,
     filter.dateStart,
     filter.dateEnd,
-    projectTags.assignments,
+    projectTags.effectiveAssignments,
   ),
 )
 

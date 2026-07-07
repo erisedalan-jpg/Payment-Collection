@@ -68,7 +68,7 @@ export const useFilterStore = defineStore('filter', () => {
     if (!excludeOn.value || excludeTags.value.length === 0) return {}
     const sel = new Set(excludeTags.value)
     const out: Record<string, boolean> = {}
-    for (const [pid, names] of Object.entries(projectTags.assignments)) {
+    for (const [pid, names] of Object.entries(projectTags.effectiveAssignments)) {
       if (names.some((n) => sel.has(n))) out[pid] = true
     }
     return out
