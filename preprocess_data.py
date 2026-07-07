@@ -95,6 +95,16 @@ def _collection_nodes_for(pid, rid, collection_stages):
     return collection_stages.get(pid) or (collection_stages.get(rid) if rid else None) or []
 
 
+def derive_sign_unit_tag_seed(project_rows):
+    """按 config.SIGN_UNIT_TAG_RULES 精确匹配 signUnit(trim 后) → {pid: [tag]}。规则派生,不写标签文件。"""
+    seed = {}
+    for p in project_rows:
+        tag = config.SIGN_UNIT_TAG_RULES.get((p.get("signUnit") or "").strip())
+        if tag:
+            seed[p["projectId"]] = [tag]
+    return seed
+
+
 def _pay_projects_from_collection(collection_stages):
     """回款项目清单换源:取收款阶段台账(collection_stages.csv)的项目号。
     取代旧的 yundocs project_overview 派生,语义=回款项目即收款台账里的项目。"""
@@ -253,7 +263,7 @@ def main():
         "paymentRecords": payment_records,
         "paymentNodes": payment_nodes,
         "projectProfit": project_profit,
-        "tagSeed": {},
+        "tagSeed": derive_sign_unit_tag_seed(dept_projects),
     }
 
     # === 9d. 快照/diff/事件流/周期对比(Phase P3) ===
