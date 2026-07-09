@@ -1237,6 +1237,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not pid or field not in PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 weekProgress/nextPlan"))
             return
+        self._audit_set(target=pid, detail='%s（已修改）' % audit.field_label(field))
         account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
@@ -1261,6 +1262,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
+        self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         def _apply(s):
@@ -1281,6 +1283,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        self._audit_set(target='快照#%d' % idx, detail='删除历史快照')
         holder = {}
 
         def _apply(s):
@@ -1315,6 +1318,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
+        self._audit_set(detail=audit.summarize_scope(data))
 
         def _apply(s):
             s['scope'] = _temp.normalize_scope(data)
@@ -1337,6 +1341,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not pid or field not in _temp.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 weekProgress/nextPlan"))
             return
+        self._audit_set(target=pid, detail='%s（已修改）' % audit.field_label(field))
         account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
@@ -1361,6 +1366,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
+        self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         def _apply(s):
@@ -1381,6 +1387,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        self._audit_set(target='快照#%d' % idx, detail='删除历史快照')
         holder = {}
 
         def _apply(s):
@@ -1415,6 +1422,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
+        self._audit_set(detail=audit.summarize_scope(data))
 
         def _apply(s):
             s['scope'] = _oppf.normalize_scope(data)
@@ -1437,6 +1445,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not oid or field not in _oppf.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "oppId 必填、field 须为 weekProgress/nextPlan"))
             return
+        self._audit_set(target=oid, detail='%s（已修改）' % audit.field_label(field))
         account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
@@ -1461,6 +1470,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
+        self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         def _apply(s):
@@ -1481,6 +1491,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        self._audit_set(target='快照#%d' % idx, detail='删除历史快照')
         holder = {}
 
         def _apply(s):
@@ -1515,6 +1526,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
+        self._audit_set(detail=audit.summarize_scope(data))
 
         def _apply(s):
             s['scope'] = _riskfu.normalize_scope(data)
@@ -1541,6 +1553,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not rk or field not in _riskfu.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "riskKey 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
+        self._audit_set(target=rk, detail='%s（已修改）' % audit.field_label(field))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ok, res = self._followup_txn(
             _risk_lock, _load_risk_followup,
@@ -1561,6 +1574,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
+        self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         def _apply(s):
@@ -1581,6 +1595,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        self._audit_set(target='快照#%d' % idx, detail='删除历史快照')
         holder = {}
 
         def _apply(s):
@@ -1615,6 +1630,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
+        self._audit_set(detail=audit.summarize_scope(data))
 
         def _apply(s):
             s['scope'] = _paykey.normalize_scope(data)
@@ -1641,6 +1657,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not pid or field not in _paykey.PROGRESS_FIELDS:
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
+        self._audit_set(target=pid, detail='%s（已修改）' % audit.field_label(field))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ok, res = self._followup_txn(
             _paykey_lock, _load_paykey_followup,
@@ -1661,6 +1678,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(rows, list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "rows 须为数组"))
             return
+        self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         def _apply(s):
@@ -1681,6 +1699,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         idx = data.get('archiveIdx')
         if not isinstance(idx, int) or idx < 0:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 须为非负整数")); return
+        self._audit_set(target='快照#%d' % idx, detail='删除历史快照')
         holder = {}
 
         def _apply(s):
