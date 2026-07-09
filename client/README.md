@@ -6,8 +6,9 @@
 
 平台 `/data` 页的「获取本机 PMIS cookie / 倚天 cookie」按钮需要本机跑一个小代理替浏览器取 cookie（浏览器自身取不到零信任 cookie）。
 
-- 启动：`python cookie_agent.py`（或用 PyInstaller 打成 exe）。常驻监听 `127.0.0.1:8765`，只接受来自平台源 `Origin` 的请求（内网安全）。
-- 开机自启：把 `cookie_agent.py`（或其 exe）的快捷方式放进 Windows「启动」目录（`Win+R` → `shell:startup`）。
+- 启动：`python cookie_agent.py`（前台占终端，关窗口即停）；**推荐双击本目录 `启动代理.vbs`**（用 pythonw 隐藏静默拉起、无终端窗口），或 `pythonw cookie_agent.py`。常驻监听 `127.0.0.1:8765`，只接受来自平台源 `Origin`、且 `Host` 为 `127.0.0.1/localhost` 的请求（内网安全 + 防 DNS rebinding）。
+- 停止：任务管理器结束 `pythonw.exe`；或 `taskkill /f /im pythonw.exe`。判断是否在跑：`netstat -ano | findstr 8765`，或 `/data` 页显示「本机代理：已连接」。
+- 开机自启：把 `启动代理.vbs`（或 exe）的**快捷方式**放进 Windows「启动」目录（`Win+R` → `shell:startup`）→ 开机隐藏常驻。
 - 配置（可选）：同目录 `agent_config.json` 可覆盖 `{"port": 8765, "allowed_origins": ["http://<平台IP>"]}`；缺省已含平台 IP。
 - 用法：代理在跑 + 本机零信任已登录 PMIS/倚天 → 到平台 `/data` 页点「获取本机 PMIS cookie 并推送」/「获取本机倚天 cookie 并存储」即可；页面会显示「本机代理：已连接」。
 - 前提：开平台网页的机器 = 装零信任、能取 cookie 的机器（同一台）。
