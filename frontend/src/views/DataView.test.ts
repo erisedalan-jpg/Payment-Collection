@@ -5,6 +5,7 @@ import ElementPlus from 'element-plus'
 import DataView from './DataView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
+import * as cookieAgent from '@/lib/cookieAgent'
 
 vi.mock('@/lib/manualApi', () => ({
   manualApi: {
@@ -12,6 +13,12 @@ vi.mock('@/lib/manualApi', () => ({
     import: vi.fn(async () => ({ success: true, message: '导入成功' })),
     rollback: vi.fn(async () => ({ success: true, message: '已回滚' })),
   },
+}))
+
+vi.mock('@/lib/cookieAgent', () => ({
+  pingAgent: vi.fn().mockResolvedValue(true),
+  fetchPmisCookie: vi.fn(),
+  fetchYitianCookie: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -157,5 +164,33 @@ describe('DataView(两条来源重构)', () => {
     const ui = btns.findIndex((t) => t.includes('更新数据（重新处理）'))
     expect(di).toBeGreaterThanOrEqual(0)
     expect(ui).toBeGreaterThan(di)
+  })
+})
+
+describe('DataView 本机取 cookie', () => {
+  it('获取本机 PMIS cookie(含 SESSION) → 推送到 /api/pmis/cookie', async () => {
+    const { api } = await import('@/api/client')
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue({ sessionPreview: 'SESSION1' } as never)
+    vi.mocked(cookieAgent.fetchPmisCookie).mockResolvedValue({
+      ok: true, cookie: 'SESSION=z; a=b', names: ['SESSION', 'a'], hasSession: true, error: '',
+    })
+    const w = await mountView()
+    await flushPromises()
+    await (w.vm as unknown as { onFetchPmisCookie: () => Promise<void> }).onFetchPmisCookie()
+    await flushPromises()
+    expect(postSpy).toHaveBeenCalledWith('/api/pmis/cookie', { cookie: 'SESSION=z; a=b' })
+  })
+
+  it('取到无 SESSION → 告警且不推送', async () => {
+    const { api } = await import('@/api/client')
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue({} as never)
+    vi.mocked(cookieAgent.fetchPmisCookie).mockResolvedValue({
+      ok: true, cookie: 'a=b', names: ['a'], hasSession: false, error: '',
+    })
+    const w = await mountView()
+    await flushPromises()
+    await (w.vm as unknown as { onFetchPmisCookie: () => Promise<void> }).onFetchPmisCookie()
+    await flushPromises()
+    expect(postSpy).not.toHaveBeenCalledWith('/api/pmis/cookie', expect.anything())
   })
 })
