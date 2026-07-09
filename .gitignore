@@ -27,6 +27,10 @@ data/analysis_data.js
 yundocs_data/
 # input/ 为用户放置/上传的真实数据（PMIS 七表、组织架构、项目映射、预算核算），不入库
 input/
+# 倚天导出（验证阶段）：cookie 凭据 + 导出数据不入库；脚本/说明可入库
+yitian/config.json
+yitian/downloads/
+yitian/__pycache__/
 # 快照与事件流（运行时生成，Phase P3）
 data/snapshots/
 data/events.json
@@ -49,6 +53,9 @@ data/temp_followup.backup-*.json
 # 本地账号库(含密码哈希,敏感,运行时生成,SP-2)
 data/accounts.json
 data/accounts.json.tmp
+data/audit_log.jsonl
+data/audit_log.jsonl.tmp
+data/audit_archive/
 # 回款比对报告（含真实业务数据，一次性诊断产物，不入库）
 report/
 
