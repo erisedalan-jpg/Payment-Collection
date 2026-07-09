@@ -191,3 +191,18 @@ def test_join_detail_filters_empty():
     assert audit.join_detail(['a', '', 'b', None]) == 'a · b'
     assert audit.join_detail([]) == ''
     assert audit.join_detail(['只此一段']) == '只此一段'
+
+
+def test_diff_changes_integer_float_shown_without_dot_zero():
+    # 商机金额字段落盘为 float(如 100.0),整数值 float 显示去掉多余 .0
+    assert audit.diff_changes({'x': 100.0}, {'x': 200.0}) == 'x 100→200'
+
+
+def test_diff_changes_fractional_float_preserved():
+    # 真分数 float 不受归一化影响,原样显示
+    assert audit.diff_changes({'x': 100.5}, {'x': 200.0}) == 'x 100.5→200'
+
+
+def test_diff_changes_int_float_vs_str_same_value_still_diffs():
+    # 存储侧 float 100.0 与请求侧字符串 '100' 值不相等(类型不同)→仍视作变化,归一化后显 '100→100'(审计如实呈现)
+    assert audit.diff_changes({'x': 100.0}, {'x': '100'}) == 'x 100→100'
