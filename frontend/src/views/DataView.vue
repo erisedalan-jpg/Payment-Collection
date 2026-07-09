@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
 import { api } from '@/api/client'
+import { pingAgent, fetchPmisCookie, fetchYitianCookie } from '@/lib/cookieAgent'
 import { usePmisSync } from '@/composables/usePmisSync'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
@@ -62,6 +63,49 @@ const pmisCookie = ref('')
 const cookieStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessionPreview: '', updatedAt: '' })
 const cookieMsg = ref('')
 const cookieErr = ref(false)
+const agentOnline = ref(false)
+const yitianStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessionPreview: '', updatedAt: '' })
+const yitianMsg = ref('')
+const yitianErr = ref(false)
+
+async function checkAgent() {
+  agentOnline.value = await pingAgent()
+}
+async function loadYitianStatus() {
+  try { yitianStatus.value = await api.get('/api/yitian/cookie') } catch { /* 未登录/缺接口静默 */ }
+}
+
+async function onFetchPmisCookie() {
+  cookieMsg.value = ''; cookieErr.value = false
+  const res = await fetchPmisCookie()
+  if (!res.ok) { cookieErr.value = true; cookieMsg.value = 'PMIS cookie 获取失败：' + res.error; return }
+  if (!res.hasSession) {
+    cookieErr.value = true
+    cookieMsg.value = '未检测到 PMIS 登录态（cookie 无 SESSION），请先在零信任内登录 PMIS'
+    return
+  }
+  try {
+    const r = await api.post<{ sessionPreview: string }>('/api/pmis/cookie', { cookie: res.cookie })
+    cookieStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
+    cookieMsg.value = `已获取并推送 PMIS cookie（${res.names.length} 项）`
+  } catch (e) {
+    cookieErr.value = true; cookieMsg.value = '推送失败：' + (e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function onFetchYitianCookie() {
+  yitianMsg.value = ''; yitianErr.value = false
+  const res = await fetchYitianCookie()
+  if (!res.ok) { yitianErr.value = true; yitianMsg.value = '倚天 cookie 获取失败：' + res.error; return }
+  try {
+    const r = await api.post<{ sessionPreview: string }>('/api/yitian/cookie', { cookie: res.cookie })
+    yitianStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
+    yitianMsg.value = `已获取并存储倚天 cookie（${res.names.length} 项，备用）`
+  } catch (e) {
+    yitianErr.value = true; yitianMsg.value = '存储失败：' + (e instanceof Error ? e.message : String(e))
+  }
+}
+
 const { progress: dlProgress, message: dlMessage, running: dlRunning, start: startDownload } =
   usePmisDownload({ onDone: () => { loadFileStatus(); loadCookieStatus() } })
 
@@ -165,6 +209,8 @@ const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => f
 const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
 
 onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load(); loadCookieStatus() })
+onMounted(() => { checkAgent(); loadYitianStatus() })
+defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 </script>
 
 <template>
@@ -223,12 +269,25 @@ onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); 
       </div>
       <div v-if="cookieMsg" class="dv-row dv-hint" :class="cookieErr ? '' : 'ok'">{{ cookieMsg }}</div>
       <div class="dv-row">
+        <button class="dv-btn primary" data-test="btn-fetch-pmis-cookie" @click="onFetchPmisCookie">获取本机 PMIS cookie 并推送</button>
+        <span class="dv-hint">本机代理：{{ agentOnline ? '已连接' : '未运行（请启动 cookie 代理）' }}</span>
+      </div>
+      <div class="dv-row">
         <button class="dv-btn" data-test="btn-download" :disabled="dlRunning || repRunning" @click="onDownload">下载数据</button>
         <button class="dv-btn primary" :disabled="repRunning || dlRunning" @click="startReprocess()">更新数据（重新处理）</button>
         <span class="dv-hint">下载：从 PMIS 抓取并覆盖 input/（只下载不更新）；更新：读取已获取数据重算看板</span>
       </div>
       <div v-if="dlRunning || dlProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
       <div v-if="repRunning || repProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
+    </div>
+
+    <div class="dv-card">
+      <div class="dv-card-head">倚天 Cookie（取到备用，暂无下载）</div>
+      <div class="dv-row">
+        <button class="dv-btn" data-test="btn-fetch-yitian-cookie" @click="onFetchYitianCookie">获取本机倚天 cookie 并存储</button>
+        <span class="dv-hint">当前 {{ yitianStatus.sessionPreview || '-' }} · 更新于 {{ yitianStatus.updatedAt || '-' }} · 本机代理：{{ agentOnline ? '已连接' : '未运行' }}</span>
+      </div>
+      <div v-if="yitianMsg" class="dv-row dv-hint" :class="yitianErr ? '' : 'ok'">{{ yitianMsg }}</div>
     </div>
 
     <div class="dv-grid2">

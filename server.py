@@ -88,6 +88,7 @@ PARENT_DIR = os.path.dirname(BASE_DIR)
 # ── PMIS 在线下载流水线(pmisdata/) ──
 PMISDATA_DIR = os.path.join(BASE_DIR, 'pmisdata')
 PMISDATA_CONFIG = os.path.join(PMISDATA_DIR, 'config.json')
+YITIAN_CONFIG = os.path.join(BASE_DIR, 'data', 'yitian_config.json')
 PMIS_PIPELINE_SCRIPT = os.path.join(PMISDATA_DIR, 'run_pmis_pipeline.sh')
 
 # 前端 Web 根:打包态用内置 dist,开发态用 frontend/dist
@@ -194,6 +195,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/risk-followup/scope', '/api/risk-followup/archive', '/api/risk-followup/archive/delete',
     '/api/payment-key-followup/scope', '/api/payment-key-followup/archive', '/api/payment-key-followup/archive/delete',
     '/api/pmis/cookie', '/api/pmis/download',
+    '/api/yitian/cookie',
 })
 
 
@@ -660,6 +662,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_files_status()
         elif parsed.path == '/api/pmis/cookie':
             self.handle_pmis_cookie_get()
+        elif parsed.path == '/api/yitian/cookie':
+            self.handle_yitian_cookie_get()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -799,6 +803,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_opportunities_import()
         elif parsed.path == '/api/pmis/cookie':
             self.handle_pmis_cookie_save()
+        elif parsed.path == '/api/yitian/cookie':
+            self.handle_yitian_cookie_save()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -1912,6 +1918,30 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_INTERNAL, f"写入失败: {e}"))
             return
         self._json_response({"success": True, "sessionPreview": preview, "message": "Cookie 已更新"})
+
+    def handle_yitian_cookie_get(self):
+        """GET /api/yitian/cookie - 当前倚天 cookie 状态。超管专属。"""
+        import yitian_config
+        self._json_response(yitian_config.read_session_status(YITIAN_CONFIG))
+
+    def handle_yitian_cookie_save(self):
+        """POST /api/yitian/cookie {cookie} - 写 data/yitian_config.json。超管专属。"""
+        import yitian_config
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(n).decode('utf-8'))
+        except Exception as e:
+            self._json_response(_error_payload(ERR_PARSE, f"请求体解析失败: {e}"))
+            return
+        try:
+            preview = yitian_config.write_session_cookie(YITIAN_CONFIG, body.get('cookie') or '')
+        except ValueError as e:
+            self._json_response(_error_payload(ERR_VALIDATION, str(e)))
+            return
+        except OSError as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"写入失败: {e}"))
+            return
+        self._json_response({"success": True, "sessionPreview": preview, "message": "倚天 Cookie 已更新"})
 
     def _sse_write(self, text):
         """SSE 推送一段文本;客户端断开→返回 False 不抛(供循环 break)。"""

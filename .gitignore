@@ -78,3 +78,11 @@ Thumbs.db
 .omc/
 # 根级 node_modules（若有）
 /node_modules/
+
+client/agent_config.json
+data/yitian_config.json
+data/yitian_config.json.tmp
+# client 本地敏感/用户态/产物:config.json 含真实 cookie(密钥)、gui_settings 含账号设置、dist 为打包产物
+client/config.json
+client/gui_settings.json
+client/dist/
