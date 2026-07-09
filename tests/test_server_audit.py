@@ -207,3 +207,45 @@ def test_followup_delete_and_tags_save_enriched(tmp_path, monkeypatch):
         assert '标签库' in trow['detail'] and '挂载' in trow['detail']
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_progress_update_target_and_field(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        _post(conn, cookie, '/api/progress/update',
+              {'projectId': 'PRJ-7', 'field': 'weekProgress', 'content': '本周做了很多事情属于正文'}).read()
+        _wait_for(lambda: audit.read({'event': ['progress.update']}, 1, 50)['rows'])
+        row = audit.read({'event': ['progress.update']}, 1, 50)['rows'][0]
+        assert row['target'] == 'PRJ-7' and row['detail'] == '本周进展（已修改）'
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_risk_followup_update_riskkey_target(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        _post(conn, cookie, '/api/risk-followup/update',
+              {'riskKey': 'RK-3', 'field': 'followAction', 'content': '推动情况正文'}).read()
+        _wait_for(lambda: audit.read({'event': ['risk_followup.update']}, 1, 50)['rows'])
+        row = audit.read({'event': ['risk_followup.update']}, 1, 50)['rows'][0]
+        assert row['target'] == 'RK-3' and row['detail'] == '跟进动作（已修改）'
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_temp_followup_scope_summarized(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        _post(conn, cookie, '/api/temp-followup/scope',
+              {'combinator': 'and', 'groups': [{'x': 1}, {'y': 2}]}).read()
+        _wait_for(lambda: audit.read({'event': ['temp_followup.scope']}, 1, 50)['rows'])
+        row = audit.read({'event': ['temp_followup.scope']}, 1, 50)['rows'][0]
+        assert row['detail'] == 'AND · 2 组条件'
+    finally:
+        srv.shutdown(); srv.server_close()
