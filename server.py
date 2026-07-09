@@ -837,6 +837,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     
     def handle_clear_data(self):
         """删除业务数据文件 data/analysis_data.json 及原始提取数据目录 yundocs_data/"""
+        self._audit_set(detail='清空全部数据')
         data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
         legacy_js = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
         yundocs_dir = os.path.join(BASE_DIR, 'yundocs_data')
@@ -887,6 +888,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_stop_server(self):
         """GET /api/stop - 停止服务（前端页面停止按钮调用）"""
+        self._audit_set(detail='请求停止服务')
         logger.info("收到停止服务请求，正在关闭服务...")
         self._json_response({"status": "stopping", "message": "服务正在停止..."})
         # 在新线程中延迟退出，确保响应先发送完成
@@ -1136,6 +1138,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         finally:
             history_state["running"] = False
+        _mp = []
+        if summary.get('tags'):
+            _mp.append('项目标签 %d 条' % summary['tags'].get('tagsCount', 0))
+        if summary.get('followup'):
+            _mp.append('跟进记录 %d 条' % summary['followup'].get('count', 0))
+        self._audit_set(target=str(body.get('fileName') or ''), detail='导入 ' + (' · '.join(_mp) or '无'))
         self._json_response({"success": True, "message": "导入成功", **summary})
 
     def handle_manual_backups(self):
@@ -1161,6 +1169,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not vid:
             self._json_response(_error_payload(ERR_VALIDATION, "缺少版本 id"))
             return
+        self._audit_set(target=vid, detail='回滚人工导入 %s' % vid)
         history_state["running"] = True
         try:
             with _history_lock:
@@ -1908,6 +1917,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         os.makedirs(pmis_dir, exist_ok=True)
         with open(os.path.join(pmis_dir, name), 'wb') as f:
             f.write(body)
+        self._audit_set(target=name, detail='上传 PMIS 文件 · %d 字节' % len(body))
         self.send_response(200)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -1941,6 +1951,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         os.makedirs(input_dir, exist_ok=True)
         with open(os.path.join(input_dir, name), 'wb') as f:
             f.write(body)
+        self._audit_set(target=name, detail='上传项目域文件 · %d 字节' % len(body))
         self.send_response(200)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -1961,6 +1972,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_PARSE, f"请求体解析失败: {e}"))
             return
+        self._audit_set(detail='更新 PMIS Cookie')
         try:
             preview = pmis_config.write_session_cookie(PMISDATA_CONFIG, body.get('cookie') or '')
         except ValueError as e:
@@ -1985,6 +1997,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json_response(_error_payload(ERR_PARSE, f"请求体解析失败: {e}"))
             return
+        self._audit_set(detail='更新倚天 Cookie')
         try:
             preview = yitian_config.write_session_cookie(YITIAN_CONFIG, body.get('cookie') or '')
         except ValueError as e:
@@ -2014,6 +2027,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                                   {"running": True, "progress": 0, "message": "启动下载..."}):
             self._json_response(download_state)
             return
+        self._audit_set(detail='触发 PMIS 数据拉取')
         threading.Thread(target=run_download, daemon=True).start()
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
@@ -2037,6 +2051,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                                   {"running": True, "progress": 0, "message": "启动更新..."}):
             self._json_response(reprocess_state)
             return
+        self._audit_set(detail='触发数据重新处理')
         threading.Thread(target=run_reprocess, daemon=True).start()
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
@@ -2076,6 +2091,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not vid:
             self._json_response(_error_payload(ERR_VALIDATION, "缺少版本 id"))
             return
+        self._audit_set(target=vid, detail='回滚到版本 %s' % vid)
         history_state["running"] = True
         try:
             with _history_lock:
@@ -2093,6 +2109,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_data_history_undo(self):
         """POST /api/data-history/undo-rollback - 撤销上次回滚。"""
+        self._audit_set(detail='撤销上次数据回滚')
         if self._history_busy():
             self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中,请稍后再撤销"))
             return
