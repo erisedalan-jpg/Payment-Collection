@@ -78,3 +78,7 @@ Thumbs.db
 .omc/
 # 根级 node_modules（若有）
 /node_modules/
+
+client/agent_config.json
+data/yitian_config.json
+data/yitian_config.json.tmp
