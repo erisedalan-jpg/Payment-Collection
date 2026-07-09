@@ -7,7 +7,9 @@ import {
   listAccounts, createAccount, updateAccount, deleteAccount,
   type AdminAccount,
 } from '@/lib/admin'
+import AuditLogTab from '@/components/AuditLogTab.vue'
 
+const activeTab = ref('accounts')
 const store = useDataStore()
 const accounts = ref<AdminAccount[]>([])
 const loading = ref(false)
@@ -110,6 +112,8 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
 </script>
 
 <template>
+  <el-tabs v-model="activeTab" class="admin-tabs">
+    <el-tab-pane label="账号管理" name="accounts">
   <div class="admin-view">
     <div class="admin-head">
       <h2 class="admin-title">账号管理</h2>
@@ -185,6 +189,11 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
       </template>
     </el-dialog>
   </div>
+    </el-tab-pane>
+    <el-tab-pane label="审计日志" name="audit">
+      <AuditLogTab v-if="activeTab === 'audit'" />
+    </el-tab-pane>
+  </el-tabs>
 </template>
 
 <style scoped>
