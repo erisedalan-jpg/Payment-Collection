@@ -38,6 +38,7 @@ _ACTION_MAP = {
     ('GET', '/api/stop'): ('server.stop', '停止服务'),
     ('GET', '/api/pmis/download'): ('pmis.download', 'PMIS拉取'),
     ('POST', '/api/pmis/cookie'): ('pmis.cookie_save', '更新PMIS Cookie'),
+    ('POST', '/api/yitian/cookie'): ('yitian.cookie_save', '更新倚天 Cookie'),
     ('POST', '/api/pmis/upload'): ('pmis.upload', '上传PMIS包'),
     ('POST', '/api/inputs/upload'): ('inputs.upload', '上传数据文件'),
     ('POST', '/api/data-history/rollback'): ('data.history_rollback', '数据回滚'),
