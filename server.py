@@ -667,6 +667,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_auth_me()
         elif parsed.path == '/api/admin/accounts':
             self.handle_admin_accounts_list()
+        elif parsed.path == '/api/admin/audit':
+            self.handle_admin_audit()
         elif parsed.path == '/data/analysis_data.json':
             self.handle_data_json()
         else:
@@ -2188,6 +2190,34 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if self._require_super() is None:
             return
         self._send_json(200, {"success": True, "accounts": auth.list_public_accounts()})
+
+    def handle_admin_audit(self):
+        # 超管专属审计查询：筛选(账号/事件/时间/结果/关键词) + 分页 + facets
+        if self._require_super() is None:
+            return
+        q = parse_qs(urlparse(self.path).query)
+
+        def one(k, default=''):
+            v = q.get(k, [default])
+            return v[0] if v else default
+
+        filters = {
+            'account': one('account'),
+            'event': q.get('event', []),
+            'from': one('from'), 'to': one('to'),
+            'result': one('result'),
+            'kw': one('kw'),
+        }
+        try:
+            page = max(1, int(one('page', '1')))
+        except ValueError:
+            page = 1
+        try:
+            page_size = min(audit.MAX_ROWS, max(1, int(one('pageSize', '50'))))
+        except ValueError:
+            page_size = 50
+        result = audit.read(filters, page, page_size)
+        self._send_json(200, {'success': True, **result})
 
     def handle_admin_account_create(self):
         if self._require_super() is None:
