@@ -31,6 +31,13 @@ class Agent(HTTPServer):
 
 
 class _Handler(BaseHTTPRequestHandler):
+    def _host_allowed(self):
+        # 防 DNS rebinding:只接受 Host 为 127.0.0.1/localhost。攻击者把域名重绑到
+        # 127.0.0.1 后浏览器发同源 GET(不带 Origin)会绕过 Origin 白名单,但其 Host
+        # 仍是攻击者域名 → 在此拦掉,避免代理向恶意页吐出零信任 cookie。
+        host = (self.headers.get('Host') or '').split(':')[0].strip().lower()
+        return host in ('127.0.0.1', 'localhost')
+
     def _origin_allowed(self, origin):
         # 无 Origin(如本机 curl)放行读健康/cookie;有 Origin 必须在白名单
         return (not origin) or (origin in self.server.allowed_origins)
@@ -65,6 +72,9 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         origin = self.headers.get('Origin')
         path = self.path.split('?')[0]
+        if not self._host_allowed():
+            self._send(403, {"ok": False, "error": "host not allowed"}, None)
+            return
         if not self._origin_allowed(origin):
             self._send(403, {"ok": False, "error": "origin not allowed"}, None)
             return

@@ -126,3 +126,24 @@ def test_options_preflight_headers():
         r.read()
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_dns_rebinding_host_rejected(monkeypatch):
+    # DNS rebinding:域名重绑到 127.0.0.1,浏览器发同源 GET(无 Origin),但 Host 是攻击者域名。
+    called = {'n': 0}
+
+    def _boom():
+        called['n'] += 1
+        return {'ok': True, 'cookie': 'SESSION=leak', 'names': ['SESSION'], 'hasSession': True, 'error': ''}
+
+    monkeypatch.setattr(cookie_agent.cookie_core, 'fetch_pmis', _boom)
+    srv, port = _start(['http://plat'])
+    try:
+        conn = http.client.HTTPConnection('127.0.0.1', port)
+        conn.request('GET', '/pmis-cookie', headers={'Host': 'evil.com'})   # 伪造 Host,无 Origin
+        r = conn.getresponse()
+        assert r.status == 403
+        assert 'leak' not in r.read().decode('utf-8')   # 未泄露 cookie
+        assert called['n'] == 0                          # 未调用取 cookie
+    finally:
+        srv.shutdown(); srv.server_close()
