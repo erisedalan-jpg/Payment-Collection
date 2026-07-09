@@ -92,6 +92,33 @@ def test_account_create_recorded_with_target_no_password(tmp_path, monkeypatch):
         srv.shutdown(); srv.server_close()
 
 
+def test_audit_endpoint_super_reads_nonsuper_403(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    try:
+        conn, cookie = _login(port)                       # admin 超管
+        # 造一条业务写(创建普通账号)以产生可读审计
+        conn.request("POST", "/api/admin/accounts/create",
+                     json.dumps({"account": "puser", "password": "Pw123456", "displayName": "普通",
+                                 "allowedPages": ["projects"], "allowedL4": ["交付一部"]}),
+                     {"Content-Type": "application/json", "Cookie": cookie})
+        conn.getresponse().read()
+        _wait_for(lambda: audit.read({"event": ["account.create"]}, 1, 50)["rows"])
+        # 超管读端点
+        conn.request("GET", "/api/admin/audit?pageSize=100", headers={"Cookie": cookie})
+        r = conn.getresponse()
+        assert r.status == 200
+        data = json.loads(r.read())
+        assert data["success"] is True
+        assert data["total"] >= 1
+        assert "accounts" in data["facets"] and "events" in data["facets"]
+        # 普通账号登录后读 → 403
+        conn2, cookie2 = _login(port, "puser", "Pw123456")
+        conn2.request("GET", "/api/admin/audit", headers={"Cookie": cookie2})
+        assert conn2.getresponse().status == 403
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
 def test_read_only_get_not_recorded(tmp_path, monkeypatch):
     srv, port = _start(tmp_path, monkeypatch)
     try:
