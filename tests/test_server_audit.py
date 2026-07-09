@@ -286,3 +286,55 @@ def test_opportunity_delete_enriched(tmp_path, monkeypatch):
         assert drow['detail'] == '删除商机' and rid in drow['target']
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_reprocess_busy_not_marked_triggered(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    server.reprocess_state.clear(); server.reprocess_state.update({'running': True, 'progress': 50})
+    try:
+        conn, cookie = _login(port)
+        conn.request('GET', '/api/reprocess', headers={'Cookie': cookie})
+        conn.getresponse().read()
+        _wait_for(lambda: audit.read({'event': ['data.reprocess']}, 1, 50)['rows'])
+        row = audit.read({'event': ['data.reprocess']}, 1, 50)['rows'][0]
+        assert not row.get('detail')   # 被拒:不标记"触发"
+    finally:
+        server.reprocess_state.clear()
+        server.reprocess_state.update({'running': False, 'progress': 0, 'message': ''})
+        srv.shutdown(); srv.server_close()
+
+
+def test_reprocess_trigger_recorded(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+
+    def _fake():
+        server.reprocess_state.clear()
+        server.reprocess_state.update({'running': False, 'progress': 100, 'message': 'done'})
+    monkeypatch.setattr(server, 'run_reprocess', _fake)
+    try:
+        conn, cookie = _login(port)
+        conn.request('GET', '/api/reprocess', headers={'Cookie': cookie})
+        conn.getresponse().read()
+        _wait_for(lambda: audit.read({'event': ['data.reprocess']}, 1, 50)['rows'])
+        row = audit.read({'event': ['data.reprocess']}, 1, 50)['rows'][0]
+        assert row['detail'] == '触发数据重新处理'
+    finally:
+        server.reprocess_state.clear()
+        server.reprocess_state.update({'running': False, 'progress': 0, 'message': ''})
+        srv.shutdown(); srv.server_close()
+
+
+def test_pmis_cookie_save_enriched_no_value(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    monkeypatch.setattr(server, 'PMISDATA_CONFIG', str(tmp_path / 'pmis_config.json'))
+    try:
+        conn, cookie = _login(port)
+        _post(conn, cookie, '/api/pmis/cookie', {'cookie': 'SESSION=SECRET_TOKEN_XYZ; a=1'}).read()
+        _wait_for(lambda: audit.read({'event': ['pmis.cookie_save']}, 1, 50)['rows'])
+        row = audit.read({'event': ['pmis.cookie_save']}, 1, 50)['rows'][0]
+        assert row['detail'] == '更新 PMIS Cookie'
+        with open(str(tmp_path / 'audit_log.jsonl'), encoding='utf-8') as f:
+            raw = f.read()
+        assert 'SECRET_TOKEN_XYZ' not in raw   # cookie 值绝不落审计
+    finally:
+        srv.shutdown(); srv.server_close()
