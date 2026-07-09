@@ -244,6 +244,8 @@ def field_label(key):
 
 
 def _show(v):
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)  # 整数值的 float(如商机金额字段落盘后 100.0)显示去掉多余 .0
     return str(v) if v not in (None, '') else '(空)'
 
 

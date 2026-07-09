@@ -1769,6 +1769,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             now_date, now_dt = self._opp_now()
             row = _opp.apply_create_with_fields(store, fields, account, now_date, now_dt)
             _save_opportunities(store)
+            _l4 = (fields or {}).get('l4') or ''
+            self._audit_set(
+                target=str((fields or {}).get('name') or row.get('id', '')),
+                detail=audit.join_detail(['新建商机', ('L4:%s' % _l4) if _l4 else '']))
             self._json_response({"row": row})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"新增商机失败: {e}"))
@@ -1795,6 +1799,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             if target is None:
                 self._send_json(404, _error_payload(ERR_NOT_FOUND, f"商机不存在: {rid}"))
                 return
+            old_snapshot = dict(target)  # 捕获旧值供审计 diff(apply_update 会就地改)
             # 非超管:只能改本人 L4 范围内的行;且不得把行的 L4 改到本人范围外
             if not is_super:
                 if not _opp.can_access_l4(target.get('l4'), allowed, False):
@@ -1806,6 +1811,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             now_date, now_dt = self._opp_now()
             row = _opp.apply_update(store, rid, fields, account, now_date, now_dt)
             _save_opportunities(store)
+            self._audit_set(
+                target=str(old_snapshot.get('name') or rid),
+                detail=audit.diff_changes(old_snapshot, fields, labels=_OPP_FIELD_LABELS) or '更新商机')
             self._json_response({"row": row})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"保存商机失败: {e}"))
@@ -1815,6 +1823,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None or not isinstance(data.get('ids'), list):
             self._send_json(400, _error_payload(ERR_VALIDATION, "ids 须为数组"))
             return
+        _ids = data['ids']
+        self._audit_set(
+            target=('%d 个商机' % len(_ids)) if len(_ids) > 5 else ('、'.join(str(i) for i in _ids) or '0 个'),
+            detail='删除商机')
         account, rec = self._session_account_rec()
         rec = rec or {}
         try:
@@ -1847,6 +1859,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             with open(tmp, 'wb') as f:
                 f.write(body)
             rows = _opp.read_opportunities_xlsx(tmp)
+            self._audit_set(detail='整表替换 · 导入 %d 条（旧表已备份）' % len(rows))
         finally:
             try:
                 os.remove(tmp)
