@@ -488,6 +488,8 @@ def _save_paykey_followup(store):
 
 # ── 商机管理(V2.0.0) ──
 OPPORTUNITIES_FILE = os.path.join(BASE_DIR, 'data', 'opportunities.json')
+# 商机字段 key → 中文标签(供审计更新详情;反转 opportunities 既有列名映射)
+_OPP_FIELD_LABELS = {v: k for k, v in _opp.HEADER_TO_FIELD.items()}
 OPP_INPUT_NAMES = ('opportunities.xlsx', 'opportunitites.xlsx')  # 后者兼容用户原文笔误
 _opp_lock = threading.Lock()
 
@@ -2169,6 +2171,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             })
         except Exception:
             logger.error('audit 记录失败', exc_info=True)
+
+    def _audit_set(self, target=None, detail=None):
+        """handler 内富化本请求审计的目标/详情;仅覆盖传入的非 None 值。
+        取值须防御式,绝不因审计让主流程 500(调用方保证不抛)。"""
+        if target is not None:
+            self._audit_target = target
+        if detail is not None:
+            self._audit_detail = detail
 
     def _audit_login(self, account, ok, reason=''):
         """登录/登出以外的认证补录:登录成功/失败。绝不记密码。"""

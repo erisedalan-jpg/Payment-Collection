@@ -132,3 +132,62 @@ def test_record_never_raises_on_write_failure(tmp_path, monkeypatch):
     monkeypatch.setattr('builtins.open', boom)
     # 不应抛出
     audit.record({'event': 'x', 'action': 'X', 'account': 'a', 'success': True})
+
+
+def test_field_label_known_and_unknown():
+    assert audit.field_label('weekProgress') == '本周进展'
+    assert audit.field_label('nextPlan') == '下步计划'
+    assert audit.field_label('followAction') == '跟进动作'
+    assert audit.field_label('revConclusion') == '回顾结论'
+    assert audit.field_label('nextRevDate') == '下次回顾日期'
+    assert audit.field_label('跟进类型') == '跟进类型'  # 未知键原样返回
+
+
+def test_diff_changes_short_old_to_new():
+    assert audit.diff_changes({'跟进状态': '跟进中'}, {'跟进状态': '已解决'}) == '跟进状态 跟进中→已解决'
+
+
+def test_diff_changes_unchanged_omitted():
+    assert audit.diff_changes({'a': '1'}, {'a': '1'}) == ''
+
+
+def test_diff_changes_missing_old_shows_empty_marker():
+    assert audit.diff_changes({}, {'跟进人': '张三'}) == '跟进人 (空)→张三'
+
+
+def test_diff_changes_multiple_joined_by_semicolon():
+    out = audit.diff_changes({'跟进类型': '电话沟通', '跟进状态': '跟进中'},
+                             {'跟进类型': '邮件推动', '跟进状态': '已解决'})
+    assert out == '跟进类型 电话沟通→邮件推动；跟进状态 跟进中→已解决'
+
+
+def test_diff_changes_long_value_masked():
+    out = audit.diff_changes({'remark': ''}, {'remark': 'x' * 30}, labels={'remark': '备注'})
+    assert out == '备注（已改）'
+
+
+def test_diff_changes_uses_labels():
+    out = audit.diff_changes({'amountWan': '100'}, {'amountWan': '200'},
+                             labels={'amountWan': '预估金额(万元)'})
+    assert out == '预估金额(万元) 100→200'
+
+
+def test_summarize_scope_groups_and_combinator_upper():
+    assert audit.summarize_scope({'combinator': 'and', 'groups': [1, 2, 3]}) == 'AND · 3 组条件'
+
+
+def test_summarize_scope_empty_or_bad():
+    assert audit.summarize_scope({'groups': []}) == '清空范围'
+    assert audit.summarize_scope(None) == '清空范围'
+    assert audit.summarize_scope({'combinator': 'OR', 'groups': [{'x': 1}]}) == 'OR · 1 组条件'
+
+
+def test_count_delta():
+    assert audit.count_delta(5, 5) == '5'
+    assert audit.count_delta(12, 13) == '12→13'
+
+
+def test_join_detail_filters_empty():
+    assert audit.join_detail(['a', '', 'b', None]) == 'a · b'
+    assert audit.join_detail([]) == ''
+    assert audit.join_detail(['只此一段']) == '只此一段'
