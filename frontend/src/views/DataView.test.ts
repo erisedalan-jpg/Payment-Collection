@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import DataView from './DataView.vue'
+import DataStatusBar from '@/components/DataStatusBar.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import * as cookieAgent from '@/lib/cookieAgent'
@@ -46,20 +47,18 @@ describe('DataView(两条来源重构)', () => {
     expect(w.text()).toContain('2026-06-12 16:40')
   })
 
-  it('数据来源说明卡存在且含两种方式说明', async () => {
+  it('主区含两种获取方式的说明文本', async () => {
     const w = await mountView()
-    const heads = w.findAll('.dv-card-head').map((n) => n.text())
-    expect(heads.some((t) => t.includes('数据来源'))).toBe(true)
-    expect(w.text()).toContain('页面导入')
-    expect(w.text()).toContain('本地放置')
+    expect(w.text()).toContain('两种方式')
+    expect(w.text()).toContain('上传文件')
+    expect(w.text()).not.toContain('在线下载')   // 沿用旧约束:不得出现该字样
   })
 
-  it('数据文件清单卡存在，含 PMIS 九表与项目域文件分区', async () => {
+  it('上传文件区含 PMIS 九表与项目域文件两分区', async () => {
     const w = await mountView()
-    const heads = w.findAll('.dv-card-head').map((n) => n.text())
-    expect(heads.some((t) => t.includes('数据文件清单'))).toBe(true)
     expect(w.text()).toContain('PMIS 九表')
     expect(w.text()).toContain('项目域文件')
+    expect(w.find('[data-test="files-card"]').exists()).toBe(true)
   })
 
   it('PMIS 九行渲染', async () => {
@@ -103,11 +102,11 @@ describe('DataView(两条来源重构)', () => {
     expect(calls.some((u: string) => u.includes('/api/pmis/links'))).toBe(false)
   })
 
-  it('更新数据卡与设置卡保留', async () => {
+  it('主区含「获取与更新数据」，清空数据进维护折叠区', async () => {
     const w = await mountView()
     const heads = w.findAll('.dv-card-head').map((n) => n.text())
-    expect(heads.some((t) => t.includes('更新数据'))).toBe(true)
-    expect(heads.some((t) => t.includes('设置'))).toBe(true)
+    expect(heads.some((t) => t.includes('获取与更新数据'))).toBe(true)
+    expect(w.text()).toContain('清空数据')
   })
 
   it('渲染「人工数据导入 / 回滚」卡', async () => {
@@ -164,6 +163,20 @@ describe('DataView(两条来源重构)', () => {
     const ui = btns.findIndex((t) => t.includes('更新数据（重新处理）'))
     expect(di).toBeGreaterThanOrEqual(0)
     expect(ui).toBeGreaterThan(di)
+  })
+
+  it('渲染状态总览条 DataStatusBar', async () => {
+    const w = await mountView()
+    expect(w.findComponent(DataStatusBar).exists()).toBe(true)
+  })
+
+  it('维护区四折叠面板标题齐全', async () => {
+    const w = await mountView()
+    const t = w.text()
+    expect(t).toContain('项目标签')
+    expect(t).toContain('人工数据导入')
+    expect(t).toContain('数据历史')
+    expect(t).toContain('清空数据')
   })
 })
 
