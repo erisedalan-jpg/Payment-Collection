@@ -378,8 +378,6 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 .data-view { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--gap-card); }
 .dv-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2); }
 .dv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
-.dv-times { font-size: var(--fs-1); color: var(--sub); }
-.dv-times b { color: var(--txt); }
 .dv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1); }
 .dv-card-head { font-weight: 700; font-size: var(--fs-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--txt); }
 .dv-sub-head { font-size: var(--fs-1); font-weight: 700; color: var(--sub); padding: var(--sp-2) var(--sp-4) 0; }
@@ -391,7 +389,7 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 .dv-ftime { margin-left: auto; color: var(--mut); font-size: var(--fs-1); flex-shrink: 0; }
 .dv-label { width: 70px; flex-shrink: 0; color: var(--sub); font-weight: 600; font-size: var(--fs-1); }
 .dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); cursor: pointer; color: var(--txt); }
-.dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); transition: transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
 .dv-btn.ghost { color: var(--sub); }
 .dv-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .dv-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
@@ -402,8 +400,6 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 .dv-bar { height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .dv-bar-fill { height: 100%; background: var(--accent); transition: width var(--dur-2) var(--ease); }
 .dv-msg { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-2); }
-.dv-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
-@media (max-width: 768px) { .dv-grid2 { grid-template-columns: 1fr; } }
 .dv-tags-mgr { flex-wrap: wrap; gap: var(--sp-2); }
 .dv-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .dv-tag.off { opacity: .5; }
@@ -435,7 +431,7 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 .dv-badge.warn { background: var(--warn-bg); color: var(--warn-text); }
 .dv-hint.err { color: var(--danger-text); }
 .dv-btn-lg { font-size: var(--fs-3); padding: var(--sp-2) var(--sp-5); }
-.dv-btn.primary:hover:not(:disabled) { box-shadow: var(--lift); }
+.dv-btn.primary:hover:not(:disabled) { transform: translateY(var(--lift)); box-shadow: var(--shadow-2); }
 .dv-danger-title { color: var(--danger-text); font-weight: 700; }
 .dv-more, .dv-maint { margin: 0; }
 .dv-more :deep(.el-collapse-item__header),
