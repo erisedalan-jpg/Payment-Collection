@@ -249,3 +249,40 @@ def test_temp_followup_scope_summarized(tmp_path, monkeypatch):
         assert row['detail'] == 'AND · 2 组条件'
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_opportunity_create_and_update_enriched(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        r = _post(conn, cookie, '/api/opportunities/create',
+                  {'fields': {'name': '某商机', 'l4': '交付一部', 'amountWan': '100'}})
+        rid = json.loads(r.read())['row']['id']
+        _wait_for(lambda: audit.read({'event': ['opportunities.create']}, 1, 50)['rows'])
+        crow = audit.read({'event': ['opportunities.create']}, 1, 50)['rows'][0]
+        assert crow['target'] == '某商机' and '新建商机' in crow['detail']
+        # 更新:短值 旧→新
+        _post(conn, cookie, '/api/opportunities/update',
+              {'id': rid, 'fields': {'amountWan': '200'}}).read()
+        _wait_for(lambda: audit.read({'event': ['opportunities.update']}, 1, 50)['rows'])
+        urow = audit.read({'event': ['opportunities.update']}, 1, 50)['rows'][0]
+        assert urow['target'] == '某商机'
+        assert '100→200' in urow['detail']
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_opportunity_delete_enriched(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        r = _post(conn, cookie, '/api/opportunities/create', {'fields': {'name': '待删商机', 'l4': '交付一部'}})
+        rid = json.loads(r.read())['row']['id']
+        _post(conn, cookie, '/api/opportunities/delete', {'ids': [rid]}).read()
+        _wait_for(lambda: audit.read({'event': ['opportunities.delete']}, 1, 50)['rows'])
+        drow = audit.read({'event': ['opportunities.delete']}, 1, 50)['rows'][0]
+        assert drow['detail'] == '删除商机' and rid in drow['target']
+    finally:
+        srv.shutdown(); srv.server_close()
