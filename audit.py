@@ -112,3 +112,118 @@ def _trim_and_archive(events, max_rows, max_days, now):
     while start < n and _ts_epoch(events[start].get('ts', '')) < cutoff:
         start += 1                                     # 保留窗口内早于 cutoff 的也进溢出
     return events[start:], events[:start]
+
+
+def _read_all_locked():
+    if not os.path.exists(AUDIT_LOG_FILE):
+        return []
+    out = []
+    with open(AUDIT_LOG_FILE, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except Exception:
+                continue
+    return out
+
+
+def _maybe_rotate_locked():
+    """惰性滚动:超条数或最旧超天数才重写活动日志、把溢出按年追加进归档。"""
+    events = _read_all_locked()
+    if not events:
+        return
+    over_count = len(events) > MAX_ROWS + TRIM_MARGIN
+    oldest_old = _ts_epoch(events[0].get('ts', '')) < (time.time() - MAX_DAYS * 86400)
+    if not (over_count or oldest_old):
+        return
+    kept, overflow = _trim_and_archive(events, MAX_ROWS, MAX_DAYS, time.time())
+    if not overflow:
+        return
+    os.makedirs(AUDIT_ARCHIVE_DIR, exist_ok=True)
+    by_year = {}
+    for ev in overflow:
+        year = (str(ev.get('ts', ''))[:4]) or 'unknown'
+        by_year.setdefault(year, []).append(ev)
+    for year, evs in by_year.items():
+        path = os.path.join(AUDIT_ARCHIVE_DIR, 'audit-%s.jsonl' % year)
+        with open(path, 'a', encoding='utf-8') as f:
+            for ev in evs:
+                f.write(json.dumps(ev, ensure_ascii=False) + '\n')
+    tmp = AUDIT_LOG_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        for ev in kept:
+            f.write(json.dumps(ev, ensure_ascii=False) + '\n')
+    os.replace(tmp, AUDIT_LOG_FILE)
+
+
+def record(event):
+    """补全 ts、追加一行、按需滚动归档。绝不抛出(审计失败不影响主流程)。"""
+    try:
+        ev = dict(event)
+        ev.setdefault('ts', datetime.datetime.now().astimezone().isoformat(timespec='seconds'))
+        with _lock:
+            os.makedirs(os.path.dirname(AUDIT_LOG_FILE), exist_ok=True)
+            with open(AUDIT_LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(ev, ensure_ascii=False) + '\n')
+            _maybe_rotate_locked()
+    except Exception:
+        pass
+
+
+def _facet_events(events):
+    seen = {}
+    for e in events:
+        code = e.get('event', '')
+        if code and code not in seen:
+            seen[code] = e.get('action', code)
+    return [{'code': c, 'label': seen[c]} for c in sorted(seen)]
+
+
+def _apply_filters(events, f):
+    acc = f.get('account') or ''
+    evset = set(f.get('event') or [])
+    frm = f.get('from') or ''
+    to = f.get('to') or ''
+    result = f.get('result') or ''
+    kw = (f.get('kw') or '').lower()
+    out = []
+    for e in events:
+        if acc and e.get('account', '') != acc:
+            continue
+        if evset and e.get('event', '') not in evset:
+            continue
+        ts = e.get('ts', '')
+        if frm and ts[:10] < frm:
+            continue
+        if to and ts[:10] > to:
+            continue
+        if result == 'success' and not e.get('success'):
+            continue
+        if result == 'failure' and e.get('success'):
+            continue
+        if kw:
+            hay = ' '.join(str(e.get(k, '')) for k in
+                           ('account', 'displayName', 'action', 'target', 'detail', 'path')).lower()
+            if kw not in hay:
+                continue
+        out.append(e)
+    return out
+
+
+def read(filters, page, page_size):
+    """读活动日志、应用筛选、分页(最新在前)。返回 {rows,total,facets}。"""
+    with _lock:
+        events = _read_all_locked()
+    facets = {
+        'accounts': sorted({e.get('account', '') for e in events if e.get('account')}),
+        'events': _facet_events(events),
+    }
+    rows = list(reversed(_apply_filters(events, filters or {})))
+    total = len(rows)
+    page = max(1, int(page or 1))
+    page_size = max(1, int(page_size or 50))
+    start = (page - 1) * page_size
+    return {'rows': rows[start:start + page_size], 'total': total, 'facets': facets}
