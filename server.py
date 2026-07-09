@@ -24,6 +24,7 @@ from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from urllib.parse import urlparse, parse_qs
 import auth
+import audit
 import config
 import data_history
 import data_scope
@@ -600,7 +601,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
         super().end_headers()
-    
+
+    def send_response(self, code, message=None):
+        self._audit_status = code
+        super().send_response(code, message)
+
     def parse_path(self):
         parsed = urlparse(self.path)
         return parse_qs(parsed.query)
@@ -611,7 +616,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         if not self._authz_gate():
             return
+        try:
+            self._dispatch_get(parsed)
+        finally:
+            self._audit_request()
 
+    def _dispatch_get(self, parsed):
         # 拦截静态文件请求，强制添加 charset=utf-8
         if parsed.path.endswith(('.js', '.css', '.html')):
             self._serve_static_with_charset()
@@ -723,7 +733,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         if not self._authz_gate():
             return
+        try:
+            self._dispatch_post(parsed)
+        finally:
+            self._audit_request()
 
+    def _dispatch_post(self, parsed):
         if parsed.path == '/api/followup/add':
             self.handle_followup_add()
         elif parsed.path == '/api/followup/delete':
@@ -2088,6 +2103,50 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return None
         return account
 
+    def _audit_request(self, target=None, detail=None):
+        """中央审计:map_action 命中的写请求落一条。绝不抛(失败仅记日志)。"""
+        try:
+            path = urlparse(self.path).path
+            mapped = audit.map_action(self.command, path)
+            if not mapped:
+                return
+            event_code, action = mapped
+            token = auth.parse_cookie_token(self.headers.get('Cookie'))
+            account = auth.validate_session(token) or ''
+            rec = auth.load_accounts().get('users', {}).get(account) if account else None
+            status = getattr(self, '_audit_status', 0) or 0
+            audit.record({
+                'event': event_code, 'action': action,
+                'account': account,
+                'displayName': (rec or {}).get('displayName', account),
+                'ip': audit.client_ip(self.headers, self.client_address),
+                'userAgent': (self.headers.get('User-Agent') or '')[:audit.UA_MAX],
+                'method': self.command, 'path': path,
+                'status': status, 'success': 200 <= status < 300,
+                'target': target if target is not None else getattr(self, '_audit_target', None),
+                'detail': detail if detail is not None else getattr(self, '_audit_detail', None),
+            })
+        except Exception:
+            logger.error('audit 记录失败', exc_info=True)
+
+    def _audit_login(self, account, ok, reason=''):
+        """登录/登出以外的认证补录:登录成功/失败。绝不记密码。"""
+        try:
+            rec = auth.load_accounts().get('users', {}).get(account) if (ok and account) else None
+            audit.record({
+                'event': 'login.success' if ok else 'login.failure',
+                'action': '登录成功' if ok else '登录失败',
+                'account': account or '',
+                'displayName': (rec or {}).get('displayName', account or ''),
+                'ip': audit.client_ip(self.headers, self.client_address),
+                'userAgent': (self.headers.get('User-Agent') or '')[:audit.UA_MAX],
+                'method': 'POST', 'path': '/api/login',
+                'status': 200 if ok else 401, 'success': bool(ok),
+                'target': None, 'detail': None if ok else reason,
+            })
+        except Exception:
+            logger.error('audit 登录记录失败', exc_info=True)
+
     def _read_json_body(self):
         """读 POST JSON body;失败或超出 MAX_JSON_BODY 返回 None(调用方负责报 400)。"""
         try:
@@ -2137,6 +2196,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
+        self._audit_target = str(data.get('account', ''))
+        self._audit_detail = '授予页面%s L4%s' % (data.get('allowedPages', []), data.get('allowedL4', []))
         try:
             user = auth.add_account(
                 data.get('account', ''), data.get('password', ''),
@@ -2155,6 +2216,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         account = data.get('account', '')
+        self._audit_target = str(account)
+        _changed = []
+        if data.get('displayName') is not None:
+            _changed.append('显示名')
+        if data.get('allowedPages') is not None:
+            _changed.append('页面权限')
+        if data.get('allowedL4') is not None:
+            _changed.append('L4权限')
+        if data.get('password'):
+            _changed.append('重置密码')
+        self._audit_detail = '修改:' + ('、'.join(_changed) or '无')
         try:
             user = auth.edit_account(
                 account,
@@ -2179,6 +2251,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         account = data.get('account', '')
+        self._audit_target = str(account)
+        self._audit_detail = '删除账号(其会话已强制失效)'
         if account == super_account:
             self._send_json(400, _error_payload(ERR_VALIDATION, "不能删除自己"))
             return
@@ -2202,19 +2276,37 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         account = (data.get('account') or '').strip()
         password = data.get('password') or ''
         if len(account) > 256 or len(password) > 256:
+            self._audit_login(account[:256], False, '账号或密码超长')
             self._send_json(401, _error_payload(ERR_AUTH, "账号或密码错误"))
             return
         user = auth.authenticate(account, password)
         if not user:
+            exists = account in auth.load_accounts().get('users', {})
+            self._audit_login(account, False, '密码错误' if exists else '账号不存在')
             self._send_json(401, _error_payload(ERR_AUTH, "账号或密码错误"))
             return
         token = auth.create_session(account)
+        self._audit_login(account, True)
         self._send_json(200, {"success": True, "user": user},
                         [('Set-Cookie', auth.build_set_cookie(token))])
 
     def handle_logout(self):
         token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token) or ''
         auth.destroy_session(token)
+        if account:
+            try:
+                rec = auth.load_accounts().get('users', {}).get(account) or {}
+                audit.record({
+                    'event': 'logout', 'action': '登出', 'account': account,
+                    'displayName': rec.get('displayName', account),
+                    'ip': audit.client_ip(self.headers, self.client_address),
+                    'userAgent': (self.headers.get('User-Agent') or '')[:audit.UA_MAX],
+                    'method': 'POST', 'path': '/api/logout',
+                    'status': 200, 'success': True, 'target': None, 'detail': None,
+                })
+            except Exception:
+                logger.error('audit 登出记录失败', exc_info=True)
         self._send_json(200, {"success": True},
                         [('Set-Cookie', auth.build_clear_cookie())])
 
@@ -2225,6 +2317,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not account:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
+        self._audit_detail = '修改本人密码'
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
