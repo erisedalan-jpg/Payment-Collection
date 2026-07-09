@@ -943,7 +943,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data.get('跟进状态') not in FOLLOWUP_STATUSES:
             self._json_response(_error_payload(ERR_VALIDATION, f"跟进状态无效，可选: {', '.join(FOLLOWUP_STATUSES)}"))
             return
-        
+
+        self._audit_set(
+            target=audit.join_detail([data.get('项目编号', ''), data.get('项目名称', '')]),
+            detail=audit.join_detail(['跟进类型「%s」' % data.get('跟进类型', ''),
+                                      '状态「%s」' % data.get('跟进状态', ''), '（内容已填写）']))
+
         # 自动生成记录编号
         today_str = datetime.now().strftime('%Y%m%d')
         record_num = _get_next_record_num(today_str)
@@ -980,6 +985,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not record_id:
             self._json_response(_error_payload(ERR_VALIDATION, "缺少记录编号"))
             return
+
+        self._audit_set(target=record_id, detail='删除跟进记录')
 
         # 从本地JSON中删除指定记录
         records = _load_followup_records()
@@ -1029,11 +1036,18 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         found = False
         for r in records:
             if r.get('记录编号') == record_id:
+                old = dict(r)  # 捕获旧值供审计 diff
                 # 仅更新允许编辑的字段
                 editable_fields = ['跟进人', '跟进类型', '跟进内容', '跟进状态', '下次跟进计划日期']
                 for field in editable_fields:
                     if field in data and data[field]:
                         r[field] = data[field]
+                enum_detail = audit.diff_changes(old, {k: r[k] for k in ('跟进类型', '跟进状态', '跟进人') if k in r})
+                text_note = '（内容/日期已修改）' if any(
+                    f in data and data.get(f) and data.get(f) != old.get(f)
+                    for f in ('跟进内容', '下次跟进计划日期')) else ''
+                self._audit_set(target=record_id,
+                                detail=audit.join_detail([enum_detail, text_note]) or '修改跟进记录')
                 found = True
                 break
 
@@ -1186,9 +1200,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         def _apply(s):
+            old_tag_n, old_asg_n = len(s.get('tags', [])), len(s.get('assignments', {}))
             s['version'] = 1
             s['tags'] = tags
             s['assignments'] = assignments
+            self._audit_set(detail='标签库 %s 个 · 挂载 %s 项目' % (
+                audit.count_delta(old_tag_n, len(tags)),
+                audit.count_delta(old_asg_n, len(assignments))))
             return True
 
         ok, res = self._followup_txn(_tags_lock, _load_project_tags, _apply, _save_project_tags)

@@ -132,3 +132,78 @@ def test_read_only_get_not_recorded(tmp_path, monkeypatch):
         assert me_rows == []
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def _patch_business_files(monkeypatch, tmp_path):
+    """把业务数据文件全局指到 tmp,避免测试污染真实 data/。"""
+    for name in ('FOLLOWUP_FILE', 'PROJECT_TAGS_FILE', 'PROGRESS_FILE',
+                 'TEMP_FOLLOWUP_FILE', 'OPP_FOLLOWUP_FILE', 'RISK_FOLLOWUP_FILE',
+                 'PAYKEY_FOLLOWUP_FILE', 'OPPORTUNITIES_FILE'):
+        monkeypatch.setattr(server, name, str(tmp_path / (name.lower() + '.json')))
+
+
+def _post(conn, cookie, path, body):
+    conn.request('POST', path, json.dumps(body),
+                 {'Content-Type': 'application/json', 'Cookie': cookie})
+    return conn.getresponse()
+
+
+def test_followup_add_enriched_and_content_private(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        secret = '这是一段较长的跟进内容属于业务正文不应落审计日志'
+        _post(conn, cookie, '/api/followup/add', {
+            '项目编号': 'PRJ-9', '项目名称': '测试项目', '跟进人': '李四',
+            '跟进类型': '邮件推动', '跟进内容': secret, '跟进状态': '跟进中'}).read()
+        _wait_for(lambda: audit.read({'event': ['followup.add']}, 1, 50)['rows'])
+        row = audit.read({'event': ['followup.add']}, 1, 50)['rows'][0]
+        assert row['target'] == 'PRJ-9 · 测试项目'
+        assert '邮件推动' in row['detail'] and '跟进中' in row['detail']
+        with open(str(tmp_path / 'audit_log.jsonl'), encoding='utf-8') as f:
+            assert secret not in f.read()   # 长正文不落审计
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_followup_update_records_old_to_new(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        r = _post(conn, cookie, '/api/followup/add', {
+            '项目编号': 'PRJ-1', '项目名称': 'P1', '跟进人': '王五',
+            '跟进类型': '电话沟通', '跟进内容': '短', '跟进状态': '跟进中'})
+        rec_id = json.loads(r.read())['记录编号']
+        _post(conn, cookie, '/api/followup/update',
+              {'记录编号': rec_id, '跟进状态': '已解决'}).read()
+        _wait_for(lambda: audit.read({'event': ['followup.update']}, 1, 50)['rows'])
+        row = audit.read({'event': ['followup.update']}, 1, 50)['rows'][0]
+        assert row['target'] == rec_id
+        assert row['detail'] == '跟进状态 跟进中→已解决'
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_followup_delete_and_tags_save_enriched(tmp_path, monkeypatch):
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        r = _post(conn, cookie, '/api/followup/add', {
+            '项目编号': 'PRJ-2', '项目名称': 'P2', '跟进人': '赵六',
+            '跟进类型': '现场拜访', '跟进内容': '短', '跟进状态': '跟进中'})
+        rec_id = json.loads(r.read())['记录编号']
+        _post(conn, cookie, '/api/followup/delete', {'记录编号': rec_id}).read()
+        _wait_for(lambda: audit.read({'event': ['followup.delete']}, 1, 50)['rows'])
+        drow = audit.read({'event': ['followup.delete']}, 1, 50)['rows'][0]
+        assert drow['target'] == rec_id and drow['detail'] == '删除跟进记录'
+        # 标签保存
+        _post(conn, cookie, '/api/tags',
+              {'tags': [{'name': 'A'}, {'name': 'B'}], 'assignments': {'PRJ-2': ['A']}}).read()
+        _wait_for(lambda: audit.read({'event': ['tags.save']}, 1, 50)['rows'])
+        trow = audit.read({'event': ['tags.save']}, 1, 50)['rows'][0]
+        assert '标签库' in trow['detail'] and '挂载' in trow['detail']
+    finally:
+        srv.shutdown(); srv.server_close()
