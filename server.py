@@ -612,6 +612,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     
     def do_GET(self):
         parsed = urlparse(self.path)
+        self._reset_audit_state()
         if not self._auth_gate():
             return
         if not self._authz_gate():
@@ -731,6 +732,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        self._reset_audit_state()
         if not self._auth_gate():
             return
         if not self._authz_gate():
@@ -2104,6 +2106,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(403, _error_payload(ERR_FORBIDDEN, "需要超级管理员权限"))
             return None
         return account
+
+    def _reset_audit_state(self):
+        """逐请求复位审计实例状态,防 keep-alive(HTTP/1.1)下同一 handler 实例
+        跨请求把上一请求的 target/detail/status 串到未设置的下一请求。"""
+        self._audit_status = None
+        self._audit_target = None
+        self._audit_detail = None
 
     def _audit_request(self, target=None, detail=None):
         """中央审计:map_action 命中的写请求落一条。绝不抛(失败仅记日志)。"""

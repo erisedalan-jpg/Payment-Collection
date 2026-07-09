@@ -54,13 +54,17 @@ function onPageChange(p: number) {
 }
 
 async function onExport() {
-  applyDateRange()
-  const res = await fetchAudit(filters.value, 1, 10000)
-  if (!res.rows.length) {
-    ElMessage.info('无可导出的记录')
-    return
+  try {
+    applyDateRange()
+    const res = await fetchAudit(filters.value, 1, 10000)
+    if (!res.rows.length) {
+      ElMessage.info('无可导出的记录')
+      return
+    }
+    exportRows('审计日志.xlsx', buildExportRows(res.rows))
+  } catch (e) {
+    ElMessage.error((e as Error).message)
   }
-  exportRows('审计日志.xlsx', buildExportRows(res.rows))
 }
 
 onMounted(load)
