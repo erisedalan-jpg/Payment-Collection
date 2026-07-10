@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { usePagedRows } from '@/lib/usePagedRows'
 import { useExternalSort } from '@/lib/useExternalSort'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
@@ -71,7 +72,7 @@ const filtered = computed(() => {
 })
 
 // 表头排序（custom，跨页排全集）
-const { sortState, onSortChange, sorted } = useExternalSort(filtered, NUMERIC_KEYS)
+const { sortState, onSortChange, sorted, defaultSort } = useExternalSort(filtered, NUMERIC_KEYS, userScopedKey(TABLE_ID))
 
 const { paged, currentPage, pageSize } = usePagedRows(sorted, 50)
 
@@ -101,7 +102,7 @@ function onExport() {
     </div>
     <div class="pv-scroll">
       <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable external-sort
-        @row-click="onRow" @sort-change="onSortChange">
+        @row-click="onRow" @sort-change="onSortChange" :default-sort="defaultSort">
         <template v-for="col in COLS" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="pv-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>
         </template>
