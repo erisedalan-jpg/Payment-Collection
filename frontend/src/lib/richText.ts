@@ -27,7 +27,7 @@ function serializeNode(node: Node): string {
   if (node.nodeType === 3) return escapeText(node.nodeValue || '')  // 文本
   if (node.nodeType !== 1) return ''                                // 注释等一律丢
   const el = node as Element
-  const tag = el.tagName
+  const tag = el.tagName.toUpperCase()  // SVG/MathML 命名空间标签 tagName 保留原始大小写(如 svg script)→ 归一后才能命中大写集合
   if (DROP_WITH_CONTENT.has(tag)) return ''
   if (!TAG_WHITELIST.has(tag)) return serializeChildren(el)         // 未白名单:拆解,保留净化后子内容
   if (tag === 'BR') return '<br>'
