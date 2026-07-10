@@ -4,7 +4,7 @@ let activeCell: { tryClose: () => boolean; contains: (n: Node) => boolean } | nu
 </script>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount, onDeactivated } from 'vue'
 import { ElMessage } from 'element-plus'
 import { sanitizeRichText } from '@/lib/richText'
 
@@ -34,6 +34,10 @@ const rootEl = ref<HTMLElement | null>(null)
 
 const renderedHtml = computed(() => sanitizeRichText(props.content))
 
+// el-table 无 row-key 时分页/排序/筛选后按索引复用行,props.saveHandler(内联箭头绑当时的行)可能在
+// 编辑器开着时被重绑到新行的 handler；进入编辑时快照,commit 用快照,避免存到错行。
+let boundSave: ((html: string) => Promise<void> | void) | null = null
+
 const self = {
   tryClose(): boolean {
     if (dirty.value) { flash.value = true; setTimeout(() => { flash.value = false }, 400); return false }
@@ -50,6 +54,7 @@ function startEdit() {
   if (!props.editable) return
   if (activeCell && activeCell !== self && !activeCell.tryClose()) return  // 别处有脏编辑器拒绝关闭 → 不切换
   activeCell = self
+  boundSave = props.saveHandler
   editing.value = true
   dirty.value = false
   document.addEventListener('mousedown', onDocMousedown, true)
@@ -67,6 +72,7 @@ function startEdit() {
 function stopEdit() {
   editing.value = false
   dirty.value = false
+  boundSave = null
   if (activeCell === self) activeCell = null
   document.removeEventListener('mousedown', onDocMousedown, true)
 }
@@ -75,9 +81,10 @@ function cancel() { stopEdit() }
 
 async function commit() {
   const html = sanitizeRichText(editorEl.value ? editorEl.value.innerHTML : '')
+  const save = boundSave ?? props.saveHandler
   saving.value = true
   try {
-    await props.saveHandler(html)
+    await save(html)
     stopEdit()
   } catch (e) {
     ElMessage.error('保存失败: ' + ((e as Error)?.message ?? ''))
@@ -102,6 +109,9 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onBeforeUnmount(() => { if (activeCell === self) activeCell = null; document.removeEventListener('mousedown', onDocMousedown, true) })
+// keep-alive 页面停用(deactivated)不会走 onBeforeUnmount:若停用时正在编辑,须主动 stopEdit()
+// 清单例/监听,否则 activeCell 悬挂,切到另一 keep-alive 页点格编辑会被拒(flash 打在离屏组件上)。
+onDeactivated(() => { if (editing.value) stopEdit() })
 
 defineExpose({ editing, dirty, startEdit, cancel, commit, tryClose: self.tryClose })
 </script>

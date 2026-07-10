@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { defineComponent, h, KeepAlive, ref as vueRef } from 'vue'
 import ElementPlus from 'element-plus'
 import RichTextCell from './RichTextCell.vue'
 
@@ -87,6 +88,60 @@ describe('RichTextCell 编辑态', () => {
     await w.find('.rtc-empty').trigger('click')
     await w.find('.rtc-save').trigger('click')
     await flushPromises()
+    expect(w.find('.rtc-editor').exists()).toBe(true)
+  })
+  it('保存用进入编辑时快照的 saveHandler(行复用 prop 重绑不串行)', async () => {
+    const A = vi.fn().mockResolvedValue(undefined)
+    const B = vi.fn().mockResolvedValue(undefined)
+    const w = mountCell({ content: '', editable: true, saveHandler: A })
+    await w.find('.rtc-empty').trigger('click')
+    ;(w.find('[contenteditable]').element as HTMLElement).innerHTML = '<b>x</b>'
+    await w.setProps({ saveHandler: B })   // 模拟 el-table 行复用后 saveHandler 重绑到别的行
+    await w.find('.rtc-save').trigger('click')
+    await flushPromises()
+    expect(A).toHaveBeenCalledWith('<b>x</b>')
+    expect(B).not.toHaveBeenCalled()
+  })
+})
+
+describe('RichTextCell keep-alive 停用释放单例', () => {
+  it('停用页面的脏编辑器不挡另一 keep-alive 页进入编辑', async () => {
+    const PageA = defineComponent({
+      props: { saveHandler: { type: Function, required: true } },
+      setup(props) {
+        return () => h(RichTextCell as any, { content: '', editable: true, saveHandler: props.saveHandler })
+      },
+    })
+    const PageB = defineComponent({
+      props: { saveHandler: { type: Function, required: true } },
+      setup(props) {
+        return () => h(RichTextCell as any, { content: '', editable: true, saveHandler: props.saveHandler })
+      },
+    })
+    const active = vueRef<'A' | 'B'>('A')
+    const saveA = vi.fn()
+    const saveB = vi.fn()
+    const Wrapper = defineComponent({
+      setup() {
+        return () => h(KeepAlive, null, {
+          default: () => (active.value === 'A'
+            ? h(PageA, { key: 'A', saveHandler: saveA })
+            : h(PageB, { key: 'B', saveHandler: saveB })),
+        })
+      },
+    })
+    const w = mount(Wrapper, { global: { plugins: [ElementPlus] } })
+    mountedWrappers.push(w as unknown as ReturnType<typeof mount>)
+
+    await w.find('.rtc-empty').trigger('click')
+    ;(w.find('[contenteditable]').element as HTMLElement).innerHTML = '<b>dirty</b>'
+    await w.find('[contenteditable]').trigger('input')  // dirty = true, 不保存不取消
+
+    active.value = 'B'
+    await flushPromises()
+
+    // PageA 已停用(deactivated 非卸载),但组件应主动 stopEdit() 释放模块单例。
+    await w.find('.rtc-empty').trigger('click')
     expect(w.find('.rtc-editor').exists()).toBe(true)
   })
 })

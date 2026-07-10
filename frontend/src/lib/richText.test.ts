@@ -37,6 +37,9 @@ describe('sanitizeRichText 白名单', () => {
     expect(sanitizeRichText('A & B')).toBe('A &amp; B')
     expect(sanitizeRichText('纯文本')).toBe('纯文本')
   })
+  it('SVG 命名空间 script 也被丢弃(命名空间大小写归一)', () => {
+    expect(sanitizeRichText('<svg><script>alert(1)</script></svg>')).toBe('')
+  })
 })
 
 describe('htmlToPlainText 去标签', () => {
