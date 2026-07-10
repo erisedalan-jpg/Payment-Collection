@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOpportunitiesStore } from '@/stores/opportunities'
 import { useOpportunityFollowupStore } from '@/stores/opportunityFollowup'
@@ -15,10 +15,11 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import SegToggle from '@/components/SegToggle.vue'
-import ProgressEditModal from '@/components/ProgressEditModal.vue'
+import RichTextCell from '@/components/RichTextCell.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
+import { htmlToPlainText } from '@/lib/richText'
 
 const TABLE_ID = 'opportunity-followup'
 const auth = useAuthStore()
@@ -48,8 +49,8 @@ function oppToDataColumn(c: OppColumn): DataColumn {
   return { ...base, formatter: (v) => (v === '' || v == null ? '-' : String(v)) }
 }
 const FOLLOWUP_COLUMNS: DataColumn[] = [
-  { key: 'weekProgress', label: '本周工作进展', width: 240, wrap: true, formatter: (v, r) => (v ? `${r.weekProgressEditTime}：${v}` : '') },
-  { key: 'nextPlan', label: '后续工作计划', width: 240, wrap: true, formatter: (v, r) => (v ? `${r.nextPlanEditTime}：${v}` : '') },
+  { key: 'weekProgress', label: '本周工作进展', width: 240, wrap: true, formatter: (v, r) => (v ? `${r.weekProgressEditTime}：${htmlToPlainText(String(v))}` : '') },
+  { key: 'nextPlan', label: '后续工作计划', width: 240, wrap: true, formatter: (v, r) => (v ? `${r.nextPlanEditTime}：${htmlToPlainText(String(v))}` : '') },
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
 ]
@@ -67,21 +68,9 @@ function onToggle(key: string) {
   prefs.toggle(key)
 }
 
-function progCell(row: OppFollowupRow, field: 'weekProgress' | 'nextPlan'): string {
+function editPrefix(row: OppFollowupRow, field: 'weekProgress' | 'nextPlan'): string {
   const t = field === 'weekProgress' ? row.weekProgressEditTime : row.nextPlanEditTime
-  const c = row[field]
-  if (!c) return fp.isCurrent.value ? '点击填写' : '-'
-  return `${t}：${c}`
-}
-
-// 进展编辑(走 oppFollowup store;projectId 位置传 oppId)
-const editOpen = ref(false)
-const editCtx = reactive({ projectId: '', projectName: '', field: 'weekProgress' as 'weekProgress' | 'nextPlan', initial: '' })
-function openEdit(row: OppFollowupRow, field: 'weekProgress' | 'nextPlan') {
-  if (!fp.isCurrent.value) return
-  editCtx.projectId = row.id; editCtx.projectName = String(row.name ?? row.id)
-  editCtx.field = field; editCtx.initial = row[field] ?? ''
-  editOpen.value = true
+  return t ? `${t}：` : ''
 }
 
 const scopeOpen = ref(false)
@@ -115,7 +104,6 @@ function doExport() {
 }
 
 defineExpose({
-  editOpen, editCtx,
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
@@ -155,12 +143,20 @@ defineExpose({
           </span>
         </template>
         <template #cell-weekProgress="{ row }">
-          <span class="kp-prog-cell" :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as OppFollowupRow, 'weekProgress')">{{ progCell(row as OppFollowupRow, 'weekProgress') }}</span>
+          <RichTextCell
+            :content="(row as OppFollowupRow).weekProgress ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as OppFollowupRow, 'weekProgress')"
+            :save-handler="(html: string) => oppf.update((row as OppFollowupRow).id, 'weekProgress', html)"
+          />
         </template>
         <template #cell-nextPlan="{ row }">
-          <span class="kp-prog-cell" :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as OppFollowupRow, 'nextPlan')">{{ progCell(row as OppFollowupRow, 'nextPlan') }}</span>
+          <RichTextCell
+            :content="(row as OppFollowupRow).nextPlan ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as OppFollowupRow, 'nextPlan')"
+            :save-handler="(html: string) => oppf.update((row as OppFollowupRow).id, 'nextPlan', html)"
+          />
         </template>
       </DataTable>
     </div>
@@ -171,9 +167,6 @@ defineExpose({
         :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
-
-    <ProgressEditModal v-model="editOpen" store="oppFollowup"
-      :project-id="editCtx.projectId" :project-name="editCtx.projectName" :field="editCtx.field" :initial="editCtx.initial" />
 
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="oppf.scope"
       :catalog="OPP_SCOPE_CATALOG" :single-table="true" :match-fn="opportunityMatches"

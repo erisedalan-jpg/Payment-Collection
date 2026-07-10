@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
@@ -17,13 +17,14 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import SegToggle from '@/components/SegToggle.vue'
-import ProgressEditModal from '@/components/ProgressEditModal.vue'
+import RichTextCell from '@/components/RichTextCell.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
+import { htmlToPlainText } from '@/lib/richText'
 
 defineOptions({ name: 'PaymentKeyFollowupView' })
 useViewScrollMemory()
@@ -77,8 +78,8 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'top1000', label: 'TOP1000', width: 90 },
   { key: 'quadrant', label: '象限', width: 140 },
   // —— 跟进列 ——
-  { key: 'followAction', label: '跟进动作', width: 240, wrap: true },
-  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true },
+  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170 },
 ])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
@@ -95,23 +96,11 @@ function onToggle(key: string) {
   prefs.toggle(key)
 }
 
-function progCell(row: PaymentKeyRow, field: 'followAction' | 'revConclusion'): string {
+function editPrefix(row: PaymentKeyRow, field: 'followAction' | 'revConclusion'): string {
   const t = field === 'followAction' ? row.followActionEditTime : row.revConclusionEditTime
-  const c = row[field]
-  if (!c) return fp.isCurrent.value ? '点击填写' : '-'
-  return `${t}：${c}`
+  return t ? `${t}：` : ''
 }
 function onRow(row: Record<string, any>) { router.push('/project/' + row.projectId) }
-
-// 进展编辑(走 paymentKey store)
-const editOpen = ref(false)
-const editCtx = reactive({ projectId: '', projectName: '', field: 'followAction' as 'followAction' | 'revConclusion', initial: '' })
-function openEdit(row: PaymentKeyRow, field: 'followAction' | 'revConclusion') {
-  if (!fp.isCurrent.value) return
-  editCtx.projectId = row.projectId; editCtx.projectName = row.projectName
-  editCtx.field = field; editCtx.initial = row[field] ?? ''
-  editOpen.value = true
-}
 
 // 下次rev时间(内联日期编辑)
 async function onDateChange(row: PaymentKeyRow, val: string | null) {
@@ -153,7 +142,6 @@ function doExport() {
 }
 
 defineExpose({
-  editOpen, editCtx,
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
@@ -193,12 +181,20 @@ defineExpose({
           </span>
         </template>
         <template #cell-followAction="{ row }">
-          <span class="kp-prog-cell" :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as PaymentKeyRow, 'followAction')">{{ progCell(row as PaymentKeyRow, 'followAction') }}</span>
+          <RichTextCell
+            :content="(row as PaymentKeyRow).followAction ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as PaymentKeyRow, 'followAction')"
+            :save-handler="(html: string) => pk.update((row as PaymentKeyRow).projectId, 'followAction', html)"
+          />
         </template>
         <template #cell-revConclusion="{ row }">
-          <span class="kp-prog-cell" :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as PaymentKeyRow, 'revConclusion')">{{ progCell(row as PaymentKeyRow, 'revConclusion') }}</span>
+          <RichTextCell
+            :content="(row as PaymentKeyRow).revConclusion ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as PaymentKeyRow, 'revConclusion')"
+            :save-handler="(html: string) => pk.update((row as PaymentKeyRow).projectId, 'revConclusion', html)"
+          />
         </template>
         <template #cell-nextRevDate="{ row }">
           <el-date-picker v-if="fp.isCurrent.value" :model-value="(row as PaymentKeyRow).nextRevDate || ''" type="date"
@@ -216,9 +212,6 @@ defineExpose({
         :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
-
-    <ProgressEditModal v-model="editOpen" store="paymentKey"
-      :project-id="editCtx.projectId" :project-name="editCtx.projectName" :field="editCtx.field" :initial="editCtx.initial" />
 
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="scopeInputs" :initial="pk.scope"
       title="范围设置（回款重点跟进）" @save="(s) => pk.saveScope(s)" />

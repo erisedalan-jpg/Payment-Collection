@@ -130,16 +130,16 @@ describe('RiskFollowupView', () => {
     const bodyRows = w.findAll('tbody tr')
     expect(bodyRows.length).toBeLessThanOrEqual(50)
   }, 20000) // 渲染满页(55行)重表,并行争用下放宽超时
-  it('rev结论/下次rev时间两列头渲染 ColumnFilter', async () => {
+  it('下次rev时间列头渲染 ColumnFilter；rev结论列富文本化后不再可筛选(V2.8.2)', async () => {
     seed()
     const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const vm = w.vm as any
-    expect(vm.FILTERABLE.has('revConclusion')).toBe(true)
+    expect(vm.FILTERABLE.has('revConclusion')).toBe(false)   // V2.8.2:富文本化后移除筛选
     expect(vm.FILTERABLE.has('nextRevDate')).toBe(true)
     const filters = w.findAllComponents(ColumnFilter)
     const filteredKeys = filters.map((f) => f.props('colKey'))
-    expect(filteredKeys).toContain('revConclusion')
+    expect(filteredKeys).not.toContain('revConclusion')
     expect(filteredKeys).toContain('nextRevDate')
   })
 })
