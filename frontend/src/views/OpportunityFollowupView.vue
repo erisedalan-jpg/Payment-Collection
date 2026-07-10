@@ -9,6 +9,8 @@ import { OPP_SCOPE_CATALOG, opportunityMatches } from '@/lib/opportunityScope'
 import { buildOppFollowupRows, type OppFollowupRow } from '@/lib/opportunityFollowup'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -59,7 +61,7 @@ const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['name', 'customer', 'top1000', 'amountWan', 'opportunityLevel', 'status', 'frOwner',
   'weekProgress', 'nextPlan', 'followDate', 'followBy']
 const FILTERABLE = new Set<string>([...OPP_FILTERABLE, 'followBy', 'followDate'])
-const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
@@ -67,6 +69,7 @@ function onToggle(key: string) {
   if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
   prefs.toggle(key)
 }
+const psort = usePersistentSort(userScopedKey(TABLE_ID))
 
 function editPrefix(row: OppFollowupRow, field: 'weekProgress' | 'nextPlan'): string {
   const t = field === 'weekProgress' ? row.weekProgressEditTime : row.nextPlanEditTime
@@ -135,7 +138,7 @@ defineExpose({
       {{ auth.isSuper ? '请点击「范围设置」定义重点商机跟进范围（默认：TOP1000 且 提前介入 且 重点商机 且 状态非赢单）。' : '暂无重点商机跟进。' }}
     </div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}

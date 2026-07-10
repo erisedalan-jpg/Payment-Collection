@@ -28,6 +28,8 @@ const props = withDefaults(
     /** opt-in 表底汇总行(el-table 原生 show-summary，恒在表底、不随排序移动)；默认关，不影响既有调用方 */
     showSummary?: boolean
     summaryMethod?: (ctx: { columns: { property: string }[]; data: Record<string, any>[] }) => string[]
+    /** 初始排序(透传 el-table :default-sort);用于持久化恢复表头排序箭头。 */
+    defaultSort?: { prop: string; order: 'ascending' | 'descending' } | null
   }>(),
   { showCount: true, clickable: false, externalSort: false, showSummary: false },
 )
@@ -57,6 +59,7 @@ function onSortChange(e: { prop: string | null; order: string | null }) {
       @sort-change="onSortChange"
       :show-summary="props.showSummary"
       :summary-method="props.summaryMethod"
+      :default-sort="props.defaultSort ?? undefined"
     >
       <el-table-column
         v-for="col in props.columns"
