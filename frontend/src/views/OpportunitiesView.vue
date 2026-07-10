@@ -6,6 +6,7 @@ import { useOpportunitiesStore } from '@/stores/opportunities'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { OPP_COLUMNS, DEFAULT_VISIBLE, FILTERABLE, recentUpdateOf } from '@/lib/opportunityColumns'
 import type { OppColumn } from '@/lib/opportunityColumns'
 import { exportRows } from '@/lib/exportXlsx'
@@ -34,7 +35,7 @@ const editRow = ref<OppRow | null>(null)
 const editMode = ref<'create' | 'edit'>('edit')
 
 // 选列
-const prefs = useColumnPrefs(TABLE_ID, OPP_COLUMNS.map((c) => c.key), DEFAULT_VISIBLE)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), OPP_COLUMNS.map((c) => c.key), DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value
     .map((k) => OPP_COLUMNS.find((c) => c.key === k))

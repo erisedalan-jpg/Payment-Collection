@@ -9,6 +9,7 @@ import { OPP_SCOPE_CATALOG, opportunityMatches } from '@/lib/opportunityScope'
 import { buildOppFollowupRows, type OppFollowupRow } from '@/lib/opportunityFollowup'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -59,7 +60,7 @@ const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['name', 'customer', 'top1000', 'amountWan', 'opportunityLevel', 'status', 'frOwner',
   'weekProgress', 'nextPlan', 'followDate', 'followBy']
 const FILTERABLE = new Set<string>([...OPP_FILTERABLE, 'followBy', 'followDate'])
-const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))

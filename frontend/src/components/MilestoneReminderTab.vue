@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { MilestoneProject } from '@/lib/milestoneAnalytics'
 import { buildReminderRows, reminderRange, reminderStat, type ReminderPreset, type ReminderRow } from '@/lib/milestoneDetailRows'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { exportRows } from '@/lib/exportXlsx'
@@ -58,7 +59,7 @@ const ALL_COLUMNS: DataColumn[] = [
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['projectId', 'projectName', 'contract', 'manager', 'orgL4', 'node', 'planDate', 'actualDate', 'done', 'priorityLabel']
-const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 

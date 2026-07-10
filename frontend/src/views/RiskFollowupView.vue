@@ -9,6 +9,7 @@ import { buildRiskRows, riskRowMatches, RISK_SCOPE_CATALOG, type RiskRow } from 
 import { RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefsDynamic } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { useFollowupPage } from '@/composables/useFollowupPage'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
@@ -87,7 +88,7 @@ const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
 const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户', 'nextRevDate'])
-const prefs = useColumnPrefsDynamic(TABLE_ID, allKeys, DEFAULT_VISIBLE)
+const prefs = useColumnPrefsDynamic(userScopedKey(TABLE_ID), allKeys, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = computed(() => ALL_COLUMNS.value.map((c) => ({ key: c.key, label: c.label })))

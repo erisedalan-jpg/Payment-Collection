@@ -8,6 +8,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, type ProjectFilters, type ProjectRow } from '@/lib/projectList'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
@@ -71,7 +72,7 @@ const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
 const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit'])
 
-const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
