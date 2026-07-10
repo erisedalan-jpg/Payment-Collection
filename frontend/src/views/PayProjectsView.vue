@@ -90,7 +90,7 @@ const filtered = computed(() => {
 })
 
 // 表头排序（custom，跨页排全集）
-const { sortState, onSortChange, sorted } = useExternalSort(filtered, NUMERIC_KEYS)
+const { sortState, onSortChange, sorted, defaultSort } = useExternalSort(filtered, NUMERIC_KEYS, userScopedKey(TABLE_ID))
 
 const { paged, currentPage, pageSize } = usePagedRows(sorted, 50)
 
@@ -119,7 +119,7 @@ function onExport() {
     </div>
     <div class="pov-scroll">
       <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable external-sort
-        @row-click="onRow" @sort-change="onSortChange">
+        @row-click="onRow" @sort-change="onSortChange" :default-sort="defaultSort">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="pov-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>
         </template>
