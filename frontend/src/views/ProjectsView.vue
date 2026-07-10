@@ -8,6 +8,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, type ProjectFilters, type ProjectRow } from '@/lib/projectList'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -78,6 +79,7 @@ const visibleColumns = computed(() =>
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 
 const onToggle = prefs.makeToggle(cf, TABLE_ID)
+const psort = usePersistentSort(userScopedKey(TABLE_ID))
 
 // KPI 深链 → 列枚举写 crossFilter(并确保列可见) / 特殊项写本地态
 function qval(v: unknown): string | null {
@@ -166,7 +168,7 @@ defineExpose({ ALL_COLUMNS })
 
     <div v-if="!rows.length" class="pv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
     <div v-else class="pv-scroll">
-      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="pv-th">{{ c.label }}<el-tooltip v-if="c.key === 'health'" placement="top">
               <template #content>四维异常——进度:里程碑进度状态含滞后/延期/超期;风险:最高等级高且未关闭&gt;0;成本:超支或消耗比&gt;100%;回款:存在延期回款节点。<br />总评:0 项=健康 / 1 项=关注 / ≥2 项=风险;PMIS 未匹配=无数据。</template>

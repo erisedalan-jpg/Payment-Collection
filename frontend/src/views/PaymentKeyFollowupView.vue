@@ -11,6 +11,7 @@ import { buildScopeInputs } from '@/lib/tempFollowup'
 import { projectMatches } from '@/lib/tempScope'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
@@ -96,6 +97,7 @@ function onToggle(key: string) {
   if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
   prefs.toggle(key)
 }
+const psort = usePersistentSort(userScopedKey(TABLE_ID))
 
 function editPrefix(row: PaymentKeyRow, field: 'followAction' | 'revConclusion'): string {
   const t = field === 'followAction' ? row.followActionEditTime : row.revConclusionEditTime
@@ -174,7 +176,7 @@ defineExpose({
       {{ auth.isSuper ? '请点击「范围设置」定义回款重点跟进范围。' : '暂无回款重点跟进项目。' }}
     </div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
