@@ -51,8 +51,8 @@ function oppToDataColumn(c: OppColumn): DataColumn {
   return { ...base, formatter: (v) => (v === '' || v == null ? '-' : String(v)) }
 }
 const FOLLOWUP_COLUMNS: DataColumn[] = [
-  { key: 'weekProgress', label: '本周工作进展', width: 240, wrap: true, formatter: (v, r) => (v ? `${r.weekProgressEditTime}：${htmlToPlainText(String(v))}` : '') },
-  { key: 'nextPlan', label: '后续工作计划', width: 240, wrap: true, formatter: (v, r) => (v ? `${r.nextPlanEditTime}：${htmlToPlainText(String(v))}` : '') },
+  { key: 'weekProgress', label: '本周工作进展', width: 480, wrap: true, formatter: (v, r) => (v ? `${r.weekProgressEditTime}：${htmlToPlainText(String(v))}` : '') },
+  { key: 'nextPlan', label: '后续工作计划', width: 480, wrap: true, formatter: (v, r) => (v ? `${r.nextPlanEditTime}：${htmlToPlainText(String(v))}` : '') },
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
 ]
