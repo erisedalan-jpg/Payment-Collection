@@ -228,3 +228,62 @@ def read(filters, page, page_size):
     page_size = max(1, int(page_size or 50))
     start = (page - 1) * page_size
     return {'rows': rows[start:start + page_size], 'total': total, 'facets': facets}
+
+
+# ── target/detail 富化辅助(纯函数,供 server 各 handler 拼审计详情;不依赖 server) ──
+
+_FIELD_LABELS = {
+    'weekProgress': '本周进展', 'nextPlan': '下步计划',
+    'followAction': '跟进动作', 'revConclusion': '回顾结论', 'nextRevDate': '下次回顾日期',
+}
+
+
+def field_label(key):
+    """字段键 → 中文标签;未知键(通常本就是中文键)原样返回。"""
+    return _FIELD_LABELS.get(key, str(key))
+
+
+def _show(v):
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)  # 整数值的 float(如商机金额字段落盘后 100.0)显示去掉多余 .0
+    return str(v) if v not in (None, '') else '(空)'
+
+
+def diff_changes(old, changed, labels=None, long_threshold=20):
+    """对 changed 中值发生变化的键拼审计详情:短值记『标签 旧→新』,
+    长值(任一侧字符串长度 > long_threshold)只标『标签（已改）』,无变化返回 ''。
+    old/changed 为 dict;labels 提供键→中文覆盖,缺省用 field_label。"""
+    labels = labels or {}
+    parts = []
+    for k, nv in (changed or {}).items():
+        ov = (old or {}).get(k)
+        if nv == ov:
+            continue
+        label = labels.get(k) or field_label(k)
+        s_ov, s_nv = _show(ov), _show(nv)
+        if len(s_ov) > long_threshold or len(s_nv) > long_threshold:
+            parts.append('%s（已改）' % label)
+        else:
+            parts.append('%s %s→%s' % (label, s_ov, s_nv))
+    return '；'.join(parts)
+
+
+def summarize_scope(scope):
+    """范围 {combinator, groups} → 'AND · 3 组条件';空/无组/畸形返回 '清空范围'。"""
+    if not isinstance(scope, dict):
+        return '清空范围'
+    groups = scope.get('groups') or []
+    if not groups:
+        return '清空范围'
+    comb = str(scope.get('combinator') or 'AND').upper()
+    return '%s · %d 组条件' % (comb, len(groups))
+
+
+def count_delta(old, new):
+    """计数变化:相等返回 'N',不等返回 '旧→新'。"""
+    return str(new) if old == new else '%d→%d' % (old, new)
+
+
+def join_detail(parts):
+    """过滤空片段,用 ' · ' 拼接。"""
+    return ' · '.join(p for p in parts if p)
