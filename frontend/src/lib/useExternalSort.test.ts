@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { ref, computed } from 'vue'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { ref, computed, nextTick } from 'vue'
 import { useExternalSort } from './useExternalSort'
+import { loadSort } from './sortPrefs'
 
 describe('useExternalSort', () => {
+  beforeEach(() => localStorage.clear())
+
   const NUMERIC_KEYS = new Set(['amount'])
 
   it('无排序时返回原序(引用同一 rows)', () => {
@@ -62,5 +65,37 @@ describe('useExternalSort', () => {
     const { onSortChange, sorted } = useExternalSort(computed(() => rows.value), NUMERIC_KEYS)
     onSortChange({ prop: 'amount', order: 'ascending' })
     expect(sorted.value.map((r) => r.id)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('传 viewKey:从 localStorage 恢复初值并生效', () => {
+    localStorage.setItem('colsort:v1', JSON.stringify({ prop: 'amount', order: 'desc' }))
+    const rows = ref([{ id: 'a', amount: 3 }, { id: 'b', amount: 1 }, { id: 'c', amount: 20 }])
+    const { sortState, sorted } = useExternalSort(computed(() => rows.value), NUMERIC_KEYS, 'v1')
+    expect(sortState.value).toEqual({ prop: 'amount', order: 'desc' })
+    expect(sorted.value.map((r) => r.id)).toEqual(['c', 'a', 'b'])
+  })
+  it('传 viewKey:onSortChange 后落库', async () => {
+    const rows = ref([{ id: 'a', amount: 1 }])
+    const { onSortChange } = useExternalSort(computed(() => rows.value), NUMERIC_KEYS, 'v2')
+    onSortChange({ prop: 'amount', order: 'ascending' })
+    await nextTick()
+    expect(JSON.parse(localStorage.getItem('colsort:v2')!)).toEqual({ prop: 'amount', order: 'asc' })
+  })
+  it('传 viewKey:sortState 置空后清空存储(视图 reset 路径)', async () => {
+    const rows = ref([{ id: 'a', amount: 1 }])
+    const { sortState } = useExternalSort(computed(() => rows.value), NUMERIC_KEYS, 'v3')
+    sortState.value = { prop: 'amount', order: 'asc' }
+    await nextTick()
+    expect(loadSort('v3')).toEqual({ prop: 'amount', order: 'asc' })
+    sortState.value = { prop: '', order: '' }
+    await nextTick()
+    expect(loadSort('v3')).toEqual({ prop: '', order: '' })
+  })
+  it('defaultSort 反映当前 sortState;不传 viewKey 也可用', () => {
+    const rows = ref([{ id: 'a', amount: 1 }])
+    const { onSortChange, defaultSort } = useExternalSort(computed(() => rows.value), NUMERIC_KEYS, 'v4')
+    expect(defaultSort.value).toBeUndefined()
+    onSortChange({ prop: 'amount', order: 'ascending' })
+    expect(defaultSort.value).toEqual({ prop: 'amount', order: 'ascending' })
   })
 })
