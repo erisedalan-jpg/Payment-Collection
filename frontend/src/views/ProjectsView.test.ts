@@ -8,6 +8,7 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import * as followupApiModule from '@/lib/followupApi'
+import { userScopedKey } from '@/lib/userScopedKey'
 
 let router: Router
 beforeEach(() => {
@@ -270,7 +271,7 @@ describe('ProjectsView', () => {
     expect(def.some((t) => t.includes('TOP1000'))).toBe(false)
     expect(def.some((t) => t.includes('象限'))).toBe(false)
     // 启用后两列出现 → 证明它们确实存在于 ALL_COLUMNS(否则永远无法渲染)
-    localStorage.setItem('colprefs:projects-active',
+    localStorage.setItem(`colprefs:${userScopedKey('projects-active')}`,
       JSON.stringify(['projectName', 'top1000', 'quadrant', 'action']))
     const w2 = mountView()
     await flushPromises()
@@ -282,7 +283,7 @@ describe('ProjectsView', () => {
 
   it('启用后 TOP1000/象限 列渲染且带筛选器(可筛)', async () => {
     seed()
-    localStorage.setItem('colprefs:projects-active',
+    localStorage.setItem(`colprefs:${userScopedKey('projects-active')}`,
       JSON.stringify(['projectName', 'top1000', 'quadrant', 'action']))
     const w = mountView()
     await flushPromises()

@@ -23,6 +23,7 @@ import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 
@@ -99,7 +100,7 @@ const L4_COLS: DataColumn[] = [
 ]
 
 const L4_TABLE_ID = 'cost-l4-summary'
-const l4Prefs = useColumnPrefs(L4_TABLE_ID, L4_COLS.map((c) => c.key), L4_COLS.map((c) => c.key))
+const l4Prefs = useColumnPrefs(userScopedKey(L4_TABLE_ID), L4_COLS.map((c) => c.key), L4_COLS.map((c) => c.key))
 const l4VisibleColumns = computed(() =>
   l4Prefs.visibleKeys.value.map((k) => L4_COLS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const l4PickerColumns = L4_COLS.map((c) => ({ key: c.key, label: c.label }))

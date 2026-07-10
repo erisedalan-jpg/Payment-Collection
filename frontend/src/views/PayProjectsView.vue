@@ -15,6 +15,7 @@ import { projectPaymentRows, filterProjects, rateColorPmis } from '@/lib/payment
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { tagMatch } from '@/lib/tagFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { usePagedRows } from '@/lib/usePagedRows'
 import { useExternalSort } from '@/lib/useExternalSort'
 import { exportRows } from '@/lib/exportXlsx'
@@ -72,7 +73,7 @@ const FILTERABLE = new Set(['projectManager', 'dept', 'projectLevel'])
 // 数值列排序按数值，其余按中文 localeCompare
 const NUMERIC_KEYS = new Set(['contract', 'actualTotal', 'paymentRatio', 'expectedTotal', 'nodeCount', 'reachedCount', 'delayedCount'])
 
-const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, ALL_KEYS)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, ALL_KEYS)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => COLS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = COLS.map((c) => ({ key: c.key, label: c.label }))

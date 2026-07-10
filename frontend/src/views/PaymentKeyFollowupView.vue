@@ -11,6 +11,7 @@ import { buildScopeInputs } from '@/lib/tempFollowup'
 import { projectMatches } from '@/lib/tempScope'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -87,7 +88,7 @@ const DEFAULT_VISIBLE = ['projectId', 'projectName', 'projectManager', 'orgL4', 
   'followAction', 'revConclusion', 'nextRevDate']
 const FILTERABLE = new Set(['projectManager', 'orgL4', 'projectLevel', 'paymentStatus', 'riskLevel', 'stage',
   'projectType', 'projectStatus', 'health', 'top1000', 'quadrant'])
-const prefs = useColumnPrefs(TABLE_ID, ALL_KEYS, DEFAULT_VISIBLE)
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
