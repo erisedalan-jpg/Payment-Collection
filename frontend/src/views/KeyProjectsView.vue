@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
@@ -15,12 +15,13 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import SegToggle from '@/components/SegToggle.vue'
-import ProgressEditModal from '@/components/ProgressEditModal.vue'
+import RichTextCell from '@/components/RichTextCell.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
+import { htmlToPlainText } from '@/lib/richText'
 
 defineOptions({ name: 'KeyProjectsView' })
 useViewScrollMemory()
@@ -81,32 +82,13 @@ function onToggle(key: string) {
   prefs.toggle(key)
 }
 
-function progCell(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan'): string {
+function editPrefix(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan'): string {
   const t = field === 'weekProgress' ? row.weekProgressEditTime : row.nextPlanEditTime
-  const c = row[field]
-  if (!c) return fp.isCurrent.value ? '点击填写' : '-'
-  return `${t}：${c}`
+  return t ? `${t}：` : ''
 }
 
 function onRow(row: Record<string, any>) {
   router.push('/project/' + row.projectId)
-}
-
-// 编辑
-const editOpen = ref(false)
-const editCtx = reactive({
-  projectId: '',
-  projectName: '',
-  field: 'weekProgress' as 'weekProgress' | 'nextPlan',
-  initial: '',
-})
-function openEdit(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan') {
-  if (!fp.isCurrent.value) return
-  editCtx.projectId = row.projectId
-  editCtx.projectName = row.projectName
-  editCtx.field = field
-  editCtx.initial = row[field] ?? ''
-  editOpen.value = true
 }
 
 // 更新归档(超管)
@@ -149,8 +131,8 @@ function exportRow(r: KeyProjectRow): Record<string, unknown> {
     L4组织: r.orgL4,
     '合同金额(万)': r.contractWan,
     风险: r.openRisks ? `${r.riskLevel}(${r.openRisks})` : r.riskLevel,
-    本周工作进展: r.weekProgress ? `${r.weekProgressEditTime}：${r.weekProgress}` : '',
-    后续工作计划: r.nextPlan ? `${r.nextPlanEditTime}：${r.nextPlan}` : '',
+    本周工作进展: r.weekProgress ? `${r.weekProgressEditTime}：${htmlToPlainText(r.weekProgress)}` : '',
+    后续工作计划: r.nextPlan ? `${r.nextPlanEditTime}：${htmlToPlainText(r.nextPlan)}` : '',
     跟进日期: r.followDate,
     跟进人: r.followBy,
   }
@@ -158,7 +140,6 @@ function exportRow(r: KeyProjectRow): Record<string, unknown> {
 
 // 暴露供测试
 defineExpose({
-  editOpen, editCtx,
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
 })
@@ -204,18 +185,20 @@ defineExpose({
           </span>
         </template>
         <template #cell-weekProgress="{ row }">
-          <span
-            class="kp-prog-cell"
-            :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as KeyProjectRow, 'weekProgress')"
-          >{{ progCell(row as KeyProjectRow, 'weekProgress') }}</span>
+          <RichTextCell
+            :content="(row as KeyProjectRow).weekProgress ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as KeyProjectRow, 'weekProgress')"
+            :save-handler="(html: string) => progress.update((row as KeyProjectRow).projectId, 'weekProgress', html)"
+          />
         </template>
         <template #cell-nextPlan="{ row }">
-          <span
-            class="kp-prog-cell"
-            :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as KeyProjectRow, 'nextPlan')"
-          >{{ progCell(row as KeyProjectRow, 'nextPlan') }}</span>
+          <RichTextCell
+            :content="(row as KeyProjectRow).nextPlan ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as KeyProjectRow, 'nextPlan')"
+            :save-handler="(html: string) => progress.update((row as KeyProjectRow).projectId, 'nextPlan', html)"
+          />
         </template>
       </DataTable>
     </div>
@@ -226,14 +209,6 @@ defineExpose({
         :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
-
-    <ProgressEditModal
-      v-model="editOpen"
-      :project-id="editCtx.projectId"
-      :project-name="editCtx.projectName"
-      :field="editCtx.field"
-      :initial="editCtx.initial"
-    />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"
