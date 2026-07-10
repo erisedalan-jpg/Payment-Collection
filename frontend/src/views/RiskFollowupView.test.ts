@@ -8,7 +8,8 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushMock }) }))
 
 vi.mock('@/lib/riskFollowupApi', () => ({
   riskFollowupApi: {
@@ -45,6 +46,7 @@ function seedMany(n: number) {
 
 describe('RiskFollowupView', () => {
   beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => pushMock.mockClear())
   it('默认展示全部风险(含已关闭),16 默认列含跟进三列', async () => {
     seed()
     const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
@@ -141,5 +143,12 @@ describe('RiskFollowupView', () => {
     const filteredKeys = filters.map((f) => f.props('colKey'))
     expect(filteredKeys).not.toContain('revConclusion')
     expect(filteredKeys).toContain('nextRevDate')
+  })
+  it('点行下钻到该风险项目 /project/:id', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    await w.find('.el-table__row').trigger('click')
+    expect(pushMock).toHaveBeenCalledWith('/project/P1')
   })
 })
