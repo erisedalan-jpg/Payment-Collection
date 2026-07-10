@@ -91,7 +91,7 @@ describe('useExternalSort', () => {
     await nextTick()
     expect(loadSort('v3')).toEqual({ prop: '', order: '' })
   })
-  it('defaultSort 反映当前 sortState;不传 viewKey 也可用', () => {
+  it('defaultSort 反映当前 sortState(传 viewKey 时)', () => {
     const rows = ref([{ id: 'a', amount: 1 }])
     const { onSortChange, defaultSort } = useExternalSort(computed(() => rows.value), NUMERIC_KEYS, 'v4')
     expect(defaultSort.value).toBeUndefined()
