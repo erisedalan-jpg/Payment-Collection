@@ -80,8 +80,8 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'top1000', label: 'TOP1000', width: 90 },
   { key: 'quadrant', label: '象限', width: 140 },
   // —— 跟进列 ——
-  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
-  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'followAction', label: '跟进动作', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'revConclusion', label: 'rev结论', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170 },
 ])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
