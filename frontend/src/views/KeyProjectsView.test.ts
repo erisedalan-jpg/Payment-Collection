@@ -64,10 +64,11 @@ describe('KeyProjectsView', () => {
     expect(w.find('.kp-archive-btn').exists()).toBe(false)
     expect(w.find('.kp-export-btn').exists()).toBe(false)
   })
-  it('点进展单元格(当前数据)打开编辑弹窗', async () => {
+  it('点进展单元格(当前数据)进入内联富文本编辑', async () => {
     seed(); const w = await mountView()
-    await w.find('.kp-prog-cell').trigger('click')
-    expect((w.vm as any).editOpen).toBe(true)
+    await w.find('.rtc-empty').trigger('click')       // 空进展格 = 「点击填写」
+    expect(w.find('.rtc-editor').exists()).toBe(true)
+    expect(w.find('[contenteditable]').exists()).toBe(true)
   })
   it('点行跳项目详情', async () => {
     seed(); const push = vi.spyOn(router, 'push'); const w = await mountView()
