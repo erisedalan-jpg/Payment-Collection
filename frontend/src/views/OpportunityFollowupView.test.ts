@@ -42,7 +42,7 @@ describe('OpportunityFollowupView', () => {
     expect(html).toContain('本周工作进展')
     expect(html).toContain('跟进人')
     expect(html).toContain('商机级别')
-    expect(html).toContain('2026-06-25 10:00：本周推进')
+    expect(w.text()).toContain('2026-06-25 10:00：本周推进')
   })
   it('超管见范围设置/更新/导出按钮;普通管理员不见', async () => {
     const ws = await mountView(true)
