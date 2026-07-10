@@ -66,8 +66,8 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'contractWan', label: '合同金额(万)', width: 110, sortable: true, num: true,
     formatter: (v) => (v == null ? '-' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
   { key: 'riskLevel', label: '风险', width: 96, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
-  { key: 'weekProgress', label: '本周工作进展', width: 240, wrap: true },
-  { key: 'nextPlan', label: '后续工作计划', width: 240, wrap: true },
+  { key: 'weekProgress', label: '本周工作进展', width: 480, wrap: true },
+  { key: 'nextPlan', label: '后续工作计划', width: 480, wrap: true },
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
 ])

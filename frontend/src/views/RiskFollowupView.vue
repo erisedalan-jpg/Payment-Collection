@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
@@ -30,6 +31,7 @@ const data = useDataStore()
 const auth = useAuthStore()
 const risk = useRiskFollowupStore()
 const cf = useCrossFilterStore()
+const router = useRouter()
 // 延迟渲染:点击进页先出标题/工具栏,下一两帧再挂全量风险大表(数百行×数十列),消除跨页点击冻结。
 const { ready } = useDeferredMount()
 
@@ -62,8 +64,8 @@ const PROJECT_COLS: DataColumn[] = [
   { key: '项目状态', label: '项目状态', width: 100, sortable: true },
 ]
 const FOLLOW_COLS: DataColumn[] = [
-  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
-  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'followAction', label: '跟进动作', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'revConclusion', label: 'rev结论', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170, sortable: true },
 ]
 const NON_RISK_KEYS = new Set<string>([
@@ -100,6 +102,10 @@ const psort = usePersistentSort(userScopedKey(TABLE_ID))
 function editPrefix(row: RiskRow, field: 'followAction' | 'revConclusion'): string {
   const t = field === 'followAction' ? row.followActionEditTime : row.revConclusionEditTime
   return t ? `${t}：` : ''
+}
+
+function onRow(row: Record<string, any>) {
+  router.push('/project/' + (row as RiskRow).projectId)
 }
 
 // —— 日期编辑(下次rev时间) ——
@@ -168,7 +174,7 @@ defineExpose({
     <div v-if="!fp.rows.value.length" class="kp-empty">暂无风险数据。</div>
     <div v-else-if="!ready" class="kp-defer"><el-skeleton :rows="10" animated /></div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
