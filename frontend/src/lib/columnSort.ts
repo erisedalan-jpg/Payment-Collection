@@ -1,6 +1,6 @@
 import type { DataColumn } from '@/components/DataTable.vue'
 
-/** 长文本列（大段换行文字），排序无意义，不开启排序。用户钦定 4 列。 */
+/** 长文本列（大段换行文字），排序无意义，不开启排序。原 4 列 + V2.8.2 富文本化的 followAction/revConclusion。 */
 export const NON_SORTABLE_KEYS = new Set<string>(['weekProgress', 'nextPlan', 'remark', 'mainProducts', 'followAction', 'revConclusion'])
 
 /**

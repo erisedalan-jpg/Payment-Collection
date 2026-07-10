@@ -55,7 +55,7 @@ describe('withSortable', () => {
     expect(input[0].sortable).toBeUndefined()
   })
 
-  it('NON_SORTABLE_KEYS 恰为 4 个长文本 key', () => {
-    expect([...NON_SORTABLE_KEYS].sort()).toEqual(['mainProducts', 'nextPlan', 'remark', 'weekProgress'])
+  it('NON_SORTABLE_KEYS 恰为 6 个长文本 key（V2.8.2 加 followAction/revConclusion 富文本列）', () => {
+    expect([...NON_SORTABLE_KEYS].sort()).toEqual(['followAction', 'mainProducts', 'nextPlan', 'remark', 'revConclusion', 'weekProgress'])
   })
 })
