@@ -62,8 +62,8 @@ const PROJECT_COLS: DataColumn[] = [
   { key: '项目状态', label: '项目状态', width: 100, sortable: true },
 ]
 const FOLLOW_COLS: DataColumn[] = [
-  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
-  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'followAction', label: '跟进动作', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'revConclusion', label: 'rev结论', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170, sortable: true },
 ]
 const NON_RISK_KEYS = new Set<string>([
