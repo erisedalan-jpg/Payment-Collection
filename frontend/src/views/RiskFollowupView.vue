@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
@@ -14,13 +14,14 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import SegToggle from '@/components/SegToggle.vue'
-import ProgressEditModal from '@/components/ProgressEditModal.vue'
+import RichTextCell from '@/components/RichTextCell.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
+import { htmlToPlainText } from '@/lib/richText'
 
 const TABLE_ID = 'risk-followup'
 const data = useDataStore()
@@ -59,8 +60,8 @@ const PROJECT_COLS: DataColumn[] = [
   { key: '项目状态', label: '项目状态', width: 100, sortable: true },
 ]
 const FOLLOW_COLS: DataColumn[] = [
-  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, sortable: true },
-  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, sortable: true },
+  { key: 'followAction', label: '跟进动作', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
+  { key: 'revConclusion', label: 'rev结论', width: 240, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170, sortable: true },
 ]
 const NON_RISK_KEYS = new Set<string>([
@@ -85,7 +86,7 @@ const ALL_COLUMNS = computed<DataColumn[]>(() => [...riskCols.value, ...PROJECT_
 const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
-const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户', 'revConclusion', 'nextRevDate'])
+const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户', 'nextRevDate'])
 const prefs = useColumnPrefsDynamic(TABLE_ID, allKeys, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
@@ -93,21 +94,9 @@ const pickerColumns = computed(() => ALL_COLUMNS.value.map((c) => ({ key: c.key,
 function onToggle(key: string) { if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key); prefs.toggle(key) }
 
 // —— 文本编辑(跟进动作/rev结论) ——
-const editOpen = ref(false)
-const editCtx = reactive({ riskKey: '', title: '', field: 'followAction' as 'followAction' | 'revConclusion', initial: '' })
-function progCell(row: RiskRow, field: 'followAction' | 'revConclusion'): string {
+function editPrefix(row: RiskRow, field: 'followAction' | 'revConclusion'): string {
   const t = field === 'followAction' ? row.followActionEditTime : row.revConclusionEditTime
-  const c = (row as Record<string, any>)[field]
-  if (!c) return fp.isCurrent.value ? '点击填写' : '-'
-  return t ? `${t}：${c}` : `${c}`
-}
-function openEdit(row: RiskRow, field: 'followAction' | 'revConclusion') {
-  if (!fp.isCurrent.value) return
-  editCtx.riskKey = row.riskKey
-  editCtx.title = `${row['项目名称'] ?? ''} / 风险 ${row['风险编码'] ?? ''}`
-  editCtx.field = field
-  editCtx.initial = (row as Record<string, any>)[field] ?? ''
-  editOpen.value = true
+  return t ? `${t}：` : ''
 }
 
 // —— 日期编辑(下次rev时间) ——
@@ -145,7 +134,6 @@ function doExport() {
 }
 
 defineExpose({
-  editOpen, editCtx,
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
@@ -185,12 +173,20 @@ defineExpose({
           </span>
         </template>
         <template #cell-followAction="{ row }">
-          <span class="kp-prog-cell" :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as RiskRow, 'followAction')">{{ progCell(row as RiskRow, 'followAction') }}</span>
+          <RichTextCell
+            :content="((row as RiskRow) as Record<string, any>).followAction ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as RiskRow, 'followAction')"
+            :save-handler="(html: string) => risk.update((row as RiskRow).riskKey, 'followAction', html)"
+          />
         </template>
         <template #cell-revConclusion="{ row }">
-          <span class="kp-prog-cell" :class="{ editable: fp.isCurrent.value }"
-            @click.stop="openEdit(row as RiskRow, 'revConclusion')">{{ progCell(row as RiskRow, 'revConclusion') }}</span>
+          <RichTextCell
+            :content="((row as RiskRow) as Record<string, any>).revConclusion ?? ''"
+            :editable="fp.isCurrent.value"
+            :prefix="editPrefix(row as RiskRow, 'revConclusion')"
+            :save-handler="(html: string) => risk.update((row as RiskRow).riskKey, 'revConclusion', html)"
+          />
         </template>
         <template #cell-nextRevDate="{ row }">
           <el-date-picker v-if="fp.isCurrent.value" :model-value="(row as RiskRow).nextRevDate || ''" type="date"
@@ -207,10 +203,6 @@ defineExpose({
         :page-sizes="[20, 50, 80, 100]" :total="fp.filtered.value.length"
         layout="sizes, prev, pager, next" size="small" background />
     </div>
-
-    <ProgressEditModal v-model="editOpen" store="riskFollowup"
-      :project-id="editCtx.riskKey" :project-name="editCtx.title" :head-text="editCtx.title"
-      :field="editCtx.field" :initial="editCtx.initial" />
 
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="risk.scope"
       single-table :catalog="RISK_SCOPE_CATALOG" :match-fn="riskRowMatches"
