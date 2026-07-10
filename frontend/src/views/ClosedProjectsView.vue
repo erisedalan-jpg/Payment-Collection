@@ -7,6 +7,7 @@ import type { ClosedProject } from '@/types/analysis'
 import { buildClosedRows, filterClosedRows, type ClosedRow } from '@/lib/closedProjectList'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -60,6 +61,7 @@ const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 
 // 关列时清其表头筛选(不变式)：collapsed into useColumnPrefs.makeToggle
 const onToggle = prefs.makeToggle(cf, TABLE_ID)
+const psort = usePersistentSort(userScopedKey(TABLE_ID))
 
 const pageSize = ref(50)
 const currentPage = ref(1)
@@ -81,7 +83,7 @@ function onRow(row: Record<string, any>) { router.push(`/closed-project/${row.pr
 
     <div v-if="!rows.length" class="cv-empty">暂无已关闭项目数据——请在「数据管理」提供 PMIS 已关闭三表后点「更新数据」。</div>
     <div v-else class="cv-scroll">
-      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="cv-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>
         </template>

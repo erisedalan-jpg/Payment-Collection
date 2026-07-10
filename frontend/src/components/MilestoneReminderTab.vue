@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { MilestoneProject } from '@/lib/milestoneAnalytics'
 import { buildReminderRows, reminderRange, reminderStat, type ReminderPreset, type ReminderRow } from '@/lib/milestoneDetailRows'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
@@ -67,6 +68,7 @@ const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
 const FILTERABLE = new Set(['projectType', 'manager', 'orgL3', 'orgL4', 'node', 'done', 'linked', 'priorityLabel'])
 
 const onToggle = prefs.makeToggle(cf, TABLE_ID)
+const psort = usePersistentSort(userScopedKey(TABLE_ID))
 
 const pageSize = ref(50)
 const currentPage = ref(1)
@@ -108,7 +110,7 @@ defineExpose({ rangeModel, filtered })
       <div class="mrt-card"><div class="mrt-k">逾期未完成</div><div class="mrt-v mrt-v-danger u-num">{{ stat.overdue }}</div></div>
     </div>
     <div class="mrt-scroll">
-      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="mrt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="winRows" /></span>
         </template>

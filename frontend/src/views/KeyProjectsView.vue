@@ -9,6 +9,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildKeyProjectRows, type KeyProjectRow } from '@/lib/keyProjects'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
@@ -82,6 +83,7 @@ function onToggle(key: string) {
   if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
   prefs.toggle(key)
 }
+const psort = usePersistentSort(userScopedKey(TABLE_ID))
 
 function editPrefix(row: KeyProjectRow, field: 'weekProgress' | 'nextPlan'): string {
   const t = field === 'weekProgress' ? row.weekProgressEditTime : row.nextPlanEditTime
@@ -178,7 +180,7 @@ defineExpose({
 
     <div v-if="!fp.rows.value.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}

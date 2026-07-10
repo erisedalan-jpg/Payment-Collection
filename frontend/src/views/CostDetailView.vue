@@ -23,6 +23,7 @@ import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
@@ -104,6 +105,7 @@ const l4Prefs = useColumnPrefs(userScopedKey(L4_TABLE_ID), L4_COLS.map((c) => c.
 const l4VisibleColumns = computed(() =>
   l4Prefs.visibleKeys.value.map((k) => L4_COLS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const l4PickerColumns = L4_COLS.map((c) => ({ key: c.key, label: c.label }))
+const l4Sort = usePersistentSort(userScopedKey(L4_TABLE_ID))
 
 // —— 项目成本明细表 ——
 const num0 = (v: any) => Number(v || 0).toLocaleString('zh-CN')
@@ -200,7 +202,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
             <ColumnPicker :columns="l4PickerColumns" :visible-keys="l4Prefs.visibleKeys.value"
               @toggle="l4Prefs.toggle" @move-up="l4Prefs.moveUp" @move-down="l4Prefs.moveDown" @reset="l4Prefs.reset" />
           </div>
-          <DataTable :columns="l4VisibleColumns" :rows="l4Rows" :show-count="false">
+          <DataTable :columns="l4VisibleColumns" :rows="l4Rows" :show-count="false" :default-sort="l4Sort.defaultSort.value" @sort-change="l4Sort.onSortChange">
           <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}%</span></template>
         </DataTable></div>
       </div>
