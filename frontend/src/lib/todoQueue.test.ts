@@ -71,6 +71,15 @@ describe('buildTodoQueue', () => {
     expect(r.items.filter((i) => i.bucket === '成本超支').map((i) => i.projectId)).toEqual(['X', 'Y'])
   })
 
+  it('成本超支：仅命中 交付成本超支(flag) 且 overspendAmount<=0 时仍计入，detail 显示文字标签而非"超支 0.0 万"', () => {
+    const rows = [prow('F', ['交付成本超支'], 0)]
+    const r = buildTodoQueue([], [], rows as any, NOW, 7)
+    expect(r.counts['成本超支']).toBe(1)
+    const item = r.items.find((i) => i.bucket === '成本超支')!
+    expect(item.detail).toBe('交付成本超支')
+    expect(item.detail).not.toContain('超支 0.0 万')
+  })
+
   it('混合桶整体按 urgencyRank 升序：已延期 < 今到期 < 临期 < 里程碑 < 超支', () => {
     const nodes: PayNodeRow[] = [
       payNode({ projectId: 'A', stage: 's', status: '延期', planDate: ymd(2026, 6, 1), unpaidAmount: 100 }),

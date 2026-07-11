@@ -52,7 +52,7 @@ export function buildTodoQueue(
 
   // 1. 回款：延期优先，否则判临期窗口（互斥）
   payNodes.forEach((n, i) => {
-    const plan = String(n.planDate || '')
+    const plan = String(n.planDate || '').slice(0, 10)
     if (n.status === '延期') {
       items.push({
         key: `pay-delayed-${i}-${n.projectId}`, bucket: '回款已延期', stateLabel: '已延期', tone: 'danger',
@@ -104,7 +104,7 @@ export function buildTodoQueue(
       items.push({
         key: `over-${r.projectId}`, bucket: '成本超支', stateLabel: '超支', tone: 'danger',
         projectId: r.projectId, projectName: r.projectName, amount: r.overspendAmount,
-        detail: `超支 ${wan(r.overspendAmount)} 万`, urgencyRank: 5, sortSub: -r.overspendAmount,
+        detail: r.overspendAmount > 0 ? `超支 ${wan(r.overspendAmount)} 万` : '交付成本超支', urgencyRank: 5, sortSub: -r.overspendAmount,
       })
     }
   })
