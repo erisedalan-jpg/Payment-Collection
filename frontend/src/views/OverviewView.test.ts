@@ -54,9 +54,17 @@ function seed() {
           expectedPayment: 200000, receivedAmount: 0, unpaidAmount: 200000, status: '待回款' },
       ],
     },
-    events: Array.from({ length: 12 }, (_, i) => ({
-      date: iso(now), type: '到账', domain: 'payment', projectId: 'P-1', projectName: '风险甲', summary: `事件${i}`,
-    })),
+    events: [
+      // 无 tone 的「普通」事件排在前面，danger 的「要紧」事件排在后面：
+      // shownEvents 恒 slice(0,10)，若顺序反过来（要紧在前），"全部"下前 10 项仍全是
+      // danger、会把 2 条普通事件挤出可见范围，导致"切到全部后普通事件也显示"断言失败。
+      ...Array.from({ length: 2 }, (_, i) => ({
+        date: iso(now), type: '到账', domain: 'payment', projectId: 'P-1', projectName: '风险甲', summary: `普通${i}`,
+      })),
+      ...Array.from({ length: 10 }, (_, i) => ({
+        date: iso(now), type: '延期', domain: 'project', projectId: 'P-1', projectName: '风险甲', summary: `要紧${i}`, tone: 'danger',
+      })),
+    ],
   } as any
 }
 
@@ -118,18 +126,35 @@ describe('OverviewView', () => {
     expect(w.find('.ov-acard-toggle').exists()).toBe(false)
   })
 
-  it('右栏动态最多 10 条 + 查看全部链接', async () => {
+  it('右栏动态默认只看要紧(过滤无 tone 事件)且有查看全部链接', async () => {
     seed()
     const w = await mountView()
+    // 12 条事件中仅 10 条 danger 计入（2 条无 tone 被默认要紧过滤）
     expect(w.findAll('.ev-item')).toHaveLength(10)
     expect(w.find('a[href="/activity"]').exists()).toBe(true)
+  })
+
+  it('切到「全部」后普通事件也显示', async () => {
+    seed()
+    const w = await mountView()
+    await w.find('[data-test="seg-all"]').trigger('click')
+    expect(w.text()).toContain('普通0')
+  })
+
+  it('本期变化数字条:有 periodCompare 时显示、无时不渲染', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).periodCompare = { lastSync: { baseDate: '2026-07-01', advancedProjects: 4, newDelayedNodes: 2, paymentGained: 3500000, riskNetChange: 1 } }
+    const w = await mountView()
+    expect(w.find('.ov-digest').exists()).toBe(true)
+    expect(w.find('.ov-digest').text()).toContain('阶段推进')
   })
 
   it('无数据空态不崩(零项目零事件)', async () => {
     const ds = useDataStore()
     ds.data = { meta: {}, dashboard: {}, summary: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, rawNodes: [], events: [] } as any
     const w = await mountView()
-    expect(w.text()).toContain('首次同步，暂无变化记录')
+    expect(w.text()).toContain('暂无要紧动态')
     expect(w.find('.ov-band').text()).toContain('在管')
   })
 
