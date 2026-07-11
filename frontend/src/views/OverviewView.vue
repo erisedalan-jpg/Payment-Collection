@@ -17,6 +17,7 @@ import { classifyProjects } from '@/lib/riskClassify'
 import TodoQueue from '@/components/TodoQueue.vue'
 import { buildTodoQueue } from '@/lib/todoQueue'
 import { buildMilestoneProjects } from '@/lib/milestoneAnalytics'
+import { isAnomalous } from '@/lib/anomaly'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -57,7 +58,7 @@ const classEntries = computed(() => classifyProjects(rows.value))
 // 待办/临期 队列（7/30 天窗口）
 const todoWindow = ref<7 | 30>(7)
 const milestoneProjects = computed(() =>
-  buildMilestoneProjects(projects.value, pmisMap.value, (data.data?.projectMilestones ?? {}) as Record<string, any>),
+  buildMilestoneProjects(projects.value.filter((p) => !isAnomalous(p)), pmisMap.value, (data.data?.projectMilestones ?? {}) as Record<string, any>),
 )
 const payNodes = computed(() => paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis))
 const pidOverspend = computed(() => new Map(projects.value.map((p) => [p.projectId, p.overspendAmount ?? 0])))

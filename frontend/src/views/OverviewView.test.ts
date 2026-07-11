@@ -164,6 +164,8 @@ describe('OverviewView', () => {
     expect(w.text()).toContain('待办 / 临期')
     // seed P-1 有 status='延期' 节点 → 至少一条已延期待办
     expect(w.findAll('.tq-item').length).toBeGreaterThanOrEqual(1)
+    // seed() 未设置 periodCompare → 本期变化数字条不应渲染
+    expect(w.find('.ov-digest').exists()).toBe(false)
   })
 })
 
