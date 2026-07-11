@@ -122,6 +122,14 @@ describe('OverviewView', () => {
     expect(w.text()).toContain('首次同步，暂无变化记录')
     expect(w.find('.ov-band').text()).toContain('在管')
   })
+
+  it('中列渲染待办/临期队列(有延期回款节点时非空)', async () => {
+    seed()
+    const w = await mountView()
+    expect(w.text()).toContain('待办 / 临期')
+    // seed P-1 有 status='延期' 节点 → 至少一条已延期待办
+    expect(w.findAll('.tq-item').length).toBeGreaterThanOrEqual(1)
+  })
 })
 
 describe('OverviewView 标签排除', () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
@@ -12,6 +12,9 @@ import RatioRing from '@/components/RatioRing.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { buildProjectRows } from '@/lib/projectList'
 import { classifyProjects } from '@/lib/riskClassify'
+import TodoQueue from '@/components/TodoQueue.vue'
+import { buildTodoQueue } from '@/lib/todoQueue'
+import { buildMilestoneProjects } from '@/lib/milestoneAnalytics'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -49,6 +52,19 @@ const healthSegments = computed(() => [
 // 异常分诊:去 健康度低(并入体检带)+ 隐藏 0 项,按 danger→warn→mut 稳定排序(组内保留 classifyProjects 固定序)
 const rows = computed(() => buildProjectRows(projects.value, pmisMap.value))
 const classEntries = computed(() => classifyProjects(rows.value))
+
+// 待办/临期 队列（7/30 天窗口）
+const todoWindow = ref<7 | 30>(7)
+const milestoneProjects = computed(() =>
+  buildMilestoneProjects(projects.value, pmisMap.value, (data.data?.projectMilestones ?? {}) as Record<string, any>),
+)
+const payNodes = computed(() => paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis))
+const pidOverspend = computed(() => new Map(projects.value.map((p) => [p.projectId, p.overspendAmount ?? 0])))
+const todoRows = computed(() =>
+  rows.value.map((r) => ({ projectId: r.projectId, projectName: r.projectName, riskReasons: r.riskReasons, overspendAmount: pidOverspend.value.get(r.projectId) ?? 0 })),
+)
+const todoResult = computed(() => buildTodoQueue(payNodes.value, milestoneProjects.value, todoRows.value, new Date(), todoWindow.value))
+
 const SEVERITY_ORDER: Record<string, number> = { danger: 0, warn: 1, mut: 2 }
 const BLURB: Record<string, string> = {
   回款延期: '有延期收款节点的项目',
@@ -148,6 +164,10 @@ defineExpose({ baseProjects })
         <div v-else class="ov-anomaly-empty">暂无需要处理的异常</div>
       </section>
 
+      <section class="ov-todo">
+        <TodoQueue :result="todoResult" v-model:window-days="todoWindow" />
+      </section>
+
       <aside class="ov-aside">
         <div class="ov-aside-title">项目动态</div>
         <EventTimeline :events="recentEvents" empty-text="首次同步，暂无变化记录" />
@@ -181,7 +201,7 @@ defineExpose({ baseProjects })
 .ov-pay-k { font-size: var(--fs-1); color: var(--mut); }
 
 /* 下半区 */
-.ov-lower { display: grid; grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr); gap: var(--sp-4); align-items: start; }
+.ov-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-4); align-items: start; }
 
 /* 异常分诊 */
 .ov-anomaly-title { font-size: var(--fs-2); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-3); }
