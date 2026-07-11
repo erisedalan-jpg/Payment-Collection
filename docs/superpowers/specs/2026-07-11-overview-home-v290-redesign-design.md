@@ -53,7 +53,7 @@
 | 成本超支 | 项目行 `riskReasons`（`buildProjectRows`） | category ∈ {`交付成本超支`, `总成本超支大于5000`}（按 projectId 去重，一项目一条） | 项目名 · `超支 X 万` |
 
 - **回款节点单状态互斥**：每个 `PayNodeRow` 至多产出一条——`status==='延期'` 优先归「回款已延期」，**否则**再判临期窗口（`planDate==今`→今到期 / `planDate∈(今,今+窗口]`→临期）；已延期与临期互不重复计数（防延期节点又落窗口被双计）。里程碑节点同理：`planDate<今`→滞后、否则窗口内→临期，二选一。
-- 回款/里程碑均**排除异常项目**（`paymentNodeRows`/`buildMilestoneProjects` 已内建 `isAnomalous`/`excludedIds` 排除，与全站口径一致）。
+- 回款/里程碑/成本超支均**排除异常项目**：回款经 `paymentNodeRows` 内建 `isAnomalous` 排除；成本超支经 `riskReasons`（`buildProjectRows` 调用）对异常项目短路只出「数据异常」一类、不产生超支 category，间接排除；里程碑因 `buildMilestoneProjects` 本身不做该排除，改由 `OverviewView` 侧在调用前以 `!isAnomalous` 过滤 `projects` 传入，三桶口径与全站一致。
 - 成本超支桶**只取 >5000**：`总成本超支小于5000` 不入队列（符合用户「大于5000」诉求），但仍留在异常卡的「成本超支」计分（异常卡不拆档，见 §3）。
 - 窗口切换（7/30 天）**只影响两个「临期」判定**（回款临期上界、里程碑临期上界）；已延期 / 里程碑滞后 / 成本超支不受窗口影响。
 
