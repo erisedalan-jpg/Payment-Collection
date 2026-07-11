@@ -23,7 +23,7 @@ import FollowupModals from '@/components/FollowupModals.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
-import { fmt } from '@/lib/format'
+import { fmt, fmtRatio } from '@/lib/format'
 import { htmlToPlainText } from '@/lib/richText'
 
 const TABLE_ID = 'risk-followup'
@@ -73,6 +73,8 @@ const NON_RISK_KEYS = new Set<string>([
   'projectId', 'riskKey',
   'followActionEditTime', 'followActionEditBy', 'revConclusionEditTime', 'revConclusionEditBy', 'nextRevDateEditTime', 'nextRevDateEditBy',
 ])
+// 比率型风险列以百分比展示(如 1 → 100%),口径与 /projects 一致(fmtRatio)。
+const PERCENT_RISK_KEYS = new Set<string>(['回款完成率', '完工进展'])
 const riskCols = computed<DataColumn[]>(() => {
   const known = new Map(RISK_COLUMNS.map((c) => [c.key, c]))
   const keys: string[] = []
@@ -82,8 +84,12 @@ const riskCols = computed<DataColumn[]>(() => {
   }
   return keys.map((k) => {
     const c = known.get(k)
-    return { key: k, label: c?.label ?? k, width: c?.width ?? 160, wrap: true, sortable: true,
-      formatter: c?.date ? (v: unknown) => fmtDateCell(v) : undefined } as DataColumn
+    const formatter = c?.date
+      ? (v: unknown) => fmtDateCell(v)
+      : PERCENT_RISK_KEYS.has(k)
+        ? (v: unknown) => fmtRatio(v)
+        : undefined
+    return { key: k, label: c?.label ?? k, width: c?.width ?? 160, wrap: true, sortable: true, formatter } as DataColumn
   })
 })
 const ALL_COLUMNS = computed<DataColumn[]>(() => [...riskCols.value, ...PROJECT_COLS, ...FOLLOW_COLS])
