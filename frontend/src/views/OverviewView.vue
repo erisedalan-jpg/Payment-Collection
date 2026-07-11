@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
@@ -8,10 +8,16 @@ import { paymentNodeRows } from '@/lib/paymentPmis'
 import { useFilterStore } from '@/stores/filter'
 import { fmtWan } from '@/lib/format'
 import EventTimeline from '@/components/EventTimeline.vue'
+import SegToggle from '@/components/SegToggle.vue'
+import { filterEvents } from '@/lib/activity'
 import RatioRing from '@/components/RatioRing.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { buildProjectRows } from '@/lib/projectList'
 import { classifyProjects } from '@/lib/riskClassify'
+import TodoQueue from '@/components/TodoQueue.vue'
+import { buildTodoQueue } from '@/lib/todoQueue'
+import { buildMilestoneProjects } from '@/lib/milestoneAnalytics'
+import { isAnomalous } from '@/lib/anomaly'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -35,7 +41,6 @@ const band = computed(() => paymentBand(
   filter.dateStart,
   filter.dateEnd,
 ))
-const recentEvents = computed(() => ((data.data?.events ?? []) as Event[]).slice(0, 10))
 const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.value.yearActual / band.value.yearExpected, 1) : 0))
 
 // 体检带:健康分段条数据(无数据段仅 count>0 时由组件过滤显示;无 to 不可点)
@@ -49,6 +54,19 @@ const healthSegments = computed(() => [
 // 异常分诊:去 健康度低(并入体检带)+ 隐藏 0 项,按 danger→warn→mut 稳定排序(组内保留 classifyProjects 固定序)
 const rows = computed(() => buildProjectRows(projects.value, pmisMap.value))
 const classEntries = computed(() => classifyProjects(rows.value))
+
+// 待办/临期 队列（7/30 天窗口）
+const todoWindow = ref<7 | 30>(7)
+const milestoneProjects = computed(() =>
+  buildMilestoneProjects(projects.value.filter((p) => !isAnomalous(p)), pmisMap.value, (data.data?.projectMilestones ?? {}) as Record<string, any>),
+)
+const payNodes = computed(() => paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis))
+const pidOverspend = computed(() => new Map(projects.value.map((p) => [p.projectId, p.overspendAmount ?? 0])))
+const todoRows = computed(() =>
+  rows.value.map((r) => ({ projectId: r.projectId, projectName: r.projectName, riskReasons: r.riskReasons, overspendAmount: pidOverspend.value.get(r.projectId) ?? 0 })),
+)
+const todoResult = computed(() => buildTodoQueue(payNodes.value, milestoneProjects.value, todoRows.value, new Date(), todoWindow.value))
+
 const SEVERITY_ORDER: Record<string, number> = { danger: 0, warn: 1, mut: 2 }
 const BLURB: Record<string, string> = {
   回款延期: '有延期收款节点的项目',
@@ -64,9 +82,6 @@ const anomalyCards = computed(() =>
     .sort((a, b) => SEVERITY_ORDER[a.tone] - SEVERITY_ORDER[b.tone]),
 )
 
-const expanded = reactive<Record<string, boolean>>({})
-function toggle(cat: string) { expanded[cat] = !expanded[cat] }
-
 interface DrillItem { key: string; projectId: string; primary: string; secondary: string }
 function cardItems(cat: string): DrillItem[] {
   if (cat === '回款延期' && band.value.delayedTop.length) {
@@ -75,11 +90,48 @@ function cardItems(cat: string): DrillItem[] {
     }))
   }
   const entry = classEntries.value.find((e) => e.category === cat)
-  return (entry?.projects ?? []).slice(0, 5).map((p, i) => ({
+  return (entry?.projects ?? []).slice(0, 3).map((p, i) => ({
     key: `${p.projectId}-${i}`, projectId: p.projectId, primary: p.projectName || p.projectId, secondary: p.detail,
   }))
 }
 function catLink(cat: string): string { return `/projects?riskCategory=${encodeURIComponent(cat)}` }
+
+// 本期变化数字条（基线=上次同步；快照不足则 null 不渲染）
+const digest = computed(() => {
+  const e = data.data?.periodCompare?.lastSync
+  if (!e) return null
+  const sign = (n: number) => (n > 0 ? `+${n}` : String(n))
+  return [
+    { k: '阶段推进', v: String(e.advancedProjects ?? 0) },
+    { k: '新增延期', v: String(e.newDelayedNodes ?? 0) },
+    { k: '回款新增', v: `${fmtWan(e.paymentGained ?? 0)}万` },
+    { k: '风险净增', v: sign(e.riskNetChange ?? 0) },
+  ]
+})
+
+// 事件：默认只看要紧（tone∈warn/danger）+ L4 快筛
+const EV_SCOPE_OPTS = [
+  { value: 'important', label: '只看要紧' },
+  { value: 'all', label: '全部' },
+]
+const evScope = ref('important') // 'important' | 'all'（用 string 避免 SegToggle v-model 回写 string 时的联合类型不可赋值）
+const evL4 = ref('')
+const pidL4 = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const p of projects.value) { if (p.projectId && p.orgL4) map[p.projectId] = String(p.orgL4) }
+  return map
+})
+const l4Options = computed(() => {
+  const set = new Set<string>()
+  for (const p of projects.value) { if (p.orgL4) set.add(String(p.orgL4)) }
+  return [{ value: '', label: '全部 L4' }, ...[...set].sort((a, b) => a.localeCompare(b, 'zh-CN')).map((v) => ({ value: v, label: v }))]
+})
+const shownEvents = computed(() => {
+  let evs = (data.data?.events ?? []) as Event[]
+  if (evScope.value === 'important') evs = evs.filter((e) => e.tone === 'warn' || e.tone === 'danger')
+  if (evL4.value) evs = filterEvents(evs, { domain: '', query: '', types: [], l4: evL4.value }, pidL4.value)
+  return evs.slice(0, 10)
+})
 
 defineExpose({ baseProjects })
 </script>
@@ -127,13 +179,7 @@ defineExpose({ baseProjects })
               <span class="ov-acard-count u-num" :class="`ov-acard-count--${c.tone}`">{{ c.count }}</span>
             </div>
             <div class="ov-acard-blurb">{{ BLURB[c.category] }}</div>
-            <div class="ov-acard-ops">
-              <RouterLink class="ov-acard-link" :to="catLink(c.category)">查看清单 →</RouterLink>
-              <button class="ov-acard-toggle" type="button" @click="toggle(c.category)">
-                展开 <span class="ov-acard-arrow" :class="{ 'ov-acard-arrow--open': expanded[c.category] }">▾</span>
-              </button>
-            </div>
-            <div v-if="expanded[c.category]" class="ov-acard-body">
+            <div class="ov-acard-body">
               <button v-for="it in cardItems(c.category)" :key="it.key" type="button"
                 class="ov-acard-item" @click="router.push(`/project/${it.projectId}`)">
                 <span class="ov-acard-item-name">{{ it.primary }}</span>
@@ -148,9 +194,25 @@ defineExpose({ baseProjects })
         <div v-else class="ov-anomaly-empty">暂无需要处理的异常</div>
       </section>
 
+      <section class="ov-todo">
+        <TodoQueue :result="todoResult" v-model:window-days="todoWindow" />
+      </section>
+
       <aside class="ov-aside">
         <div class="ov-aside-title">项目动态</div>
-        <EventTimeline :events="recentEvents" empty-text="首次同步，暂无变化记录" />
+        <div v-if="digest" class="ov-digest">
+          <span v-for="d in digest" :key="d.k" class="ov-digest-i">
+            <span class="ov-digest-k">{{ d.k }}</span>
+            <span class="ov-digest-v u-num">{{ d.v }}</span>
+          </span>
+        </div>
+        <div class="ov-ev-tools">
+          <SegToggle v-model="evScope" :options="EV_SCOPE_OPTS" />
+          <el-select v-model="evL4" size="small" style="width: 120px">
+            <el-option v-for="o in l4Options" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </div>
+        <EventTimeline :events="shownEvents" empty-text="暂无要紧动态" />
         <RouterLink class="ov-more" to="/activity">查看全部 →</RouterLink>
       </aside>
     </div>
@@ -181,7 +243,7 @@ defineExpose({ baseProjects })
 .ov-pay-k { font-size: var(--fs-1); color: var(--mut); }
 
 /* 下半区 */
-.ov-lower { display: grid; grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr); gap: var(--sp-4); align-items: start; }
+.ov-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-4); align-items: start; }
 
 /* 异常分诊 */
 .ov-anomaly-title { font-size: var(--fs-2); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-3); }
@@ -198,11 +260,6 @@ defineExpose({ baseProjects })
 .ov-acard-count--warn { color: var(--warn-text); }
 .ov-acard-count--mut { color: var(--mut); }
 .ov-acard-blurb { font-size: var(--fs-1); color: var(--sub); margin-top: var(--sp-1); }
-.ov-acard-ops { display: flex; align-items: center; justify-content: space-between; margin-top: var(--sp-2); }
-.ov-acard-link { font-size: var(--fs-1); color: var(--accent); text-decoration: none; font-weight: 600; }
-.ov-acard-toggle { border: none; background: none; cursor: pointer; font-size: var(--fs-1); color: var(--sub); display: inline-flex; align-items: center; gap: var(--sp-1); }
-.ov-acard-arrow { display: inline-block; transition: transform var(--dur-2) var(--ease); }
-.ov-acard-arrow--open { transform: rotate(180deg); }
 .ov-acard-body { margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .ov-acard-item { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); border: none; background: none; padding: 3px 0; font-size: var(--fs-1); color: var(--txt); cursor: pointer; text-align: left; width: 100%; }
 .ov-acard-item:hover { color: var(--accent); }
@@ -215,6 +272,11 @@ defineExpose({ baseProjects })
 .ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); box-shadow: var(--shadow-1); }
 .ov-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 .ov-more { font-size: var(--fs-1); color: var(--accent); text-decoration: none; font-weight: 600; }
+.ov-digest { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0; margin-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
+.ov-digest-i { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.ov-digest-k { font-size: var(--fs-1); color: var(--mut); }
+.ov-digest-v { font-size: var(--fs-2); font-weight: 700; color: var(--txt); }
+.ov-ev-tools { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
 
 @media (max-width: 1200px) {
   .ov-lower { grid-template-columns: 1fr; }
