@@ -8,6 +8,8 @@ import { paymentNodeRows } from '@/lib/paymentPmis'
 import { useFilterStore } from '@/stores/filter'
 import { fmtWan } from '@/lib/format'
 import EventTimeline from '@/components/EventTimeline.vue'
+import SegToggle from '@/components/SegToggle.vue'
+import { filterEvents } from '@/lib/activity'
 import RatioRing from '@/components/RatioRing.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { buildProjectRows } from '@/lib/projectList'
@@ -38,7 +40,6 @@ const band = computed(() => paymentBand(
   filter.dateStart,
   filter.dateEnd,
 ))
-const recentEvents = computed(() => ((data.data?.events ?? []) as Event[]).slice(0, 10))
 const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.value.yearActual / band.value.yearExpected, 1) : 0))
 
 // 体检带:健康分段条数据(无数据段仅 count>0 时由组件过滤显示;无 to 不可点)
@@ -93,6 +94,43 @@ function cardItems(cat: string): DrillItem[] {
   }))
 }
 function catLink(cat: string): string { return `/projects?riskCategory=${encodeURIComponent(cat)}` }
+
+// 本期变化数字条（基线=上次同步；快照不足则 null 不渲染）
+const digest = computed(() => {
+  const e = data.data?.periodCompare?.lastSync
+  if (!e) return null
+  const sign = (n: number) => (n > 0 ? `+${n}` : String(n))
+  return [
+    { k: '阶段推进', v: String(e.advancedProjects ?? 0) },
+    { k: '新增延期', v: String(e.newDelayedNodes ?? 0) },
+    { k: '回款新增', v: `${fmtWan(e.paymentGained ?? 0)}万` },
+    { k: '风险净增', v: sign(e.riskNetChange ?? 0) },
+  ]
+})
+
+// 事件：默认只看要紧（tone∈warn/danger）+ L4 快筛
+const EV_SCOPE_OPTS = [
+  { value: 'important', label: '只看要紧' },
+  { value: 'all', label: '全部' },
+]
+const evScope = ref('important') // 'important' | 'all'（用 string 避免 SegToggle v-model 回写 string 时的联合类型不可赋值）
+const evL4 = ref('')
+const pidL4 = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const p of projects.value) { if (p.projectId && p.orgL4) map[p.projectId] = String(p.orgL4) }
+  return map
+})
+const l4Options = computed(() => {
+  const set = new Set<string>()
+  for (const p of projects.value) { if (p.orgL4) set.add(String(p.orgL4)) }
+  return [{ value: '', label: '全部 L4' }, ...[...set].sort((a, b) => a.localeCompare(b, 'zh-CN')).map((v) => ({ value: v, label: v }))]
+})
+const shownEvents = computed(() => {
+  let evs = (data.data?.events ?? []) as Event[]
+  if (evScope.value === 'important') evs = evs.filter((e) => e.tone === 'warn' || e.tone === 'danger')
+  if (evL4.value) evs = filterEvents(evs, { domain: '', query: '', types: [], l4: evL4.value }, pidL4.value)
+  return evs.slice(0, 10)
+})
 
 defineExpose({ baseProjects })
 </script>
@@ -161,7 +199,19 @@ defineExpose({ baseProjects })
 
       <aside class="ov-aside">
         <div class="ov-aside-title">项目动态</div>
-        <EventTimeline :events="recentEvents" empty-text="首次同步，暂无变化记录" />
+        <div v-if="digest" class="ov-digest">
+          <span v-for="d in digest" :key="d.k" class="ov-digest-i">
+            <span class="ov-digest-k">{{ d.k }}</span>
+            <span class="ov-digest-v u-num">{{ d.v }}</span>
+          </span>
+        </div>
+        <div class="ov-ev-tools">
+          <SegToggle v-model="evScope" :options="EV_SCOPE_OPTS" />
+          <el-select v-model="evL4" size="small" style="width: 120px">
+            <el-option v-for="o in l4Options" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </div>
+        <EventTimeline :events="shownEvents" empty-text="暂无要紧动态" />
         <RouterLink class="ov-more" to="/activity">查看全部 →</RouterLink>
       </aside>
     </div>
@@ -221,6 +271,11 @@ defineExpose({ baseProjects })
 .ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); box-shadow: var(--shadow-1); }
 .ov-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 .ov-more { font-size: var(--fs-1); color: var(--accent); text-decoration: none; font-weight: 600; }
+.ov-digest { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0; margin-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
+.ov-digest-i { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.ov-digest-k { font-size: var(--fs-1); color: var(--mut); }
+.ov-digest-v { font-size: var(--fs-2); font-weight: 700; color: var(--txt); }
+.ov-ev-tools { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
 
 @media (max-width: 1200px) {
   .ov-lower { grid-template-columns: 1fr; }
