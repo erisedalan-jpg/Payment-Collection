@@ -108,6 +108,16 @@ describe('OverviewView', () => {
     expect(w.text()).not.toContain('健康度低')
   })
 
+  it('异常卡默认内联显示项目行(无需点展开)且无展开按钮', async () => {
+    seed()
+    const w = await mountView()
+    // seed P-1 命中回款延期/成本超支等 → 至少一张卡，且默认可见项目名「风险甲」
+    expect(w.find('.ov-acard-item').exists()).toBe(true)
+    expect(w.text()).toContain('风险甲')
+    // 旧「展开 ▾」toggle 已移除
+    expect(w.find('.ov-acard-toggle').exists()).toBe(false)
+  })
+
   it('右栏动态最多 10 条 + 查看全部链接', async () => {
     seed()
     const w = await mountView()

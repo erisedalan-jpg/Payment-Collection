@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
@@ -80,9 +80,6 @@ const anomalyCards = computed(() =>
     .sort((a, b) => SEVERITY_ORDER[a.tone] - SEVERITY_ORDER[b.tone]),
 )
 
-const expanded = reactive<Record<string, boolean>>({})
-function toggle(cat: string) { expanded[cat] = !expanded[cat] }
-
 interface DrillItem { key: string; projectId: string; primary: string; secondary: string }
 function cardItems(cat: string): DrillItem[] {
   if (cat === '回款延期' && band.value.delayedTop.length) {
@@ -91,7 +88,7 @@ function cardItems(cat: string): DrillItem[] {
     }))
   }
   const entry = classEntries.value.find((e) => e.category === cat)
-  return (entry?.projects ?? []).slice(0, 5).map((p, i) => ({
+  return (entry?.projects ?? []).slice(0, 3).map((p, i) => ({
     key: `${p.projectId}-${i}`, projectId: p.projectId, primary: p.projectName || p.projectId, secondary: p.detail,
   }))
 }
@@ -143,13 +140,7 @@ defineExpose({ baseProjects })
               <span class="ov-acard-count u-num" :class="`ov-acard-count--${c.tone}`">{{ c.count }}</span>
             </div>
             <div class="ov-acard-blurb">{{ BLURB[c.category] }}</div>
-            <div class="ov-acard-ops">
-              <RouterLink class="ov-acard-link" :to="catLink(c.category)">查看清单 →</RouterLink>
-              <button class="ov-acard-toggle" type="button" @click="toggle(c.category)">
-                展开 <span class="ov-acard-arrow" :class="{ 'ov-acard-arrow--open': expanded[c.category] }">▾</span>
-              </button>
-            </div>
-            <div v-if="expanded[c.category]" class="ov-acard-body">
+            <div class="ov-acard-body">
               <button v-for="it in cardItems(c.category)" :key="it.key" type="button"
                 class="ov-acard-item" @click="router.push(`/project/${it.projectId}`)">
                 <span class="ov-acard-item-name">{{ it.primary }}</span>
@@ -218,11 +209,6 @@ defineExpose({ baseProjects })
 .ov-acard-count--warn { color: var(--warn-text); }
 .ov-acard-count--mut { color: var(--mut); }
 .ov-acard-blurb { font-size: var(--fs-1); color: var(--sub); margin-top: var(--sp-1); }
-.ov-acard-ops { display: flex; align-items: center; justify-content: space-between; margin-top: var(--sp-2); }
-.ov-acard-link { font-size: var(--fs-1); color: var(--accent); text-decoration: none; font-weight: 600; }
-.ov-acard-toggle { border: none; background: none; cursor: pointer; font-size: var(--fs-1); color: var(--sub); display: inline-flex; align-items: center; gap: var(--sp-1); }
-.ov-acard-arrow { display: inline-block; transition: transform var(--dur-2) var(--ease); }
-.ov-acard-arrow--open { transform: rotate(180deg); }
 .ov-acard-body { margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .ov-acard-item { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); border: none; background: none; padding: 3px 0; font-size: var(--fs-1); color: var(--txt); cursor: pointer; text-align: left; width: 100%; }
 .ov-acard-item:hover { color: var(--accent); }
