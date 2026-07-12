@@ -28,6 +28,15 @@ def test_sanitize_stored_name_strips_path():
     assert portal.sanitize_stored_name('') == 'file'
 
 
+def test_sanitize_collapses_double_dots():
+    out = portal.sanitize_stored_name('report..2024.txt')
+    assert '..' not in out
+    assert out == 'report.2024.txt'
+    assert portal._valid_stored_name(out) is True
+    # 既有断言不回归
+    assert portal.sanitize_stored_name('../../etc/passwd') == 'passwd'
+
+
 def test_validate_ok_url_item():
     out = portal.validate_portal_config(_cfg([_item()]))
     assert out['groups'] == ['G']
