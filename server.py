@@ -1300,7 +1300,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._json_response({"success": True, "config": cfg})
 
     def _cleanup_portal_orphans(self, cfg):
-        """删 portal_files/ 下不再被引用的文件;绝不抛(清理失败不影响保存)。"""
+        """删 portal_files/ 下不再被引用的文件;绝不抛(清理失败不影响保存)。
+        （单机单超管场景;并发保存下未及引用的新上传文件可能被清,属可接受权衡。）"""
         try:
             if not os.path.isdir(PORTAL_FILES_DIR):
                 return

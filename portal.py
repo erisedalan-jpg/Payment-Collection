@@ -37,6 +37,7 @@ def sanitize_stored_name(name: str) -> str:
     base = (name or '').replace('\\', '/').split('/')[-1]
     base = base.replace('\x00', '')
     base = re.sub(r'[\r\n\t]', '', base).strip()
+    base = re.sub(r'\.{2,}', '.', base)
     return base or 'file'
 
 
