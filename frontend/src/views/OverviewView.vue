@@ -18,11 +18,30 @@ import TodoQueue from '@/components/TodoQueue.vue'
 import { buildTodoQueue } from '@/lib/todoQueue'
 import { buildMilestoneProjects } from '@/lib/milestoneAnalytics'
 import { isAnomalous } from '@/lib/anomaly'
+import PortalLaunchpad from '@/components/PortalLaunchpad.vue'
+import { usePortalStore } from '@/stores/portal'
+import { buildSections } from '@/lib/portal'
+import { useAuthStore } from '@/stores/auth'
+import { userScopedKey } from '@/lib/userScopedKey'
 
 const data = useDataStore()
 const filter = useFilterStore()
 const router = useRouter()
 onMounted(() => { if (!data.data) data.load() })
+
+const auth = useAuthStore()
+const portal = usePortalStore()
+const portalSections = computed(() => buildSections(portal.config))
+const PORTAL_COLLAPSE_KEY = 'portal_collapsed'
+const portalCollapsed = ref(false)
+onMounted(() => {
+  portal.load().catch(() => {})
+  try { portalCollapsed.value = localStorage.getItem(userScopedKey(PORTAL_COLLAPSE_KEY)) === '1' } catch { /* ignore */ }
+})
+function togglePortal() {
+  portalCollapsed.value = !portalCollapsed.value
+  try { localStorage.setItem(userScopedKey(PORTAL_COLLAPSE_KEY), portalCollapsed.value ? '1' : '0') } catch { /* ignore */ }
+}
 
 const baseProjects = computed(() => {
   const all = (data.data?.projects ?? []) as Project[]
@@ -138,6 +157,21 @@ defineExpose({ baseProjects })
 
 <template>
   <div class="overview-view">
+    <!-- 快捷入口 / 门户 -->
+    <section v-if="portalSections.length || auth.isSuper" class="ov-portal">
+      <div class="ov-portal-head">
+        <span class="ov-portal-title">快捷入口</span>
+        <button v-if="portalSections.length" class="ov-portal-toggle" @click="togglePortal">
+          {{ portalCollapsed ? '展开' : '收起' }}
+        </button>
+        <RouterLink v-if="auth.isSuper" class="ov-portal-cfg" to="/data">＋ 配置</RouterLink>
+      </div>
+      <template v-if="portalSections.length">
+        <PortalLaunchpad v-show="!portalCollapsed" :sections="portalSections" />
+      </template>
+      <div v-else-if="auth.isSuper" class="ov-portal-empty">还没有快捷入口，去数据管理页配置 →</div>
+    </section>
+
     <!-- 体检带 -->
     <section class="ov-band">
       <div class="ov-band-health">
@@ -286,4 +320,21 @@ defineExpose({ baseProjects })
 @media (max-width: 768px) {
   .ov-band-pay { flex-direction: column; align-items: stretch; }
 }
+
+/* 快捷入口 / 门户 */
+.ov-portal {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--card-pad); background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1); margin-bottom: var(--gap-card);
+}
+.ov-portal-head { display: flex; align-items: center; gap: var(--sp-2); }
+.ov-portal-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }
+.ov-portal-toggle, .ov-portal-cfg {
+  font-size: var(--fs-1); color: var(--sub); background: none; border: none;
+  cursor: pointer; text-decoration: none; padding: 0 var(--sp-1);
+}
+.ov-portal-cfg { margin-left: auto; }
+.ov-portal-toggle:hover, .ov-portal-cfg:hover { color: var(--txt); }
+.ov-portal-empty { font-size: var(--fs-1); color: var(--mut); }
 </style>
