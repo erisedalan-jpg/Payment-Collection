@@ -41,7 +41,7 @@
 | 图标外观 | **首字母色块 + 可选 emoji + 置顶⭐**（emoji 有值覆盖首字母） |
 | url 打开方式 | **新标签页**打开（`target=_blank` + `rel="noopener noreferrer"`） |
 | 排序交互 | v1 **上移/下移按钮**（组级 + 组内项级），不引拖拽依赖（拖拽留后续增强） |
-| 上传上限 | **50 MB**（单文件；可调常量） |
+| 上传上限 | **200 MB**（单文件；可调常量） |
 | 首页空态 | 当前账号**无可见项 → 整块不渲染**；超管额外显一行「＋ 配置首页快捷入口 →」跳 `/data` |
 | 版本 | **Y 级 V2.10.0**（新增首页区块 + /data 配置 + 新后端端点/本地数据；Y 无需大版本确认） |
 
@@ -113,7 +113,7 @@
 | 端点 | 方法 | 权限 | 行为 |
 |---|---|---|---|
 | `/api/portal/config` | GET | 全员登录 | 读 `portal_links.json`；**超管**返回全量 `{version, groups, items}`；**非超管**返回 `visibleForAccount(config, account)`——只含 `visibility` 命中该账号的 items，`groups` 仅保留仍有可见项的组；越权项**整条不出现**（连 name/url/文件名都不返回）。响应统一 `_json_response({success, config})` |
-| `/api/portal/upload` | POST | 仅超管 | multipart 单文件（仿 inputs upload 解析）；校验大小 ≤ 50MB（`PORTAL_MAX_UPLOAD = 50*1024*1024`）；生成 `id`（若前端未带则后端补）与 `storedName`，写 `data/portal_files/`；返回 `{success, file:{storedName, originalName, size}}`。**不**直接改 config（前端拿回引用后随 config 一起保存） |
+| `/api/portal/upload` | POST | 仅超管 | multipart 单文件（仿 inputs upload 解析）；校验大小 ≤ 200MB（`PORTAL_MAX_UPLOAD = 200*1024*1024`）；生成 `id`（若前端未带则后端补）与 `storedName`，写 `data/portal_files/`；返回 `{success, file:{storedName, originalName, size}}`。**不**直接改 config（前端拿回引用后随 config 一起保存） |
 | `/api/portal/config` | POST | 仅超管 | 整存：`_require_super` + `_read_json_body` + `validate_portal_config`（纯函数，见下）→ `_followup_txn(_portal_lock, _load_portal_config, lambda _: new, _save_portal_config)` → 清理孤儿文件；审计 `_audit_set` |
 | `/api/portal/download` | GET | 全员登录 | 参数 `id`；载 config → 找该 id 的 file 项 → **校验 `itemVisibleTo(item, account)`**（否则 404，不区分「不存在/无权」以免探测）→ `name = os.path.basename(item.file.storedName)`，`path = os.path.join(PORTAL_FILES_DIR, name)`，`os.path.isfile` 校验 → 读字节 → `Content-Type: application/octet-stream` + `Content-Disposition: attachment; filename="<ascii回退>"; filename*=UTF-8''<百分号编码 originalName>` + `Content-Length` → `wfile.write` |
 
@@ -140,7 +140,7 @@ handler 内 `self._audit_set(detail='跳转 %d 项 · 文件 %d 项' % (n_url, n
 2. **越权下载 → 404**：下载端点对「项不存在」与「项存在但无权」**返回同一 404**，避免账号据响应差异探测他人可见文件的存在。
 3. **URL scheme 白名单**：`_is_safe_url` 仅放 `http/https`；存储时（`validate_portal_config`）与前端渲染时双校验，挡 `javascript:`/`data:` 点击 XSS。url 项渲染 `rel="noopener noreferrer"` + `target="_blank"`。
 4. **下载路径消毒**：只在 `PORTAL_FILES_DIR = os.path.join(BASE_DIR, 'data', 'portal_files')` 内取文件，`os.path.basename(storedName)` 消毒；`storedName` 在 `validate_portal_config` 阶段拒绝含 `/`、`\`、`..`。
-5. **上传约束**：仅超管；大小 ≤ 50MB；`storedName` 由后端按 `id` 生成，原名仅用于 `Content-Disposition` 展示，落盘名不含用户可控路径。
+5. **上传约束**：仅超管；大小 ≤ 200MB；`storedName` 由后端按 `id` 生成，原名仅用于 `Content-Disposition` 展示，落盘名不含用户可控路径。
 6. **写端点**：config/upload 走 `_require_super` + `_SUPER_ONLY_PATHS` 双保险；multipart 解析失败/超限 → 400 明确报错。
 7. **审计留痕**：门户增删改（config.save / upload）落审计，可追溯谁改了分发范围。
 
