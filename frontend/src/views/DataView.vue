@@ -15,10 +15,13 @@ import { useDataHistory } from '@/composables/useDataHistory'
 import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
 import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
+import PortalConfigCard from '@/components/PortalConfigCard.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
 const filter = useFilterStore()
+const auth = useAuthStore()
 
 const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 const lastPmis = computed(() => (data.data as any)?.dataQuality?.summary?.lastPmisUpdate || '-')
@@ -360,6 +363,10 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
           源数据仅保留最新 1 份<template v-if="historySource?.refreshedAt">（来自 {{ historySource.refreshedAt }}{{ historySource.sizeBytes ? ' · ' + fmtMB(historySource.sizeBytes) : '' }}）</template>，回滚仅还原看板数据。
         </div>
         <div v-if="historyMsg" class="dv-row dv-hint ok">{{ historyMsg }}</div>
+      </el-collapse-item>
+
+      <el-collapse-item v-if="auth.isSuper" name="portal" title="首页门户 / 快捷入口">
+        <PortalConfigCard />
       </el-collapse-item>
 
       <el-collapse-item name="clear">

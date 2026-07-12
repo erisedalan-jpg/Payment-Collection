@@ -42,6 +42,9 @@ data/manual_backups/
 data/followup_records.json
 # 项目标签库（运行时用户数据，2C）
 data/project_tags.json
+# 首页门户/快捷入口配置 + 上传文件（本地敏感数据，运行时生成，不入库）
+data/portal_links.json
+data/portal_files/
 # 重点项目进展数据（运行时用户数据，SP-2）
 data/project_progress.json
 # 商机管理数据（运行时用户数据，V2.0.0）
