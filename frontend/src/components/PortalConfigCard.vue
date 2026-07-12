@@ -72,12 +72,12 @@ defineExpose({ draft, onDialogSave })
 <template>
   <div class="pc-card" data-test="portal-config-card">
     <div class="pc-head">
-      <button class="dv-btn primary" data-test="pc-add" @click="openNew">＋ 新建门户项</button>
-      <button class="dv-btn" data-test="pc-save" :disabled="store.saving" @click="onSave">保存</button>
-      <span class="dv-hint">在首页顶部「快捷入口」按分组展示；置顶项汇入顶部区。</span>
+      <button class="pc-btn primary" data-test="pc-add" @click="openNew">＋ 新建门户项</button>
+      <button class="pc-btn" data-test="pc-save" :disabled="store.saving" @click="onSave">保存</button>
+      <span class="pc-hint">在首页顶部「快捷入口」按分组展示；置顶项汇入顶部区。</span>
     </div>
 
-    <div v-if="!sections.length" class="dv-hint">还没有门户项，点「新建门户项」添加。</div>
+    <div v-if="!sections.length" class="pc-hint">还没有门户项，点「新建门户项」添加。</div>
 
     <div v-for="sec in sections" :key="sec.key" class="pc-sec">
       <div class="pc-sec-head">
@@ -128,4 +128,11 @@ defineExpose({ draft, onDialogSave })
 }
 .pc-mini:hover { color: var(--txt); border-color: var(--accent); }
 .pc-mini.danger:hover { color: var(--danger-text); border-color: var(--danger-text); }
+.pc-btn {
+  border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm);
+  padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); cursor: pointer; color: var(--txt);
+}
+.pc-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.pc-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.pc-hint { font-size: var(--fs-1); color: var(--mut); }
 </style>
