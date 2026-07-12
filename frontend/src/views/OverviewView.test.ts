@@ -7,6 +7,12 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
 
+vi.mock('@/lib/portalApi', () => ({
+  getPortalConfig: vi.fn(async () => ({ version: 1, groups: [], items: [] })),
+  savePortalConfig: vi.fn(),
+  downloadUrl: (id: string) => '/api/portal/download?id=' + id,
+}))
+
 let router: Router
 beforeEach(() => {
   setActivePinia(createPinia())

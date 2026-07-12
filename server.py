@@ -25,6 +25,7 @@ from logging.handlers import TimedRotatingFileHandler
 from urllib.parse import urlparse, parse_qs
 import auth
 import audit
+import portal
 import config
 import data_history
 import data_scope
@@ -196,6 +197,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/payment-key-followup/scope', '/api/payment-key-followup/archive', '/api/payment-key-followup/archive/delete',
     '/api/pmis/cookie', '/api/pmis/download',
     '/api/yitian/cookie',
+    '/api/portal/upload',
 })
 
 
@@ -310,6 +312,34 @@ def _load_project_tags():
 def _save_project_tags(store):
     with _tags_lock:
         _atomic_write_json(PROJECT_TAGS_FILE, store)
+
+
+# ── 首页门户/快捷入口(Launchpad,本地 JSON 配置 + 上传文件) ──
+PORTAL_LINKS_FILE = os.path.join(BASE_DIR, 'data', 'portal_links.json')
+PORTAL_FILES_DIR = os.path.join(BASE_DIR, 'data', 'portal_files')
+PORTAL_MAX_UPLOAD = 200 * 1024 * 1024   # 单文件上传上限 200MB
+_portal_lock = threading.RLock()
+
+
+def _load_portal_config():
+    with _portal_lock:
+        if os.path.exists(PORTAL_LINKS_FILE):
+            try:
+                with open(PORTAL_LINKS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    data.setdefault('version', 1)
+                    data.setdefault('groups', [])
+                    data.setdefault('items', [])
+                    return data
+            except Exception:
+                pass
+        return portal.empty_config()
+
+
+def _save_portal_config(store):
+    with _portal_lock:
+        _atomic_write_json(PORTAL_LINKS_FILE, store)
 
 
 # ── 重点项目进展(SP-2,本地 JSON store:current 可编 + archives 只读快照) ──
@@ -676,6 +706,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_admin_accounts_list()
         elif parsed.path == '/api/admin/audit':
             self.handle_admin_audit()
+        elif parsed.path == '/api/portal/config':
+            self.handle_portal_config_get()
+        elif parsed.path == '/api/portal/download':
+            self.handle_portal_download()
         elif parsed.path == '/data/analysis_data.json':
             self.handle_data_json()
         else:
@@ -811,6 +845,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
             self.handle_inputs_upload()
+        elif parsed.path == '/api/portal/config':
+            self.handle_portal_config_save()
+        elif parsed.path == '/api/portal/upload':
+            self.handle_portal_upload()
         elif parsed.path == '/api/data-history/rollback':
             self.handle_data_history_rollback()
         elif parsed.path == '/api/data-history/undo-rollback':
@@ -1225,6 +1263,113 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                                            res or "保存标签失败"))
             return
         self._json_response({"success": True})
+
+    def handle_portal_config_get(self):
+        """GET /api/portal/config — 全员登录;超管返回全量,普通账号仅其可见项。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        cfg = _load_portal_config()
+        if rec.get('isSuper'):
+            self._json_response({"success": True, "config": cfg})
+        else:
+            self._json_response({"success": True, "config": portal.visible_for_account(cfg, account)})
+
+    def handle_portal_config_save(self):
+        """POST /api/portal/config — 仅超管整存 + 清孤儿文件。"""
+        if self._require_super() is None:
+            return
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            cfg = portal.validate_portal_config(data)
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        n_url = sum(1 for it in cfg['items'] if it['type'] == 'url')
+        n_file = sum(1 for it in cfg['items'] if it['type'] == 'file')
+        self._audit_set(detail='跳转 %d 项 · 文件 %d 项 · 分组 %d' % (n_url, n_file, len(cfg['groups'])))
+        with _portal_lock:
+            _save_portal_config(cfg)
+            self._cleanup_portal_orphans(cfg)
+        self._json_response({"success": True, "config": cfg})
+
+    def _cleanup_portal_orphans(self, cfg):
+        """删 portal_files/ 下不再被引用的文件;绝不抛(清理失败不影响保存)。
+        （单机单超管场景;并发保存下未及引用的新上传文件可能被清,属可接受权衡。）"""
+        try:
+            if not os.path.isdir(PORTAL_FILES_DIR):
+                return
+            existing = [n for n in os.listdir(PORTAL_FILES_DIR)
+                        if os.path.isfile(os.path.join(PORTAL_FILES_DIR, n))]
+            for name in portal.orphan_files(cfg, existing):
+                try:
+                    os.remove(os.path.join(PORTAL_FILES_DIR, name))
+                except OSError:
+                    pass
+        except Exception:
+            logger.error('portal 孤儿文件清理失败', exc_info=True)
+
+    def handle_portal_upload(self):
+        """POST /api/portal/upload?name=<原名> — 仅超管;裸字节 body 落 portal_files/。"""
+        if self._require_super() is None:
+            return
+        qs = parse_qs(urlparse(self.path).query)
+        original = (qs.get('name', [''])[0] or '').strip()
+        if not original:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "缺少文件名"))
+            return
+        body = self._read_body_bytes(PORTAL_MAX_UPLOAD)
+        if body is None:
+            self._send_json(413, _error_payload(ERR_VALIDATION, "请求体缺失或超出 200MB 上限"))
+            return
+        if len(body) == 0:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "缺少文件内容"))
+            return
+        stored = '%s__%s' % (portal.new_file_token(), portal.sanitize_stored_name(original))
+        os.makedirs(PORTAL_FILES_DIR, exist_ok=True)
+        with open(os.path.join(PORTAL_FILES_DIR, stored), 'wb') as f:
+            f.write(body)
+        self._audit_set(target=original, detail='上传门户文件 · %d 字节' % len(body))
+        self._json_response({"success": True,
+                             "file": {"storedName": stored, "originalName": original, "size": len(body)}})
+
+    def handle_portal_download(self):
+        """GET /api/portal/download?id=<itemId> — 登录;再校验可见性 → 强制下载。
+        项不存在 / 无权 / 文件缺失 一律 404,避免据响应差异探测他人可见文件。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        iid = (parse_qs(urlparse(self.path).query).get('id', [''])[0] or '').strip()
+        cfg = _load_portal_config()
+        item = next((it for it in cfg.get('items', [])
+                     if it.get('id') == iid and it.get('type') == 'file'), None)
+        if not item or not portal.item_visible_to(item, account, bool(rec.get('isSuper'))):
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, "文件不存在"))
+            return
+        stored = os.path.basename((item.get('file') or {}).get('storedName', ''))
+        path = os.path.join(PORTAL_FILES_DIR, stored)
+        if not stored or not os.path.isfile(path):
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, "文件不存在"))
+            return
+        with open(path, 'rb') as f:
+            body = f.read()
+        original = (item.get('file') or {}).get('originalName', stored)
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/octet-stream')
+        self.send_header('Content-Disposition', portal.content_disposition(original))
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body)
 
     def handle_progress_get(self):
         """GET /api/progress — 返回重点项目进展 {current, archives}。"""
