@@ -14,6 +14,7 @@ import snapshots as snapshots_mod
 import milestones as milestones_mod
 import profit as profit_mod
 import collection_stages as collection_mod
+import yitian as yitian_mod
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -290,6 +291,23 @@ def main():
     print(f"  主域项目总数: {len(dept_projects)}")
     print(f"  回款阶段总数(收款阶段节点): {sum(len(v) for v in payment_nodes.values())}")
     print(f"  输出文件: {output_file}")
+
+    # === 11. 倚天工时域(V3.0.0):离线导入。缺 input/yitian/工时.xlsx 则跳过,绝不阻断主管线 ===
+    try:
+        ydata = yitian_mod.build_yitian_data(BASE_DIR)
+        if ydata is None:
+            print("[INFO] 未提供 input/yitian/工时.xlsx,跳过倚天工时域")
+        else:
+            ypath = schema.validate_and_write_yitian_json(ydata, OUTPUT_DIR)
+            ymeta = ydata["meta"]
+            print("[OK] 倚天工时域: %d 行 / %d 人 / 日历源 %s → %s"
+                  % (ymeta["rows"], ymeta["employees"], ymeta["calendarSource"], ypath))
+            if ymeta["droppedRows"]:
+                print("  [WARN] 倚天工时 %d 行因工号不在组织架构花名册被丢弃" % ymeta["droppedRows"])
+            if ymeta["calendarSource"] == "fallback":
+                print("  [WARN] 未提供 input/yitian/holidays.csv,工作日退化为纯周一~周五(节假日周饱和度会偏低)")
+    except Exception as e:   # 倚天域是附加特性,任何异常都不得影响 analysis_data.json
+        print(f"  [WARN] 倚天工时域生成失败,本次跳过: {e}")
 
 if __name__ == "__main__":
     main()
