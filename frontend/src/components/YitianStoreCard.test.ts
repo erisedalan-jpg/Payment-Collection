@@ -47,20 +47,41 @@ describe('YitianStoreCard', () => {
     expect((w.vm as any).stats.rows).toBe(0)
   })
 
-  it('按区间删除', async () => {
+  it('按区间删除(确认后)', async () => {
+    const { ElMessageBox } = await import('element-plus')
+    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as any)
     const w = mount(YitianStoreCard, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     ;(w.vm as any).range = ['2026-04-17', '2026-04-17']
     await (w.vm as any).onDeleteRange()
+    expect(confirmSpy).toHaveBeenCalled()
     expect(delSpy).toHaveBeenCalledWith('2026-04-17', '2026-04-17')
     expect((w.vm as any).stats.rows).toBe(440)
+    confirmSpy.mockRestore()
   })
 
-  it('未选区间不发请求', async () => {
+  it('未选区间不发请求(不弹确认框)', async () => {
+    const { ElMessageBox } = await import('element-plus')
+    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm')
     const w = mount(YitianStoreCard, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     ;(w.vm as any).range = null
     await (w.vm as any).onDeleteRange()
+    expect(confirmSpy).not.toHaveBeenCalled()
     expect(delSpy).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+
+  it('I-4: 取消删除区间确认框 → 不发请求', async () => {
+    // 误删的历史周没有源文件可重导 = 永久丢失,破坏性高于「清空」,必须有二次确认。
+    const { ElMessageBox } = await import('element-plus')
+    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    const w = mount(YitianStoreCard, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    ;(w.vm as any).range = ['2026-04-17', '2026-04-17']
+    await (w.vm as any).onDeleteRange()
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(delSpy).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
   })
 })

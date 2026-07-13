@@ -16,6 +16,7 @@ except Exception:
     pass
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -233,6 +234,23 @@ def _error_payload(code, message):
     return {"success": False, "code": code, "message": message}
 
 
+_ISO_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+
+def _valid_iso_date(s):
+    """严格校验 s 是合法的 YYYY-MM-DD。正则先挡住非数字/未补零格式(如 "0"、"2026-4-1"),
+    strptime 再挡真实日历合法性(如 "2026-02-31")。
+    倚天累积库 delete-range 曾经只做字符串比较(start <= date <= end),"0"~"9" 这类
+    非日期串因字典序恒真会删光全库、"2026-4-1" 这类未补零串又会静默删 0 行却报 success(I-1)。"""
+    if not _ISO_DATE_RE.match(s or ''):
+        return False
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
+
+
 def _atomic_write_json(path, data):
     """原子写 JSON:先写 .tmp 再 os.replace,避免并发/崩溃留半截坏文件。"""
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
@@ -313,19 +331,6 @@ def _load_yitian_cached():
             except Exception:
                 return None
         return _yitian_cache['data']
-
-
-def _clear_yitian_store():
-    """清空数据时一并清倚天累积库(员工级工时不能清了业务数据还留在盘上)。
-    **不动 data/yitian_settings.json** —— 那是配置不是数据。"""
-    try:
-        yitian_store.clear_store(YITIAN_STORE_FILE)
-    except OSError:
-        pass
-    try:
-        os.remove(YITIAN_DATA_FILE)
-    except OSError:
-        pass
 
 
 _tags_lock = threading.RLock()
@@ -2466,20 +2471,30 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                         detail='剔除类型: ' + ('、'.join(clean['excludedTypes']) or '(无)'))
         self._send_json(200, {"success": True, "settings": clean})
 
-    def _rebuild_yitian_data(self):
-        """累积库变更后就地重建 data/yitian_data.json,并清缓存 ——
-        否则页面还在展示已被删掉的数据。累积库空 → 删掉下发文件。"""
-        data = yitian.build_yitian_data(BASE_DIR)
-        if data is None:
-            try:
-                os.remove(YITIAN_DATA_FILE)
-            except OSError:
-                pass
-        else:
-            schema.validate_and_write_yitian_json(data, os.path.join(BASE_DIR, 'data'))
-        with _yitian_cache_lock:
-            _yitian_cache['mtime'] = None
-            _yitian_cache['data'] = None
+    def _rebuild_yitian_data(self, store):
+        """用给定的(可能已在内存中变更但**尚未落盘**的)累积库重建 data/yitian_data.json。
+
+        I-2:"先算通再落盘"两阶段提交 —— build/schema 校验全部在内存里做完,调用方
+        (两个写端点)只在本方法**不抛异常**时才把 store 落盘;任一步失败,磁盘上的
+        累积库文件和下发 JSON 都保持原样,不会出现"库已改并落盘、下发数据却还是旧的"
+        三方不一致。异常不吞、原样向上抛,由调用方决定 500 响应文案。
+        缓存置空放进 finally:缓存宁可空(下次重新读)也不能脏。
+        累积库空 → 删掉下发文件(M-5:写/删同一目录统一用 YITIAN_DATA_FILE 派生,
+        不再各自维护一份 os.path.join(BASE_DIR,'data'),避免测试只 monkeypatch 一个
+        导致写到真实 data/yitian_data.json)。"""
+        try:
+            data = yitian.build_yitian_data(BASE_DIR, store=store)
+            if data is None:
+                try:
+                    os.remove(YITIAN_DATA_FILE)
+                except OSError:
+                    pass
+            else:
+                schema.validate_and_write_yitian_json(data, os.path.dirname(YITIAN_DATA_FILE))
+        finally:
+            with _yitian_cache_lock:
+                _yitian_cache['mtime'] = None
+                _yitian_cache['data'] = None
 
     def handle_yitian_store_get(self):
         """GET /api/yitian/store - 累积状态(行数/覆盖区间)。登录 + 任一倚天页面授权。"""
@@ -2497,18 +2512,33 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True, "stats": stats})
 
     def handle_yitian_store_clear(self):
-        """POST /api/yitian/store/clear - 清空累积库(误导入的回退手段)。超管专属。"""
+        """POST /api/yitian/store/clear - 清空累积库(误导入的回退手段)。超管专属。
+
+        I-2:先在内存里清空 → 用它重建下发数据,**重建成功才落盘**;重建失败(build/schema
+        校验抛异常)磁盘上的累积库文件保持原样,返回 500 而不是让客户端连接中断收不到响应。"""
         if self._require_super() is None:
             return
         with _yitian_store_lock:
-            yitian_store.clear_store(YITIAN_STORE_FILE)
-            self._rebuild_yitian_data()
+            store = yitian_store.empty_store()
+            try:
+                self._rebuild_yitian_data(store)
+            except Exception as e:
+                self._send_json(500, _error_payload(
+                    ERR_INTERNAL, f"清空后重建下发数据失败,累积库未变更: {e}"))
+                return
+            yitian_store.save_store(YITIAN_STORE_FILE, store)
+            stats = yitian_store.store_stats(store)
         self._audit_set(target='倚天工时累积库', detail='清空全部累积数据')
-        self._send_json(200, {"success": True,
-                              "stats": yitian_store.store_stats(yitian_store.empty_store())})
+        self._send_json(200, {"success": True, "stats": stats})
 
     def handle_yitian_store_delete_range(self):
-        """POST /api/yitian/store/delete-range {start,end} - 按日期区间删累积数据。超管专属。"""
+        """POST /api/yitian/store/delete-range {start,end} - 按日期区间删累积数据。超管专属。
+
+        I-1:起止日期须为合法的 YYYY-MM-DD(_valid_iso_date 双重校验:格式 + 真实日历),
+        不能只做字符串比较——"0"~"9" 这类非日期串字典序恒真会删光全库,"2026-4-1" 这类
+        未补零串又会静默删 0 行却返回 success。
+        I-2:先在内存里删 → 用它重建下发数据,**重建成功才落盘**;失败则磁盘累积库保持
+        原样(本次删除相当于回滚),返回 500 而不是让客户端连接中断收不到响应。"""
         if self._require_super() is None:
             return
         body = self._read_json_body()
@@ -2517,14 +2547,22 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         start = str(body.get('start') or '').strip()
         end = str(body.get('end') or '').strip()
-        if not start or not end or start > end:
-            self._send_json(400, _error_payload(ERR_VALIDATION, "起止日期非法"))
+        if not _valid_iso_date(start) or not _valid_iso_date(end):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "起止日期须为合法的 YYYY-MM-DD 格式"))
+            return
+        if start > end:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "起始日期不能晚于结束日期"))
             return
         with _yitian_store_lock:
             store = yitian_store.load_store(YITIAN_STORE_FILE)
             n = yitian_store.delete_range(store, start, end)
+            try:
+                self._rebuild_yitian_data(store)
+            except Exception as e:
+                self._send_json(500, _error_payload(
+                    ERR_INTERNAL, f"删除后重建下发数据失败,累积库未变更(本次删除未生效): {e}"))
+                return
             yitian_store.save_store(YITIAN_STORE_FILE, store)
-            self._rebuild_yitian_data()
             stats = yitian_store.store_stats(store)
         self._audit_set(target='倚天工时累积库', detail='删除区间 %s ~ %s 共 %d 行' % (start, end, n))
         self._send_json(200, {"success": True, "deleted": n, "stats": stats})

@@ -302,6 +302,9 @@ def main():
         else:
             print("[OK] 倚天工时导入: 新增 %d 行 / 更新 %d 行 / 累积库共 %d 行"
                   % (ing["added"], ing["updated"], ing["total"]))
+            if ing["skipped"]:
+                print("  [WARN] 倚天工时 %d 行因缺工时ID被跳过(无去重键,无法累积)"
+                      % ing["skipped"])
         ydata = yitian_mod.build_yitian_data(BASE_DIR)
         if ydata is None:
             print("[INFO] 倚天累积库为空,跳过倚天工时域")
