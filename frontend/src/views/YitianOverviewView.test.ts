@@ -41,11 +41,19 @@ describe('YitianOverviewView', () => {
     expect(w.text()).toContain('18')          // 8 + 10
   })
 
-  it('渲染分层汇总表', async () => {
+  it('渲染分层汇总表:标题去括号,只含 L4 层,不含层级列,含固定汇总行', async () => {
     const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
-    expect(w.text()).toContain('交付实施三部')
+    expect(w.text()).toContain('分层汇总')
+    expect(w.text()).not.toContain('分层汇总（')
     expect(w.text()).toContain('银行服务组')
+    // 只展示 L4 层:L3 名不再出现在表格里
+    expect(w.text()).not.toContain('交付实施三部')
+    // 层级列已删除
+    expect(w.text()).not.toContain('层级')
+    // 固定汇总行:合计 + 按 Σ实际÷Σ基础 重算的饱和度(18h / 16h = 112.5%)
+    expect(w.text()).toContain('合计')
+    expect(w.text()).toContain('112.5%')
   })
 
   it('加载失败显示错误', async () => {
@@ -53,5 +61,21 @@ describe('YitianOverviewView', () => {
     const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(w.text()).toContain('无倚天工时页面权限')
+  })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
+
+  it('工时类型占比同时给出环图与柱状图', async () => {
+    const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.typeOption.series[0].type).toBe('pie')
+    expect(vm.typeBarOption.series[0].type).toBe('bar')
+    // 柱状图的类目与数据必须与占比同源(同一批 typeRows)
+    expect(vm.typeBarOption.xAxis.data).toEqual(vm.typeRows.map((t: any) => t.type))
   })
 })

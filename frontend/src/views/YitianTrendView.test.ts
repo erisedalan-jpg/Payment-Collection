@@ -67,6 +67,12 @@ describe('YitianTrendView', () => {
     expect(s.weeks).toEqual(['2026-W23'])
     expect(s.hours).toEqual([16])
   })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianTrendView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
 })
 
 // I-5:零工作日的整周(假期周)不能画成合规率/饱和度 0%——那是凭空捏造出的暴跌,

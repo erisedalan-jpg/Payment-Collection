@@ -18,6 +18,10 @@ const options = computed(() => {
   return t.length ? t : FALLBACK_TYPES
 })
 
+// 全部剔除 → 合规率分母为 0 → 页面只能显示 "-"。管理员看到会以为系统坏了,必须当场说清。
+const allExcluded = computed(() =>
+  options.value.length > 0 && options.value.every((t) => draft.value.includes(t)))
+
 onMounted(async () => {
   await store.load()
   draft.value = [...store.settings.excludedTypes]
@@ -37,7 +41,7 @@ async function onSave() {
   }
 }
 
-defineExpose({ draft, onSave })
+defineExpose({ draft, onSave, allExcluded })
 </script>
 
 <template>
@@ -55,6 +59,11 @@ defineExpose({ draft, onSave })
       <el-checkbox v-for="t in options" :key="t" :value="t" :label="t" />
     </el-checkbox-group>
 
+    <p v-if="allExcluded" class="ys-hint ys-danger">
+      全部工时类型都被剔除了：合规率的分母为 0，各页的「合规率」只会显示 “-”、问题数恒为 0。
+      这不是故障——至少保留一个类型参与检查，合规率才有意义。
+    </p>
+
     <div class="ys-actions">
       <el-button type="primary" :loading="store.saving" @click="onSave">保存</el-button>
       <span v-if="msg" class="ys-msg" :class="{ 'ys-msg-err': err }">{{ msg }}</span>
@@ -63,9 +72,10 @@ defineExpose({ draft, onSave })
 </template>
 
 <style scoped>
-.ys-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
+.ys-card { display: flex; flex-direction: column; gap: var(--gap-stack); padding: var(--sp-3) var(--sp-4); }
 .ys-hint { font-size: var(--fs-2); color: var(--sub); line-height: var(--lh-base); }
 .ys-warn { color: var(--warn-text); background: var(--warn-bg); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); }
+.ys-danger { color: var(--danger-text); background: var(--danger-bg); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); }
 .ys-group { display: flex; flex-wrap: wrap; gap: var(--gap-stack); }
 .ys-actions { display: flex; align-items: center; gap: var(--gap-stack); }
 .ys-msg { font-size: var(--fs-1); color: var(--ok-text); }

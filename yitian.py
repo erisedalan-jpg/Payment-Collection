@@ -1,9 +1,12 @@
 # yitian.py
 """倚天工时域:管线组装。
 
-读 input/yitian/工时.xlsx(白名单列) → 工号 join input/组织架构.xlsx 花名册 → 工作日/双周标签
-→ 合规判定(yitian_check) → 码表压缩 → YitianData dict。
-input/yitian/工时.xlsx 缺失 → 返回 None(调用方跳过,绝不阻断主管线)。
+ingest():读 input/yitian/工时.xlsx(白名单列,每周仅含当周数据) → upsert 进累积库
+(data/yitian_store.json,按工时ID去重)。input/yitian/工时.xlsx 缺失 → 返回 None,不动累积库。
+
+build_yitian_data():**从累积库**读全量行 → 工号 join input/组织架构.xlsx 花名册 →
+工作日/双周标签 → 合规判定(yitian_check) → 码表压缩 → YitianData dict。
+累积库为空 → 返回 None(调用方跳过,绝不阻断主管线)。
 """
 from __future__ import annotations
 
@@ -15,6 +18,7 @@ import config
 import yitian_calendar as CAL
 import yitian_check as CHK
 import yitian_rules as R
+import yitian_store as STORE
 from projects import read_org_roster, read_sheet_by_header, read_sheet_headers, read_top1000
 
 # ── 工时.xlsx 取列白名单(全表 77 列,只读这 13 个) ──
@@ -33,17 +37,24 @@ COL_PRODUCT_NAME = "产研侧产品名称"
 COL_WORK_ORDER = "工单编号"
 COL_SALES_L2 = "销售L2组织"
 COL_SERVICE_MODE = "服务方式"
+COL_WID = "工时ID"          # 累积库去重键(实测 540/540 唯一、零空值)
 
-# 白名单列存在性校验用(13 列全列上)。导出端一旦改名/删列,缺列必须报错并跳过倚天段,
+# 白名单列存在性校验用(14 列全列上)。导出端一旦改名/删列,缺列必须报错并跳过倚天段,
 # 不能像 dict.get() 那样静默返回 None → "" → 全量误判(如 05-09 后每条 checked 行都吃
 # MISS_SERVICE_MODE,合规率崩到个位数却零报错)。
 REQUIRED_COLS = [
     COL_EMP_ID, COL_TYPE, COL_HOURS, COL_DATE, COL_CONTENT, COL_CUSTOMER,
     COL_PROJECT_TYPE, COL_WORKTYPE3, COL_PRODUCT_LINE, COL_PRODUCT_NAME,
-    COL_WORK_ORDER, COL_SALES_L2, COL_SERVICE_MODE,
+    COL_WORK_ORDER, COL_SALES_L2, COL_SERVICE_MODE, COL_WID,
 ]
 
 HOURS_PER_DAY = 8   # 基础工时 = 工作日数 × 8h
+
+STORE_FILE_NAME = "yitian_store.json"
+
+
+def store_path(base_dir: str) -> str:
+    return os.path.join(base_dir, "data", STORE_FILE_NAME)
 
 
 class _Dim:
@@ -70,12 +81,20 @@ def _hours(v) -> float:
         return 0.0
 
 
+def _missing_columns(path: str) -> List[str]:
+    """白名单列(REQUIRED_COLS)存在性校验,返回缺失列名(全齐则 [])。
+    仅 read_timesheet() 调用(ingest() 唯一入口是 read_timesheet(),不再各自重复读一遍
+    表头 —— 同一份 xlsx 曾经被 open 两次,见 M-7)。导出端一旦改名/删列,能挡住,
+    不能像 dict.get() 那样静默返回 None → "" → 全量误判。"""
+    headers = read_sheet_headers(path, COL_TYPE)
+    return [c for c in REQUIRED_COLS if c not in headers]
+
+
 def read_timesheet(path: str) -> Optional[List[Dict[str, Any]]]:
     """工时.xlsx → 归一化行(仅白名单列)。表头在第 1 行,按"含工时类型"自动选 sheet。
     工号统一大写、日期统一 YYYY-MM-DD、工时类型已做售前服务校正。
     白名单列缺失(导出端改名/删列) → 打印 [ERROR] 并返回 None(调用方跳过倚天段)。"""
-    headers = read_sheet_headers(path, COL_TYPE)
-    missing = [c for c in REQUIRED_COLS if c not in headers]
+    missing = _missing_columns(path)
     if missing:
         print("[ERROR] 倚天工时表缺列: %s,跳过倚天工时域" % "、".join(missing))
         return None
@@ -87,6 +106,7 @@ def read_timesheet(path: str) -> Optional[List[Dict[str, Any]]]:
         project_type = str(r.get(COL_PROJECT_TYPE) or "").strip()
         work_type = CHK.corrected_work_type(project_type, str(r.get(COL_TYPE) or "").strip())
         out.append({
+            "wid": str(r.get(COL_WID) or "").strip(),
             "emp_id": str(r.get(COL_EMP_ID) or "").strip().upper(),
             "date": d.isoformat() if d else "",
             "work_type": work_type,
@@ -104,8 +124,13 @@ def read_timesheet(path: str) -> Optional[List[Dict[str, Any]]]:
     return out
 
 
-def build_yitian_data(base_dir: str) -> Optional[dict]:
-    """完整倚天数据 dict;input/yitian/工时.xlsx 缺失 → None。"""
+def ingest(base_dir: str) -> Optional[dict]:
+    """把 input/yitian/工时.xlsx 的行 upsert 进累积库。
+    文件不存在 → None(不动累积库);缺列 → 打 [ERROR] 并 None(不阻断主管线,
+    缺列校验唯一发生在 read_timesheet() 内部,不再重复读一遍表头,见 M-7)。
+    返回 {"added": 新增, "updated": 更新, "skipped": 无工时ID被跳过, "total": 库内总行数}。
+    skipped(I-3):有列无值的行(工时ID 单元格为空)无去重键无法累积,调用方(preprocess_data.py)
+    须在 skipped>0 时打 [WARN],不能像早期那样零计数零告警地静默丢行。"""
     input_dir = os.path.join(base_dir, "input")
     ts_path = os.path.join(input_dir, config.YITIAN_DIRNAME, config.YITIAN_TIMESHEET_FILE)
     if not os.path.isfile(ts_path):
@@ -113,6 +138,28 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
 
     rows = read_timesheet(ts_path)
     if rows is None:
+        return None      # 缺列,read_timesheet() 已打印 [ERROR]
+
+    path = store_path(base_dir)
+    store = STORE.load_store(path)
+    added, updated, skipped = STORE.upsert_rows(store, rows)
+    STORE.save_store(path, store)
+    return {"added": added, "updated": updated, "skipped": skipped, "total": len(store["rows"])}
+
+
+def build_yitian_data(base_dir: str, store: Optional[dict] = None) -> Optional[dict]:
+    """完整倚天数据 dict,**从累积库构建**(每周导出先 ingest() 进库,这里读全量库)。
+    累积库为空 → None(调用方跳过,不阻断主管线)。
+
+    store(可选,I-2):传了就用它(内存中已变更、尚未落盘的累积库),不传才从磁盘读
+    (默认行为不变,既有调用方一律不用改)。这是"先算通再落盘"两阶段提交的基础——
+    server.py 的两个写端点先在内存里改 store、用它 build 出新数据、校验通过才落盘,
+    build/schema 校验失败就不会出现"累积库已改、下发 JSON 还是旧的"三方不一致。"""
+    input_dir = os.path.join(base_dir, "input")
+    if store is None:
+        store = STORE.load_store(store_path(base_dir))
+    rows = store["rows"]
+    if not rows:
         return None
     roster = read_org_roster(os.path.join(input_dir, config.ORG_FILE))
     roster_ids = {p["id"] for p in roster}
@@ -170,6 +217,7 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
                 "snippet": r["content"][:R.SNIPPET_MAX] if ok == 2 else "",
             })
 
+    st = STORE.store_stats(store)
     return {
         "meta": {
             "periodStart": days[0]["d"] if days else None,
@@ -181,6 +229,9 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
             "calendarSource": calendar_source,
             "hoursPerDay": HOURS_PER_DAY,
             "thisBgL2": list(R.THIS_BG_L2_ORGS),   # 跨BG判定常量随数据下发,前端不重复维护
+            "storeRows": st["rows"],               # 累积库覆盖状态(供 /data 展示)
+            "storeStart": st["start"],
+            "storeEnd": st["end"],
         },
         "roster": roster,
         "days": days,

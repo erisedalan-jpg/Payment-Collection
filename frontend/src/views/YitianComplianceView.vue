@@ -103,7 +103,7 @@ defineExpose({ codeFilter, rows, codeDist })
 </template>
 
 <style scoped>
-.yt-page { display: flex; flex-direction: column; gap: var(--gap-section); }
+.yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-card {
   background: var(--card);
   border: 1px solid var(--line);

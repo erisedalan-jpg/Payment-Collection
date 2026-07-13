@@ -21,3 +21,30 @@ export async function saveYitianSettings(cfg: YitianSettings): Promise<YitianSet
   const r = await api.post<{ success: boolean; settings: YitianSettings }>('/api/yitian/settings', cfg)
   return r.settings
 }
+
+export interface YitianStoreStats {
+  rows: number
+  start: string | null
+  end: string | null
+}
+
+/** 累积库状态(已累积多少行、覆盖哪段日期)。 */
+export async function getYitianStore(): Promise<YitianStoreStats> {
+  const r = await api.get<{ success: boolean; stats: YitianStoreStats }>('/api/yitian/store')
+  return r.stats
+}
+
+/** 清空累积库(超管)。误导入的回退手段。 */
+export async function clearYitianStore(): Promise<YitianStoreStats> {
+  const r = await api.post<{ success: boolean; stats: YitianStoreStats }>('/api/yitian/store/clear', {})
+  return r.stats
+}
+
+/** 按日期区间删除累积数据(超管)。 */
+export async function deleteYitianStoreRange(
+  start: string, end: string,
+): Promise<{ deleted: number; stats: YitianStoreStats }> {
+  const r = await api.post<{ success: boolean; deleted: number; stats: YitianStoreStats }>(
+    '/api/yitian/store/delete-range', { start, end })
+  return { deleted: r.deleted, stats: r.stats }
+}

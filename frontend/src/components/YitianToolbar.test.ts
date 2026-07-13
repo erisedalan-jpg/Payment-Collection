@@ -54,6 +54,16 @@ describe('YitianToolbar', () => {
     expect(w.text()).toContain('holidays.csv')
   })
 
+  it('控件为 small 尺寸且排在同一行(不换行容器)', () => {
+    const w = mountBar(DATA)
+    expect(w.find('.yt-row').exists()).toBe(true)
+    // 三个控件都在同一个 .yt-row 里
+    const row = w.find('.yt-row')
+    expect(row.findComponent({ name: 'ElDatePicker' }).exists()).toBe(true)
+    expect(row.findComponent({ name: 'ElRadioGroup' }).exists()).toBe(true)
+    expect(row.findComponent({ name: 'ElSelect' }).exists()).toBe(true)
+  })
+
   it('数据跨度外的日期被禁用', () => {
     const w = mountBar(DATA)
     const fn = (w.vm as any).disabledDate as (d: Date) => boolean

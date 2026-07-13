@@ -52,15 +52,16 @@ defineExpose({ l4Options, disabledDate })
     <div class="yt-row">
       <el-date-picker :model-value="rangeModel" type="daterange" value-format="YYYY-MM-DD" unlink-panels
         range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"
-        :disabled-date="disabledDate" :clearable="false" @update:model-value="onRangeChange" />
+        :disabled-date="disabledDate" :clearable="false" size="small" class="yt-date"
+        @update:model-value="onRangeChange" />
 
-      <el-radio-group v-model="view.weekMode" size="default">
-        <el-radio-button value="calc">计算周(周五~周四)</el-radio-button>
-        <el-radio-button value="iso">自然周(周一~周日)</el-radio-button>
+      <el-radio-group v-model="view.weekMode" size="small">
+        <el-radio-button value="calc" title="计算周:周五~周四">计算周</el-radio-button>
+        <el-radio-button value="iso" title="自然周:周一~周日">自然周</el-radio-button>
       </el-radio-group>
 
       <el-select v-model="view.l4s" multiple collapse-tags collapse-tags-tooltip clearable
-        placeholder="全部 L4 组织" class="yt-l4">
+        placeholder="全部 L4 组织" size="small" class="yt-l4">
         <el-option v-for="o in l4Options" :key="o" :label="o" :value="o" />
       </el-select>
 
@@ -76,7 +77,8 @@ defineExpose({ l4Options, disabledDate })
 <style scoped>
 .yt-bar { margin-bottom: var(--gap-section); }
 .yt-row { display: flex; flex-wrap: wrap; gap: var(--gap-stack); align-items: center; }
-.yt-l4 { min-width: 220px; }
+.yt-date { width: 260px; }
+.yt-l4 { min-width: 180px; max-width: 240px; }
 .yt-hint { color: var(--mut); font-size: var(--fs-1); }
 .yt-warn {
   margin-top: var(--gap-stack);
