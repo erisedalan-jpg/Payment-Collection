@@ -345,6 +345,9 @@ class YitianMeta(_Base):
     calendarSource: str              # "csv" | "fallback"(holidays.csv 缺失,退化为纯周一~周五)
     hoursPerDay: int
     thisBgL2: List[str]              # 本BG销售L2组织(跨BG判定常量,随数据下发)
+    storeRows: int                   # 累积库总行数(供 /data 展示"累积了多久")
+    storeStart: Optional[str]        # 累积库覆盖区间起(可空,但键必须出现)
+    storeEnd: Optional[str]          # 累积库覆盖区间止(同上)
 
 
 class YitianRosterItem(_Base):

@@ -105,7 +105,7 @@ defineExpose({ draft, onDialogSave })
 </template>
 
 <style scoped>
-.pc-card { display: flex; flex-direction: column; gap: var(--sp-3); }
+.pc-card { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
 .pc-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .pc-sec { display: flex; flex-direction: column; gap: var(--sp-1); }
 .pc-sec-head { display: flex; align-items: center; gap: var(--sp-1); }

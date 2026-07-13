@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import ElementPlus from 'element-plus'
 import DataTable, { type DataColumn } from './DataTable.vue'
 
@@ -148,5 +150,17 @@ describe('DataTable show-summary', () => {
     })
     await flushPromises()
     expect(w.text()).not.toContain('合计')
+  })
+})
+
+describe('DataTable 表底汇总行数字挂 tabular-nums(M-6)', () => {
+  // el-table 原生 show-summary 渲染的表底(.el-table__footer)不吃 cell-class-name，
+  // 普通 body 单元格靠 col.num→.u-num 挂 tabular-nums 的路子在 footer 上不生效，
+  // 违反 CLAUDE.md 硬约束「表格数字列必须挂 .u-num」。须靠 :deep 选择器直接兜底。
+  it('scoped 样式里对 .el-table__footer .cell 挂 font-variant-numeric: tabular-nums', () => {
+    const _metaUrl = import.meta.url
+    const src = readFileSync(fileURLToPath(new URL('./DataTable.vue', _metaUrl)), 'utf-8')
+    expect(src).toContain(':deep(.el-table__footer .cell)')
+    expect(src).toMatch(/:deep\(\.el-table__footer \.cell\)\s*\{\s*font-variant-numeric:\s*tabular-nums/)
   })
 })

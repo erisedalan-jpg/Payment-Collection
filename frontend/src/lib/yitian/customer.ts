@@ -62,6 +62,31 @@ export function top1000ByL4(
     .sort((a, b) => b.topHours - a.topHours)
 }
 
+export interface Top1000Totals {
+  hours: number
+  topHours: number
+  pct: number
+  topCustomers: number
+}
+
+/** TOP1000 表的合计。占比按 ΣTOP ÷ Σ总 重算;客户数**全局去重**(同一客户可能被多个组服务,不能相加)。
+ *  入参 rows 是已剔除「未分配L4」后的可见行,合计与表格所见一致。 */
+export function top1000TotalsRow(
+  data: YitianData, start: string, end: string, l4s: string[], rows: Top1000Row[],
+): Top1000Totals {
+  const visible = new Set(rows.map((r) => r.l4))
+  const l4Of = rosterL4Map(data)
+  const custs = new Set<number>()
+  for (const e of selectEntries(data, start, end, l4s)) {
+    if (!CUSTOMER_TYPES.includes(typeNameOf(data, e))) continue
+    if (!visible.has(l4Of[e.e] ?? '')) continue
+    if (e.top && e.cu !== null && e.cu !== undefined) custs.add(e.cu)
+  }
+  const hours = rows.reduce((s, r) => s + r.hours, 0)
+  const topHours = rows.reduce((s, r) => s + r.topHours, 0)
+  return { hours, topHours, pct: hours > 0 ? topHours / hours : 0, topCustomers: custs.size }
+}
+
 /** 跨 BG 支持:本 BG = 销售L2组织 ∈ meta.thisBgL2(常量随数据下发,前端不另维护一份)。 */
 export function bgSupport(
   data: YitianData, start: string, end: string, l4s: string[] = [],

@@ -116,7 +116,7 @@ defineExpose({ series })
 </template>
 
 <style scoped>
-.yt-page { display: flex; flex-direction: column; gap: var(--gap-section); }
+.yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--gap-card); }
 .yt-card {
   background: var(--card);

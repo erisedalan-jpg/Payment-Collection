@@ -14,6 +14,9 @@ export type Droppedrows = number;
 export type Calendarsource = string;
 export type Hoursperday = number;
 export type Thisbgl2 = string[];
+export type Storerows = number;
+export type Storestart = string | null;
+export type Storeend = string | null;
 export type Id = string;
 export type Name = string;
 export type L2 = string;
@@ -76,6 +79,9 @@ export interface YitianMeta {
   calendarSource: Calendarsource;
   hoursPerDay: Hoursperday;
   thisBgL2: Thisbgl2;
+  storeRows: Storerows;
+  storeStart: Storestart;
+  storeEnd: Storeend;
   [k: string]: unknown;
 }
 export interface YitianRosterItem {

@@ -69,6 +69,7 @@ frontend/*.tsbuildinfo
 # schema.py 导出的中间产物（TS 类型生成用），不入库
 schema.json
 data/yitian_data.json
+data/yitian_store.json
 yitian_schema.json
 
 # ── 系统 ──

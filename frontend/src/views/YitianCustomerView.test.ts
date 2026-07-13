@@ -16,7 +16,11 @@ const DATA = {
   meta: { periodStart: '2026-06-01', periodEnd: '2026-06-01', generatedAt: '', rows: 2,
           employees: 1, droppedRows: 0, calendarSource: 'csv', hoursPerDay: 8,
           thisBgL2: ['银行集团军'] },
-  roster: [{ id: 'A1', name: '张三', l2: '', l3: '交付实施三部', l31: '服务二部', l4: '银行服务组', category: '' }],
+  roster: [
+    { id: 'A1', name: '张三', l2: '', l3: '交付实施三部', l31: '服务二部', l4: '银行服务组', category: '' },
+    // 部门负责人,花名册 L4 为空 → 归入「未分配L4」,无客户支持归属,页面应剔除
+    { id: 'A9', name: '赵六', l2: '', l3: '交付实施三部', l31: '服务二部', l4: '', category: '' },
+  ],
   days: [{ d: '2026-06-01', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' }],
   dims: { types: ['项目类'], workTypes: [], customers: ['大客户', '小客户'], products: [],
           productNames: [], projectTypes: [], salesL2: ['银行集团军', '政企大区'], serviceModes: [] },
@@ -50,5 +54,29 @@ describe('YitianCustomerView', () => {
     expect(bg.thisBg).toBe(6)
     expect(bg.crossBg).toBe(2)
     expect(w.text()).toContain('跨 BG')
+  })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianCustomerView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
+
+  it('TOP1000 标题去括号,口径说明降为表上小字,不含"未分配L4"行,含固定汇总行', async () => {
+    const w = mount(YitianCustomerView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.text()).toContain('TOP1000 大客户支持')
+    expect(w.text()).not.toContain('TOP1000 大客户支持（')
+    expect(w.text()).not.toContain('未分配L4')
+    const rows = (w.vm as any).topRows as { l4: string }[]
+    expect(rows.every((r) => r.l4 !== '未分配L4')).toBe(true)
+    expect(w.text()).toContain('合计')
+  })
+
+  it('跨 BG 标题去括号,口径说明降为小字', async () => {
+    const w = mount(YitianCustomerView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.text()).toContain('跨 BG 支持')
+    expect(w.text()).not.toContain('跨 BG 支持（')
   })
 })
