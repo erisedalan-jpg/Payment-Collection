@@ -16,6 +16,7 @@ import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
 import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
+import YitianScopeCard from '@/components/YitianScopeCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -377,6 +378,10 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 
       <el-collapse-item v-if="auth.isSuper" name="portal" title="首页门户 / 快捷入口">
         <PortalConfigCard />
+      </el-collapse-item>
+
+      <el-collapse-item v-if="auth.isSuper" name="yitian-scope" title="倚天工时 · 合规检查范围">
+        <YitianScopeCard />
       </el-collapse-item>
 
       <el-collapse-item name="clear">

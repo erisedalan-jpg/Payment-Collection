@@ -13,6 +13,7 @@ import { usePaymentKeyFollowupStore } from './paymentKeyFollowup'
 import { usePortalStore } from './portal'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -34,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
       usePortalStore().reset()
       useYitianStore().reset()
       useYitianViewStore().reset()
+      useYitianSettingsStore().reset()
     }
     return res
   }
@@ -53,6 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
     usePortalStore().reset()
     useYitianStore().reset()
     useYitianViewStore().reset()
+    useYitianSettingsStore().reset()
   }
   async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
     const res = await apiChangePassword(oldPassword, newPassword)

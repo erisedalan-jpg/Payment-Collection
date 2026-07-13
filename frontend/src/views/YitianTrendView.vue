@@ -4,13 +4,15 @@ import YitianToolbar from '@/components/YitianToolbar.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { weekBuckets } from '@/lib/yitian/calendar'
-import { selectEntries, empStats, complianceRate, unfilledList, neverFilledList } from '@/lib/yitian/metrics'
+import { selectEntries, empStats, complianceRate, isIncluded, unfilledList, neverFilledList } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
+const settings = useYitianSettingsStore()
 
-onMounted(() => { store.load() })
+onMounted(() => { store.load(); settings.load() })
 
 const ready = computed(() => !!store.data)
 
@@ -34,8 +36,8 @@ const series = computed(() => {
     const es = selectEntries(data, b.start, b.end, view.l4s)
     const stats = empStats(data, b.start, b.end, view.l4s)
 
-    out.issues.push(es.filter((e) => e.chk && e.ok === 2).length)
-    const r = complianceRate(es)
+    out.issues.push(es.filter((e) => isIncluded(data, e, settings.settings.excludedTypes) && e.ok === 2).length)
+    const r = complianceRate(data, es, settings.settings.excludedTypes)
     out.okRate.push(r === null ? 0 : Number((r * 100).toFixed(1)))
     out.hours.push(Number(es.reduce((s, e) => s + e.h, 0).toFixed(1)))
     out.overtime.push(Number(stats.filter((s) => s.diff > 0).reduce((s, x) => s + x.diff, 0).toFixed(1)))
