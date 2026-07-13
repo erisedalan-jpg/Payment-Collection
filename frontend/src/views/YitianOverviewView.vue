@@ -106,7 +106,7 @@ const orgRows = computed(() => {
 </template>
 
 <style scoped>
-.yt-page { display: flex; flex-direction: column; gap: var(--gap-section); }
+.yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(480px, 2fr); gap: var(--gap-card); }
 @media (max-width: 1200px) { .yt-grid { grid-template-columns: 1fr; } }
 .yt-card {

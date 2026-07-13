@@ -67,4 +67,10 @@ describe('YitianAnalyticsView', () => {
     const rows = (w.vm as any).topRows as { name: string }[]
     expect(rows[0].name).toBe('张三')
   })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianAnalyticsView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
 })

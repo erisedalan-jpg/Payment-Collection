@@ -85,4 +85,10 @@ describe('YitianComplianceView', () => {
     expect(hintItem.classes()).toContain('yt-dist--warn')
     expect(issueItem.classes()).not.toContain('yt-dist--warn')
   })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianComplianceView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
 })
