@@ -152,11 +152,16 @@ class TestClearDataRemovesYitianData:
         yitian_f.write_text('{"roster": []}', encoding="utf-8")
         settings_f = data_dir / "yitian_settings.json"
         settings_f.write_text('{"excludedTypes": []}', encoding="utf-8")
+        store_f = data_dir / "yitian_store.json"
+        store_f.write_text('{"version": 1, "rows": []}', encoding="utf-8")
 
         monkeypatch.setattr(server, "BASE_DIR", str(tmp_path))
         monkeypatch.setattr(server, "ANALYSIS_FILE", str(analysis_f))
         monkeypatch.setattr(server, "YITIAN_DATA_FILE", str(yitian_f))
         monkeypatch.setattr(server, "YITIAN_SETTINGS_FILE", str(settings_f))
+        # 隔离累积库路径:handle_clear_data 现在也会清累积库,不隔离会清到真实的
+        # data/yitian_store.json(开发机上的真实倚天累积数据)
+        monkeypatch.setattr(server, "YITIAN_STORE_FILE", str(store_f))
         # 预置一份非空缓存,验证清空后缓存也被置空(否则下一次 /api/yitian/data 仍会命中旧缓存)
         server._yitian_cache['mtime'] = os.path.getmtime(str(yitian_f))
         server._yitian_cache['data'] = {"roster": []}
@@ -189,3 +194,39 @@ class TestFileStatus:
         out = S.collect_file_status(str(tmp_path))
         assert out[config.YITIAN_TIMESHEET_FILE] is not None       # 在子目录里被找到
         assert out[config.YITIAN_HOLIDAYS_FILE] is None            # 未提供 → None
+
+
+class TestYitianStoreEndpoints:
+    def test_get_store_not_in_super_only(self):
+        # GET 是全体授权账号要用的(页面要显示累积状态);该集合按 path 匹配不分 method
+        assert '/api/yitian/store' not in S._SUPER_ONLY_PATHS
+
+    def test_write_paths_are_super_only(self):
+        # 这两个是 POST-only 的独立 path,入闸是安全且必要的
+        assert '/api/yitian/store/clear' in S._SUPER_ONLY_PATHS
+        assert '/api/yitian/store/delete-range' in S._SUPER_ONLY_PATHS
+
+    def test_store_file_path(self):
+        assert S.YITIAN_STORE_FILE.endswith('yitian_store.json')
+        assert S.YITIAN_STORE_FILE != S.YITIAN_SETTINGS_FILE
+
+
+class TestClearDataAlsoClearsStore:
+    def test_clear_data_removes_store_but_keeps_settings(self, tmp_path, monkeypatch):
+        import yitian_store, yitian_settings
+        store_p = str(tmp_path / 'yitian_store.json')
+        set_p = str(tmp_path / 'yitian_settings.json')
+        st = yitian_store.empty_store()
+        yitian_store.upsert_rows(st, [{"wid": "1", "date": "2026-04-17"}])
+        yitian_store.save_store(store_p, st)
+        yitian_settings.save_settings(set_p, {"excludedTypes": ["管理类"]})
+
+        monkeypatch.setattr(S, 'YITIAN_STORE_FILE', store_p)
+        monkeypatch.setattr(S, 'YITIAN_SETTINGS_FILE', set_p)
+        # 隔离下发文件路径:_clear_yitian_store 也会尝试删 YITIAN_DATA_FILE,不隔离会
+        # 删到真实的 data/yitian_data.json(开发机上的真实倚天下发数据)
+        monkeypatch.setattr(S, 'YITIAN_DATA_FILE', str(tmp_path / 'yitian_data.json'))
+        S._clear_yitian_store()          # 清空数据流程里调用的那个函数
+
+        assert yitian_store.load_store(store_p)["rows"] == []      # 累积数据清了
+        assert yitian_settings.load_settings(set_p)["excludedTypes"] == ["管理类"]   # 配置留着
