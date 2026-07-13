@@ -16,6 +16,7 @@ def _minimal():
             "generatedAt": "2026-07-12 10:00", "rows": 1, "employees": 1,
             "droppedRows": 0, "calendarSource": "csv", "hoursPerDay": 8,
             "thisBgL2": ["交付中心"],
+            "storeRows": 1, "storeStart": "2026-06-01", "storeEnd": "2026-06-01",
         },
         "roster": [{"id": "A1", "name": "张三", "l2": "交付中心", "l3": "交付实施三部",
                     "l31": "服务二部", "l4": "银行服务组", "category": "正式员工"}],
