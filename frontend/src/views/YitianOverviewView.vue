@@ -56,6 +56,18 @@ const typeOption = computed(() => ({
   }],
 }))
 
+const typeBarOption = computed(() => ({
+  tooltip: { trigger: 'axis', valueFormatter: (v: number) => `${v} h` },
+  grid: { left: 48, right: 16, top: 24, bottom: 32 },
+  xAxis: { type: 'category', data: typeRows.value.map((t) => t.type) },
+  yAxis: { type: 'value' },
+  series: [{
+    name: '工时',
+    type: 'bar',
+    data: typeRows.value.map((t) => Number(t.hours.toFixed(1))),
+  }],
+}))
+
 const orgCols: DataColumn[] = [
   { key: 'name', label: 'L4 组织', width: 160, sortable: true },
   { key: 'parent', label: '上级组织', width: 140, sortable: true },
@@ -88,6 +100,8 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   }
   return columns.map((c) => disp[c.property] ?? '')
 }
+
+defineExpose({ typeOption, typeBarOption, typeRows })
 </script>
 
 <template>
@@ -103,7 +117,10 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
       <div class="yt-grid">
         <section class="yt-card">
           <h3 class="yt-h">工时类型占比</h3>
-          <ChartBox :option="typeOption" height="300px" />
+          <div class="yt-charts">
+            <ChartBox :option="typeOption" height="300px" />
+            <ChartBox :option="typeBarOption" height="300px" />
+          </div>
         </section>
 
         <section class="yt-card">
@@ -128,4 +145,5 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   box-shadow: var(--shadow-1);
 }
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
+.yt-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--gap-card); }
 </style>

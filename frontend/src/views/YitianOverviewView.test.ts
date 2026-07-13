@@ -68,4 +68,14 @@ describe('YitianOverviewView', () => {
     await flushPromises()
     expect(w.find('.yt-page').exists()).toBe(true)
   })
+
+  it('工时类型占比同时给出环图与柱状图', async () => {
+    const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.typeOption.series[0].type).toBe('pie')
+    expect(vm.typeBarOption.series[0].type).toBe('bar')
+    // 柱状图的类目与数据必须与占比同源(同一批 typeRows)
+    expect(vm.typeBarOption.xAxis.data).toEqual(vm.typeRows.map((t: any) => t.type))
+  })
 })
