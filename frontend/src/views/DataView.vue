@@ -16,6 +16,7 @@ import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
 import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
+import YitianScopeCard from '@/components/YitianScopeCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -45,8 +46,11 @@ async function onPmisUpload() {
 
 // —— 项目域文件(input/ 根) ——
 const { upload: inputsUpload, INPUT_FILE_NAMES } = useInputFiles()
+const YITIAN_FILE_NAMES = ['工时.xlsx', 'holidays.csv']
 // 展示名单:legacy xlsx 仅作上传兼容不展示
-const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES.filter((n) => n !== 'delivery_analysis.xlsx')
+const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES
+  .filter((n) => n !== 'delivery_analysis.xlsx')
+  .filter((n) => !YITIAN_FILE_NAMES.includes(n))   // 倚天两文件单独成组展示
 const inputsInput = ref<HTMLInputElement | null>(null)
 const inputsUploadMsg = ref('')
 async function onUploadInputs() {
@@ -276,6 +280,13 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
             <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
             <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
           </div>
+          <div class="dv-sub-head">倚天工时域（input/yitian/）</div>
+          <div class="dv-fgrid">
+            <div v-for="name in YITIAN_FILE_NAMES" :key="name" class="dv-fcell" :title="name">
+              <span class="dv-fname2">{{ name }}</span>
+              <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -367,6 +378,10 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 
       <el-collapse-item v-if="auth.isSuper" name="portal" title="首页门户 / 快捷入口">
         <PortalConfigCard />
+      </el-collapse-item>
+
+      <el-collapse-item v-if="auth.isSuper" name="yitian-scope" title="倚天工时 · 合规检查范围">
+        <YitianScopeCard />
       </el-collapse-item>
 
       <el-collapse-item name="clear">

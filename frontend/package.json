@@ -10,7 +10,7 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "gen:types": "cd .. && python schema.py && cd frontend && json2ts -i ../schema.json -o src/types/analysis.ts"
+    "gen:types": "cd .. && python schema.py && cd frontend && json2ts -i ../schema.json -o src/types/analysis.ts && json2ts -i ../yitian_schema.json -o src/types/yitian.ts"
   },
   "dependencies": {
     "echarts": "^5.6.0",

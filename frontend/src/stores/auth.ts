@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authenticate, fetchMe as apiFetchMe, logoutApi, changePassword as apiChangePassword, type AuthUser, type AuthResult } from '@/lib/auth'
 import { canAccess as pageCanAccess, type PageKey } from '@/lib/pageAccess'
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
+import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
 import { useDataStore } from './data'
 import { useProjectProgressStore } from './projectProgress'
 import { useOpportunitiesStore } from './opportunities'
@@ -11,6 +11,9 @@ import { useOpportunityFollowupStore } from './opportunityFollowup'
 import { useRiskFollowupStore } from './riskFollowup'
 import { usePaymentKeyFollowupStore } from './paymentKeyFollowup'
 import { usePortalStore } from './portal'
+import { useYitianStore } from '@/stores/yitian'
+import { useYitianViewStore } from '@/stores/yitianView'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -30,6 +33,9 @@ export const useAuthStore = defineStore('auth', () => {
       useRiskFollowupStore().reset()
       usePaymentKeyFollowupStore().reset()
       usePortalStore().reset()
+      useYitianStore().reset()
+      useYitianViewStore().reset()
+      useYitianSettingsStore().reset()
     }
     return res
   }
@@ -47,6 +53,9 @@ export const useAuthStore = defineStore('auth', () => {
     useRiskFollowupStore().reset()
     usePaymentKeyFollowupStore().reset()
     usePortalStore().reset()
+    useYitianStore().reset()
+    useYitianViewStore().reset()
+    useYitianSettingsStore().reset()
   }
   async function changePassword(oldPassword: string, newPassword: string): Promise<AuthResult> {
     const res = await apiChangePassword(oldPassword, newPassword)
@@ -66,7 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
   function firstAllowedPath(): string {
     if (!user.value) return '/login'
     if (user.value.isSuper) return '/'
-    const all = [...PROJECT_LINKS, ...ANALYSIS_LINKS, ...KEY_FOLLOWUP_LINKS, ...PAYMENT_LINKS, ...TOOL_LINKS]
+    const all = [...PROJECT_LINKS, ...ANALYSIS_LINKS, ...KEY_FOLLOWUP_LINKS, ...PAYMENT_LINKS, ...YITIAN_LINKS, ...TOOL_LINKS]
     const hit = all.find((l) => canAccess(l.key))
     return hit ? hit.to : '/login'
   }

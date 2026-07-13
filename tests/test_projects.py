@@ -512,3 +512,29 @@ class TestBuildProjectsSignUnit:
         sf_out = next(p for p in out if p["projectId"] == "SF-1")
         assert sf_out["isPresale"] is True
         assert sf_out["signUnit"] == "原项目签约单位"
+
+
+class TestReadSheetHeaders:
+    """read_sheet_headers:白名单列存在性校验用(倚天工时域 I-3)——只取表头,不依赖数据行数。"""
+
+    def test_returns_headers_of_matched_sheet(self, tmp_path):
+        path = _make_xlsx(tmp_path, "工时.xlsx", [
+            ("Sheet1", [("工时类型", "工时", "员工编号"), ("项目类", 8, "A1")]),
+        ])
+        assert P.read_sheet_headers(path, "工时类型") == ["工时类型", "工时", "员工编号"]
+
+    def test_works_even_with_zero_data_rows(self, tmp_path):
+        # 只有表头、没有数据行的空表——不能因为 raw rows 是空列表就无法校验列是否齐全
+        path = _make_xlsx(tmp_path, "工时.xlsx", [
+            ("Sheet1", [("工时类型", "工时", "员工编号")]),
+        ])
+        assert P.read_sheet_headers(path, "工时类型") == ["工时类型", "工时", "员工编号"]
+
+    def test_sheet_not_found_returns_empty_list(self, tmp_path):
+        path = _make_xlsx(tmp_path, "工时.xlsx", [
+            ("Sheet1", [("别的表头",), ("值",)]),
+        ])
+        assert P.read_sheet_headers(path, "工时类型") == []
+
+    def test_missing_file_returns_empty_list(self, tmp_path):
+        assert P.read_sheet_headers(str(tmp_path / "不存在.xlsx"), "工时类型") == []

@@ -4,6 +4,8 @@ export const INPUT_FILE_NAMES = [
   '组织架构.xlsx', 'A.xlsx', 'delivery_analysis.csv', 'delivery_analysis.xlsx',
   'payment_records.csv', 'profit_loss_direct.csv', 'profit_loss_bridge.csv', 'budget_data.csv',
   'collection_stages.csv', 'TOP1000.xlsx',
+  // 倚天工时域(V3.0.0):后端按 config.INPUT_SUBDIR_MAP 落到 input/yitian/,前端仍走同一个上传端点
+  '工时.xlsx', 'holidays.csv',
 ]
 
 /** 项目主域三输入文件上传(组织架构/项目映射/预算核算)。白名单外文件跳过。 */

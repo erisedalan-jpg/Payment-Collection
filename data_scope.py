@@ -67,3 +67,54 @@ def filter_analysis_data(data: dict, allowed_l4: list) -> dict:
         out['meta'] = nm
 
     return out
+
+
+def scope_yitian_data(data: dict, allowed_l4: list) -> dict:
+    """按 allowed_l4 裁倚天数据(roster/entries/issues);'*' → 原样返回;不改入参。
+
+    工时是员工级敏感数据:非本 L4 的员工、其工时行、其问题正文摘要,一律不下发。
+    issues[].i 指向 entries 下标——裁行后必须重映射,否则指到别人头上。"""
+    if not isinstance(data, dict):
+        return data
+    allow = set(allowed_l4 or [])
+    if '*' in allow:
+        return data
+
+    roster = data.get('roster') or []
+    keep_roster = [p for p in roster
+                   if isinstance(p, dict) and str(p.get('l4') or '').strip() in allow]
+    keep_ids = {p.get('id') for p in keep_roster}
+
+    entries = data.get('entries') or []
+    old_to_new = {}
+    keep_entries = []
+    for i, e in enumerate(entries):
+        if isinstance(e, dict) and e.get('e') in keep_ids:
+            old_to_new[i] = len(keep_entries)
+            keep_entries.append(e)
+
+    issues = data.get('issues') or []
+    keep_issues = []
+    for it in issues:
+        if not isinstance(it, dict):
+            continue
+        ni = old_to_new.get(it.get('i'))
+        if ni is None:
+            continue
+        nit = dict(it)
+        nit['i'] = ni
+        keep_issues.append(nit)
+
+    out = dict(data)               # 浅拷顶层(days/dims 无个人信息,原样透传)
+    out['roster'] = keep_roster
+    out['entries'] = keep_entries
+    out['issues'] = keep_issues
+
+    meta = data.get('meta')
+    if isinstance(meta, dict):
+        nm = dict(meta)
+        nm['rows'] = len(keep_entries)
+        nm['employees'] = len(keep_roster)
+        out['meta'] = nm
+
+    return out
