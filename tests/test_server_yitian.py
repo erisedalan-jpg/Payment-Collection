@@ -1,9 +1,15 @@
 import json
 import http.client
+import os
 import threading
+
+import pytest
+
 import auth
 import audit
+import config
 import server
+import server as S
 
 
 def _wait_for(predicate, timeout=1.0, interval=0.02):
@@ -85,3 +91,101 @@ def test_non_super_forbidden(tmp_path, monkeypatch):
         assert conn2.getresponse().status == 403
     finally:
         srv.shutdown(); srv.server_close()
+
+
+class TestYitianPageGate:
+    def test_yitian_data_not_in_super_only_paths(self):
+        # 铁律:该集合按 path 匹配不分 method,加进去会把普通授权账号一起 403
+        assert '/api/yitian/data' not in S._SUPER_ONLY_PATHS
+
+    def test_raw_json_path_still_protected(self):
+        # 非超管不得直链原始文件绕过 L4 切分
+        assert S._is_protected_data_path('/data/yitian_data.json') is True
+        assert S._is_protected_data_path('/data/analysis_data.json') is False
+
+    def test_page_keys_cover_five_pages(self):
+        assert set(S._YITIAN_PAGE_KEYS) == {
+            'yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer'}
+
+
+class TestYitianSettingsEndpoint:
+    def test_settings_not_in_super_only_paths(self):
+        # 铁律:该集合按 path 匹配不分 method;GET 是全体授权账号要用的,加进去会把他们一起 403
+        assert '/api/yitian/settings' not in S._SUPER_ONLY_PATHS
+
+    def test_settings_file_is_not_the_cookie_config(self):
+        # data/yitian_config.json 是 V2.1.1 的 cookie 配置,与本配置无关,不得复用
+        assert S.YITIAN_SETTINGS_FILE != S.YITIAN_CONFIG
+        assert S.YITIAN_SETTINGS_FILE.endswith('yitian_settings.json')
+
+
+class TestUploadSubdir:
+    def test_timesheet_maps_to_yitian_subdir(self):
+        assert config.INPUT_SUBDIR_MAP[config.YITIAN_TIMESHEET_FILE] == config.YITIAN_DIRNAME
+        assert config.INPUT_SUBDIR_MAP[config.YITIAN_HOLIDAYS_FILE] == config.YITIAN_DIRNAME
+
+    def test_main_domain_files_have_no_subdir(self):
+        assert config.ORG_FILE not in config.INPUT_SUBDIR_MAP
+
+    def test_upload_whitelist_includes_yitian_files(self):
+        assert S.is_valid_input_name(config.YITIAN_TIMESHEET_FILE) is True
+        assert S.is_valid_input_name(config.YITIAN_HOLIDAYS_FILE) is True
+        assert S.is_valid_input_name("../../etc/passwd") is False
+
+    def test_target_dir_helper(self, tmp_path):
+        base = str(tmp_path)
+        assert S._input_target_dir(base, config.YITIAN_TIMESHEET_FILE).endswith(
+            "input" + __import__("os").sep + "yitian")
+        assert S._input_target_dir(base, config.ORG_FILE).endswith("input")
+
+
+class TestClearDataRemovesYitianData:
+    """I-4:清空数据不能漏删 data/yitian_data.json——那是全系统最敏感的员工级数据,
+    「清空」后仍留在盘上且 /api/yitian/data 照常下发,与「清空」语义直接冲突。"""
+
+    def test_clear_data_removes_yitian_data_file_and_cache(self, tmp_path, monkeypatch):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        analysis_f = data_dir / "analysis_data.json"
+        analysis_f.write_text("{}", encoding="utf-8")
+        yitian_f = data_dir / "yitian_data.json"
+        yitian_f.write_text('{"roster": []}', encoding="utf-8")
+        settings_f = data_dir / "yitian_settings.json"
+        settings_f.write_text('{"excludedTypes": []}', encoding="utf-8")
+
+        monkeypatch.setattr(server, "BASE_DIR", str(tmp_path))
+        monkeypatch.setattr(server, "ANALYSIS_FILE", str(analysis_f))
+        monkeypatch.setattr(server, "YITIAN_DATA_FILE", str(yitian_f))
+        monkeypatch.setattr(server, "YITIAN_SETTINGS_FILE", str(settings_f))
+        # 预置一份非空缓存,验证清空后缓存也被置空(否则下一次 /api/yitian/data 仍会命中旧缓存)
+        server._yitian_cache['mtime'] = os.path.getmtime(str(yitian_f))
+        server._yitian_cache['data'] = {"roster": []}
+
+        srv, port = _start(tmp_path, monkeypatch)
+        try:
+            conn, ck = _login(port)
+            conn.request("GET", "/api/clear-data", headers={"Cookie": ck})
+            r = conn.getresponse()
+            assert r.status == 200
+            body = json.loads(r.read())
+            assert body["success"] is True
+
+            assert not yitian_f.exists()                      # 员工级工时数据已删
+            assert settings_f.exists()                         # 配置文件不是数据,不删
+            assert server._yitian_cache['data'] is None         # 缓存同步置空
+            assert server._yitian_cache['mtime'] is None
+        finally:
+            srv.shutdown(); srv.server_close()
+            server._yitian_cache['mtime'] = None
+            server._yitian_cache['data'] = None
+
+
+class TestFileStatus:
+    def test_status_covers_yitian_files(self, tmp_path):
+        import os
+        ydir = tmp_path / "input" / "yitian"
+        ydir.mkdir(parents=True)
+        (ydir / config.YITIAN_TIMESHEET_FILE).write_bytes(b"x")
+        out = S.collect_file_status(str(tmp_path))
+        assert out[config.YITIAN_TIMESHEET_FILE] is not None       # 在子目录里被找到
+        assert out[config.YITIAN_HOLIDAYS_FILE] is None            # 未提供 → None

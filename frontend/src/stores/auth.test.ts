@@ -149,4 +149,13 @@ describe('stores/auth 访问控制', () => {
     s.user = { account: 'k', displayName: 'k', isSuper: false, allowedPages: ['projects-key'], allowedL4: [] }
     expect(s.firstAllowedPath()).toBe('/projects/key')
   })
+  // 回归:新增页面分区必须并入 firstAllowedPath 的 nav 全集,否则只授权该分区的账号
+  // 在全集里找不到任何有权链接 → 被踢回 /login → 登录后又被弹回,死循环。
+  it('firstAllowedPath:普通账号仅倚天权限→/yitian(不得被踢回 /login)', () => {
+    const s = useAuthStore()
+    s.user = { account: 'y', displayName: 'y', isSuper: false, allowedPages: ['yitian'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/yitian')
+    s.user = { account: 'y2', displayName: 'y2', isSuper: false, allowedPages: ['yitian-trend'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/yitian/trend')
+  })
 })

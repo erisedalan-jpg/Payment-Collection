@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
+import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 const auth = useAuthStore()
@@ -12,6 +12,7 @@ const projectLinks = computed(() => PROJECT_LINKS.filter((l) => auth.canAccess(l
 const analysisLinks = computed(() => ANALYSIS_LINKS.filter((l) => auth.canAccess(l.key)))
 const keyFollowupLinks = computed(() => KEY_FOLLOWUP_LINKS.filter((l) => auth.canAccess(l.key)))
 const paymentLinks = computed(() => PAYMENT_LINKS.filter((l) => auth.canAccess(l.key)))
+const yitianLinks = computed(() => YITIAN_LINKS.filter((l) => auth.canAccess(l.key)))
 const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key)))
 
 const activeSectionKey = computed(() => {
@@ -21,6 +22,7 @@ const activeSectionKey = computed(() => {
   if (p.startsWith('/opportunities/board')) return 'analysis'
   if (p.startsWith('/insight')) return 'analysis'
   if (p.startsWith('/payment')) return 'payment'
+  if (p.startsWith('/yitian')) return 'yitian'
   if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
   if (p.startsWith('/admin')) return 'admin'
   return 'project'
@@ -73,6 +75,16 @@ function onToggle(key: string) {
         </button>
         <div v-show="expanded('payment')" class="section-links">
           <RouterLink v-for="link in paymentLinks" :key="link.to" :to="link.to"
+            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
+        </div>
+      </div>
+
+      <div v-if="yitianLinks.length" class="section" :class="{ collapsed: !expanded('yitian') }">
+        <button type="button" class="section-label" @click="onToggle('yitian')">
+          <span class="section-caret">{{ expanded('yitian') ? '▾' : '▸' }}</span>倚天工时
+        </button>
+        <div v-show="expanded('yitian')" class="section-links">
+          <RouterLink v-for="link in yitianLinks" :key="link.to" :to="link.to"
             class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
         </div>
       </div>

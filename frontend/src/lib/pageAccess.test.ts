@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canAccess } from './pageAccess'
+import { canAccess, PAGE_OPTIONS } from './pageAccess'
 import { KEY_FOLLOWUP_LINKS, PROJECT_LINKS } from '@/nav'
 
 describe('pageAccess.canAccess', () => {
@@ -34,5 +34,23 @@ describe('nav links', () => {
     expect(keys.indexOf('activity')).toBe(keys.indexOf('opportunities-progress') + 1)
     const opp = PROJECT_LINKS.find((l) => l.key === 'opportunities-progress')!
     expect(opp.label).toBe('商机清单')
+  })
+})
+
+describe('倚天 pageKey', () => {
+  it('五个倚天页面都能被单独授权', () => {
+    const keys = ['yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer'] as const
+    for (const k of keys) {
+      expect(canAccess([k], k)).toBe(true)
+      expect(canAccess(['overview'], k)).toBe(false)
+      expect(canAccess(['*'], k)).toBe(true)
+    }
+  })
+
+  it('PAGE_OPTIONS 含倚天五页(账号管理表单能勾到)', () => {
+    const keys = PAGE_OPTIONS.map((o) => o.key)
+    for (const k of ['yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer']) {
+      expect(keys).toContain(k)
+    }
   })
 })

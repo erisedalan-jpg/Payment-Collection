@@ -68,6 +68,8 @@ frontend/dist/
 frontend/*.tsbuildinfo
 # schema.py 导出的中间产物（TS 类型生成用），不入库
 schema.json
+data/yitian_data.json
+yitian_schema.json
 
 # ── 系统 ──
 .DS_Store
@@ -85,6 +87,8 @@ Thumbs.db
 client/agent_config.json
 data/yitian_config.json
 data/yitian_config.json.tmp
+data/yitian_settings.json
+data/yitian_settings.json.tmp
 # client 本地敏感/用户态/产物:config.json 含真实 cookie(密钥)、gui_settings 含账号设置、dist 为打包产物
 client/config.json
 client/gui_settings.json

@@ -29,6 +29,11 @@ function makeRouter() {
       { path: '/payment', component: { template: '<div/>' } },
       { path: '/payment/projects', component: { template: '<div/>' } },
       { path: '/payment/nodes', component: { template: '<div/>' } },
+      { path: '/yitian', component: { template: '<div/>' } },
+      { path: '/yitian/compliance', component: { template: '<div/>' } },
+      { path: '/yitian/analytics', component: { template: '<div/>' } },
+      { path: '/yitian/trend', component: { template: '<div/>' } },
+      { path: '/yitian/customer', component: { template: '<div/>' } },
       { path: '/data', component: { template: '<div/>' } },
       { path: '/governance', component: { template: '<div/>' } },
       { path: '/about', component: { template: '<div/>' } },
@@ -73,14 +78,20 @@ describe('AppSidebar', () => {
     expect(text).toContain('临时重点跟进')    // 重点跟进分区
     expect(text).toContain('风险跟进')        // 重点跟进分区(新页)
     expect(text).toContain('回款重点跟进')    // 重点跟进分区(新页)
+    expect(text).toContain('倚天工时')        // 倚天工时分区标题(V3.0.0)
+    expect(text).toContain('倚天工时总览')    // 倚天工时组
+    expect(text).toContain('工时合规检查')    // 倚天工时组
+    expect(text).toContain('工时统计分析')    // 倚天工时组
+    expect(text).toContain('工时趋势分析')    // 倚天工时组
+    expect(text).toContain('客户支持分析')    // 倚天工时组
     expect(text).not.toContain('看板首页')    // 旧 label 退场
     expect(text).not.toContain('回款分析')    // SP4 拆分后单入口退场
     expect(text).not.toContain('多维看板')    // 迁移后更名为「回款多维分析」
     expect(text).not.toContain('回款进度')    // /payment/plan 已删
     expect(text).not.toContain('风险项目')    // /payment/risk 已删
     expect(text).not.toContain('回款台账')    // /ledger 已删
-    // 六个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+工具(3)+系统管理(1) = 24
-    expect(wrapper.findAll('.nav-sub').length).toBe(24)
+    // 七个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+倚天工时(5)+工具(3)+系统管理(1) = 29
+    expect(wrapper.findAll('.nav-sub').length).toBe(29)
   })
 
   it('toggle button flips uiStore collapsed', async () => {

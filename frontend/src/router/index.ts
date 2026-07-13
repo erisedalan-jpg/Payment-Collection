@@ -29,6 +29,11 @@ import TempFollowupView from '@/views/TempFollowupView.vue'
 import OpportunityFollowupView from '@/views/OpportunityFollowupView.vue'
 import OpportunitiesBoardView from '@/views/OpportunitiesBoardView.vue'
 import PaymentKeyFollowupView from '@/views/PaymentKeyFollowupView.vue'
+import YitianOverviewView from '@/views/YitianOverviewView.vue'
+import YitianComplianceView from '@/views/YitianComplianceView.vue'
+import YitianAnalyticsView from '@/views/YitianAnalyticsView.vue'
+import YitianTrendView from '@/views/YitianTrendView.vue'
+import YitianCustomerView from '@/views/YitianCustomerView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -99,6 +104,12 @@ export const router = createRouter({
       },
     },
     { path: '/payment', name: 'payment', component: DashboardView, meta: { title: '回款总览', pageKey: 'payment' } },
+    // 倚天工时域(V3.0.0):hideFilter —— 本域用自己的 YitianToolbar,不吃全站 FilterBar
+    { path: '/yitian', name: 'yitian', component: YitianOverviewView, meta: { title: '倚天工时总览', hideFilter: true, pageKey: 'yitian' } },
+    { path: '/yitian/compliance', name: 'yitian-compliance', component: YitianComplianceView, meta: { title: '工时合规检查', hideFilter: true, pageKey: 'yitian-compliance' } },
+    { path: '/yitian/analytics', name: 'yitian-analytics', component: YitianAnalyticsView, meta: { title: '工时统计分析', hideFilter: true, pageKey: 'yitian-analytics' } },
+    { path: '/yitian/trend', name: 'yitian-trend', component: YitianTrendView, meta: { title: '工时趋势分析', hideFilter: true, pageKey: 'yitian-trend' } },
+    { path: '/yitian/customer', name: 'yitian-customer', component: YitianCustomerView, meta: { title: '客户支持分析', hideFilter: true, pageKey: 'yitian-customer' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true, pageKey: 'data' } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true, pageKey: 'governance' } },
     { path: '/about', name: 'about', component: AboutView, meta: { title: '关于产品', hideFilter: true, pageKey: 'about' } },
