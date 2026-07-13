@@ -1,0 +1,79 @@
+import { describe, it, expect } from 'vitest'
+import { ISSUE_LABELS, issueRows, countByCode, countByL4 } from './compliance'
+import type { YitianData } from '@/types/yitian'
+
+const DATA = {
+  meta: { hoursPerDay: 8, thisBgL2: ['交付中心'] },
+  roster: [
+    { id: 'A1', name: '张三', l2: '', l3: '交付实施三部', l31: '服务二部', l4: '银行服务组', category: '' },
+    { id: 'A2', name: '李四', l2: '', l3: '交付实施三部', l31: '服务一部', l4: '浙江服务组', category: '' },
+  ],
+  days: [
+    { d: '2026-06-01', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
+    { d: '2026-06-02', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
+  ],
+  dims: {
+    types: ['项目类'], workTypes: [], customers: ['某客户'], products: [], productNames: [],
+    projectTypes: [], salesL2: [], serviceModes: [],
+  },
+  entries: [
+    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: false, chk: true, ok: 2, iss: ['MISS_SUMMARY', 'MISS_NEXT'] },
+    { d: '2026-06-02', e: 'A2', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 2, iss: ['MISS_SUMMARY'] },
+    { d: '2026-06-02', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 0, iss: [] },
+  ],
+  issues: [
+    { i: 0, codes: ['MISS_SUMMARY', 'MISS_NEXT'], msgs: ['缺少工作概述', '缺少下一步工作计划'], snippet: '张三的正文' },
+    { i: 1, codes: ['MISS_SUMMARY'], msgs: ['缺少工作概述'], snippet: '李四的正文' },
+  ],
+} as unknown as YitianData
+
+describe('ISSUE_LABELS', () => {
+  it('八码齐全', () => {
+    expect(Object.keys(ISSUE_LABELS).sort()).toEqual([
+      'HINT_PRESALE_PRODUCT', 'MISS_CUSTOMER', 'MISS_NEXT', 'MISS_PROGRESS',
+      'MISS_SERVICE_MODE', 'MISS_SUMMARY', 'PRODUCT_MISMATCH', 'TYPE_MISMATCH',
+    ])
+  })
+})
+
+describe('issueRows', () => {
+  it('只出问题行,并挂上员工/组织/客户', () => {
+    const rows = issueRows(DATA, '2026-06-01', '2026-06-02')
+    expect(rows).toHaveLength(2)
+    const r0 = rows.find((r) => r.empId === 'A1')!
+    expect(r0.empName).toBe('张三')
+    expect(r0.l4).toBe('银行服务组')       // 组织取自花名册
+    expect(r0.customer).toBe('某客户')
+    expect(r0.workOrder).toBe('WO1')
+    expect(r0.snippet).toBe('张三的正文')
+    expect(r0.codes).toEqual(['MISS_SUMMARY', 'MISS_NEXT'])
+  })
+
+  it('按区间过滤', () => {
+    expect(issueRows(DATA, '2026-06-01', '2026-06-01')).toHaveLength(1)
+  })
+
+  it('按 L4 过滤', () => {
+    const rows = issueRows(DATA, '2026-06-01', '2026-06-02', ['浙江服务组'])
+    expect(rows.map((r) => r.empId)).toEqual(['A2'])
+  })
+
+  it('合规行不出现在问题清单', () => {
+    const rows = issueRows(DATA, '2026-06-01', '2026-06-02')
+    expect(rows.every((r) => r.ok !== 0)).toBe(true)
+  })
+})
+
+describe('countByCode / countByL4', () => {
+  const rows = issueRows(DATA, '2026-06-01', '2026-06-02')
+  it('按问题码计数(一行多码则各计一次)', () => {
+    const c = countByCode(rows)
+    expect(c[0]).toMatchObject({ code: 'MISS_SUMMARY', label: '缺少工作概述', count: 2 })
+    expect(c.find((x) => x.code === 'MISS_NEXT')!.count).toBe(1)
+  })
+  it('按 L4 计数(问题行数,不是问题码数)', () => {
+    const c = countByL4(rows)
+    expect(c).toHaveLength(2)
+    expect(c.every((x) => x.count === 1)).toBe(true)
+  })
+})
