@@ -17,9 +17,9 @@ const DATA = {
     projectTypes: [], salesL2: [], serviceModes: [],
   },
   entries: [
-    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: false, chk: true, ok: 2, iss: ['MISS_SUMMARY', 'MISS_NEXT'] },
-    { d: '2026-06-02', e: 'A2', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 2, iss: ['MISS_SUMMARY'] },
-    { d: '2026-06-02', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: false, ok: 2, iss: ['MISS_SUMMARY', 'MISS_NEXT'] },
+    { d: '2026-06-02', e: 'A2', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 2, iss: ['MISS_SUMMARY'] },
+    { d: '2026-06-02', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
   ],
   issues: [
     { i: 0, codes: ['MISS_SUMMARY', 'MISS_NEXT'], msgs: ['缺少工作概述', '缺少下一步工作计划'], snippet: '张三的正文' },
@@ -75,5 +75,40 @@ describe('countByCode / countByL4', () => {
     const c = countByL4(rows)
     expect(c).toHaveLength(2)
     expect(c.every((x) => x.count === 1)).toBe(true)
+  })
+})
+
+// I-7:合规明细页(issueRows)必须吃 excludedTypes,否则超管把某类型剔出合规范围后,
+// /yitian 总览的问题数变了,/yitian/compliance 仍原样列出这些行,两页对不上。
+const DATA_WITH_EXCLUDABLE_TYPE = {
+  ...DATA,
+  dims: { ...DATA.dims, types: ['项目类', '假期类'] },
+  entries: [
+    ...DATA.entries,
+    // 第 4 条(下标 3):假期类问题行,issues[].i 必须指向这个原始下标(带 index 遍历,不能先过滤)
+    { d: '2026-06-02', e: 'A2', t: 1, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 2, iss: ['MISS_SUMMARY'] },
+  ],
+  issues: [
+    ...DATA.issues,
+    { i: 3, codes: ['MISS_SUMMARY'], msgs: ['缺少工作概述'], snippet: '假期类问题行正文' },
+  ],
+} as unknown as YitianData
+
+describe('issueRows · excludedTypes(I-7,口径与总览/趋势页同源)', () => {
+  it('excludedTypes 为空时不剔除任何类型', () => {
+    const rows = issueRows(DATA_WITH_EXCLUDABLE_TYPE, '2026-06-01', '2026-06-02', [], [])
+    expect(rows.some((r) => r.type === '假期类')).toBe(true)
+  })
+
+  it('excludedTypes 剔除假期类后,该行从问题明细里消失', () => {
+    const rows = issueRows(DATA_WITH_EXCLUDABLE_TYPE, '2026-06-01', '2026-06-02', [], ['假期类'])
+    expect(rows.some((r) => r.type === '假期类')).toBe(false)
+    expect(rows).toHaveLength(2)   // 只剩原来两条项目类问题行
+  })
+
+  it('剔除后 issues[].i 下标映射仍然正确(不能先过滤 entries 再遍历)', () => {
+    const rows = issueRows(DATA_WITH_EXCLUDABLE_TYPE, '2026-06-01', '2026-06-02', [], [])
+    const r3 = rows.find((r) => r.type === '假期类')!
+    expect(r3.snippet).toBe('假期类问题行正文')
   })
 })

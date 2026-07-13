@@ -1,5 +1,6 @@
 import json
 import http.client
+import os
 import threading
 
 import pytest
@@ -136,6 +137,47 @@ class TestUploadSubdir:
         assert S._input_target_dir(base, config.YITIAN_TIMESHEET_FILE).endswith(
             "input" + __import__("os").sep + "yitian")
         assert S._input_target_dir(base, config.ORG_FILE).endswith("input")
+
+
+class TestClearDataRemovesYitianData:
+    """I-4:清空数据不能漏删 data/yitian_data.json——那是全系统最敏感的员工级数据,
+    「清空」后仍留在盘上且 /api/yitian/data 照常下发,与「清空」语义直接冲突。"""
+
+    def test_clear_data_removes_yitian_data_file_and_cache(self, tmp_path, monkeypatch):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        analysis_f = data_dir / "analysis_data.json"
+        analysis_f.write_text("{}", encoding="utf-8")
+        yitian_f = data_dir / "yitian_data.json"
+        yitian_f.write_text('{"roster": []}', encoding="utf-8")
+        settings_f = data_dir / "yitian_settings.json"
+        settings_f.write_text('{"excludedTypes": []}', encoding="utf-8")
+
+        monkeypatch.setattr(server, "BASE_DIR", str(tmp_path))
+        monkeypatch.setattr(server, "ANALYSIS_FILE", str(analysis_f))
+        monkeypatch.setattr(server, "YITIAN_DATA_FILE", str(yitian_f))
+        monkeypatch.setattr(server, "YITIAN_SETTINGS_FILE", str(settings_f))
+        # 预置一份非空缓存,验证清空后缓存也被置空(否则下一次 /api/yitian/data 仍会命中旧缓存)
+        server._yitian_cache['mtime'] = os.path.getmtime(str(yitian_f))
+        server._yitian_cache['data'] = {"roster": []}
+
+        srv, port = _start(tmp_path, monkeypatch)
+        try:
+            conn, ck = _login(port)
+            conn.request("GET", "/api/clear-data", headers={"Cookie": ck})
+            r = conn.getresponse()
+            assert r.status == 200
+            body = json.loads(r.read())
+            assert body["success"] is True
+
+            assert not yitian_f.exists()                      # 员工级工时数据已删
+            assert settings_f.exists()                         # 配置文件不是数据,不删
+            assert server._yitian_cache['data'] is None         # 缓存同步置空
+            assert server._yitian_cache['mtime'] is None
+        finally:
+            srv.shutdown(); srv.server_close()
+            server._yitian_cache['mtime'] = None
+            server._yitian_cache['data'] = None
 
 
 class TestFileStatus:

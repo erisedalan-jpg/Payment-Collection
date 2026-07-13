@@ -9,9 +9,14 @@ class TestTypes:
     def test_checked_types(self):
         assert R.CHECKED_TYPES == ("项目类", "售前类", "售后类")
 
-    def test_excluded_and_mgmt(self):
+    def test_mgmt_type(self):
         assert R.MGMT_TYPE == "管理类"
-        assert set(R.EXCLUDED_TYPES) == {"业务类", "假期类"}
+
+    def test_excluded_types_not_defined_here(self):
+        # M-1:「剔除哪些类型」是超管可配项(yitian_settings.DEFAULT_EXCLUDED_TYPES),
+        # 不在 yitian_rules 里重复定义——曾经的 R.EXCLUDED_TYPES(2 项)与
+        # yitian_settings.DEFAULT_EXCLUDED_TYPES(3 项)同名不同义,是个维护陷阱,已删除。
+        assert not hasattr(R, "EXCLUDED_TYPES")
 
 
 class TestRequiredPatterns:

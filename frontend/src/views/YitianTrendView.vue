@@ -20,8 +20,8 @@ const ready = computed(() => !!store.data)
 const series = computed(() => {
   const data = store.data
   const empty = {
-    weeks: [] as string[], issues: [] as number[], okRate: [] as number[],
-    hours: [] as number[], overtime: [] as number[], sat: [] as number[],
+    weeks: [] as string[], issues: [] as number[], okRate: [] as (number | null)[],
+    hours: [] as number[], overtime: [] as number[], sat: [] as (number | null)[],
     unfilled: [] as number[], typeStack: [] as { name: string; data: number[] }[],
   }
   if (!data) return empty
@@ -38,13 +38,16 @@ const series = computed(() => {
 
     out.issues.push(es.filter((e) => isIncluded(data, e, settings.settings.excludedTypes) && e.ok === 2).length)
     const r = complianceRate(data, es, settings.settings.excludedTypes)
-    out.okRate.push(r === null ? 0 : Number((r * 100).toFixed(1)))
+    // 假期周(区间内零工作日)没有可检行,complianceRate 正确返回 null;
+    // 推 0 会在图上画成「合规率暴跌到 0%」的假象,与 /yitian KPI 卡对同一个 null 显示 '-' 的口径不一致。
+    // ECharts 对 null 默认断线,正是要的效果——不能填 0。
+    out.okRate.push(r === null ? null : Number((r * 100).toFixed(1)))
     out.hours.push(Number(es.reduce((s, e) => s + e.h, 0).toFixed(1)))
     out.overtime.push(Number(stats.filter((s) => s.diff > 0).reduce((s, x) => s + x.diff, 0).toFixed(1)))
 
     const sumBase = stats.reduce((s, x) => s + x.base, 0)
     const sumHours = stats.reduce((s, x) => s + x.hours, 0)
-    out.sat.push(sumBase > 0 ? Number(((sumHours / sumBase) * 100).toFixed(1)) : 0)
+    out.sat.push(sumBase > 0 ? Number(((sumHours / sumBase) * 100).toFixed(1)) : null)
     out.unfilled.push(unfilledList(stats).length + neverFilledList(stats).length)
 
     for (const t of types) typeAcc[t][bi] = 0
@@ -61,7 +64,7 @@ const series = computed(() => {
   return out
 })
 
-function lineOption(name: string, data: number[], unit = '') {
+function lineOption(name: string, data: (number | null)[], unit = '') {
   return {
     tooltip: { trigger: 'axis', valueFormatter: (v: number) => `${v}${unit}` },
     grid: { left: 48, right: 16, top: 24, bottom: 32 },

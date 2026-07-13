@@ -28,15 +28,17 @@ def _ts_row(**kw):
     return [base[h] for h in TS_HEADERS]
 
 
-def _make_input(tmp_path, ts_rows, org_rows=None, top_rows=None, holidays=None):
-    """造 input/ 目录树:input/yitian/工时.xlsx + input/组织架构.xlsx + input/TOP1000.xlsx。"""
+def _make_input(tmp_path, ts_rows, org_rows=None, top_rows=None, holidays=None, ts_headers=None):
+    """造 input/ 目录树:input/yitian/工时.xlsx + input/组织架构.xlsx + input/TOP1000.xlsx。
+    ts_headers 可覆盖表头(缺列场景用),默认 TS_HEADERS 全量。"""
     base = tmp_path
     ydir = base / "input" / "yitian"
     ydir.mkdir(parents=True)
 
+    headers = ts_headers if ts_headers is not None else TS_HEADERS
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.append(TS_HEADERS)
+    ws.append(headers)
     for r in ts_rows:
         ws.append(r)
     wb.save(str(ydir / "工时.xlsx"))
@@ -84,6 +86,19 @@ class TestBuildYitianData:
         (tmp_path / "input").mkdir()
         assert Y.build_yitian_data(str(tmp_path)) is None
 
+    def test_missing_required_column_returns_none_and_logs_error(self, tmp_path, capsys):
+        # I-3: 白名单列一旦被导出端改名/删列,不能静默错判(全量误判 MISS_SERVICE_MODE 却零报错)。
+        headers = [h for h in TS_HEADERS if h != "服务方式"]
+        idx = TS_HEADERS.index("服务方式")
+        row = _ts_row()
+        row = row[:idx] + row[idx + 1:]
+        base = _make_input(tmp_path, [row], ts_headers=headers)
+
+        assert Y.build_yitian_data(base) is None
+        out = capsys.readouterr().out
+        assert "[ERROR]" in out
+        assert "服务方式" in out
+
     def test_basic_shape(self, tmp_path):
         base = _make_input(tmp_path, [_ts_row()])
         data = Y.build_yitian_data(base)
@@ -118,6 +133,23 @@ class TestBuildYitianData:
         assert iss["i"] == 0
         assert iss["snippet"] == "今天干了点活"
         assert len(iss["codes"]) == len(iss["msgs"])
+
+    def test_hint_only_row_gets_no_snippet(self, tmp_path):
+        # I-6(用户裁决:收紧):只有真问题行(ok=2)才下发 120 字摘要;
+        # 合规(提示)行(ok=1,如 HINT_PRESALE_PRODUCT)不下发工作成果正文。
+        content = GOOD + "这是提示行的工作成果全文不应下发"
+        base = _make_input(tmp_path, [_ts_row(
+            项目类型="售前服务类", 工作类型三="环境调研", 产研侧产品线="其他",
+            工作成果=content,
+        )])
+        data = Y.build_yitian_data(base)
+        e = data["entries"][0]
+        assert e["ok"] == 1
+        assert e["iss"] == ["HINT_PRESALE_PRODUCT"]
+        iss = data["issues"][0]
+        assert iss["codes"] == ["HINT_PRESALE_PRODUCT"]
+        assert iss["snippet"] == ""                              # 提示行 snippet 为空串
+        assert content not in repr(data)                          # 提示行正文绝不落盘
 
     def test_excluded_type_still_gets_entry_but_no_codes(self, tmp_path):
         # 假期类没有必填字段规则 → 判定结果为空码/ok=0,但仍是一条正常 entry;

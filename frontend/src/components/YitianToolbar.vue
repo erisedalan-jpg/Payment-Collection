@@ -23,7 +23,9 @@ const isFallback = computed(() => store.data?.meta.calendarSource === 'fallback'
 function disabledDate(d: Date): boolean {
   const r = range.value
   if (!r.start || !r.end) return false
-  const s = d.toISOString().slice(0, 10)
+  // 用本地日期分量拼串,不要用 toISOString()——那会先转 UTC,在 UTC+8 下本地零点的 Date
+  // 会退回前一天,导致数据跨度的第一天被误判为「早于跨度」而禁选(I-2)。
+  const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return s < r.start || s > r.end
 }
 

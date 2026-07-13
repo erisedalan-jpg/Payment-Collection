@@ -24,7 +24,7 @@ def _minimal():
                  "productNames": [], "projectTypes": [], "salesL2": [], "serviceModes": []},
         "entries": [{"d": "2026-06-01", "e": "A1", "t": 0, "h": 8.0, "wt": None, "cu": None,
                      "pl": None, "pn": None, "pt": None, "sm": None, "bg": None,
-                     "wo": "", "top": False, "chk": True, "ok": 0, "iss": []}],
+                     "wo": "", "top": False, "ok": 0, "iss": []}],
         "issues": [],
     }
 

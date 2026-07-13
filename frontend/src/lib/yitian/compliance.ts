@@ -1,5 +1,5 @@
 import type { YitianData } from '@/types/yitian'
-import { rosterL4Map } from './metrics'
+import { isIncluded, rosterL4Map } from './metrics'
 
 // 注意:本模块不能用 selectEntries —— issues[].i 是 entries 的**原始下标**,
 // 必须在原数组上带 index 遍历才能对得上;先过滤会让下标失配。
@@ -32,9 +32,10 @@ export interface IssueRow {
   snippet: string
 }
 
-/** 问题明细行(仅 ok≠0 的行)。组织/姓名取自花名册,问题正文摘要取自 issues[]。 */
+/** 问题明细行(仅 ok≠0 且纳入 excludedTypes 范围的行)。组织/姓名取自花名册,问题正文摘要取自 issues[]。
+ *  excludedTypes 口径必须与总览(kpi)/趋势页同源,否则超管一勾选剔除类型,两页问题数就对不上。 */
 export function issueRows(
-  data: YitianData, start: string, end: string, l4s: string[] = [],
+  data: YitianData, start: string, end: string, l4s: string[] = [], excludedTypes: string[] = [],
 ): IssueRow[] {
   const byId = new Map(data.roster.map((p) => [p.id, p]))
   const l4Of = rosterL4Map(data)
@@ -49,6 +50,7 @@ export function issueRows(
   const out: IssueRow[] = []
   data.entries.forEach((e, i) => {
     if (e.ok === 0) return
+    if (!isIncluded(data, e, excludedTypes)) return
     if (start && e.d < start) return
     if (end && e.d > end) return
     const l4 = l4Of[e.e] ?? ''

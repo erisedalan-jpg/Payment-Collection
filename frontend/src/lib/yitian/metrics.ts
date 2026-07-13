@@ -43,8 +43,11 @@ export interface Kpi {
   baseHours: number
 }
 
-/** 花名册里 L4 为空的人(部门负责人等)的兜底分组名。
- *  实测 85 人里有 3 个 L4 为空且有工时——按空串分组会让 L3 合计对不上各 L4 之和。 */
+/** 花名册里 L3/L3-1/L4 为空的人的兜底分组名。
+ *  实测 85 人里有 L3-1/L4 为空且有工时的人——按空串分组会被 orgSummary 的 bump() 空名守卫吞掉,
+ *  导致该层合计对不上上一层合计(如 L3-1 合计 < L3 合计)。三层统一兜底,永不落空串。 */
+export const NO_L3 = '未分配L3'
+export const NO_L31 = '未分配L3-1'
 export const NO_L4 = '未分配L4'
 
 /** 工号 → L4(组织权威是花名册,不是工时表;空 L4 兜底为 NO_L4)。 */
@@ -94,8 +97,8 @@ export function empStats(
     return {
       id: p.id,
       name: p.name,
-      l3: p.l3,
-      l31: p.l31,
+      l3: p.l3 || NO_L3,
+      l31: p.l31 || NO_L31,   // 空 L3-1 兜底,否则该层合计对不上 L3 合计(40h 会凭空消失)
       l4: p.l4 || NO_L4,   // 空 L4 兜底,否则 L3 合计对不上各 L4 之和
       hours: h,
       base,
@@ -146,8 +149,10 @@ export function orgSummary(
   const buckets = new Map<string, { level: OrgRow['level']; name: string; parent: string; hours: number; people: number }>()
 
   const bump = (level: OrgRow['level'], name: string, parent: string, hrs: number) => {
-    if (!name) return
-    const k = level + '|' + name
+    // 桶键含 parent:同名但不同上级(如两个不同 L3-1 下各自的「未分配L4」)不得合桶,
+    // 否则 parent 只会记首次插入值,把工时错记到错误的上级组织名下。
+    // empStats 已把 l3/l31/l4 全兜底为非空串,这里不再需要空名守卫。
+    const k = level + '|' + parent + '|' + name
     const b = buckets.get(k)
     if (!b) buckets.set(k, { level, name, parent, hours: hrs, people: 1 })
     else {

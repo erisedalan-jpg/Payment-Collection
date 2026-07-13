@@ -8,6 +8,7 @@ const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianComplianceView from './YitianComplianceView.vue'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
 
 const DATA = {
   meta: { periodStart: '2026-06-01', periodEnd: '2026-06-02', generatedAt: '', rows: 2,
@@ -23,8 +24,8 @@ const DATA = {
   dims: { types: ['项目类'], workTypes: [], customers: ['某客户'], products: [], productNames: [],
           projectTypes: [], salesL2: [], serviceModes: [] },
   entries: [
-    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: false, chk: true, ok: 2, iss: ['MISS_SUMMARY'] },
-    { d: '2026-06-02', e: 'A2', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 1, iss: ['HINT_PRESALE_PRODUCT'] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: false, ok: 2, iss: ['MISS_SUMMARY'] },
+    { d: '2026-06-02', e: 'A2', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 1, iss: ['HINT_PRESALE_PRODUCT'] },
   ],
   issues: [
     { i: 0, codes: ['MISS_SUMMARY'], msgs: ['缺少工作概述'], snippet: '张三的正文' },
@@ -62,5 +63,26 @@ describe('YitianComplianceView', () => {
     await flushPromises()
     const dist = (w.vm as any).codeDist as { code: string; count: number }[]
     expect(dist.find((d) => d.code === 'MISS_SUMMARY')!.count).toBe(1)
+  })
+
+  it('遵循 excludedTypes 口径(I-7):剔除的类型不出现在问题明细,与总览/趋势页同源', async () => {
+    const w = mount(YitianComplianceView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    // DATA 里两条问题行的工时类型都是 dims.types[0] = '项目类';把它剔出合规范围后,
+    // 问题明细应同步清空(不能像之前那样对超管的配置无感)。
+    useYitianSettingsStore().settings.excludedTypes = ['项目类']
+    await flushPromises()
+    const rows = (w.vm as any).rows as unknown[]
+    expect(rows).toHaveLength(0)
+  })
+
+  it('提示码(HINT_ 前缀)分布 chip 用 warn 状态色,问题码用 danger(M-5)', async () => {
+    const w = mount(YitianComplianceView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const items = w.findAll('.yt-dist li')
+    const hintItem = items.find((li) => li.text().includes('售前服务类产品类别不应为「其他」'))!
+    const issueItem = items.find((li) => li.text().includes('缺少工作概述'))!
+    expect(hintItem.classes()).toContain('yt-dist--warn')
+    expect(issueItem.classes()).not.toContain('yt-dist--warn')
   })
 })

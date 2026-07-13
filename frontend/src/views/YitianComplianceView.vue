@@ -4,19 +4,23 @@ import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { issueRows, countByCode, ISSUE_LABELS } from '@/lib/yitian/compliance'
 import { exportRows } from '@/lib/exportXlsx'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
+const settings = useYitianSettingsStore()
 
-onMounted(() => { store.load() })
+onMounted(() => { store.load(); settings.load() })
 
 const ready = computed(() => !!store.data)
 const codeFilter = ref<string[]>([])
 
+// excludedTypes 必须传进去,否则超管在 /data 剔除某类型后,总览/趋势页的问题数变了,
+// 这里仍原样列出,两页口径漂移(I-7)。
 const allRows = computed(() =>
-  store.data ? issueRows(store.data, view.start, view.end, view.l4s) : [])
+  store.data ? issueRows(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes) : [])
 
 const codeDist = computed(() => countByCode(allRows.value))
 
@@ -83,7 +87,7 @@ defineExpose({ codeFilter, rows, codeDist })
         </div>
         <div v-if="!codeDist.length" class="yt-empty">本区间无合规问题</div>
         <ul v-else class="yt-dist">
-          <li v-for="c in codeDist" :key="c.code">
+          <li v-for="c in codeDist" :key="c.code" :class="{ 'yt-dist--warn': c.code.startsWith('HINT_') }">
             <span class="yt-dist-label">{{ c.label }}</span>
             <span class="yt-dist-count u-num">{{ c.count }}</span>
           </li>
@@ -120,6 +124,11 @@ defineExpose({ codeFilter, rows, codeDist })
   background: var(--danger-bg);
   color: var(--danger-text);
   font-size: var(--fs-2);
+}
+/* HINT_ 前缀是提示,不是问题——状态语义色须与问题码区分(M-5) */
+.yt-dist li.yt-dist--warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .yt-dist-count { font-weight: 700; }
 </style>
