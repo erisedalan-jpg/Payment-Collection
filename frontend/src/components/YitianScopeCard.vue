@@ -63,7 +63,7 @@ defineExpose({ draft, onSave })
 </template>
 
 <style scoped>
-.ys-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
+.ys-card { display: flex; flex-direction: column; gap: var(--gap-stack); padding: var(--sp-3) var(--sp-4); }
 .ys-hint { font-size: var(--fs-2); color: var(--sub); line-height: var(--lh-base); }
 .ys-warn { color: var(--warn-text); background: var(--warn-bg); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); }
 .ys-group { display: flex; flex-wrap: wrap; gap: var(--gap-stack); }

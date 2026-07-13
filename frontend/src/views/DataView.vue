@@ -17,6 +17,7 @@ import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
 import YitianScopeCard from '@/components/YitianScopeCard.vue'
+import YitianStoreCard from '@/components/YitianStoreCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -60,6 +61,35 @@ async function onUploadInputs() {
   inputsUploadMsg.value = `已上传 ${ok}/${files.length} 个项目域文件,请点[更新数据]生效`
   if (inputsInput.value) inputsInput.value.value = ''
   loadFileStatus()
+}
+
+// —— 倚天工时域文件(input/yitian/) ——
+const yitianInput = ref<HTMLInputElement | null>(null)
+const yitianUploadMsg = ref('')
+async function onUploadYitian() {
+  const files = Array.from(yitianInput.value?.files || [])
+  if (!files.length) return
+  const ok = await inputsUpload(files)      // 复用既有 useInputFiles().upload,白名单已含倚天两文件
+  yitianUploadMsg.value = `已上传 ${ok}/${files.length} 个倚天文件，请点[更新数据]生效`
+  if (yitianInput.value) yitianInput.value.value = ''
+  loadFileStatus()
+}
+
+/** holidays.csv 模板:前端生成 Blob 下载,不需要后端。 */
+function onDownloadHolidayTemplate() {
+  const lines = [
+    '日期,类型',
+    '2026-01-01,休',
+    '2026-02-16,休',
+    '2026-02-14,班',
+  ]
+  // BOM 让 Excel 打开不乱码
+  const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'holidays.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
 }
 
 // —— 更新数据 / 设置 ——
@@ -287,6 +317,18 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
               <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
             </div>
           </div>
+          <div class="dv-row dv-actions">
+            <input ref="yitianInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
+            <button class="dv-btn" @click="onUploadYitian">上传倚天文件</button>
+            <button class="dv-btn" @click="onDownloadHolidayTemplate">下载 holidays.csv 模板</button>
+            <span v-if="yitianUploadMsg" class="dv-hint">{{ yitianUploadMsg }}</span>
+          </div>
+          <div class="dv-hint dv-fmt">
+            holidays.csv 格式（UTF-8，两列）：<code>日期,类型</code>；类型只有两种——
+            <code>休</code>=法定假/调休放假（即使落在周一~周五），<code>班</code>=调休上班（即使落在周末）。
+            未列出的日期按「周一~周五为工作日」处理。不提供该文件时全站按纯周一~周五近似，
+            含节假日的周期饱和度会偏低。
+          </div>
         </div>
       </div>
 
@@ -384,6 +426,10 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
         <YitianScopeCard />
       </el-collapse-item>
 
+      <el-collapse-item v-if="auth.isSuper" name="yitian-store" title="倚天工时 · 累积数据管理">
+        <YitianStoreCard />
+      </el-collapse-item>
+
       <el-collapse-item name="clear">
         <template #title><span class="dv-danger-title">清空数据 ⚠</span></template>
         <div class="dv-row">
@@ -448,6 +494,8 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 .dv-path .dv-sub-head { padding-left: var(--sp-3); }
 .dv-path .dv-fgrid { padding-left: var(--sp-3); padding-right: var(--sp-3); }
 .dv-path .dv-actions { border-top: 1px dashed var(--line); }
+.dv-fmt { padding: var(--sp-1) var(--sp-3) var(--sp-2); line-height: var(--lh-base); }
+.dv-fmt code { background: var(--card2, var(--card)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0 4px; }
 .dv-badge { font-size: var(--fs-1); font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); }
 .dv-badge.ok { background: var(--ok-bg); color: var(--ok-text); }
 .dv-badge.warn { background: var(--warn-bg); color: var(--warn-text); }
