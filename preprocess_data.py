@@ -303,7 +303,8 @@ def main():
             print("[OK] 倚天工时域: %d 行 / %d 人 / 日历源 %s → %s"
                   % (ymeta["rows"], ymeta["employees"], ymeta["calendarSource"], ypath))
             if ymeta["droppedRows"]:
-                print("  [WARN] 倚天工时 %d 行因工号不在组织架构花名册被丢弃" % ymeta["droppedRows"])
+                print("  [WARN] 倚天工时 %d 行因工号不在组织架构花名册或工作日不可解析被丢弃"
+                      % ymeta["droppedRows"])
             if ymeta["calendarSource"] == "fallback":
                 print("  [WARN] 未提供 input/yitian/holidays.csv,工作日退化为纯周一~周五(节假日周饱和度会偏低)")
     except Exception as e:   # 倚天域是附加特性,任何异常都不得影响 analysis_data.json

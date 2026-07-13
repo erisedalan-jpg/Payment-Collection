@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -57,7 +57,49 @@ describe('YitianToolbar', () => {
   it('数据跨度外的日期被禁用', () => {
     const w = mountBar(DATA)
     const fn = (w.vm as any).disabledDate as (d: Date) => boolean
-    expect(fn(new Date('2026-05-31'))).toBe(true)
-    expect(fn(new Date('2026-06-03'))).toBe(false)
+    // 本地构造 Date(月份从 0 起),不用 new Date('2026-05-31') 那种按 UTC 解析的字符串写法——
+    // 后者在 UTC+8 会把 bug 盖住(I-2 回归)。
+    expect(fn(new Date(2026, 4, 31))).toBe(true)
+    expect(fn(new Date(2026, 5, 3))).toBe(false)
+  })
+
+  it('数据跨度的第一天不被禁选(I-2:toISOString 时区 off-by-one 回归)', () => {
+    const w = mountBar(DATA)
+    const fn = (w.vm as any).disabledDate as (d: Date) => boolean
+    // periodStart = '2026-06-01';本地零点构造,不能用 UTC 字符串解析(会掩盖 bug)
+    expect(fn(new Date(2026, 5, 1))).toBe(false)
+    expect(fn(new Date(2026, 5, 5))).toBe(false)   // periodEnd 同理不被禁选
+  })
+})
+
+describe('YitianToolbar · 时区无关回归(模拟 UTC+8 环境)', () => {
+  // 本沙盒宿主机系统时区是 America/Los_Angeles(UTC 之后),该时区下 toISOString() 天然不回退一天,
+  // 无法用真实系统时区复现 I-2(需要 UTC+8 这类"领先 UTC"的时区)。
+  // 这里临时打桩 Date.prototype.toISOString:把"本地零点构造出的挂钟分量"当作中国时区(UTC+8)
+  // 重新折算出 UTC 时刻,精确复刻生产环境(UTC+8)下 toISOString() 的行为,与宿主机实际时区无关。
+  let originalToISOString: typeof Date.prototype.toISOString
+
+  beforeEach(() => {
+    localStorage.clear()
+    originalToISOString = Date.prototype.toISOString
+    Date.prototype.toISOString = function (this: Date) {
+      const utcMs = Date.UTC(
+        this.getFullYear(), this.getMonth(), this.getDate(),
+        this.getHours(), this.getMinutes(), this.getSeconds(), this.getMilliseconds(),
+      ) - 8 * 3600 * 1000   // 挂钟分量视为 UTC+8 本地零点 → 折算 UTC
+      return originalToISOString.call(new Date(utcMs))   // 用原始实现,避免递归打桩
+    }
+  })
+
+  afterEach(() => {
+    Date.prototype.toISOString = originalToISOString
+  })
+
+  it('数据跨度第一天在 UTC+8 下不被禁选', () => {
+    const w = mountBar(DATA)
+    const fn = (w.vm as any).disabledDate as (d: Date) => boolean
+    // periodStart = '2026-06-01';本地零点构造的 Date 在(模拟的)UTC+8 下,
+    // 旧实现 toISOString().slice(0,10) 会退回 '2026-05-31',把这一天误判为「早于跨度」而禁用。
+    expect(fn(new Date(2026, 5, 1))).toBe(false)
   })
 })

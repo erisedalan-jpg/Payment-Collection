@@ -9,8 +9,9 @@ from __future__ import annotations
 
 # ── 工时类型 ──
 CHECKED_TYPES = ("项目类", "售前类", "售后类")   # 进入全量合规检查
-MGMT_TYPE = "管理类"                              # 跳过检查、直接合规,但计入合规率分母
-EXCLUDED_TYPES = ("业务类", "假期类")             # 不进合规检查(分子分母都不进),但仍进工时统计
+# 跳过检查、直接合规(无必填字段规则,无可检之处)。是否计入合规率分母不由本常量决定——
+# 那是超管可配的 yitian_settings.excludedTypes,前端按 dims.types[t] ∉ excludedTypes 现算。
+MGMT_TYPE = "管理类"
 
 # ── 必填字段(全文模糊匹配 工作成果),大小写不敏感 ──
 SUMMARY_RE = r"(工作概述|工作概况|工作总结|工作汇报|工作总述|工作述职)"

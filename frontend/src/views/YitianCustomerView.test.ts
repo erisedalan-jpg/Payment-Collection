@@ -21,8 +21,8 @@ const DATA = {
   dims: { types: ['项目类'], workTypes: [], customers: ['大客户', '小客户'], products: [],
           productNames: [], projectTypes: [], salesL2: ['银行集团军', '政企大区'], serviceModes: [] },
   entries: [
-    { d: '2026-06-01', e: 'A1', t: 0, h: 6, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: true, chk: true, ok: 0, iss: [] },
-    { d: '2026-06-01', e: 'A1', t: 0, h: 2, wt: null, cu: 1, pl: null, pn: null, pt: null, sm: null, bg: 1, wo: '', top: false, chk: true, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 6, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: true, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 2, wt: null, cu: 1, pl: null, pn: null, pt: null, sm: null, bg: 1, wo: '', top: false, ok: 0, iss: [] },
   ],
   issues: [],
 } as unknown as YitianData

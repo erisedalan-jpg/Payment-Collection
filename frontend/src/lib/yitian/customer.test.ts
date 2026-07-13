@@ -19,13 +19,13 @@ const DATA = {
   },
   entries: [
     // 张三:项目类 6h 大客户(TOP1000) 本BG
-    { d: '2026-06-01', e: 'A1', t: 0, h: 6, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: true, chk: true, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 6, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: true, ok: 0, iss: [] },
     // 张三:项目类 2h 小客户 跨BG
-    { d: '2026-06-01', e: 'A1', t: 0, h: 2, wt: null, cu: 1, pl: null, pn: null, pt: null, sm: null, bg: 1, wo: '', top: false, chk: true, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 2, wt: null, cu: 1, pl: null, pn: null, pt: null, sm: null, bg: 1, wo: '', top: false, ok: 0, iss: [] },
     // 张三:管理类 8h —— TOP1000 与跨BG 都不该统计管理类
-    { d: '2026-06-02', e: 'A1', t: 1, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: false, chk: true, ok: 0, iss: [] },
+    { d: '2026-06-02', e: 'A1', t: 1, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: false, ok: 0, iss: [] },
     // 李四:售前类 4h 大客户 本BG
-    { d: '2026-06-02', e: 'A2', t: 2, h: 4, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: true, chk: true, ok: 0, iss: [] },
+    { d: '2026-06-02', e: 'A2', t: 2, h: 4, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: 0, wo: '', top: true, ok: 0, iss: [] },
   ],
   issues: [],
 } as unknown as YitianData

@@ -22,11 +22,12 @@ def _open_workbook(path: str):
         return None
 
 
-def _read_header_sheet(path: str, key_header: str) -> List[Dict[str, Any]]:
-    """在所有 sheet 中找首行含 key_header 的表(跳过透视杂表),转 list[dict]。找不到返回 []。"""
+def _locate_header_sheet(path: str, key_header: str):
+    """在所有 sheet 中找首行含 key_header 的表(跳过透视杂表)。
+    命中返回 (表头list, 数据行list[tuple]);找不到返回 (None, None)。"""
     wb = _open_workbook(path)
     if wb is None:
-        return []
+        return None, None
     try:
         for ws in wb.worksheets:
             rows = list(ws.iter_rows(values_only=True))
@@ -35,18 +36,33 @@ def _read_header_sheet(path: str, key_header: str) -> List[Dict[str, Any]]:
             headers = [str(h).strip() if h is not None else "" for h in rows[0]]
             if key_header not in headers:
                 continue
-            out = []
-            for raw in rows[1:]:
-                d = {}
-                for i, h in enumerate(headers):
-                    if h:
-                        d[h] = raw[i] if i < len(raw) else None
-                if any(v is not None for v in d.values()):
-                    out.append(d)
-            return out
-        return []
+            return headers, rows[1:]
+        return None, None
     finally:
         wb.close()
+
+
+def _read_header_sheet(path: str, key_header: str) -> List[Dict[str, Any]]:
+    """在所有 sheet 中找首行含 key_header 的表(跳过透视杂表),转 list[dict]。找不到返回 []。"""
+    headers, data_rows = _locate_header_sheet(path, key_header)
+    if headers is None:
+        return []
+    out = []
+    for raw in data_rows:
+        d = {}
+        for i, h in enumerate(headers):
+            if h:
+                d[h] = raw[i] if i < len(raw) else None
+        if any(v is not None for v in d.values()):
+            out.append(d)
+    return out
+
+
+def read_sheet_headers(path: str, key_header: str) -> List[str]:
+    """公开包装:定位含 key_header 的 sheet,只返回表头(不管数据行数;白名单列存在性校验用,
+    如 0 数据行的空表也能校验列是否齐全)。找不到返回 []。"""
+    headers, _ = _locate_header_sheet(path, key_header)
+    return headers or []
 
 
 def read_org_names(path: str) -> Tuple[set, set, int]:

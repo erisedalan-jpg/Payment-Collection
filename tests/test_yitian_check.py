@@ -26,21 +26,6 @@ class TestCorrection:
         assert K.corrected_work_type("交付实施", "售后类") == "售后类"
 
 
-class TestIsChecked:
-    def test_project_with_hours(self):
-        assert K.is_checked("项目类", 6) is True
-
-    def test_management_counts_in_denominator(self):
-        assert K.is_checked("管理类", 8) is True
-
-    def test_business_and_holiday_excluded(self):
-        assert K.is_checked("业务类", 8) is False
-        assert K.is_checked("假期类", 8) is False
-
-    def test_zero_hours_excluded(self):
-        assert K.is_checked("项目类", 0) is False
-
-
 class TestRequiredFields:
     def test_all_missing(self):
         codes, msgs = K.check_row(_row(content="今天干了点活"))

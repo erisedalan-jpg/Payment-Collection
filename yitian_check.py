@@ -27,19 +27,6 @@ def corrected_work_type(project_type: str, work_type: str) -> str:
     return work_type
 
 
-def is_checked(work_type: str, hours: float) -> bool:
-    """[已退役,勿用于新代码] 早期版本用它在后端预判"是否进合规检查"。
-    该口径已改为超管可配(yitian_settings.excludedTypes),由前端现算 —— 后端不再预判。
-    保留仅为不破坏既有测试;新代码一律不要调用。"""
-    if work_type in R.EXCLUDED_TYPES:
-        return False
-    try:
-        h = float(hours)
-    except (TypeError, ValueError):
-        return False
-    return h > 0
-
-
 def peer_contents(rows: List[dict]) -> Dict[str, str]:
     """按工单编号合并同工单全部工作成果(同工单关联检查用)。无工单号的行不参与。"""
     out: Dict[str, str] = {}
@@ -100,10 +87,9 @@ def _check_product(row: dict, peer: str) -> Tuple[List[str], List[str]]:
 
 
 def check_row(row: dict, peer: str = "") -> Tuple[List[str], List[str]]:
-    """单行合规判定 → (问题码列表, 中文消息列表),两者一一对应。管理类直接合规。"""
+    """单行合规判定 → (问题码列表, 中文消息列表),两者一一对应。
+    仅项目类/售前类/售后类进入检查,其余类型(含管理类)直接合规(无必填字段规则,无可检之处)。"""
     work_type = str(row.get("work_type") or "")
-    if work_type == R.MGMT_TYPE:
-        return [], []
     if work_type not in R.CHECKED_TYPES:
         return [], []
 

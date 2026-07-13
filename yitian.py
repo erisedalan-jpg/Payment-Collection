@@ -15,7 +15,7 @@ import config
 import yitian_calendar as CAL
 import yitian_check as CHK
 import yitian_rules as R
-from projects import read_org_roster, read_sheet_by_header, read_top1000
+from projects import read_org_roster, read_sheet_by_header, read_sheet_headers, read_top1000
 
 # ── 工时.xlsx 取列白名单(全表 77 列,只读这 13 个) ──
 # 严禁读取:员工电话/员工所在省/员工所在市/员工入职省份/员工入职城市/岗位(个人隐私,不得落盘)。
@@ -33,6 +33,15 @@ COL_PRODUCT_NAME = "产研侧产品名称"
 COL_WORK_ORDER = "工单编号"
 COL_SALES_L2 = "销售L2组织"
 COL_SERVICE_MODE = "服务方式"
+
+# 白名单列存在性校验用(13 列全列上)。导出端一旦改名/删列,缺列必须报错并跳过倚天段,
+# 不能像 dict.get() 那样静默返回 None → "" → 全量误判(如 05-09 后每条 checked 行都吃
+# MISS_SERVICE_MODE,合规率崩到个位数却零报错)。
+REQUIRED_COLS = [
+    COL_EMP_ID, COL_TYPE, COL_HOURS, COL_DATE, COL_CONTENT, COL_CUSTOMER,
+    COL_PROJECT_TYPE, COL_WORKTYPE3, COL_PRODUCT_LINE, COL_PRODUCT_NAME,
+    COL_WORK_ORDER, COL_SALES_L2, COL_SERVICE_MODE,
+]
 
 HOURS_PER_DAY = 8   # 基础工时 = 工作日数 × 8h
 
@@ -61,9 +70,16 @@ def _hours(v) -> float:
         return 0.0
 
 
-def read_timesheet(path: str) -> List[Dict[str, Any]]:
+def read_timesheet(path: str) -> Optional[List[Dict[str, Any]]]:
     """工时.xlsx → 归一化行(仅白名单列)。表头在第 1 行,按"含工时类型"自动选 sheet。
-    工号统一大写、日期统一 YYYY-MM-DD、工时类型已做售前服务校正。"""
+    工号统一大写、日期统一 YYYY-MM-DD、工时类型已做售前服务校正。
+    白名单列缺失(导出端改名/删列) → 打印 [ERROR] 并返回 None(调用方跳过倚天段)。"""
+    headers = read_sheet_headers(path, COL_TYPE)
+    missing = [c for c in REQUIRED_COLS if c not in headers]
+    if missing:
+        print("[ERROR] 倚天工时表缺列: %s,跳过倚天工时域" % "、".join(missing))
+        return None
+
     raw = read_sheet_by_header(path, COL_TYPE)
     out: List[Dict[str, Any]] = []
     for r in raw:
@@ -96,6 +112,8 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
         return None
 
     rows = read_timesheet(ts_path)
+    if rows is None:
+        return None
     roster = read_org_roster(os.path.join(input_dir, config.ORG_FILE))
     roster_ids = {p["id"] for p in roster}
 
@@ -147,7 +165,9 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
                 "i": len(entries) - 1,
                 "codes": codes,
                 "msgs": msgs,
-                "snippet": r["content"][:R.SNIPPET_MAX],   # 只有问题行下发正文摘要
+                # 只有真问题行(ok=2)才下发 120 字摘要;合规(提示)行(ok=1)不下发正文,
+                # 但仍进 issues[](页面要显示它的 codes/msgs),snippet 留空串。
+                "snippet": r["content"][:R.SNIPPET_MAX] if ok == 2 else "",
             })
 
     return {

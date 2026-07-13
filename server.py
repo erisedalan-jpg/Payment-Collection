@@ -37,6 +37,7 @@ import temp_followup as _temp
 import opportunity_followup as _oppf
 import risk_followup as _riskfu
 import payment_key_followup as _paykey
+import yitian_settings
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -917,7 +918,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
     
     def handle_clear_data(self):
-        """删除业务数据文件 data/analysis_data.json 及原始提取数据目录 yundocs_data/"""
+        """删除业务数据文件 data/analysis_data.json + data/yitian_data.json 及原始提取数据目录 yundocs_data/。
+        注意:data/yitian_settings.json 是超管配置(合规检查范围),不是数据,不在清空之列。"""
         self._audit_set(detail='清空全部数据')
         data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
         legacy_js = os.path.join(BASE_DIR, 'data', 'analysis_data.js')
@@ -939,6 +941,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 os.remove(legacy_js)
             except Exception:
                 pass
+        # 删除倚天工时数据文件(员工级隐私数据,不能"清空"完了还留在盘上继续下发)
+        if os.path.exists(YITIAN_DATA_FILE):
+            try:
+                os.remove(YITIAN_DATA_FILE)
+                msgs.append("倚天工时数据文件已删除")
+            except Exception as e:
+                msgs.append(f"倚天工时数据文件删除失败: {str(e)}")
+        with _yitian_cache_lock:
+            _yitian_cache['mtime'] = None
+            _yitian_cache['data'] = None
         # 删除原始提取数据目录
         if os.path.exists(yundocs_dir):
             try:
@@ -2401,7 +2413,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not (rec.get('isSuper') or '*' in pages or any(k in pages for k in _YITIAN_PAGE_KEYS)):
             self._send_json(403, _error_payload(ERR_FORBIDDEN, "无倚天工时页面权限"))
             return
-        import yitian_settings
         self._send_json(200, {"success": True,
                               "settings": yitian_settings.load_settings(YITIAN_SETTINGS_FILE)})
 
@@ -2409,7 +2420,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         """POST /api/yitian/settings {excludedTypes:[...]} - 超管专属。改完立即生效,无需更新数据。"""
         if self._require_super() is None:
             return
-        import yitian_settings
         body = self._read_json_body()
         if body is None:
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON"))

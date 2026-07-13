@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  NO_L4, rosterL4Map, selectEntries, baseHours, empStats, typeHours,
+  NO_L3, NO_L31, NO_L4, rosterL4Map, selectEntries, baseHours, empStats, typeHours,
   complianceRate, orgSummary, saturationTop, unfilledList, neverFilledList, kpi,
 } from './metrics'
 import type { YitianData } from '@/types/yitian'
@@ -199,5 +199,52 @@ describe('空 L4 兜底(真实花名册里有 L4 为空的部门负责人)', () 
 
   it('可按「未分配L4」筛选', () => {
     expect(selectEntries(WITH_EMPTY, R[0], R[1], [NO_L4]).map((e) => e.e)).toEqual(['A4'])
+  })
+})
+
+describe('分层汇总三层互相对平(I-1:空 L3-1 不得被吞掉,未分配L4 不得跨父级串组)', () => {
+  // A4: L4 为空,属于「服务二部」(与 A1/A2 同 L31)——8h
+  // A5: L4 为空,属于「服务一部」(与 A3 同 L31)——5h;与 A4 验证"未分配L4"按上级分桶,不串组
+  // A6: L3-1 为空(真实数据里 A000701 的场景)——40h;验证空 L3-1 不被 bump() 的空名守卫吞掉
+  const WITH_GAPS = {
+    ...DATA,
+    roster: [
+      ...DATA.roster,
+      { id: 'A4', name: '赵六', l2: '交付中心', l3: '交付实施三部', l31: '服务二部', l4: '', category: '正式员工' },
+      { id: 'A5', name: '孙七', l2: '交付中心', l3: '交付实施三部', l31: '服务一部', l4: '', category: '正式员工' },
+      { id: 'A6', name: '周八', l2: '交付中心', l3: '交付实施三部', l31: '', l4: '银行服务组', category: '正式员工' },
+    ],
+    entries: [
+      ...DATA.entries,
+      { d: '2026-06-01', e: 'A4', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+      { d: '2026-06-01', e: 'A5', t: 0, h: 5, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+      { d: '2026-06-01', e: 'A6', t: 0, h: 40, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+    ],
+  } as unknown as YitianData
+
+  it('L3 合计 == Σ各L3-1 == Σ各L4', () => {
+    const rows = orgSummary(WITH_GAPS, R[0], R[1])
+    const l3Total = rows.filter((r) => r.level === 'l3').reduce((s, r) => s + r.hours, 0)
+    const l31Total = rows.filter((r) => r.level === 'l31').reduce((s, r) => s + r.hours, 0)
+    const l4Total = rows.filter((r) => r.level === 'l4').reduce((s, r) => s + r.hours, 0)
+    expect(l3Total).toBe(81)   // 20+8+0+8+5+40
+    expect(l31Total).toBe(l3Total)
+    expect(l4Total).toBe(l3Total)
+  })
+
+  it('空 L3-1 兜底为「未分配L3-1」,不被吞掉', () => {
+    const rows = orgSummary(WITH_GAPS, R[0], R[1])
+    const row = rows.find((r) => r.level === 'l31' && r.name === NO_L31)
+    expect(row).toBeTruthy()
+    expect(row!.hours).toBe(40)
+  })
+
+  it('两个不同 L3-1 下的「未分配L4」各自一行,parent 不串组', () => {
+    const rows = orgSummary(WITH_GAPS, R[0], R[1])
+    const noL4Rows = rows.filter((r) => r.level === 'l4' && r.name === NO_L4)
+    expect(noL4Rows).toHaveLength(2)
+    const byParent = Object.fromEntries(noL4Rows.map((r) => [r.parent, r.hours]))
+    expect(byParent['服务二部']).toBe(8)   // A4
+    expect(byParent['服务一部']).toBe(5)   // A5
   })
 })
