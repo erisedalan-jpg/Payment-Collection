@@ -25,9 +25,9 @@ const DATA = {
     productNames: [], projectTypes: [], salesL2: [], serviceModes: [],
   },
   entries: [
-    { d: '2026-06-01', e: 'A1', t: 0, h: 12, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 0, iss: [] },
-    { d: '2026-06-02', e: 'A1', t: 1, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 2, iss: ['MISS_NEXT'] },
-    { d: '2026-06-01', e: 'A2', t: 2, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: false, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 12, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+    { d: '2026-06-02', e: 'A1', t: 1, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 2, iss: ['MISS_NEXT'] },
+    { d: '2026-06-01', e: 'A2', t: 2, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
   ],
   issues: [{ i: 1, codes: ['MISS_NEXT'], msgs: ['缺少下一步工作计划'], snippet: '正文' }],
 } as unknown as YitianData
@@ -106,13 +106,24 @@ describe('typeHours', () => {
   })
 })
 
+const EX = ['管理类', '业务类', '假期类']   // 默认剔除口径
+
 describe('complianceRate', () => {
-  it('分母只算 chk 行', () => {
-    // chk 行 2 条:1 条合规 + 1 条问题 → 50%
-    expect(complianceRate(selectEntries(DATA, R[0], R[1]))).toBeCloseTo(0.5)
+  it('分母按 excludedTypes 剔除(默认剔管理类)', () => {
+    // DATA 的 entries:项目类 12h(合规) / 管理类 8h(问题) / 假期类 8h
+    // 默认口径下管理类与假期类都不进分母 → 分母只剩项目类 1 条 → 100%
+    expect(complianceRate(DATA, selectEntries(DATA, R[0], R[1]), EX)).toBeCloseTo(1)
   })
-  it('无 chk 行返回 null', () => {
-    expect(complianceRate([])).toBeNull()
+  it('把管理类纳入后分母变大', () => {
+    expect(complianceRate(DATA, selectEntries(DATA, R[0], R[1]), ['业务类', '假期类']))
+      .toBeCloseTo(0.5)   // 项目类合规 + 管理类问题 → 1/2
+  })
+  it('全部纳入(不剔除任何类型)', () => {
+    const r = complianceRate(DATA, selectEntries(DATA, R[0], R[1]), [])
+    expect(r).toBeCloseTo(2 / 3)   // 3 条:项目类合规 + 管理类问题 + 假期类合规
+  })
+  it('无可计入行返回 null', () => {
+    expect(complianceRate(DATA, [], EX)).toBeNull()
   })
 })
 
@@ -133,7 +144,7 @@ describe('orgSummary', () => {
 })
 
 describe('kpi', () => {
-  const k = kpi(DATA, R[0], R[1])
+  const k = kpi(DATA, R[0], R[1], [], EX)
   it('总工时/未填人数/加班', () => {
     expect(k.totalHours).toBe(28)
     expect(k.unfilledCount).toBe(2)      // 李四(欠填) + 王五(零记录)
@@ -146,9 +157,9 @@ describe('kpi', () => {
   it('补全后饱和度 = Σmax(实际,基础) ÷ Σ基础', () => {
     expect(k.avgSatFilled).toBeCloseTo((20 + 16 + 16) / 48)
   })
-  it('合规率与问题数', () => {
-    expect(k.complianceRate).toBeCloseTo(0.5)
-    expect(k.issueCount).toBe(1)
+  it('合规率与问题数按 excludedTypes 口径', () => {
+    expect(k.complianceRate).toBeCloseTo(1)
+    expect(k.issueCount).toBe(0)   // 管理类被剔除 → 它那条问题不计入
   })
 })
 
@@ -168,7 +179,7 @@ describe('空 L4 兜底(真实花名册里有 L4 为空的部门负责人)', () 
     ],
     entries: [
       ...DATA.entries,
-      { d: '2026-06-01', e: 'A4', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 0, iss: [] },
+      { d: '2026-06-01', e: 'A4', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
     ],
   } as unknown as YitianData
 

@@ -121,11 +121,20 @@ export function typeHours(data: YitianData, entries: YitianEntry[]): TypeHour[] 
     .sort((a, b) => b.hours - a.hours)
 }
 
-/** 合规率 = (chk 且 ok<=1) ÷ chk。分母含管理类,不含业务类/假期类/0 工时。 */
-export function complianceRate(entries: YitianEntry[]): number | null {
-  const checked = entries.filter((e) => e.chk)
-  if (!checked.length) return null
-  return checked.filter((e) => e.ok <= 1).length / checked.length
+/** 该行是否计入合规率(工时类型不在超管配置的剔除清单里)。
+ *  注意:被剔除的类型仍进工时统计(总工时/饱和度/类型占比),剔除只作用于合规率分子分母。 */
+export function isIncluded(data: YitianData, e: YitianEntry, excludedTypes: string[]): boolean {
+  const name = e.t === null || e.t === undefined ? '' : (data.dims.types[e.t] ?? '')
+  return !excludedTypes.includes(name)
+}
+
+/** 合规率 = 纳入范围且 ok<=1 的行数 ÷ 纳入范围的行数。分母口径由超管配置决定。 */
+export function complianceRate(
+  data: YitianData, entries: YitianEntry[], excludedTypes: string[],
+): number | null {
+  const inc = entries.filter((e) => isIncluded(data, e, excludedTypes))
+  if (!inc.length) return null
+  return inc.filter((e) => e.ok <= 1).length / inc.length
 }
 
 /** L3 → L3-1 → L4 三层汇总。人数取花名册(不是"有记录的人数")。零记录的组也保留。 */
@@ -174,7 +183,9 @@ export function neverFilledList(stats: EmpStat[]): EmpStat[] {
   return stats.filter((s) => !s.filled)
 }
 
-export function kpi(data: YitianData, start: string, end: string, l4s: string[] = []): Kpi {
+export function kpi(
+  data: YitianData, start: string, end: string, l4s: string[] = [], excludedTypes: string[] = [],
+): Kpi {
   const entries = selectEntries(data, start, end, l4s)
   const stats = empStats(data, start, end, l4s)
   const base = baseHours(data, start, end)
@@ -192,8 +203,8 @@ export function kpi(data: YitianData, start: string, end: string, l4s: string[] 
     neverFilledCount: neverFilledList(stats).length,
     overtimeCount: overtime.length,
     overtimeHours: overtime.reduce((s, x) => s + x.diff, 0),
-    complianceRate: complianceRate(entries),
-    issueCount: entries.filter((e) => e.chk && e.ok === 2).length,
+    complianceRate: complianceRate(data, entries, excludedTypes),
+    issueCount: entries.filter((e) => isIncluded(data, e, excludedTypes) && e.ok === 2).length,
     baseHours: base,
   }
 }

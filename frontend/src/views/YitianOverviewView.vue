@@ -6,16 +6,20 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { kpi, typeHours, orgSummary, selectEntries } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
+const settings = useYitianSettingsStore()
 
-onMounted(() => { store.load() })
+onMounted(() => { store.load(); settings.load() })
 
 const ready = computed(() => !!store.data)
 
-const k = computed(() => (store.data ? kpi(store.data, view.start, view.end, view.l4s) : null))
+const k = computed(() => (store.data
+  ? kpi(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes)
+  : null))
 
 function pct(v: number | null | undefined): string {
   return v === null || v === undefined ? '-' : (v * 100).toFixed(1) + '%'
