@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { top1000ByL4, bgSupport } from './customer'
+import { top1000ByL4, bgSupport, top1000TotalsRow } from './customer'
 import type { YitianData } from '@/types/yitian'
 
 const DATA = {
@@ -52,6 +52,17 @@ describe('top1000ByL4', () => {
     const zj = rows.find((r) => r.l4 === '浙江服务组')!
     expect(zj.hours).toBe(4)
     expect(zj.topHours).toBe(4)
+  })
+})
+
+describe('top1000TotalsRow', () => {
+  it('占比按 ΣTOP工时 ÷ Σ总工时 重算,客户数全局去重(不相加)', () => {
+    const rows = top1000ByL4(DATA, S, E)
+    const t = top1000TotalsRow(DATA, S, E, [], rows)
+    expect(t.hours).toBe(12)         // 8(银行) + 4(浙江)
+    expect(t.topHours).toBe(10)      // 6 + 4
+    expect(t.pct).toBeCloseTo(10 / 12)
+    expect(t.topCustomers).toBe(1)   // 两个组服务的是同一个"大客户" → 去重后 1,不是 1+1=2
   })
 })
 

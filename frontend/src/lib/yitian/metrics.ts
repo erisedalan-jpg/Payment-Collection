@@ -173,6 +173,21 @@ export function orgSummary(
   })
 }
 
+export interface OrgTotals {
+  people: number
+  hours: number
+  base: number
+  sat: number | null
+}
+
+/** L4 行的合计。比率按 Σ实际 ÷ Σ基础 重算 —— 绝不能把各行饱和度相加或求平均。 */
+export function orgL4SummaryRow(l4Rows: OrgRow[]): OrgTotals {
+  const people = l4Rows.reduce((s, r) => s + r.people, 0)
+  const hours = l4Rows.reduce((s, r) => s + r.hours, 0)
+  const base = l4Rows.reduce((s, r) => s + r.base, 0)
+  return { people, hours, base, sat: base > 0 ? hours / base : null }
+}
+
 /** 饱和度榜(降序),取前 n。 */
 export function saturationTop(stats: EmpStat[], n = 10): EmpStat[] {
   return [...stats].sort((a, b) => b.hours - a.hours).slice(0, n)

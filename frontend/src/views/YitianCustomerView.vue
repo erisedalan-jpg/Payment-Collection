@@ -6,7 +6,8 @@ import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
-import { top1000ByL4, bgSupport } from '@/lib/yitian/customer'
+import { top1000ByL4, bgSupport, top1000TotalsRow } from '@/lib/yitian/customer'
+import { NO_L4 } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -22,15 +23,15 @@ function pct(v: number): string {
   return (v * 100).toFixed(1) + '%'
 }
 
-const topRows = computed(() => {
+const topRowsRaw = computed(() => {
   if (!store.data) return []
-  return top1000ByL4(store.data, view.start, view.end, view.l4s).map((r) => ({
-    ...r,
-    hoursText: hrs(r.hours),
-    topHoursText: hrs(r.topHours),
-    pctText: pct(r.pct),
-  }))
+  // 去掉「未分配L4」行(部门负责人,无客户支持归属)
+  return top1000ByL4(store.data, view.start, view.end, view.l4s).filter((r) => r.l4 !== NO_L4)
 })
+
+const topRows = computed(() => topRowsRaw.value.map((r) => ({
+  ...r, hoursText: hrs(r.hours), topHoursText: hrs(r.topHours), pctText: pct(r.pct),
+})))
 
 const topCols: DataColumn[] = [
   { key: 'l4', label: 'L4 组织', width: 150 },
@@ -39,6 +40,19 @@ const topCols: DataColumn[] = [
   { key: 'pctText', label: 'TOP1000 占比', width: 130, num: true, sortable: true },
   { key: 'topCustomers', label: 'TOP1000 客户数', width: 140, num: true, sortable: true },
 ]
+
+function topSummaryMethod({ columns }: { columns: { property: string }[] }): string[] {
+  if (!store.data) return columns.map(() => '')
+  const t = top1000TotalsRow(store.data, view.start, view.end, view.l4s, topRowsRaw.value)
+  const disp: Record<string, string> = {
+    l4: '合计',
+    hoursText: hrs(t.hours),
+    topHoursText: hrs(t.topHours),
+    pctText: pct(t.pct),
+    topCustomers: String(t.topCustomers),
+  }
+  return columns.map((c) => disp[c.property] ?? '')
+}
 
 const bg = computed(() =>
   store.data ? bgSupport(store.data, view.start, view.end, view.l4s)
@@ -76,12 +90,15 @@ defineExpose({ topRows, bg })
 
     <template v-if="ready">
       <section class="yt-card">
-        <h3 class="yt-h">TOP1000 大客户支持<span class="yt-sub">（仅项目类 / 售前类 / 售后类）</span></h3>
-        <DataTable :columns="topCols" :rows="topRows" :show-count="false" />
+        <h3 class="yt-h">TOP1000 大客户支持</h3>
+        <p class="yt-note">仅统计项目类 / 售前类 / 售后类工时；客户数按客户去重。</p>
+        <DataTable :columns="topCols" :rows="topRows" :show-count="false"
+          :show-summary="true" :summary-method="topSummaryMethod" />
       </section>
 
       <section class="yt-card">
-        <h3 class="yt-h">跨 BG 支持<span class="yt-sub">（仅项目类 / 售前类；本 BG 按销售 L2 组织判定）</span></h3>
+        <h3 class="yt-h">跨 BG 支持</h3>
+        <p class="yt-note">仅统计项目类 / 售前类工时；本 BG 按销售 L2 组织判定。</p>
         <MetricGrid :items="bgMetrics" col-min="200px" />
         <ChartBox :option="bgOption" height="280px" />
       </section>
@@ -99,5 +116,5 @@ defineExpose({ topRows, bg })
   box-shadow: var(--shadow-1);
 }
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
-.yt-sub { font-size: var(--fs-1); font-weight: 400; color: var(--mut); margin-left: var(--sp-2); }
+.yt-note { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--gap-stack); }
 </style>

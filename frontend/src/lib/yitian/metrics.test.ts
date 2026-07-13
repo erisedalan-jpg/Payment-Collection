@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   NO_L3, NO_L31, NO_L4, rosterL4Map, selectEntries, baseHours, empStats, typeHours,
   complianceRate, orgSummary, saturationTop, unfilledList, neverFilledList, kpi,
+  orgL4SummaryRow,
 } from './metrics'
 import type { YitianData } from '@/types/yitian'
 
@@ -140,6 +141,20 @@ describe('orgSummary', () => {
     expect(bank.parent).toBe('服务二部')
     const zj = rows.find((r) => r.level === 'l4' && r.name === '浙江服务组')!
     expect(zj.hours).toBe(0)      // 零记录的组也要出现(否则看不到全员没填)
+  })
+})
+
+describe('orgL4SummaryRow', () => {
+  it('比率按 Σ实际 ÷ Σ基础 重算(不是把各行饱和度相加/平均)', () => {
+    const rows = orgSummary(DATA, R[0], R[1]).filter((r) => r.level === 'l4')
+    const t = orgL4SummaryRow(rows)
+    expect(t.people).toBe(3)
+    expect(t.hours).toBe(28)
+    expect(t.base).toBe(48)          // 3 人 × 16h
+    expect(t.sat).toBeCloseTo(28 / 48)
+  })
+  it('基础工时为 0 时比率为 null', () => {
+    expect(orgL4SummaryRow([]).sat).toBeNull()
   })
 })
 
