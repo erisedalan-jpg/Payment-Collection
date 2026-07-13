@@ -28,7 +28,9 @@ def corrected_work_type(project_type: str, work_type: str) -> str:
 
 
 def is_checked(work_type: str, hours: float) -> bool:
-    """是否进入合规检查(= 合规率的分母)。业务类/假期类/0 工时不进;管理类进(直接算合规)。"""
+    """[已退役,勿用于新代码] 早期版本用它在后端预判"是否进合规检查"。
+    该口径已改为超管可配(yitian_settings.excludedTypes),由前端现算 —— 后端不再预判。
+    保留仅为不破坏既有测试;新代码一律不要调用。"""
     if work_type in R.EXCLUDED_TYPES:
         return False
     try:

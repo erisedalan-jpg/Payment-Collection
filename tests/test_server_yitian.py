@@ -107,6 +107,17 @@ class TestYitianPageGate:
             'yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer'}
 
 
+class TestYitianSettingsEndpoint:
+    def test_settings_not_in_super_only_paths(self):
+        # 铁律:该集合按 path 匹配不分 method;GET 是全体授权账号要用的,加进去会把他们一起 403
+        assert '/api/yitian/settings' not in S._SUPER_ONLY_PATHS
+
+    def test_settings_file_is_not_the_cookie_config(self):
+        # data/yitian_config.json 是 V2.1.1 的 cookie 配置,与本配置无关,不得复用
+        assert S.YITIAN_SETTINGS_FILE != S.YITIAN_CONFIG
+        assert S.YITIAN_SETTINGS_FILE.endswith('yitian_settings.json')
+
+
 class TestUploadSubdir:
     def test_timesheet_maps_to_yitian_subdir(self):
         assert config.INPUT_SUBDIR_MAP[config.YITIAN_TIMESHEET_FILE] == config.YITIAN_DIRNAME
