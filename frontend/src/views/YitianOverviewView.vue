@@ -7,7 +7,7 @@ import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
-import { kpi, typeHours, orgSummary, selectEntries, orgL4SummaryRow } from '@/lib/yitian/metrics'
+import { kpi, typeHours, orgSummary, selectEntries, orgL4SummaryRow, NO_L4 } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -57,14 +57,18 @@ const typeOption = computed(() => ({
 }))
 
 const typeBarOption = computed(() => ({
-  tooltip: { trigger: 'axis', valueFormatter: (v: number) => `${v} h` },
+  tooltip: { trigger: 'item', valueFormatter: (v: number) => `${v} h` },
   grid: { left: 48, right: 16, top: 24, bottom: 32 },
   xAxis: { type: 'category', data: typeRows.value.map((t) => t.type) },
   yAxis: { type: 'value' },
   series: [{
     name: '工时',
     type: 'bar',
-    data: typeRows.value.map((t) => Number(t.hours.toFixed(1))),
+    // colorBy: 'data' → 每根柱子按数据项取调色板下一色。饼图也是逐扇区取色,
+    // 两者数据顺序相同 → 同一个工时类型在两张图里是同一个颜色。
+    // 不写死色值:颜色仍由全站 ECharts 主题(--chart-1..8 令牌)给。
+    colorBy: 'data',
+    data: typeRows.value.map((t) => ({ name: t.type, value: Number(t.hours.toFixed(1)) })),
   }],
 }))
 
@@ -77,8 +81,13 @@ const orgCols: DataColumn[] = [
   { key: 'satText', label: '饱和度', width: 110, num: true, sortable: true },
 ]
 
+// 只展示 L4 层,并剔除「未分配L4」(花名册里 L4 为空的部门负责人)。
+// 合计行同样只统计这里的可见行 —— 表里看到什么,合计就是什么之和,不会对不上。
 const l4Rows = computed(() =>
-  store.data ? orgSummary(store.data, view.start, view.end, view.l4s).filter((r) => r.level === 'l4') : [])
+  store.data
+    ? orgSummary(store.data, view.start, view.end, view.l4s)
+        .filter((r) => r.level === 'l4' && r.name !== NO_L4)
+    : [])
 
 const orgRows = computed(() => l4Rows.value.map((r) => ({
   ...r,
@@ -101,7 +110,7 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   return columns.map((c) => disp[c.property] ?? '')
 }
 
-defineExpose({ typeOption, typeBarOption, typeRows })
+defineExpose({ typeOption, typeBarOption, typeRows, orgRows, orgSummaryMethod })
 </script>
 
 <template>
