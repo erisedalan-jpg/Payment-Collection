@@ -1610,12 +1610,16 @@ class YitianData(_Base):
 
 ```python
 def validate_and_write_yitian_json(data: dict, output_dir: str) -> str:
-    """用 YitianData 校验后写出 yitian_data.json。返回输出文件路径。校验失败抛 ValidationError。"""
+    """用 YitianData 校验后写出 yitian_data.json。返回输出文件路径。校验失败抛 ValidationError。
+
+    注意:这里**不用** indent(与 analysis_data.json 的写法不同)。倚天 entries 每行 16 个键,
+    indent=1 会把每个键各占一行 —— 实测同一份数据 indent=1 是 210KB/周、紧凑是 155KB/周(省 26%)。
+    该文件是机器读的(前端 fetch),不需要人眼可读性。"""
     YitianData.model_validate(data)
     os.makedirs(output_dir, exist_ok=True)
     out_path = os.path.join(output_dir, "yitian_data.json")
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=1)
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     return out_path
 
 
@@ -2425,6 +2429,23 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - `saturationTop(stats, n?): EmpStat[]` / `unfilledList(stats): EmpStat[]` / `neverFilledList(stats): EmpStat[]`
   - `kpi(data, start, end, l4s?): Kpi`
 
+**「未分配 L4」口径（真实数据逼出来的，必须实现）**
+花名册里**确实存在 L4 为空的人**（实测 85 人里有 3 个，应是部门负责人；他们有 16 条工时记录）。若按空串分组，L4 汇总表会直接吞掉这些工时 → **L3 合计 ≠ 各 L4 之和**，用户一眼就看出数字对不上。
+
+因此：**前端展示层统一把空 L4 兜底为常量 `NO_L4 = '未分配L4'`**，让它成为一个正常分组，合计自然对得上。
+
+```ts
+/** 花名册里 L4 为空的人(部门负责人等)的兜底分组名。空串分组会让 L3 合计对不上各 L4 之和。 */
+export const NO_L4 = '未分配L4'
+```
+
+- `rosterL4Map` 返回 `p.l4 || NO_L4`
+- `selectRoster` 按 `p.l4 || NO_L4` 匹配 `l4s`
+- `empStats` 的 `l4` 字段填 `p.l4 || NO_L4`
+- `orgSummary` 的 l4 层用兜底后的名字（`bump('l4', s.l4, ...)` 因为 `s.l4` 已兜底，天然生效）
+
+> 后端 `data_scope.scope_yitian_data` 仍按**原始空串**过滤——普通管理员无法被授权一个没有名字的组织，所以这 3 个人对非超管天然不可见（fail-closed，正确）。兜底只影响超管看到的展示分组。
+
 **口径定义（与 spec §7 一致，实现时不得改）**
 - 基础工时（人均）= 区间工作日数 × 8
 - 实际工时 = 该员工区间内**全部工时类型**之和（含管理类/业务类/假期类）
@@ -2441,7 +2462,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```ts
 import { describe, it, expect } from 'vitest'
 import {
-  rosterL4Map, selectEntries, baseHours, empStats, typeHours,
+  NO_L4, rosterL4Map, selectEntries, baseHours, empStats, typeHours,
   complianceRate, orgSummary, saturationTop, unfilledList, neverFilledList, kpi,
 } from './metrics'
 import type { YitianData } from '@/types/yitian'
@@ -2598,6 +2619,39 @@ describe('rosterL4Map', () => {
     expect(rosterL4Map(DATA)['A3']).toBe('浙江服务组')
   })
 })
+
+describe('空 L4 兜底(真实花名册里有 L4 为空的部门负责人)', () => {
+  // A4 无 L4 且有 8h 工时:必须归入「未分配L4」,不能被吞掉
+  const WITH_EMPTY = {
+    ...DATA,
+    roster: [
+      ...DATA.roster,
+      { id: 'A4', name: '赵六', l2: '交付中心', l3: '交付实施三部', l31: '服务二部', l4: '', category: '正式员工' },
+    ],
+    entries: [
+      ...DATA.entries,
+      { d: '2026-06-01', e: 'A4', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, chk: true, ok: 0, iss: [] },
+    ],
+  } as unknown as YitianData
+
+  it('空 L4 归入「未分配L4」', () => {
+    expect(rosterL4Map(WITH_EMPTY)['A4']).toBe(NO_L4)
+    const s = empStats(WITH_EMPTY, R[0], R[1]).find((x) => x.id === 'A4')!
+    expect(s.l4).toBe(NO_L4)
+  })
+
+  it('L3 合计 = 各 L4 之和(空 L4 不得被吞掉)', () => {
+    const rows = orgSummary(WITH_EMPTY, R[0], R[1])
+    const l3 = rows.find((r) => r.level === 'l3')!
+    const l4Sum = rows.filter((r) => r.level === 'l4').reduce((s, r) => s + r.hours, 0)
+    expect(l4Sum).toBe(l3.hours)
+    expect(rows.some((r) => r.level === 'l4' && r.name === NO_L4)).toBe(true)
+  })
+
+  it('可按「未分配L4」筛选', () => {
+    expect(selectEntries(WITH_EMPTY, R[0], R[1], [NO_L4]).map((e) => e.e)).toEqual(['A4'])
+  })
+})
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -2653,10 +2707,14 @@ export interface Kpi {
   baseHours: number
 }
 
-/** 工号 → L4(组织权威是花名册,不是工时表)。 */
+/** 花名册里 L4 为空的人(部门负责人等)的兜底分组名。
+ *  实测 85 人里有 3 个 L4 为空且有工时——按空串分组会让 L3 合计对不上各 L4 之和。 */
+export const NO_L4 = '未分配L4'
+
+/** 工号 → L4(组织权威是花名册,不是工时表;空 L4 兜底为 NO_L4)。 */
 export function rosterL4Map(data: YitianData): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const p of data.roster) out[p.id] = p.l4
+  for (const p of data.roster) out[p.id] = p.l4 || NO_L4
   return out
 }
 
@@ -2664,7 +2722,7 @@ export function rosterL4Map(data: YitianData): Record<string, string> {
 export function selectRoster(data: YitianData, l4s: string[] = []): YitianRosterItem[] {
   if (!l4s.length) return data.roster
   const allow = new Set(l4s)
-  return data.roster.filter((p) => allow.has(p.l4))
+  return data.roster.filter((p) => allow.has(p.l4 || NO_L4))
 }
 
 /** 区间 + L4 筛选后的工时行。 */
@@ -2702,7 +2760,7 @@ export function empStats(
       name: p.name,
       l3: p.l3,
       l31: p.l31,
-      l4: p.l4,
+      l4: p.l4 || NO_L4,   // 空 L4 兜底,否则 L3 合计对不上各 L4 之和
       hours: h,
       base,
       sat: base > 0 ? h / base : null,
@@ -3115,7 +3173,7 @@ export function countByL4(rows: IssueRow[]): { l4: string; count: number }[] {
 
 ```ts
 import type { YitianData, YitianEntry } from '@/types/yitian'
-import { rosterL4Map, selectEntries, selectRoster } from './metrics'
+import { NO_L4, rosterL4Map, selectEntries, selectRoster } from './metrics'
 
 // TOP1000 支持只看客户类工时;跨 BG 只看项目类/售前类(与原工具口径一致)
 const CUSTOMER_TYPES = ['项目类', '售前类', '售后类']
@@ -3148,9 +3206,11 @@ export function top1000ByL4(
   const l4Of = rosterL4Map(data)
   const acc = new Map<string, { hours: number; topHours: number; custs: Set<number> }>()
 
-  // 花名册里的 L4 先全部建桶——零工时的组也要露面(那正是"这个组没投入 TOP1000"的信号)
+  // 花名册里的 L4 先全部建桶——零工时的组也要露面(那正是"这个组没投入 TOP1000"的信号)。
+  // 空 L4 兜底为 NO_L4,否则这些人的工时会被 acc.get() 落空直接丢掉。
   for (const p of selectRoster(data, l4s)) {
-    if (p.l4 && !acc.has(p.l4)) acc.set(p.l4, { hours: 0, topHours: 0, custs: new Set() })
+    const name = p.l4 || NO_L4
+    if (!acc.has(name)) acc.set(name, { hours: 0, topHours: 0, custs: new Set() })
   }
 
   for (const e of selectEntries(data, start, end, l4s)) {
@@ -3380,6 +3440,7 @@ import { computed, onMounted } from 'vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { dataRange } from '@/lib/yitian/calendar'
+import { NO_L4 } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -3387,8 +3448,9 @@ const view = useYitianViewStore()
 const days = computed(() => store.data?.days ?? [])
 const range = computed(() => dataRange(days.value))
 
+// 空 L4 兜底为「未分配L4」——花名册里确有 L4 为空的部门负责人,直接 filter 掉会让他们的工时筛不出来
 const l4Options = computed(() => {
-  const set = new Set((store.data?.roster ?? []).map((p) => p.l4).filter(Boolean))
+  const set = new Set((store.data?.roster ?? []).map((p) => p.l4 || NO_L4))
   return [...set].sort()
 })
 
