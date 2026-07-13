@@ -4737,3 +4737,771 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - **升级动作**：换 `frontend/dist` → 覆盖后端 `*.py` → **重启后端** → 超管在 `/data` 上传 `工时.xlsx`（`holidays.csv` 可选）→ **点一次「更新数据」** → 超管给需要的账号授权 5 个新 pageKey
 - **不需要**：新依赖（openpyxl/pydantic 已在）、数据库变更、`analysis_data.json` 重算口径变化（倚天域与主域完全解耦）
 - `yitian-analyze/` 目录本期**保留**（上线后作口径比对基准），核对无误后再单独清理
+
+---
+
+### Task 14: 合规检查范围可配置 — 后端（用户钦定：消灭硬编码）
+
+**背景（必读）**：原工具把「剔除哪些工时类型不参与合规检查」硬编码成 `exclude_types = ['管理类','业务类','假期类']` 埋在脚本深处。这条口径直接决定合规率这个头号指标，却对使用者完全不可见——接手的管理员根本不知道分母里少了 71 条管理类。**用户钦定：把它提升为超管可配置项**，配置存服务端，改了立即生效。
+
+Task 1-13 已完成（后端管线 + 端点 + 前端 5 页全绿）。当前 `yitian.py` 里把这条口径写死成了 `chk` 布尔字段落进 JSON——**这等于把硬编码从脚本搬进了数据文件，必须拆掉**。
+
+**Files:**
+- Create: `yitian_settings.py`
+- Modify: `yitian.py`（去掉 `chk` 门：对**每一行**都跑判定）
+- Modify: `schema.py`（`YitianEntry` 删 `chk` 字段）
+- Modify: `server.py`（`GET/POST /api/yitian/settings`）
+- Modify: `preprocess_data.py`（无需改——`build_yitian_data` 签名不变）
+- Modify: `tests/test_yitian.py`（`chk` 相关断言改写）
+- Test: `tests/test_yitian_settings.py`、`tests/test_server_yitian.py`（追加）
+- Modify: `.gitignore`（+`data/yitian_settings.json`）
+
+**Interfaces:**
+- Produces:
+  - `yitian_settings.DEFAULT_EXCLUDED_TYPES = ["管理类", "业务类", "假期类"]`
+  - `yitian_settings.default_settings() -> dict` → `{"excludedTypes": [...]}`
+  - `yitian_settings.validate_settings(cfg: dict) -> dict`（非法输入抛 `ValueError`）
+  - `yitian_settings.load_settings(path) -> dict` / `save_settings(path, cfg) -> dict`
+  - `GET /api/yitian/settings` → `{"success": true, "settings": {...}}`（登录 + 任一倚天 pageKey）
+  - `POST /api/yitian/settings` → 同上（**超管专属**）
+  - `YitianEntry` **不再有 `chk` 字段**
+
+**铁律：**
+- `/api/yitian/settings` **绝对不能加进 `_SUPER_ONLY_PATHS`**（该集合按 path 匹配、不分 method；GET 是全体授权账号要用的）。POST 的超管校验写在 handler 内部第一行。这与 `/api/yitian/data` 是同一个坑。
+- 配置文件是 `data/yitian_settings.json`。**注意不要与既有的 `data/yitian_config.json` 搞混**——那是 V2.1.1 的倚天 cookie 配置，完全无关，不要动它。
+- 写路径基于 `BASE_DIR`。原子写 + 锁，仿 `server.py` 里 `_atomic_write_json` 与 `project_tags` 的既有范式。
+
+- [ ] **Step 1: 写失败测试**
+
+`tests/test_yitian_settings.py`：
+
+```python
+# -*- coding: utf-8 -*-
+"""yitian_settings.py:合规检查范围配置(超管可配,消灭硬编码)。"""
+import json
+
+import pytest
+
+import yitian_settings as S
+
+
+class TestDefaults:
+    def test_default_excluded_types_matches_original_tool(self):
+        # 默认值 = 原工具 exclude_types,保证开箱即用时口径与历史一致
+        assert S.DEFAULT_EXCLUDED_TYPES == ["管理类", "业务类", "假期类"]
+
+    def test_default_settings_shape(self):
+        assert S.default_settings() == {"excludedTypes": ["管理类", "业务类", "假期类"]}
+
+
+class TestValidate:
+    def test_accepts_valid(self):
+        assert S.validate_settings({"excludedTypes": ["管理类"]}) == {"excludedTypes": ["管理类"]}
+
+    def test_accepts_empty_list(self):
+        # 全部纳入(不剔除任何类型)是合法配置
+        assert S.validate_settings({"excludedTypes": []}) == {"excludedTypes": []}
+
+    def test_missing_key_falls_back_to_default(self):
+        assert S.validate_settings({}) == S.default_settings()
+
+    def test_rejects_non_list(self):
+        with pytest.raises(ValueError):
+            S.validate_settings({"excludedTypes": "管理类"})
+
+    def test_rejects_non_string_items(self):
+        with pytest.raises(ValueError):
+            S.validate_settings({"excludedTypes": ["管理类", 123]})
+
+    def test_strips_and_dedups(self):
+        assert S.validate_settings({"excludedTypes": [" 管理类 ", "管理类", ""]}) == {"excludedTypes": ["管理类"]}
+
+    def test_rejects_too_many(self):
+        with pytest.raises(ValueError):
+            S.validate_settings({"excludedTypes": [f"类型{i}" for i in range(S.MAX_TYPES + 1)]})
+
+
+class TestLoadSave:
+    def test_missing_file_returns_default(self, tmp_path):
+        assert S.load_settings(str(tmp_path / "nope.json")) == S.default_settings()
+
+    def test_corrupt_file_returns_default(self, tmp_path):
+        p = tmp_path / "bad.json"
+        p.write_text("{坏 json", encoding="utf-8")
+        assert S.load_settings(str(p)) == S.default_settings()
+
+    def test_roundtrip(self, tmp_path):
+        p = str(tmp_path / "s.json")
+        S.save_settings(p, {"excludedTypes": ["假期类"]})
+        assert S.load_settings(p) == {"excludedTypes": ["假期类"]}
+        with open(p, encoding="utf-8") as f:
+            assert json.load(f)["excludedTypes"] == ["假期类"]
+```
+
+`tests/test_yitian.py` 里与 `chk` 相关的既有用例要改写（**这是既有测试，必须同步改，否则红**）：
+
+- `test_basic_shape`：删掉对 `e["chk"]` 的断言。
+- `test_unchecked_row_carries_no_codes`：**语义反转**——假期类现在也照常跑判定（只是没有必填规则，所以码为空）。改成：
+
+```python
+    def test_excluded_type_still_gets_entry_but_no_codes(self, tmp_path):
+        # 假期类没有必填字段规则 → 判定结果为空码/ok=0,但仍是一条正常 entry;
+        # 是否计入合规率由前端按超管配置的 excludedTypes 决定,后端不再预判(不再有 chk 字段)。
+        base = _make_input(tmp_path, [_ts_row(工时类型="假期类", 工作成果="", 客户="", 服务方式="")])
+        data = Y.build_yitian_data(base)
+        e = data["entries"][0]
+        assert "chk" not in e
+        assert e["ok"] == 0 and e["iss"] == []
+        assert data["issues"] == []
+```
+
+- 新增：0 工时行现在**照常检查**（与原工具一致；原脚本 README 声称跳过、代码并没跳过）：
+
+```python
+    def test_zero_hour_row_is_still_checked(self, tmp_path):
+        base = _make_input(tmp_path, [_ts_row(工时=0, 工作成果="今天干了点活", 服务方式="")])
+        data = Y.build_yitian_data(base)
+        e = data["entries"][0]
+        assert e["h"] == 0
+        assert e["ok"] == 2                       # 正文缺三段 → 判问题
+        assert "MISS_SUMMARY" in e["iss"]
+```
+
+`tests/test_server_yitian.py` 追加：
+
+```python
+class TestYitianSettingsEndpoint:
+    def test_settings_not_in_super_only_paths(self):
+        # 铁律:该集合按 path 匹配不分 method;GET 是全体授权账号要用的,加进去会把他们一起 403
+        assert '/api/yitian/settings' not in S._SUPER_ONLY_PATHS
+
+    def test_settings_file_is_not_the_cookie_config(self):
+        # data/yitian_config.json 是 V2.1.1 的 cookie 配置,与本配置无关,不得复用
+        assert S.YITIAN_SETTINGS_FILE != S.YITIAN_CONFIG
+        assert S.YITIAN_SETTINGS_FILE.endswith('yitian_settings.json')
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `python -m pytest tests/test_yitian_settings.py -q`
+Expected: FAIL — `ModuleNotFoundError: No module named 'yitian_settings'`
+
+- [ ] **Step 3a: 实现 `yitian_settings.py`**
+
+```python
+# yitian_settings.py
+"""倚天工时域:合规检查范围配置(超管可配)。纯函数 + 原子读写,可单测。
+
+为什么要有这个文件:原工具把「剔除哪些工时类型不参与合规检查」硬编码成
+exclude_types = ['管理类','业务类','假期类'] 埋在脚本里。这条口径直接决定合规率,
+却对使用者不可见——接手的管理员根本不知道分母里少了 71 条管理类。
+本模块把它提升为服务端配置,超管在 /data 可见可改,改完立即生效(前端按配置现算,不必重跑管线)。
+"""
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Dict, List
+
+# 默认值 = 原工具的 exclude_types,保证开箱即用时口径与历史报告一致
+DEFAULT_EXCLUDED_TYPES = ["管理类", "业务类", "假期类"]
+
+MAX_TYPES = 20          # 工时类型总共就 6 种,20 是防呆上限
+MAX_TYPE_LEN = 20
+
+
+def default_settings() -> Dict[str, Any]:
+    return {"excludedTypes": list(DEFAULT_EXCLUDED_TYPES)}
+
+
+def validate_settings(cfg: Any) -> Dict[str, Any]:
+    """校验并归一化配置。非法 → ValueError。缺键 → 回落默认。
+    归一化:strip、去空串、去重(保序)。空列表是合法的(= 不剔除任何类型)。"""
+    if not isinstance(cfg, dict):
+        raise ValueError("配置必须是对象")
+    if "excludedTypes" not in cfg:
+        return default_settings()
+
+    raw = cfg["excludedTypes"]
+    if not isinstance(raw, list):
+        raise ValueError("excludedTypes 必须是数组")
+    if len(raw) > MAX_TYPES:
+        raise ValueError("excludedTypes 最多 %d 项" % MAX_TYPES)
+
+    out: List[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            raise ValueError("excludedTypes 只能含字符串")
+        s = item.strip()
+        if not s:
+            continue
+        if len(s) > MAX_TYPE_LEN:
+            raise ValueError("工时类型名过长")
+        if s not in out:
+            out.append(s)
+    return {"excludedTypes": out}
+
+
+def load_settings(path: str) -> Dict[str, Any]:
+    """读配置;文件缺失/损坏/非法 → 静默回落默认(降级不阻断)。"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return validate_settings(json.load(f))
+    except (OSError, ValueError):
+        return default_settings()
+
+
+def save_settings(path: str, cfg: Any) -> Dict[str, Any]:
+    """校验后原子写(先写 .tmp 再 replace,避免并发/崩溃留半截坏文件)。返回落盘后的配置。"""
+    clean = validate_settings(cfg)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(clean, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+    return clean
+```
+
+- [ ] **Step 3b: `yitian.py` 去掉 `chk` 门**
+
+把 `build_yitian_data` 里的这一段：
+
+```python
+    for r in kept:
+        chk = CHK.is_checked(r["work_type"], r["hours"])
+        if chk:
+            codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""))
+            ok = CHK.ok_of(codes)
+        else:
+            codes, msgs, ok = [], [], 0   # 不进检查的行(业务类/假期类/0工时)不带任何问题码
+        entries.append({
+            ...
+            "chk": chk,
+            "ok": ok,
+            "iss": codes,
+        })
+```
+
+改成（**对每一行都跑判定，不预剔除；entries 不再有 `chk` 字段**）：
+
+```python
+    for r in kept:
+        # 对每一行都跑判定 —— 是否计入合规率由超管配置的 excludedTypes 决定,前端现算。
+        # 后端绝不预判:那等于把"剔除哪些类型"这条口径二次硬编码进数据文件,改配置也不生效。
+        # 管理类/业务类/假期类没有必填字段规则,check_row 对它们天然返回空码。
+        codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""))
+        ok = CHK.ok_of(codes)
+        entries.append({
+            ...
+            "ok": ok,
+            "iss": codes,
+        })
+```
+
+（`entries.append` 里其余字段一字不动，只删 `"chk": chk` 那一行。）
+
+`yitian_check.is_checked` **不要删**——它已无调用方，但删除会牵动 `tests/test_yitian_check.py` 的既有用例。保留并加一行注释说明它已退役：
+
+```python
+def is_checked(work_type: str, hours: float) -> bool:
+    """[已退役,勿用于新代码] 早期版本用它在后端预判"是否进合规检查"。
+    该口径已改为超管可配(yitian_settings.excludedTypes),由前端现算 —— 后端不再预判。
+    保留仅为不破坏既有测试;新代码一律不要调用。"""
+```
+
+- [ ] **Step 3c: `schema.py` 删 `YitianEntry.chk`**
+
+把 `YitianEntry` 里这一行删掉：
+
+```python
+    chk: bool                        # 是否进合规检查(= 合规率分母)
+```
+
+其余字段一字不动。删完后 `python schema.py` 重新导出，并 `cd frontend && npm run gen:types` 重新生成 `src/types/yitian.ts`（Task 15 会消费新类型）。
+
+- [ ] **Step 3d: `server.py` 加两个端点**
+
+常量区（`YITIAN_DATA_FILE` 附近）：
+
+```python
+YITIAN_SETTINGS_FILE = os.path.join(BASE_DIR, 'data', 'yitian_settings.json')
+_yitian_settings_lock = threading.RLock()
+```
+
+handler（放在 `handle_yitian_data` 之后）：
+
+```python
+    def handle_yitian_settings_get(self):
+        """GET /api/yitian/settings - 合规检查范围配置。登录 + 持有任一倚天页面授权即可读
+        (页面要用它算合规率);写则须超管。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        pages = rec.get('allowedPages', [])
+        if not (rec.get('isSuper') or '*' in pages or any(k in pages for k in _YITIAN_PAGE_KEYS)):
+            self._send_json(403, _error_payload(ERR_FORBIDDEN, "无倚天工时页面权限"))
+            return
+        import yitian_settings
+        self._send_json(200, {"success": True,
+                              "settings": yitian_settings.load_settings(YITIAN_SETTINGS_FILE)})
+
+    def handle_yitian_settings_save(self):
+        """POST /api/yitian/settings {excludedTypes:[...]} - 超管专属。改完立即生效,无需更新数据。"""
+        if self._require_super() is None:
+            return
+        import yitian_settings
+        body = self._read_json_body()
+        if body is None:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON"))
+            return
+        try:
+            with _yitian_settings_lock:
+                clean = yitian_settings.save_settings(YITIAN_SETTINGS_FILE, body)
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._audit_set(target='倚天合规检查范围',
+                        detail='剔除类型: ' + ('、'.join(clean['excludedTypes']) or '(无)'))
+        self._send_json(200, {"success": True, "settings": clean})
+```
+
+> `_read_json_body` 是既有 helper（`server.py` 里已有，`portal` / `followup` 等端点都在用）。若名字不同，**先 grep 确认真名再用**，不要新造。
+
+路由：`_dispatch_get` 里紧挨 `/api/yitian/data` 之后加
+
+```python
+        elif parsed.path == '/api/yitian/settings':
+            self.handle_yitian_settings_get()
+```
+
+`_dispatch_post` 里加
+
+```python
+        elif parsed.path == '/api/yitian/settings':
+            self.handle_yitian_settings_save()
+```
+
+**不要**把 `/api/yitian/settings` 加进 `_SUPER_ONLY_PATHS`。
+
+审计：`audit.py` 的 `_ACTION_MAP` 加一行
+
+```python
+    ('POST', '/api/yitian/settings'): ('yitian.settings', '修改倚天合规检查范围'),
+```
+
+- [ ] **Step 3e: `.gitignore` 追加**
+
+```
+data/yitian_settings.json
+```
+
+- [ ] **Step 4: 验证**
+
+```bash
+python -m pytest tests/test_yitian_settings.py tests/test_yitian.py tests/test_server_yitian.py -q
+python -m pytest -q                    # 全仓零回归
+python -m ruff check yitian_settings.py yitian.py server.py schema.py
+python schema.py && cd frontend && npm run gen:types && npx vue-tsc --noEmit
+```
+
+**真实数据验证**（`input/yitian/工时.xlsx` 已就位）：
+
+```bash
+python preprocess_data.py
+python -X utf8 -c "
+import json
+d = json.load(open('data/yitian_data.json', encoding='utf-8'))
+e = d['entries'][0]
+print('entries 已无 chk 字段:', 'chk' not in e)
+types = d['dims']['types']
+EX = {'管理类','业务类','假期类'}
+inc = [x for x in d['entries'] if types[x['t']] not in EX]
+ok  = [x for x in inc if x['ok'] <= 1]
+print(f'默认口径: 分母 {len(inc)} | 合规 {len(ok)} | 问题 {len(inc)-len(ok)} | 合规率 {len(ok)/len(inc)*100:.1f}%')
+"
+```
+Expected: `entries 已无 chk 字段: True`，且 **分母 462 / 合规 442 / 问题 20 / 合规率 95.7%** —— 与原脚本在同一数据上的实跑值逐位对平（原脚本重跑:462 条、合规 366 + 合规(提示) 76 = 442、问题 20）。**对不上就停下来查，不要往下走。**
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add yitian_settings.py yitian.py schema.py server.py audit.py .gitignore frontend/src/types/yitian.ts tests/test_yitian_settings.py tests/test_yitian.py tests/test_server_yitian.py
+git commit -m "feat(yitian): 合规检查范围改超管可配(消灭 exclude_types 硬编码)
+
+原工具把'剔除哪些工时类型'硬编码在脚本里,直接决定合规率却对使用者不可见。
+改为服务端配置 data/yitian_settings.json(默认与原工具一致),超管在 /data 可见可改。
+后端不再预判 chk(那等于把硬编码搬进数据文件),对每行都跑判定,由前端按配置现算分母。
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task 15: 合规检查范围可配置 — 前端（/data 配置卡 + 口径改用配置）
+
+**背景**：Task 14 已把「剔除哪些工时类型不参与合规检查」做成服务端配置（`GET/POST /api/yitian/settings`，默认 `{"excludedTypes": ["管理类","业务类","假期类"]}`），并把 `chk` 字段从 `YitianEntry` 里删掉了。现在前端要：①按配置现算合规率分母 ②给超管一个能看见、能改的配置界面。
+
+**Files:**
+- Modify: `frontend/src/lib/yitianApi.ts`（+2 个函数）
+- Create: `frontend/src/stores/yitianSettings.ts`
+- Modify: `frontend/src/lib/yitian/metrics.ts`（`complianceRate` / `kpi` 改签名）
+- Modify: `frontend/src/lib/yitian/metrics.test.ts`（既有断言同步改）
+- Modify: `frontend/src/views/YitianOverviewView.vue` / `YitianTrendView.vue`（传配置）
+- Create: `frontend/src/components/YitianScopeCard.vue`（/data 超管配置卡）
+- Modify: `frontend/src/views/DataView.vue`（嵌入配置卡）
+- Modify: `frontend/src/stores/auth.ts`（登录/登出复位 settings store）
+- Test: `frontend/src/components/YitianScopeCard.test.ts`
+
+**Interfaces:**
+- Consumes: `types/yitian.ts`（**已无 `chk` 字段**）、`api/client` 的 `api`
+- Produces:
+  - `getYitianSettings(): Promise<YitianSettings>` / `saveYitianSettings(cfg): Promise<YitianSettings>`，`YitianSettings = { excludedTypes: string[] }`
+  - `useYitianSettingsStore()` → `{ settings, loaded, saving, load(), save(next), reset() }`
+  - `metrics.isIncluded(data, entry, excludedTypes): boolean`
+  - `metrics.complianceRate(data, entries, excludedTypes): number | null`（**签名变了**：多了 data 与 excludedTypes）
+  - `metrics.kpi(data, start, end, l4s, excludedTypes): Kpi`（**签名变了**：末尾多 excludedTypes）
+  - `WORK_TYPE_OPTIONS`（配置卡的候选项，取自 `data.dims.types`）
+
+- [ ] **Step 1: 写失败测试**
+
+`frontend/src/lib/yitian/metrics.test.ts` 里，把既有的 `complianceRate` / `kpi` 用例改成新签名（**这是既有测试，必须同步改**）：
+
+```ts
+const EX = ['管理类', '业务类', '假期类']   // 默认剔除口径
+
+describe('complianceRate', () => {
+  it('分母按 excludedTypes 剔除(默认剔管理类)', () => {
+    // DATA 的 entries:项目类 12h(合规) / 管理类 8h(问题) / 假期类 8h
+    // 默认口径下管理类与假期类都不进分母 → 分母只剩项目类 1 条 → 100%
+    expect(complianceRate(DATA, selectEntries(DATA, R[0], R[1]), EX)).toBeCloseTo(1)
+  })
+  it('把管理类纳入后分母变大', () => {
+    expect(complianceRate(DATA, selectEntries(DATA, R[0], R[1]), ['业务类', '假期类']))
+      .toBeCloseTo(0.5)   // 项目类合规 + 管理类问题 → 1/2
+  })
+  it('全部纳入(不剔除任何类型)', () => {
+    const r = complianceRate(DATA, selectEntries(DATA, R[0], R[1]), [])
+    expect(r).toBeCloseTo(2 / 3)   // 3 条:项目类合规 + 管理类问题 + 假期类合规
+  })
+  it('无可计入行返回 null', () => {
+    expect(complianceRate(DATA, [], EX)).toBeNull()
+  })
+})
+```
+
+> **注意**：`metrics.test.ts` 里那份 `DATA` fixture 的 entries 目前带 `chk` 字段且第二条是「管理类 ok=2」。`chk` 字段已从契约里删除——把 fixture 里每条 entry 的 `chk: true/false` 删掉即可（其余不动）；`as unknown as YitianData` 的断言会兜住类型。
+
+`kpi` 的既有用例同步加末位参数：
+
+```ts
+describe('kpi', () => {
+  const k = kpi(DATA, R[0], R[1], [], EX)
+  ...
+  it('合规率与问题数按 excludedTypes 口径', () => {
+    expect(k.complianceRate).toBeCloseTo(1)
+    expect(k.issueCount).toBe(0)   // 管理类被剔除 → 它那条问题不计入
+  })
+})
+```
+
+`frontend/src/components/YitianScopeCard.test.ts`（新建）：
+
+```ts
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import ElementPlus from 'element-plus'
+
+const { getSpy, saveSpy } = vi.hoisted(() => ({
+  getSpy: vi.fn(),
+  saveSpy: vi.fn(async (c: unknown) => c),
+}))
+vi.mock('@/lib/yitianApi', () => ({
+  getYitianSettings: getSpy,
+  saveYitianSettings: saveSpy,
+  getYitianData: vi.fn(),
+}))
+
+import YitianScopeCard from './YitianScopeCard.vue'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
+
+describe('YitianScopeCard', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    getSpy.mockReset()
+    saveSpy.mockClear()
+    getSpy.mockResolvedValue({ excludedTypes: ['管理类', '业务类', '假期类'] })
+  })
+
+  it('挂载即拉配置并勾上默认剔除项', async () => {
+    const w = mount(YitianScopeCard, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(getSpy).toHaveBeenCalledTimes(1)
+    expect((w.vm as any).draft).toEqual(['管理类', '业务类', '假期类'])
+  })
+
+  it('保存把勾选结果发给后端', async () => {
+    const w = mount(YitianScopeCard, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    ;(w.vm as any).draft = ['管理类']
+    await (w.vm as any).onSave()
+    expect(saveSpy).toHaveBeenCalledWith({ excludedTypes: ['管理类'] })
+    expect(useYitianSettingsStore().settings.excludedTypes).toEqual(['管理类'])
+  })
+
+  it('可以全不勾(不剔除任何类型)', async () => {
+    const w = mount(YitianScopeCard, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    ;(w.vm as any).draft = []
+    await (w.vm as any).onSave()
+    expect(saveSpy).toHaveBeenCalledWith({ excludedTypes: [] })
+  })
+
+  it('提示文案说清"纳入=白送合规"', async () => {
+    const w = mount(YitianScopeCard, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.text()).toContain('没有必填字段规则')
+  })
+})
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `cd frontend && npx vitest run src/components/YitianScopeCard.test.ts src/lib/yitian/metrics.test.ts`
+Expected: FAIL — 找不到 `YitianScopeCard.vue` / `complianceRate` 签名不符
+
+- [ ] **Step 3a: `frontend/src/lib/yitianApi.ts` 追加**
+
+```ts
+export interface YitianSettings {
+  excludedTypes: string[]
+}
+
+/** 合规检查范围配置(超管可配)。全体授权账号可读——页面要用它算合规率分母。 */
+export async function getYitianSettings(): Promise<YitianSettings> {
+  const r = await api.get<{ success: boolean; settings: YitianSettings }>('/api/yitian/settings')
+  return r.settings
+}
+
+/** 保存配置(超管专属)。改完立即生效,无需点「更新数据」。 */
+export async function saveYitianSettings(cfg: YitianSettings): Promise<YitianSettings> {
+  const r = await api.post<{ success: boolean; settings: YitianSettings }>('/api/yitian/settings', cfg)
+  return r.settings
+}
+```
+
+- [ ] **Step 3b: `frontend/src/stores/yitianSettings.ts`**
+
+```ts
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { getYitianSettings, saveYitianSettings, type YitianSettings } from '@/lib/yitianApi'
+
+/** 合规检查范围。默认与原工具一致(剔除管理类/业务类/假期类);超管可在 /data 改。 */
+const DEFAULT: YitianSettings = { excludedTypes: ['管理类', '业务类', '假期类'] }
+
+export const useYitianSettingsStore = defineStore('yitianSettings', () => {
+  const settings = ref<YitianSettings>({ ...DEFAULT })
+  const loaded = ref(false)
+  const saving = ref(false)
+
+  async function load(): Promise<void> {
+    if (loaded.value) return
+    try {
+      settings.value = await getYitianSettings()
+    } catch {
+      settings.value = { ...DEFAULT }   // 拿不到就用默认口径,不要把页面卡死
+    }
+    loaded.value = true
+  }
+
+  async function save(next: YitianSettings): Promise<void> {
+    saving.value = true
+    try {
+      settings.value = await saveYitianSettings(next)
+    } finally {
+      saving.value = false
+    }
+  }
+
+  function reset(): void {
+    settings.value = { ...DEFAULT }
+    loaded.value = false
+  }
+
+  return { settings, loaded, saving, load, save, reset }
+})
+```
+
+- [ ] **Step 3c: `frontend/src/lib/yitian/metrics.ts` 口径改用配置**
+
+删掉所有 `e.chk` 的用法，改为按 `excludedTypes` 判断。新增/改写：
+
+```ts
+/** 该行是否计入合规率(工时类型不在超管配置的剔除清单里)。
+ *  注意:被剔除的类型仍进工时统计(总工时/饱和度/类型占比),剔除只作用于合规率分子分母。 */
+export function isIncluded(data: YitianData, e: YitianEntry, excludedTypes: string[]): boolean {
+  const name = e.t === null || e.t === undefined ? '' : (data.dims.types[e.t] ?? '')
+  return !excludedTypes.includes(name)
+}
+
+/** 合规率 = 纳入范围且 ok<=1 的行数 ÷ 纳入范围的行数。分母口径由超管配置决定。 */
+export function complianceRate(
+  data: YitianData, entries: YitianEntry[], excludedTypes: string[],
+): number | null {
+  const inc = entries.filter((e) => isIncluded(data, e, excludedTypes))
+  if (!inc.length) return null
+  return inc.filter((e) => e.ok <= 1).length / inc.length
+}
+```
+
+`kpi` 的签名末尾加 `excludedTypes: string[] = []`，内部两处改写：
+
+```ts
+export function kpi(
+  data: YitianData, start: string, end: string, l4s: string[] = [], excludedTypes: string[] = [],
+): Kpi {
+  const entries = selectEntries(data, start, end, l4s)
+  ...
+  return {
+    ...
+    complianceRate: complianceRate(data, entries, excludedTypes),
+    issueCount: entries.filter((e) => isIncluded(data, e, excludedTypes) && e.ok === 2).length,
+    ...
+  }
+}
+```
+
+- [ ] **Step 3d: `frontend/src/components/YitianScopeCard.vue`**
+
+```vue
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
+import { useYitianStore } from '@/stores/yitian'
+
+// 候选项:优先取真实数据里出现过的工时类型;数据没加载时用固定 6 类兜底
+const FALLBACK_TYPES = ['项目类', '售前类', '售后类', '管理类', '业务类', '假期类']
+
+const store = useYitianSettingsStore()
+const dataStore = useYitianStore()
+
+const draft = ref<string[]>([])
+const msg = ref('')
+const err = ref(false)
+
+const options = computed(() => {
+  const t = dataStore.data?.dims.types ?? []
+  return t.length ? t : FALLBACK_TYPES
+})
+
+onMounted(async () => {
+  await store.load()
+  draft.value = [...store.settings.excludedTypes]
+})
+
+watch(() => store.settings.excludedTypes, (v) => { draft.value = [...v] })
+
+async function onSave() {
+  msg.value = ''
+  err.value = false
+  try {
+    await store.save({ excludedTypes: [...draft.value] })
+    msg.value = '已保存，立即生效（无需点「更新数据」）'
+  } catch (e) {
+    err.value = true
+    msg.value = e instanceof Error ? e.message : '保存失败'
+  }
+}
+
+defineExpose({ draft, onSave })
+</script>
+
+<template>
+  <div class="ys-card">
+    <p class="ys-hint">
+      勾选的工时类型<strong>不计入合规率</strong>的分子分母（仍计入总工时、饱和度、类型占比）。
+      默认剔除管理类 / 业务类 / 假期类，与原工时检查工具口径一致。
+    </p>
+    <p class="ys-hint ys-warn">
+      注意：管理类 / 业务类 / 假期类<strong>没有必填字段规则</strong>，把它们纳入后会一律判为合规，
+      等于给合规率白送分母——纳入前请想清楚这个指标要表达什么。
+    </p>
+
+    <el-checkbox-group v-model="draft" class="ys-group">
+      <el-checkbox v-for="t in options" :key="t" :value="t" :label="t" />
+    </el-checkbox-group>
+
+    <div class="ys-actions">
+      <el-button type="primary" :loading="store.saving" @click="onSave">保存</el-button>
+      <span v-if="msg" class="ys-msg" :class="{ 'ys-msg-err': err }">{{ msg }}</span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.ys-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
+.ys-hint { font-size: var(--fs-2); color: var(--sub); line-height: var(--lh-base); }
+.ys-warn { color: var(--warn-text); background: var(--warn-bg); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); }
+.ys-group { display: flex; flex-wrap: wrap; gap: var(--gap-stack); }
+.ys-actions { display: flex; align-items: center; gap: var(--gap-stack); }
+.ys-msg { font-size: var(--fs-1); color: var(--ok-text); }
+.ys-msg-err { color: var(--danger-text); }
+</style>
+```
+
+> **Element Plus 2.9**：`el-checkbox` 用 `:value="t"`（`label` 只作显示文案）。**先确认 `--lh-base` / `--ok-text` / `--danger-text` / `--warn-bg` / `--warn-text` 在 `theme.css` 里真实存在**再写——写错的令牌会被浏览器静默丢弃、肉眼看不出来。
+
+- [ ] **Step 3e: `frontend/src/views/DataView.vue` 嵌入配置卡（仅超管可见）**
+
+在既有的 `el-collapse` 里追加一个折叠项（照抄 `PortalConfigCard` 那一项的写法）：
+
+```vue
+        <el-collapse-item v-if="auth.isSuper" name="yitian-scope" title="倚天工时 · 合规检查范围">
+          <YitianScopeCard />
+        </el-collapse-item>
+```
+
+script 里 `import YitianScopeCard from '@/components/YitianScopeCard.vue'`。
+
+- [ ] **Step 3f: 页面接线（两处）**
+
+`YitianOverviewView.vue`：
+```ts
+import { useYitianSettingsStore } from '@/stores/yitianSettings'
+const settings = useYitianSettingsStore()
+onMounted(() => { store.load(); settings.load() })
+const k = computed(() => (store.data
+  ? kpi(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes)
+  : null))
+```
+
+`YitianTrendView.vue`：同样引入 settings store 并 `settings.load()`；把 `complianceRate(es)` 改为 `complianceRate(data, es, settings.settings.excludedTypes)`，把 `es.filter((e) => e.chk && e.ok === 2).length` 改为 `es.filter((e) => isIncluded(data, e, settings.settings.excludedTypes) && e.ok === 2).length`（`isIncluded` 从 metrics 引入）。
+
+> `YitianComplianceView` / `YitianAnalyticsView` / `YitianCustomerView` **不用改**——它们不算合规率。
+
+- [ ] **Step 3g: `frontend/src/stores/auth.ts` 复位**
+
+登录/登出两处复位批次各加一行 `useYitianSettingsStore().reset()`（顶部 import 之）。
+
+- [ ] **Step 4: 验证**
+
+```bash
+cd frontend && npx vitest run          # 全量,零回归
+cd frontend && npx vue-tsc --noEmit
+cd .. && bash verify.sh                # 全绿
+```
+
+**真实数据核对**（必须做）：临时写一个测试读 `data/yitian_data.json`，断言默认口径下 **分母 462 / 合规 442 / 问题 20 / 合规率 95.7%**（与原脚本实跑逐位对平），跑完即删。对不上就停下来查。
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add frontend/src/lib/yitianApi.ts frontend/src/stores/yitianSettings.ts frontend/src/lib/yitian/metrics.ts frontend/src/lib/yitian/metrics.test.ts frontend/src/components/YitianScopeCard.vue frontend/src/components/YitianScopeCard.test.ts frontend/src/views/DataView.vue frontend/src/views/YitianOverviewView.vue frontend/src/views/YitianTrendView.vue frontend/src/stores/auth.ts
+git commit -m "feat(yitian): /data 合规检查范围配置卡 + 合规率按配置现算
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+```
