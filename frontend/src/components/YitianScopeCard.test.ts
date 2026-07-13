@@ -53,4 +53,12 @@ describe('YitianScopeCard', () => {
     await flushPromises()
     expect(w.text()).toContain('没有必填字段规则')
   })
+
+  it('全部剔除时给出显式告警(合规率会变 "-",别让管理员以为系统坏了)', async () => {
+    getSpy.mockResolvedValue({ excludedTypes: ['项目类', '售前类', '售后类', '管理类', '业务类', '假期类'] })
+    const w = mount(YitianScopeCard, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect((w.vm as any).allExcluded).toBe(true)
+    expect(w.text()).toContain('合规率的分母为 0')
+  })
 })
