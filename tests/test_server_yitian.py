@@ -1,9 +1,14 @@
 import json
 import http.client
 import threading
+
+import pytest
+
 import auth
 import audit
+import config
 import server
+import server as S
 
 
 def _wait_for(predicate, timeout=1.0, interval=0.02):
@@ -85,3 +90,49 @@ def test_non_super_forbidden(tmp_path, monkeypatch):
         assert conn2.getresponse().status == 403
     finally:
         srv.shutdown(); srv.server_close()
+
+
+class TestYitianPageGate:
+    def test_yitian_data_not_in_super_only_paths(self):
+        # 铁律:该集合按 path 匹配不分 method,加进去会把普通授权账号一起 403
+        assert '/api/yitian/data' not in S._SUPER_ONLY_PATHS
+
+    def test_raw_json_path_still_protected(self):
+        # 非超管不得直链原始文件绕过 L4 切分
+        assert S._is_protected_data_path('/data/yitian_data.json') is True
+        assert S._is_protected_data_path('/data/analysis_data.json') is False
+
+    def test_page_keys_cover_five_pages(self):
+        assert set(S._YITIAN_PAGE_KEYS) == {
+            'yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer'}
+
+
+class TestUploadSubdir:
+    def test_timesheet_maps_to_yitian_subdir(self):
+        assert config.INPUT_SUBDIR_MAP[config.YITIAN_TIMESHEET_FILE] == config.YITIAN_DIRNAME
+        assert config.INPUT_SUBDIR_MAP[config.YITIAN_HOLIDAYS_FILE] == config.YITIAN_DIRNAME
+
+    def test_main_domain_files_have_no_subdir(self):
+        assert config.ORG_FILE not in config.INPUT_SUBDIR_MAP
+
+    def test_upload_whitelist_includes_yitian_files(self):
+        assert S.is_valid_input_name(config.YITIAN_TIMESHEET_FILE) is True
+        assert S.is_valid_input_name(config.YITIAN_HOLIDAYS_FILE) is True
+        assert S.is_valid_input_name("../../etc/passwd") is False
+
+    def test_target_dir_helper(self, tmp_path):
+        base = str(tmp_path)
+        assert S._input_target_dir(base, config.YITIAN_TIMESHEET_FILE).endswith(
+            "input" + __import__("os").sep + "yitian")
+        assert S._input_target_dir(base, config.ORG_FILE).endswith("input")
+
+
+class TestFileStatus:
+    def test_status_covers_yitian_files(self, tmp_path):
+        import os
+        ydir = tmp_path / "input" / "yitian"
+        ydir.mkdir(parents=True)
+        (ydir / config.YITIAN_TIMESHEET_FILE).write_bytes(b"x")
+        out = S.collect_file_status(str(tmp_path))
+        assert out[config.YITIAN_TIMESHEET_FILE] is not None       # 在子目录里被找到
+        assert out[config.YITIAN_HOLIDAYS_FILE] is None            # 未提供 → None
