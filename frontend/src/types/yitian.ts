@@ -48,7 +48,6 @@ export type Sm = number | null;
 export type Bg = number | null;
 export type Wo = string;
 export type Top = boolean;
-export type Chk = boolean;
 export type Ok = number;
 export type Iss = string[];
 export type Entries = YitianEntry[];
@@ -121,7 +120,6 @@ export interface YitianEntry {
   bg: Bg;
   wo: Wo;
   top: Top;
-  chk: Chk;
   ok: Ok;
   iss: Iss;
   [k: string]: unknown;

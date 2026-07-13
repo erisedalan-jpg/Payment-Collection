@@ -119,13 +119,24 @@ class TestBuildYitianData:
         assert iss["snippet"] == "今天干了点活"
         assert len(iss["codes"]) == len(iss["msgs"])
 
-    def test_unchecked_row_carries_no_codes(self, tmp_path):
-        # 假期类不进合规检查 → 即使正文空,也不得带问题码
+    def test_excluded_type_still_gets_entry_but_no_codes(self, tmp_path):
+        # 假期类没有必填字段规则 → 判定结果为空码/ok=0,但仍是一条正常 entry;
+        # 是否计入合规率由前端按超管配置的 excludedTypes 决定,后端不再预判(不再有 chk 字段)。
         base = _make_input(tmp_path, [_ts_row(工时类型="假期类", 工作成果="", 客户="", 服务方式="")])
         data = Y.build_yitian_data(base)
         e = data["entries"][0]
-        assert e["chk"] is False and e["ok"] == 0 and e["iss"] == []
+        assert "chk" not in e
+        assert e["ok"] == 0 and e["iss"] == []
         assert data["issues"] == []
+
+    def test_zero_hour_row_is_still_checked(self, tmp_path):
+        # 0 工时行现在照常检查(与原工具一致;原脚本 README 声称跳过、代码并没跳过)
+        base = _make_input(tmp_path, [_ts_row(工时=0, 工作成果="今天干了点活", 服务方式="")])
+        data = Y.build_yitian_data(base)
+        e = data["entries"][0]
+        assert e["h"] == 0
+        assert e["ok"] == 2                       # 正文缺三段 → 判问题
+        assert "MISS_SUMMARY" in e["iss"]
 
     def test_org_columns_come_from_roster_not_timesheet(self, tmp_path):
         base = _make_input(tmp_path, [_ts_row()])

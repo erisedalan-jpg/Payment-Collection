@@ -281,6 +281,8 @@ def _load_analysis_cached():
 
 
 YITIAN_DATA_FILE = os.path.join(BASE_DIR, 'data', 'yitian_data.json')
+YITIAN_SETTINGS_FILE = os.path.join(BASE_DIR, 'data', 'yitian_settings.json')
+_yitian_settings_lock = threading.RLock()
 
 _yitian_cache = {'mtime': None, 'data': None}
 _yitian_cache_lock = threading.Lock()
@@ -733,6 +735,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_cookie_get()
         elif parsed.path == '/api/yitian/data':
             self.handle_yitian_data()
+        elif parsed.path == '/api/yitian/settings':
+            self.handle_yitian_settings_get()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -878,6 +882,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_pmis_cookie_save()
         elif parsed.path == '/api/yitian/cookie':
             self.handle_yitian_cookie_save()
+        elif parsed.path == '/api/yitian/settings':
+            self.handle_yitian_settings_save()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -2381,6 +2387,42 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(200, data)
             return
         self._send_json(200, data_scope.scope_yitian_data(data, allowed))
+
+    def handle_yitian_settings_get(self):
+        """GET /api/yitian/settings - 合规检查范围配置。登录 + 持有任一倚天页面授权即可读
+        (页面要用它算合规率);写则须超管。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        pages = rec.get('allowedPages', [])
+        if not (rec.get('isSuper') or '*' in pages or any(k in pages for k in _YITIAN_PAGE_KEYS)):
+            self._send_json(403, _error_payload(ERR_FORBIDDEN, "无倚天工时页面权限"))
+            return
+        import yitian_settings
+        self._send_json(200, {"success": True,
+                              "settings": yitian_settings.load_settings(YITIAN_SETTINGS_FILE)})
+
+    def handle_yitian_settings_save(self):
+        """POST /api/yitian/settings {excludedTypes:[...]} - 超管专属。改完立即生效,无需更新数据。"""
+        if self._require_super() is None:
+            return
+        import yitian_settings
+        body = self._read_json_body()
+        if body is None:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON"))
+            return
+        try:
+            with _yitian_settings_lock:
+                clean = yitian_settings.save_settings(YITIAN_SETTINGS_FILE, body)
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._audit_set(target='倚天合规检查范围',
+                        detail='剔除类型: ' + ('、'.join(clean['excludedTypes']) or '(无)'))
+        self._send_json(200, {"success": True, "settings": clean})
 
     def _auth_gate(self):
         """检查请求路径是否需要鉴权；需要且无有效会话则返回 False（已发 401），否则返回 True。"""

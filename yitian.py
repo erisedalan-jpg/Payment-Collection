@@ -120,12 +120,11 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
     issues: List[dict] = []
 
     for r in kept:
-        chk = CHK.is_checked(r["work_type"], r["hours"])
-        if chk:
-            codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""))
-            ok = CHK.ok_of(codes)
-        else:
-            codes, msgs, ok = [], [], 0   # 不进检查的行(业务类/假期类/0工时)不带任何问题码
+        # 对每一行都跑判定 —— 是否计入合规率由超管配置的 excludedTypes 决定,前端现算。
+        # 后端绝不预判:那等于把"剔除哪些类型"这条口径二次硬编码进数据文件,改配置也不生效。
+        # 管理类/业务类/假期类没有必填字段规则,check_row 对它们天然返回空码。
+        codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""))
+        ok = CHK.ok_of(codes)
         entries.append({
             "d": r["date"],
             "e": r["emp_id"],
@@ -140,7 +139,6 @@ def build_yitian_data(base_dir: str) -> Optional[dict]:
             "bg": d_bg.idx(r["sales_l2"]),
             "wo": r["work_order"],
             "top": bool(r["customer"]) and r["customer"] in top_names,
-            "chk": chk,
             "ok": ok,
             "iss": codes,
         })

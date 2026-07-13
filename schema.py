@@ -389,7 +389,6 @@ class YitianEntry(_Base):
     bg: Optional[int]                # → dims.salesL2(可空)
     wo: str                          # 工单编号
     top: bool                        # 客户 ∈ TOP1000
-    chk: bool                        # 是否进合规检查(= 合规率分母)
     ok: int                          # 0 合规 / 1 合规(提示) / 2 问题
     iss: List[str]                   # 问题码
 
