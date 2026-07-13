@@ -336,25 +336,25 @@ class AnalysisData(_Base):
 # ── 倚天工时域(V3.0.0):与 AnalysisData 并列的第二个根模型,独立产物 data/yitian_data.json ──
 
 class YitianMeta(_Base):
-    periodStart: Optional[str] = None
-    periodEnd: Optional[str] = None
+    periodStart: Optional[str]      # 可空(无数据行时为 None),但键必须出现
+    periodEnd: Optional[str]        # 同上
     generatedAt: str
-    rows: int = 0
-    employees: int = 0
-    droppedRows: int = 0            # 工号不在花名册而被丢弃的行数(治理可见)
-    calendarSource: str = "fallback"  # "csv" | "fallback"(holidays.csv 缺失,退化为纯周一~周五)
-    hoursPerDay: int = 8
-    thisBgL2: List[str] = []        # 本BG销售L2组织(跨BG判定常量,随数据下发)
+    rows: int
+    employees: int
+    droppedRows: int                # 工号不在花名册而被丢弃的行数(治理可见)
+    calendarSource: str              # "csv" | "fallback"(holidays.csv 缺失,退化为纯周一~周五)
+    hoursPerDay: int
+    thisBgL2: List[str]              # 本BG销售L2组织(跨BG判定常量,随数据下发)
 
 
 class YitianRosterItem(_Base):
     id: str                          # 工号(大写归一),跨域连接键
-    name: str = ""
-    l2: str = ""
-    l3: str = ""
-    l31: str = ""
-    l4: str = ""
-    category: str = ""
+    name: str
+    l2: str
+    l3: str
+    l31: str
+    l4: str
+    category: str
 
 
 class YitianDay(_Base):
@@ -365,49 +365,49 @@ class YitianDay(_Base):
 
 
 class YitianDims(_Base):
-    types: List[str] = []
-    workTypes: List[str] = []
-    customers: List[str] = []
-    products: List[str] = []
-    productNames: List[str] = []
-    projectTypes: List[str] = []
-    salesL2: List[str] = []
-    serviceModes: List[str] = []
+    types: List[str]
+    workTypes: List[str]
+    customers: List[str]
+    products: List[str]
+    productNames: List[str]
+    projectTypes: List[str]
+    salesL2: List[str]
+    serviceModes: List[str]
 
 
 class YitianEntry(_Base):
     d: str                           # 工作日 YYYY-MM-DD
     e: str                           # 工号 → roster
-    t: Optional[int] = None          # → dims.types
-    h: float = 0
-    wt: Optional[int] = None         # → dims.workTypes
-    cu: Optional[int] = None         # → dims.customers
-    pl: Optional[int] = None         # → dims.products
-    pn: Optional[int] = None         # → dims.productNames
-    pt: Optional[int] = None         # → dims.projectTypes
-    sm: Optional[int] = None         # → dims.serviceModes
-    bg: Optional[int] = None         # → dims.salesL2
-    wo: str = ""                     # 工单编号
-    top: bool = False                # 客户 ∈ TOP1000
-    chk: bool = False                # 是否进合规检查(= 合规率分母)
-    ok: int = 0                      # 0 合规 / 1 合规(提示) / 2 问题
-    iss: List[str] = []              # 问题码
+    t: Optional[int]                 # → dims.types(可空,键必须出现)
+    h: float
+    wt: Optional[int]                # → dims.workTypes(可空)
+    cu: Optional[int]                # → dims.customers(可空)
+    pl: Optional[int]                # → dims.products(可空)
+    pn: Optional[int]                # → dims.productNames(可空)
+    pt: Optional[int]                # → dims.projectTypes(可空)
+    sm: Optional[int]                # → dims.serviceModes(可空)
+    bg: Optional[int]                # → dims.salesL2(可空)
+    wo: str                          # 工单编号
+    top: bool                        # 客户 ∈ TOP1000
+    chk: bool                        # 是否进合规检查(= 合规率分母)
+    ok: int                          # 0 合规 / 1 合规(提示) / 2 问题
+    iss: List[str]                   # 问题码
 
 
 class YitianIssue(_Base):
     i: int                           # entries 下标
-    codes: List[str] = []
-    msgs: List[str] = []
-    snippet: str = ""                # 工作成果前 120 字(仅问题行)
+    codes: List[str]
+    msgs: List[str]
+    snippet: str                     # 工作成果前 120 字(仅问题行)
 
 
 class YitianData(_Base):
     meta: YitianMeta
-    roster: List[YitianRosterItem] = []
-    days: List[YitianDay] = []
+    roster: List[YitianRosterItem]
+    days: List[YitianDay]
     dims: YitianDims
-    entries: List[YitianEntry] = []
-    issues: List[YitianIssue] = []
+    entries: List[YitianEntry]
+    issues: List[YitianIssue]
 
 
 def validate_and_write_json(final_data: dict, output_dir: str) -> str:
