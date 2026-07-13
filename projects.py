@@ -67,6 +67,33 @@ def read_org_names(path: str) -> Tuple[set, set, int]:
     return names, l4s, len(rows)
 
 
+def read_sheet_by_header(path: str, key_header: str) -> List[Dict[str, Any]]:
+    """公开包装:按表头关键词自动选 sheet 读表(倚天工时域等跨域复用,避免跨模块引私有函数)。"""
+    return _read_header_sheet(path, key_header)
+
+
+def read_org_roster(path: str) -> List[Dict[str, str]]:
+    """组织架构表 → 花名册 list[dict]。键:id(工号,大写归一)/name/l2/l3/l31/l4/category。
+    仅收 新L3组织 == 交付实施三部 的行(同 read_org_names);工号为空的行跳过——工号是跨域连接键。"""
+    rows = _read_header_sheet(path, "工号")
+    if rows and any(r.get("新L3组织") for r in rows):
+        rows = [r for r in rows if str(r.get("新L3组织") or "").strip() == config.DEPT_L3]
+    out: List[Dict[str, str]] = []
+    for r in rows:
+        emp_id = str(r.get("工号") or "").strip().upper()
+        if not emp_id:
+            continue
+        out.append({
+            "id": emp_id,
+            "name": str(r.get("姓名") or "").strip(),
+            "l2": str(r.get("新L2组织") or "").strip(),
+            "l3": str(r.get("新L3组织") or "").strip(),
+            "l31": str(r.get("新L3-1组织") or "").strip(),
+            "l4": str(r.get("新L4组织") or "").strip(),
+            "category": str(r.get("员工类别") or "").strip(),
+        })
+    return out
+
 
 def read_mapping(path: str) -> List[Dict[str, str]]:
     """A.xlsx(无表头):A列=当前项目号 B列=桥接负责人 C列=已关闭项目号。AC 全有才收。"""
