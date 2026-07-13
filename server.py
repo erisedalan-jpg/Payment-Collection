@@ -56,6 +56,15 @@ def is_valid_input_name(name: str) -> bool:
     return bool(name) and name in _INPUT_UPLOAD_NAMES
 
 
+def _input_target_dir(base_dir: str, name: str) -> str:
+    """上传落盘目录:命中 INPUT_SUBDIR_MAP 则写 input/<subdir>/,否则写 input/ 根。
+    name 已经过 is_valid_input_name 精确白名单校验,不存在拼接穿越面。"""
+    sub = config.INPUT_SUBDIR_MAP.get(name)
+    if sub:
+        return os.path.join(base_dir, 'input', sub)
+    return os.path.join(base_dir, 'input')
+
+
 def _mtime_str(path: str):
     try:
         return datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d %H:%M')
@@ -70,7 +79,7 @@ def collect_file_status(base_dir: str):
     for name in config.PMIS_ALL_FILENAMES:
         out[name] = _mtime_str(os.path.join(pmis_dir, name))
     for name in config.INPUT_UPLOAD_NAMES:
-        out[name] = _mtime_str(os.path.join(base_dir, 'input', name))
+        out[name] = _mtime_str(os.path.join(_input_target_dir(base_dir, name), name))
     return out
 
 
@@ -269,6 +278,32 @@ def _load_analysis_cached():
             except Exception:
                 return None
         return _analysis_cache['data']
+
+
+YITIAN_DATA_FILE = os.path.join(BASE_DIR, 'data', 'yitian_data.json')
+
+_yitian_cache = {'mtime': None, 'data': None}
+_yitian_cache_lock = threading.Lock()
+
+# 持有任一倚天页面授权即可读倚天数据(纵深防御:工时是员工级数据,未授权页面的账号连 curl 也不该拿到)
+_YITIAN_PAGE_KEYS = ('yitian', 'yitian-compliance', 'yitian-analytics',
+                     'yitian-trend', 'yitian-customer')
+
+
+def _load_yitian_cached():
+    try:
+        mtime = os.path.getmtime(YITIAN_DATA_FILE)
+    except OSError:
+        return None
+    with _yitian_cache_lock:
+        if _yitian_cache['mtime'] != mtime:
+            try:
+                with open(YITIAN_DATA_FILE, 'r', encoding='utf-8') as f:
+                    _yitian_cache['data'] = json.load(f)
+                _yitian_cache['mtime'] = mtime
+            except Exception:
+                return None
+        return _yitian_cache['data']
 
 
 _tags_lock = threading.RLock()
@@ -696,6 +731,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_pmis_cookie_get()
         elif parsed.path == '/api/yitian/cookie':
             self.handle_yitian_cookie_get()
+        elif parsed.path == '/api/yitian/data':
+            self.handle_yitian_data()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -2092,9 +2129,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "message": "缺少文件内容"}, ensure_ascii=False).encode('utf-8'))
             return
-        input_dir = os.path.join(BASE_DIR, 'input')
-        os.makedirs(input_dir, exist_ok=True)
-        with open(os.path.join(input_dir, name), 'wb') as f:
+        target_dir = _input_target_dir(BASE_DIR, name)
+        os.makedirs(target_dir, exist_ok=True)
+        with open(os.path.join(target_dir, name), 'wb') as f:
             f.write(body)
         self._audit_set(target=name, detail='上传项目域文件 · %d 字节' % len(body))
         self.send_response(200)
@@ -2321,6 +2358,29 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(404, _error_payload(ERR_NOT_FOUND, "数据文件不存在"))
             return
         self._send_json(200, data_scope.filter_analysis_data(data, allowed))
+
+    def handle_yitian_data(self):
+        """GET /api/yitian/data - 倚天工时数据。登录 + 持有任一倚天页面授权;
+        超管或 allowedL4 含 '*' → 全量,否则按 allowedL4 服务端切数据(员工级隐私,不靠前端隐藏)。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        pages = rec.get('allowedPages', [])
+        if not (rec.get('isSuper') or '*' in pages or any(k in pages for k in _YITIAN_PAGE_KEYS)):
+            self._send_json(403, _error_payload(ERR_FORBIDDEN, "无倚天工时页面权限"))
+            return
+        data = _load_yitian_cached()
+        if data is None:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, "倚天工时数据不存在,请先上传工时.xlsx并更新数据"))
+            return
+        allowed = rec.get('allowedL4', [])
+        if rec.get('isSuper') or '*' in allowed:
+            self._send_json(200, data)
+            return
+        self._send_json(200, data_scope.scope_yitian_data(data, allowed))
 
     def _auth_gate(self):
         """检查请求路径是否需要鉴权；需要且无有效会话则返回 False（已发 401），否则返回 True。"""
