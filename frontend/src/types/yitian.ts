@@ -60,33 +60,33 @@ export type Issues = YitianIssue[];
 
 export interface YitianData {
   meta: YitianMeta;
-  roster?: Roster;
-  days?: Days;
+  roster: Roster;
+  days: Days;
   dims: YitianDims;
-  entries?: Entries;
-  issues?: Issues;
+  entries: Entries;
+  issues: Issues;
   [k: string]: unknown;
 }
 export interface YitianMeta {
-  periodStart?: Periodstart;
-  periodEnd?: Periodend;
+  periodStart: Periodstart;
+  periodEnd: Periodend;
   generatedAt: Generatedat;
-  rows?: Rows;
-  employees?: Employees;
-  droppedRows?: Droppedrows;
-  calendarSource?: Calendarsource;
-  hoursPerDay?: Hoursperday;
-  thisBgL2?: Thisbgl2;
+  rows: Rows;
+  employees: Employees;
+  droppedRows: Droppedrows;
+  calendarSource: Calendarsource;
+  hoursPerDay: Hoursperday;
+  thisBgL2: Thisbgl2;
   [k: string]: unknown;
 }
 export interface YitianRosterItem {
   id: Id;
-  name?: Name;
-  l2?: L2;
-  l3?: L3;
-  l31?: L31;
-  l4?: L4;
-  category?: Category;
+  name: Name;
+  l2: L2;
+  l3: L3;
+  l31: L31;
+  l4: L4;
+  category: Category;
   [k: string]: unknown;
 }
 export interface YitianDay {
@@ -97,39 +97,39 @@ export interface YitianDay {
   [k: string]: unknown;
 }
 export interface YitianDims {
-  types?: Types;
-  workTypes?: Worktypes;
-  customers?: Customers;
-  products?: Products;
-  productNames?: Productnames;
-  projectTypes?: Projecttypes;
-  salesL2?: Salesl2;
-  serviceModes?: Servicemodes;
+  types: Types;
+  workTypes: Worktypes;
+  customers: Customers;
+  products: Products;
+  productNames: Productnames;
+  projectTypes: Projecttypes;
+  salesL2: Salesl2;
+  serviceModes: Servicemodes;
   [k: string]: unknown;
 }
 export interface YitianEntry {
   d: D1;
   e: E;
-  t?: T;
-  h?: H;
-  wt?: Wt;
-  cu?: Cu;
-  pl?: Pl;
-  pn?: Pn;
-  pt?: Pt;
-  sm?: Sm;
-  bg?: Bg;
-  wo?: Wo;
-  top?: Top;
-  chk?: Chk;
-  ok?: Ok;
-  iss?: Iss;
+  t: T;
+  h: H;
+  wt: Wt;
+  cu: Cu;
+  pl: Pl;
+  pn: Pn;
+  pt: Pt;
+  sm: Sm;
+  bg: Bg;
+  wo: Wo;
+  top: Top;
+  chk: Chk;
+  ok: Ok;
+  iss: Iss;
   [k: string]: unknown;
 }
 export interface YitianIssue {
   i: I;
-  codes?: Codes;
-  msgs?: Msgs;
-  snippet?: Snippet;
+  codes: Codes;
+  msgs: Msgs;
+  snippet: Snippet;
   [k: string]: unknown;
 }
