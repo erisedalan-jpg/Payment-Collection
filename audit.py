@@ -40,6 +40,8 @@ _ACTION_MAP = {
     ('POST', '/api/pmis/cookie'): ('pmis.cookie_save', '更新PMIS Cookie'),
     ('POST', '/api/yitian/cookie'): ('yitian.cookie_save', '更新倚天 Cookie'),
     ('POST', '/api/yitian/settings'): ('yitian.settings', '修改倚天合规检查范围'),
+    ('POST', '/api/yitian/store/clear'): ('yitian.store.clear', '清空倚天工时累积库'),
+    ('POST', '/api/yitian/store/delete-range'): ('yitian.store.delete', '删除倚天工时累积区间'),
     ('POST', '/api/pmis/upload'): ('pmis.upload', '上传PMIS包'),
     ('POST', '/api/inputs/upload'): ('inputs.upload', '上传数据文件'),
     ('POST', '/api/data-history/rollback'): ('data.history_rollback', '数据回滚'),

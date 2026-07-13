@@ -38,6 +38,9 @@ import opportunity_followup as _oppf
 import risk_followup as _riskfu
 import payment_key_followup as _paykey
 import yitian_settings
+import yitian_store
+import yitian
+import schema
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -207,6 +210,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/payment-key-followup/scope', '/api/payment-key-followup/archive', '/api/payment-key-followup/archive/delete',
     '/api/pmis/cookie', '/api/pmis/download',
     '/api/yitian/cookie',
+    '/api/yitian/store/clear', '/api/yitian/store/delete-range',
     '/api/portal/upload',
 })
 
@@ -283,7 +287,9 @@ def _load_analysis_cached():
 
 YITIAN_DATA_FILE = os.path.join(BASE_DIR, 'data', 'yitian_data.json')
 YITIAN_SETTINGS_FILE = os.path.join(BASE_DIR, 'data', 'yitian_settings.json')
+YITIAN_STORE_FILE = os.path.join(BASE_DIR, 'data', 'yitian_store.json')
 _yitian_settings_lock = threading.RLock()
+_yitian_store_lock = threading.RLock()
 
 _yitian_cache = {'mtime': None, 'data': None}
 _yitian_cache_lock = threading.Lock()
@@ -307,6 +313,19 @@ def _load_yitian_cached():
             except Exception:
                 return None
         return _yitian_cache['data']
+
+
+def _clear_yitian_store():
+    """清空数据时一并清倚天累积库(员工级工时不能清了业务数据还留在盘上)。
+    **不动 data/yitian_settings.json** —— 那是配置不是数据。"""
+    try:
+        yitian_store.clear_store(YITIAN_STORE_FILE)
+    except OSError:
+        pass
+    try:
+        os.remove(YITIAN_DATA_FILE)
+    except OSError:
+        pass
 
 
 _tags_lock = threading.RLock()
@@ -738,6 +757,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_data()
         elif parsed.path == '/api/yitian/settings':
             self.handle_yitian_settings_get()
+        elif parsed.path == '/api/yitian/store':
+            self.handle_yitian_store_get()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -885,6 +906,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_cookie_save()
         elif parsed.path == '/api/yitian/settings':
             self.handle_yitian_settings_save()
+        elif parsed.path == '/api/yitian/store/clear':
+            self.handle_yitian_store_clear()
+        elif parsed.path == '/api/yitian/store/delete-range':
+            self.handle_yitian_store_delete_range()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -918,7 +943,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
     
     def handle_clear_data(self):
-        """删除业务数据文件 data/analysis_data.json + data/yitian_data.json 及原始提取数据目录 yundocs_data/。
+        """删除业务数据文件 data/analysis_data.json + data/yitian_data.json 及原始提取数据目录 yundocs_data/;
+        并清空倚天工时累积库 data/yitian_store.json(员工级工时不能清了业务数据还留在盘上)。
         注意:data/yitian_settings.json 是超管配置(合规检查范围),不是数据,不在清空之列。"""
         self._audit_set(detail='清空全部数据')
         data_file = os.path.join(BASE_DIR, 'data', 'analysis_data.json')
@@ -941,6 +967,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 os.remove(legacy_js)
             except Exception:
                 pass
+        # 清空倚天工时累积库(员工级工时不能清了业务数据还留在盘上;不动 yitian_settings.json)
+        try:
+            yitian_store.clear_store(YITIAN_STORE_FILE)
+            msgs.append("倚天工时累积库已清空")
+        except OSError as e:
+            msgs.append(f"倚天工时累积库清空失败: {str(e)}")
         # 删除倚天工时数据文件(员工级隐私数据,不能"清空"完了还留在盘上继续下发)
         if os.path.exists(YITIAN_DATA_FILE):
             try:
@@ -2433,6 +2465,69 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._audit_set(target='倚天合规检查范围',
                         detail='剔除类型: ' + ('、'.join(clean['excludedTypes']) or '(无)'))
         self._send_json(200, {"success": True, "settings": clean})
+
+    def _rebuild_yitian_data(self):
+        """累积库变更后就地重建 data/yitian_data.json,并清缓存 ——
+        否则页面还在展示已被删掉的数据。累积库空 → 删掉下发文件。"""
+        data = yitian.build_yitian_data(BASE_DIR)
+        if data is None:
+            try:
+                os.remove(YITIAN_DATA_FILE)
+            except OSError:
+                pass
+        else:
+            schema.validate_and_write_yitian_json(data, os.path.join(BASE_DIR, 'data'))
+        with _yitian_cache_lock:
+            _yitian_cache['mtime'] = None
+            _yitian_cache['data'] = None
+
+    def handle_yitian_store_get(self):
+        """GET /api/yitian/store - 累积状态(行数/覆盖区间)。登录 + 任一倚天页面授权。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+        pages = rec.get('allowedPages', [])
+        if not (rec.get('isSuper') or '*' in pages or any(k in pages for k in _YITIAN_PAGE_KEYS)):
+            self._send_json(403, _error_payload(ERR_FORBIDDEN, "无倚天工时页面权限"))
+            return
+        stats = yitian_store.store_stats(yitian_store.load_store(YITIAN_STORE_FILE))
+        self._send_json(200, {"success": True, "stats": stats})
+
+    def handle_yitian_store_clear(self):
+        """POST /api/yitian/store/clear - 清空累积库(误导入的回退手段)。超管专属。"""
+        if self._require_super() is None:
+            return
+        with _yitian_store_lock:
+            yitian_store.clear_store(YITIAN_STORE_FILE)
+            self._rebuild_yitian_data()
+        self._audit_set(target='倚天工时累积库', detail='清空全部累积数据')
+        self._send_json(200, {"success": True,
+                              "stats": yitian_store.store_stats(yitian_store.empty_store())})
+
+    def handle_yitian_store_delete_range(self):
+        """POST /api/yitian/store/delete-range {start,end} - 按日期区间删累积数据。超管专属。"""
+        if self._require_super() is None:
+            return
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON"))
+            return
+        start = str(body.get('start') or '').strip()
+        end = str(body.get('end') or '').strip()
+        if not start or not end or start > end:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "起止日期非法"))
+            return
+        with _yitian_store_lock:
+            store = yitian_store.load_store(YITIAN_STORE_FILE)
+            n = yitian_store.delete_range(store, start, end)
+            yitian_store.save_store(YITIAN_STORE_FILE, store)
+            self._rebuild_yitian_data()
+            stats = yitian_store.store_stats(store)
+        self._audit_set(target='倚天工时累积库', detail='删除区间 %s ~ %s 共 %d 行' % (start, end, n))
+        self._send_json(200, {"success": True, "deleted": n, "stats": stats})
 
     def _auth_gate(self):
         """检查请求路径是否需要鉴权；需要且无有效会话则返回 False（已发 401），否则返回 True。"""
