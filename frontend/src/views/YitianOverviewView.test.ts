@@ -41,11 +41,19 @@ describe('YitianOverviewView', () => {
     expect(w.text()).toContain('18')          // 8 + 10
   })
 
-  it('渲染分层汇总表', async () => {
+  it('渲染分层汇总表:标题去括号,只含 L4 层,不含层级列,含固定汇总行', async () => {
     const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
-    expect(w.text()).toContain('交付实施三部')
+    expect(w.text()).toContain('分层汇总')
+    expect(w.text()).not.toContain('分层汇总（')
     expect(w.text()).toContain('银行服务组')
+    // 只展示 L4 层:L3 名不再出现在表格里
+    expect(w.text()).not.toContain('交付实施三部')
+    // 层级列已删除
+    expect(w.text()).not.toContain('层级')
+    // 固定汇总行:合计 + 按 Σ实际÷Σ基础 重算的饱和度(18h / 16h = 112.5%)
+    expect(w.text()).toContain('合计')
+    expect(w.text()).toContain('112.5%')
   })
 
   it('加载失败显示错误', async () => {

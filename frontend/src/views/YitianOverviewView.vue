@@ -7,7 +7,7 @@ import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
-import { kpi, typeHours, orgSummary, selectEntries } from '@/lib/yitian/metrics'
+import { kpi, typeHours, orgSummary, selectEntries, orgL4SummaryRow } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -56,28 +56,38 @@ const typeOption = computed(() => ({
   }],
 }))
 
-const ORG_LEVEL_LABEL: Record<string, string> = { l3: 'L3', l31: 'L3-1', l4: 'L4' }
-
 const orgCols: DataColumn[] = [
-  { key: 'levelLabel', label: '层级', width: 80 },
-  { key: 'name', label: '组织', width: 160 },
-  { key: 'parent', label: '上级组织', width: 140 },
+  { key: 'name', label: 'L4 组织', width: 160, sortable: true },
+  { key: 'parent', label: '上级组织', width: 140, sortable: true },
   { key: 'people', label: '人数', width: 90, num: true, sortable: true },
   { key: 'hoursText', label: '实际工时', width: 110, num: true, sortable: true },
   { key: 'baseText', label: '基础工时', width: 110, num: true },
   { key: 'satText', label: '饱和度', width: 110, num: true, sortable: true },
 ]
 
-const orgRows = computed(() => {
-  if (!store.data) return []
-  return orgSummary(store.data, view.start, view.end, view.l4s).map((r) => ({
-    ...r,
-    levelLabel: ORG_LEVEL_LABEL[r.level] ?? r.level,
-    hoursText: hrs(r.hours),
-    baseText: hrs(r.base),
-    satText: pct(r.sat),
-  }))
-})
+const l4Rows = computed(() =>
+  store.data ? orgSummary(store.data, view.start, view.end, view.l4s).filter((r) => r.level === 'l4') : [])
+
+const orgRows = computed(() => l4Rows.value.map((r) => ({
+  ...r,
+  hoursText: hrs(r.hours),
+  baseText: hrs(r.base),
+  satText: pct(r.sat),
+})))
+
+/** 固定汇总行(el-table 原生 show-summary,恒在表底、不随排序移动)。 */
+function orgSummaryMethod({ columns }: { columns: { property: string }[] }): string[] {
+  const t = orgL4SummaryRow(l4Rows.value)
+  const disp: Record<string, string> = {
+    name: '合计',
+    parent: '',
+    people: String(t.people),
+    hoursText: hrs(t.hours),
+    baseText: hrs(t.base),
+    satText: pct(t.sat),
+  }
+  return columns.map((c) => disp[c.property] ?? '')
+}
 </script>
 
 <template>
@@ -97,8 +107,9 @@ const orgRows = computed(() => {
         </section>
 
         <section class="yt-card">
-          <h3 class="yt-h">分层汇总（L3 → L3-1 → L4）</h3>
-          <DataTable :columns="orgCols" :rows="orgRows" :show-count="false" />
+          <h3 class="yt-h">分层汇总</h3>
+          <DataTable :columns="orgCols" :rows="orgRows" :show-count="false"
+            :show-summary="true" :summary-method="orgSummaryMethod" />
         </section>
       </div>
     </template>
