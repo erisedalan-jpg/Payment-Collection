@@ -83,7 +83,8 @@ def _hours(v) -> float:
 
 def _missing_columns(path: str) -> List[str]:
     """白名单列(REQUIRED_COLS)存在性校验,返回缺失列名(全齐则 [])。
-    ingest() 与 read_timesheet() 共用,导出端一旦改名/删列,两处都能挡住,
+    仅 read_timesheet() 调用(ingest() 唯一入口是 read_timesheet(),不再各自重复读一遍
+    表头 —— 同一份 xlsx 曾经被 open 两次,见 M-7)。导出端一旦改名/删列,能挡住,
     不能像 dict.get() 那样静默返回 None → "" → 全量误判。"""
     headers = read_sheet_headers(path, COL_TYPE)
     return [c for c in REQUIRED_COLS if c not in headers]
@@ -125,31 +126,38 @@ def read_timesheet(path: str) -> Optional[List[Dict[str, Any]]]:
 
 def ingest(base_dir: str) -> Optional[dict]:
     """把 input/yitian/工时.xlsx 的行 upsert 进累积库。
-    文件不存在 → None(不动累积库);缺列 → 打 [ERROR] 并 None(不阻断主管线)。
-    返回 {"added": 新增, "updated": 更新, "total": 库内总行数}。"""
+    文件不存在 → None(不动累积库);缺列 → 打 [ERROR] 并 None(不阻断主管线,
+    缺列校验唯一发生在 read_timesheet() 内部,不再重复读一遍表头,见 M-7)。
+    返回 {"added": 新增, "updated": 更新, "skipped": 无工时ID被跳过, "total": 库内总行数}。
+    skipped(I-3):有列无值的行(工时ID 单元格为空)无去重键无法累积,调用方(preprocess_data.py)
+    须在 skipped>0 时打 [WARN],不能像早期那样零计数零告警地静默丢行。"""
     input_dir = os.path.join(base_dir, "input")
     ts_path = os.path.join(input_dir, config.YITIAN_DIRNAME, config.YITIAN_TIMESHEET_FILE)
     if not os.path.isfile(ts_path):
         return None
 
-    missing = _missing_columns(ts_path)
-    if missing:
-        print("[ERROR] 倚天工时表缺列: %s,跳过导入" % "、".join(missing))
-        return None
-
     rows = read_timesheet(ts_path)
+    if rows is None:
+        return None      # 缺列,read_timesheet() 已打印 [ERROR]
+
     path = store_path(base_dir)
     store = STORE.load_store(path)
-    added, updated = STORE.upsert_rows(store, rows)
+    added, updated, skipped = STORE.upsert_rows(store, rows)
     STORE.save_store(path, store)
-    return {"added": added, "updated": updated, "total": len(store["rows"])}
+    return {"added": added, "updated": updated, "skipped": skipped, "total": len(store["rows"])}
 
 
-def build_yitian_data(base_dir: str) -> Optional[dict]:
+def build_yitian_data(base_dir: str, store: Optional[dict] = None) -> Optional[dict]:
     """完整倚天数据 dict,**从累积库构建**(每周导出先 ingest() 进库,这里读全量库)。
-    累积库为空 → None(调用方跳过,不阻断主管线)。"""
+    累积库为空 → None(调用方跳过,不阻断主管线)。
+
+    store(可选,I-2):传了就用它(内存中已变更、尚未落盘的累积库),不传才从磁盘读
+    (默认行为不变,既有调用方一律不用改)。这是"先算通再落盘"两阶段提交的基础——
+    server.py 的两个写端点先在内存里改 store、用它 build 出新数据、校验通过才落盘,
+    build/schema 校验失败就不会出现"累积库已改、下发 JSON 还是旧的"三方不一致。"""
     input_dir = os.path.join(base_dir, "input")
-    store = STORE.load_store(store_path(base_dir))
+    if store is None:
+        store = STORE.load_store(store_path(base_dir))
     rows = store["rows"]
     if not rows:
         return None

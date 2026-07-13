@@ -54,6 +54,16 @@ async function onDeleteRange() {
     msg.value = '请先选择要删除的日期区间'
     return
   }
+  // 误删的历史周没有源文件可重导 = 永久丢失(工时.xlsx 每周被新导出覆盖，只含最近一次导出
+  // 的那一周)，破坏性其实高于「清空」，必须有同级二次确认（I-4）。
+  try {
+    await ElMessageBox.confirm(
+      `将删除 ${r[0]} ~ ${r[1]} 区间的累积工时数据（不可撤销）。该区间的原始导出文件（工时.xlsx）` +
+      `通常已被之后每周的新导出覆盖，删除后无法从当前文件重新导入恢复。`,
+      '删除该区间', { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' })
+  } catch {
+    return   // 用户取消
+  }
   busy.value = true
   try {
     const res = await deleteYitianStoreRange(r[0], r[1])

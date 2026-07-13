@@ -246,7 +246,7 @@ class TestBuildYitianData:
         # build_yitian_data() 按"累积库为空"语义返回 None(不是"空壳 dict")。
         base = _make_input(tmp_path, [])
         r = Y.ingest(base)
-        assert r == {"added": 0, "updated": 0, "total": 0}
+        assert r == {"added": 0, "updated": 0, "skipped": 0, "total": 0}
         assert Y.build_yitian_data(base) is None
 
 
@@ -258,9 +258,19 @@ class TestIngestAndAccumulate:
     def test_ingest_then_build(self, tmp_path):
         base = _make_input(tmp_path, [_ts_row()])
         r = Y.ingest(base)
-        assert r == {"added": 1, "updated": 1 - 1, "total": 1}
+        assert r == {"added": 1, "updated": 1 - 1, "skipped": 0, "total": 1}
         data = Y.build_yitian_data(base)
         assert data["meta"]["rows"] == 1
+
+    def test_ingest_reports_skipped_rows_without_wid(self, tmp_path):
+        # I-3:某行 工时ID 单元格为空(列存在,值缺失)——REQUIRED_COLS 只保证列存在,
+        # 挡不住单元格为空;曾经这类行零计数零告警地从累积库消失。
+        base = _make_input(tmp_path, [
+            _ts_row(ID="1", 工时ID="1"),
+            _ts_row(ID="2", 工时ID=""),
+        ])
+        r = Y.ingest(base)
+        assert r == {"added": 1, "updated": 0, "skipped": 1, "total": 1}
 
     def test_second_week_accumulates(self, tmp_path):
         # 第一周导入
@@ -280,7 +290,7 @@ class TestIngestAndAccumulate:
         Y.ingest(base)
         _write_timesheet(base, [_ts_row(ID="1", 工时ID="1", 工作成果="新文本" + GOOD)])
         r = Y.ingest(base)
-        assert r == {"added": 0, "updated": 1, "total": 1}
+        assert r == {"added": 0, "updated": 1, "skipped": 0, "total": 1}
         data = Y.build_yitian_data(base)
         assert data["meta"]["rows"] == 1                    # 不变双份
 
@@ -293,3 +303,32 @@ class TestIngestAndAccumulate:
         # 缺 工时ID 列 → 缺列校验拦下,返回 None(不阻断主管线)
         base = _make_input(tmp_path, [_ts_row()], drop_cols=["工时ID"])
         assert Y.ingest(base) is None
+
+    def test_ingest_reads_header_only_once(self, tmp_path, monkeypatch):
+        # M-7:旧实现 ingest() 自己做一次缺列校验、read_timesheet() 内部又做一次,
+        # 同一份 xlsx 表头被打开读了两次。合并后只应读一次。
+        base = _make_input(tmp_path, [_ts_row()])
+        calls = []
+        orig = Y.read_sheet_headers
+
+        def counting(path, key):
+            calls.append((path, key))
+            return orig(path, key)
+
+        monkeypatch.setattr(Y, "read_sheet_headers", counting)
+        assert Y.ingest(base) is not None
+        assert len(calls) == 1
+
+    def test_build_uses_in_memory_store_when_passed(self, tmp_path):
+        # I-2:build_yitian_data 可选 store 参数——传了就用它(内存中已变更、尚未落盘),
+        # 不传才从磁盘读(默认行为不变,既有调用方不用改)。这是"先算通再落盘"两阶段提交的基础。
+        base = _make_input(tmp_path, [_ts_row(ID="1", 工时ID="1")])
+        Y.ingest(base)
+        disk_store = Y.STORE.load_store(Y.store_path(base))
+        assert len(disk_store["rows"]) == 1
+
+        # 内存里模拟"已删除但尚未落盘"的 store:清空 rows
+        mem_store = {"version": 1, "rows": []}
+        assert Y.build_yitian_data(base, store=mem_store) is None      # 传入的空 store 生效
+        # 不传 store 时仍从磁盘读,磁盘上的库并未因上面那次调用被改动
+        assert Y.build_yitian_data(base)["meta"]["rows"] == 1
