@@ -45,8 +45,11 @@ async function onPmisUpload() {
 
 // —— 项目域文件(input/ 根) ——
 const { upload: inputsUpload, INPUT_FILE_NAMES } = useInputFiles()
+const YITIAN_FILE_NAMES = ['工时.xlsx', 'holidays.csv']
 // 展示名单:legacy xlsx 仅作上传兼容不展示
-const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES.filter((n) => n !== 'delivery_analysis.xlsx')
+const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES
+  .filter((n) => n !== 'delivery_analysis.xlsx')
+  .filter((n) => !YITIAN_FILE_NAMES.includes(n))   // 倚天两文件单独成组展示
 const inputsInput = ref<HTMLInputElement | null>(null)
 const inputsUploadMsg = ref('')
 async function onUploadInputs() {
@@ -275,6 +278,13 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
             <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
             <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
             <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
+          </div>
+          <div class="dv-sub-head">倚天工时域（input/yitian/）</div>
+          <div class="dv-fgrid">
+            <div v-for="name in YITIAN_FILE_NAMES" :key="name" class="dv-fcell" :title="name">
+              <span class="dv-fname2">{{ name }}</span>
+              <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+            </div>
           </div>
         </div>
       </div>
