@@ -54,4 +54,10 @@ describe('YitianOverviewView', () => {
     await flushPromises()
     expect(w.text()).toContain('无倚天工时页面权限')
   })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
 })

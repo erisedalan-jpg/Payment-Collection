@@ -51,4 +51,10 @@ describe('YitianCustomerView', () => {
     expect(bg.crossBg).toBe(2)
     expect(w.text()).toContain('跨 BG')
   })
+
+  it('页面有内边距(不贴边)', async () => {
+    const w = mount(YitianCustomerView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.yt-page').exists()).toBe(true)
+  })
 })
