@@ -48,7 +48,7 @@ defineExpose({ pmCost1, pmCost2, techCost1, techCost2, pmTotalCost })
       </template>
 
       <div class="pm-body">
-        <div v-for="ph in store.form.pmPhases" :key="ph.name" class="pm-phase">
+        <div v-for="(ph, idx) in store.form.pmPhases" :key="idx" class="pm-phase">
           <span class="pm-phase-name">{{ ph.name }}</span>
           <div class="pm-row">
             <div class="pm-field">

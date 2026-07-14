@@ -54,7 +54,9 @@ defineExpose({ addService, removeService })
       <h3 class="bd-card-title">其他服务</h3>
       <div class="sv-tools">
         <el-select v-model="pick" class="sv-select" filterable clearable placeholder="选择服务（同一服务可加多条）">
-          <el-option v-for="s in cfg.services" :key="s.name" :value="s.name" :label="s.name" />
+          <!-- 服务名后端不强制唯一(budget_config.validate_config 未校验 services.name 去重),
+               同名服务在目录里按位置区分,故用下标做 key,不用可能重复的 name。 -->
+          <el-option v-for="(s, i) in cfg.services" :key="i" :value="s.name" :label="s.name" />
         </el-select>
         <el-button :disabled="!pick" @click="onAdd">添加</el-button>
       </div>

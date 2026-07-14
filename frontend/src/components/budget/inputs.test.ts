@@ -110,6 +110,35 @@ describe('PmSection', () => {
     s.form.pmPhases[0].pm1 = 2
     expect((w.vm as any).pmCost1).toBe(2 * 2000)        // 不是 2 × 2400
   })
+
+  // 回归:后端 budget_config.validate_config 不要求阶段名唯一,两个阶段可以同名。
+  // pmPhases 是按位置对应的数组(emptyForm/calcBudget 都按下标遍历),阶段名只是展示用的
+  // 标签、不是标识符 —— 不能拿来做 v-for 的 :key,否则 Vue 会把两行的输入框渲染错乱。
+  it('两个同名 PM 阶段各自独立渲染,互不串值(阶段名不是稳定 id,不能用来做 key)', async () => {
+    setActivePinia(createPinia())
+    const dupCfg = {
+      ...CFG,
+      pmPhases: [
+        { name: '重复阶段', content: '模板A' },
+        { name: '重复阶段', content: '模板B' },
+      ],
+    } as unknown as BudgetConfig
+    const s = useBudgetStore()
+    s.reset(dupCfg)
+    s.setCurrentConfig(dupCfg)
+    const w = mount(PmSection, opts)
+
+    expect(w.findAll('.pm-phase').length).toBe(2)       // 两行都要渲染出来
+
+    // 依次在第 0 行、第 1 行的「PM 一类」输入框里填值(每次都重新查 DOM,
+    // 避免拿着可能被 Vue 复用/替换掉的旧节点引用)
+    await w.findAll('.pm-phase')[0].find('input.el-input__inner').setValue('3')
+    await w.findAll('.pm-phase')[1].find('input.el-input__inner').setValue('5')
+
+    expect(s.form.pmPhases[0].pm1).toBe(3)
+    expect(s.form.pmPhases[1].pm1).toBe(5)
+    expect(s.result?.pmDays1).toBe(8)                   // 两行都被计入,没有互相覆盖
+  })
 })
 
 describe('DirectCostSection', () => {

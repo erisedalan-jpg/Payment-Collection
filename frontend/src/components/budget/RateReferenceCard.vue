@@ -28,9 +28,11 @@ const hotelRows = computed(() => {
   ]
 })
 
+// key 一律取 m.key(后端强制唯一,见 budget_config.validate_config);m.code 是超管可自由改写的
+// 物料编号,不保证唯一,不能拿来做 v-for 的 :key。
 const materialRows = computed(() =>
   cfg.value.materials.map((m) => ({
-    code: m.code, name: m.name, price: cfg.value.salesPrices[m.key],
+    key: m.key, code: m.code, name: m.name, price: cfg.value.salesPrices[m.key],
   })))
 
 defineExpose({ laborRows, hotelRows, materialRows })
@@ -68,7 +70,7 @@ defineExpose({ laborRows, hotelRows, materialRows })
               <tr><th>物料编码</th><th>物料名称</th><th>销售单价</th></tr>
             </thead>
             <tbody>
-              <tr v-for="m in materialRows" :key="m.code">
+              <tr v-for="m in materialRows" :key="m.key">
                 <td class="u-num">{{ m.code }}</td>
                 <td>{{ m.name }}</td>
                 <td class="u-num">{{ m.price }}</td>

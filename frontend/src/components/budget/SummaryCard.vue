@@ -88,9 +88,11 @@ defineExpose({ lines, totalDays })
     <div class="sc-margin">
       <label class="sc-label">毛利率</label>
       <el-select v-model="store.form.margin" class="sc-select" @change="touch">
+        <!-- 毛利率档位后端不强制 value 唯一(budget_config.validate_config 只校验区间,不去重),
+             按位置区分,故用下标做 key,不用可能重复的 value。 -->
         <el-option
-          v-for="m in cfg.margins"
-          :key="m.value"
+          v-for="(m, i) in cfg.margins"
+          :key="i"
           :value="m.value"
           :label="m.label"
         />
