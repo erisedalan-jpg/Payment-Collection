@@ -84,6 +84,44 @@ def test_校验_salesPrices的键必须与materials的key对齐():
         bc.validate_config(cfg)
 
 
+# 物料 key 白名单:前端 MaterialKey 是写死的四元联合,多一个键 → qty[key] 是 undefined →
+# amount = NaN → 销售下单建议整表和导出的 Excel 全是 NaN。超管手改 data/budget_config.json
+# 是合理操作,所以这道闸必须在后端(校验通过就等于放行了 NaN)。
+def _add_material(cfg, key):
+    """加一个物料并把 salesPrices 同步补齐 —— 否则会先撞上"键必须一一对应"那条,测不到白名单。"""
+    cfg["materials"].append({"key": key, "code": "X", "name": "新物料"})
+    cfg["salesPrices"][key] = 1000
+
+
+def test_校验_物料多出第5个key_报错():
+    cfg = bc.default_config()
+    _add_material(cfg, "newkey")
+    with pytest.raises(ValueError):
+        bc.validate_config(cfg)
+
+
+def test_校验_物料少一个key_报错():
+    cfg = bc.default_config()
+    dropped = cfg["materials"].pop()["key"]
+    cfg["salesPrices"].pop(dropped)
+    with pytest.raises(ValueError):
+        bc.validate_config(cfg)
+
+
+def test_校验_物料key改名_报错():
+    cfg = bc.default_config()
+    old = cfg["materials"][0]["key"]
+    cfg["materials"][0]["key"] = "pm_renamed"
+    cfg["salesPrices"]["pm_renamed"] = cfg["salesPrices"].pop(old)
+    with pytest.raises(ValueError):
+        bc.validate_config(cfg)
+
+
+def test_校验_默认配置的物料key正好是白名单():
+    cfg = bc.validate_config(bc.default_config())
+    assert {m["key"] for m in cfg["materials"]} == set(bc.ALLOWED_MATERIAL_KEYS)
+
+
 def test_校验_产品id不能重复也不能叫other():
     cfg = bc.default_config()
     cfg["products"][1]["id"] = cfg["products"][0]["id"]

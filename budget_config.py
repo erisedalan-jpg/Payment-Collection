@@ -123,6 +123,12 @@ _SERVICES: List[Dict[str, Any]] = [
     {"name": "其他服务", "desc": "用户自定义服务项", "isOther": True},
 ]
 
+# 物料 key 的白名单。**不是**装饰性的常量:前端 MaterialKey 是写死的四元联合,
+# calcSalesOrder 的 cost 记录也只有这四个键。超管手改 data/budget_config.json(明文 JSON,
+# 手改是合理的管理员操作)加进第 5 个物料,若后端放行,前端 qty[key] 就是 undefined、
+# amount = NaN —— 销售下单建议整表和导出的 Excel 全是 NaN。要加物料,前后端必须一起改。
+ALLOWED_MATERIAL_KEYS = ("pm", "pm2ndc", "eng1stc", "eng2ndc")
+
 # 销售物料。key 是内部归一化后的键(与原 HTML 里的 data-material 属性一一对应:
 # pm / pm-2ndc / 1stc / 2ndc → pm / pm2ndc / eng1stc / eng2ndc),
 # 必须与 DEFAULT_CONFIG["salesPrices"] 的键一一对应(见 validate_config)。
@@ -237,6 +243,10 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
     keys = [m["key"] for m in materials]
     if len(set(keys)) != len(keys):
         raise ValueError("物料 key 不能重复")
+    # key 集合钉死:前端只认这四个键,多一个/少一个/改个名都会让销售下单建议算出 NaN。
+    if set(keys) != set(ALLOWED_MATERIAL_KEYS):
+        raise ValueError("物料 key 必须正好是 %s(前端只认这四个键;要加物料须前后端一起改)"
+                         % "、".join(ALLOWED_MATERIAL_KEYS))
     out["materials"] = materials
 
     sp_in = cfg.get("salesPrices")

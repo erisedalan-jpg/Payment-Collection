@@ -344,6 +344,21 @@ def test_estimates_删除缺id_400(client, files, login_normal):
     assert client.post("/api/budget/estimates/delete", {}).status == 400
 
 
+# body 是合法 JSON 但不是对象(数字/字符串/数组):`(body or {}).get` 会抛 AttributeError,
+# 而 do_POST 只有 try/finally 没有 except —— 异常逃到 socketserver,客户端拿到的是**断连**
+# (http.client.RemoteDisconnected),不是 400。下面三条要的是"能拿到一个 400 响应"。
+@pytest.mark.parametrize("body", [5, "x", [1], True])
+def test_estimates_删除_body非对象_400而不是断连(client, files, login_normal, body):
+    login_normal(pages=["budget"], account="zhangsan")
+    assert client.post("/api/budget/estimates/delete", body).status == 400
+
+
+@pytest.mark.parametrize("body", [5, "x", [1]])
+def test_estimates_保存_body非对象_400而不是断连(client, files, login_normal, body):
+    login_normal(pages=["budget"], account="zhangsan")
+    assert client.post("/api/budget/estimates", body).status == 400
+
+
 # —— 审计埋点 ——
 # 设计文档 §3:配置变更与存档删除必须进 audit.py 埋点。光在 handler 里调 _audit_set 不够 ——
 # _audit_request() 是 audit.map_action((method, path)) 未命中就直接 return,所以 _ACTION_MAP
