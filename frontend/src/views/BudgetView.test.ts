@@ -15,6 +15,7 @@ vi.mock('@/lib/budgetApi', () => ({
 }))
 
 import BudgetView from './BudgetView.vue'
+import { useBudgetStore } from '@/stores/budget'
 
 const CFG = {
   version: 1,
@@ -60,5 +61,40 @@ describe('BudgetView', () => {
     const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(w.text()).toContain('无概算工具页面权限')
+  })
+
+  it('必填项没填 → 保存被拦下,不发请求', async () => {
+    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const err = (w.vm as any).validate()
+    expect(err).toContain('报价名称')
+  })
+
+  it('成本比例异常但没填说明 → 保存被拦下', async () => {
+    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const s = useBudgetStore()
+    s.form.basic = { quoteName: 'A', customerName: 'B', salesName: 'C', location: 'D',
+                     projectAmount: 100, projectLevel: 'P1', customerLevel: 'TOP1000',
+                     signType: '直签', thirdParty: '否' }
+    s.form.pmPhases[0].pm1 = 500          // 比例远超 15%
+    expect(s.result?.ratioStatus).toBe('high')
+    expect((w.vm as any).validate()).toContain('异常原因')
+    s.form.ratioExplanation = '客户要求驻场'
+    expect((w.vm as any).validate()).toBe('')
+  })
+
+  it('快照过期 → 显示横幅;点重算后横幅消失', async () => {
+    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const s = useBudgetStore()
+    s.loadRecord({ id: 'e1', quoteName: 'x', data: s.form,
+                   rateSnapshot: { ...CFG, fx: 6.0 } } as any)
+    await flushPromises()
+    expect(s.snapshotStale).toBe(true)
+    expect(w.text()).toContain('按最新费率重算')
+    s.useLatestRates()
+    await flushPromises()
+    expect(s.snapshotStale).toBe(false)
   })
 })
