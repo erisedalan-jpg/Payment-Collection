@@ -142,3 +142,11 @@ export interface CalcResult {
   costRatio: number | null     // 百分数;项目金额<=0 或 总成本=0 → null
   ratioStatus: RatioStatus
 }
+
+// —— 存档记录(store 层用的最小形状,供 budget.ts 的 loadRecord 消费) ——
+export interface EstimateRecordLike {
+  id: string
+  quoteName: string
+  data: BudgetForm
+  rateSnapshot: BudgetConfig
+}
