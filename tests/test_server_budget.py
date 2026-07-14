@@ -12,6 +12,7 @@ import http.client
 import json
 import os
 import threading
+import time
 
 import pytest
 
@@ -341,3 +342,83 @@ def test_estimates_报价名为空400(client, files, login_normal):
 def test_estimates_删除缺id_400(client, files, login_normal):
     login_normal(pages=["budget"], account="zhangsan")
     assert client.post("/api/budget/estimates/delete", {}).status == 400
+
+
+# —— 审计埋点 ——
+# 设计文档 §3:配置变更与存档删除必须进 audit.py 埋点。光在 handler 里调 _audit_set 不够 ——
+# _audit_request() 是 audit.map_action((method, path)) 未命中就直接 return,所以 _ACTION_MAP
+# 里没有对应条目时,_audit_set 设的 target/detail 全是空转、一条记录都不会落。下面的用例证明
+# 记录真的落盘了(而不只是"map 里有这一行")。
+
+def _audit_rows(event_code, expect=1, timeout=2.0):
+    """取某事件码的审计行(最新在前)。审计是在响应发出**之后**才落盘的
+    (_audit_request 在 do_POST 的 finally 里跑),所以要等一下,不能拿到响应就断言。"""
+    deadline = time.time() + timeout
+    rows = audit.read({"event": [event_code]}, 1, 50)["rows"]
+    while len(rows) < expect and time.time() < deadline:
+        time.sleep(0.02)
+        rows = audit.read({"event": [event_code]}, 1, 50)["rows"]
+    return rows
+
+
+def test_audit_超管改配置留痕_含汇率与产品数(client, files, login_super):
+    login_super()
+    body = budget_config.default_config()
+    body["fx"] = 7.1
+    assert client.post("/api/budget/config", body).status == 200
+    rows = _audit_rows("budget.config")
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["action"] == "修改概算费率配置"
+    assert r["account"] == "super" and r["success"] is True and r["status"] == 200
+    assert r["target"] == "概算工具费率配置"
+    assert "7.1" in r["detail"] and "19 条" in r["detail"]      # 汇率与产品数都在 detail 里
+
+
+def test_audit_保存报价留痕_新建与更新可区分(client, files, login_normal):
+    login_normal(pages=["budget"], account="zhangsan")
+    rid = client.post("/api/budget/estimates", _payload("原名")).json()["record"]["id"]
+    assert _audit_rows("budget.estimate.save")[0]["detail"] == "新建报价"
+    body = _payload("改名")
+    body["id"] = rid
+    assert client.post("/api/budget/estimates", body).status == 200
+    rows = _audit_rows("budget.estimate.save", expect=2)      # 最新在前
+    assert len(rows) == 2
+    assert rows[0]["detail"] == "更新报价" and rows[0]["target"] == "改名"
+    assert rows[1]["detail"] == "新建报价" and rows[1]["target"] == "原名"
+    assert rows[0]["account"] == "zhangsan" and rows[0]["success"] is True
+
+
+def test_audit_删除报价留痕_target是被删报价名(client, files, login_normal):
+    login_normal(pages=["budget"], account="zhangsan")
+    rid = client.post("/api/budget/estimates", _payload("待删的报价")).json()["record"]["id"]
+    assert client.post("/api/budget/estimates/delete", {"id": rid}).status == 200
+    rows = _audit_rows("budget.estimate.delete")
+    assert len(rows) == 1
+    assert rows[0]["action"] == "删除概算报价"
+    assert rows[0]["target"] == "待删的报价"          # 记的是名称,不是光秃秃一个 id
+    assert rows[0]["detail"] == "删除报价" and rows[0]["success"] is True
+
+
+def test_audit_越权改配置_不留成功记录_但留被拒痕迹(client, files, login_normal):
+    """仓库既有行为:_audit_request 在 dispatch 的 finally 里跑,不管成功失败都记一条,
+    用 status/success 区分(success = 200 <= status < 300)。所以越权请求**会**留痕(这正是
+    审计想要的:谁在什么时候试图越权),但绝不能被记成一条成功的配置变更。"""
+    login_normal(pages=["budget"], account="zhangsan")
+    body = budget_config.default_config()
+    body["fx"] = 9.9
+    assert client.post("/api/budget/config", body).status == 403
+    rows = _audit_rows("budget.config")
+    assert all(r["success"] is False for r in rows)     # 没有任何一条成功的配置变更
+    assert len(rows) == 1
+    assert rows[0]["status"] == 403 and rows[0]["account"] == "zhangsan"
+    assert rows[0]["target"] is None                   # handler 在 _audit_set 之前就 403 返回了
+    assert not os.path.exists(files["config"])         # 越权请求也没在磁盘上留下配置
+
+
+def test_audit_未登录请求不入审计(client, files):
+    """401 由 _auth_gate 在 dispatch 之前拦下并 return,压根不进 _audit_request ——
+    这是既有设计(未认证请求不入业务审计流),这里钉死它,免得后人误以为漏了埋点。"""
+    assert client.post("/api/budget/config", budget_config.default_config()).status == 401
+    time.sleep(0.1)
+    assert audit.read({"event": ["budget.config"]}, 1, 50)["total"] == 0
