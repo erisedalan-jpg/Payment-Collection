@@ -114,6 +114,17 @@ describe('CrmCard', () => {
     expect(s.form.crmUserEdited).toBe(false)
     expect(s.form.crmText).toContain('1.预计项目经理3.0人天；')
   })
+
+  it('编辑态点「恢复自动生成」后应回到只读态(不再停在"完成编辑")', async () => {
+    const s = setup(3, 100)
+    s.form.crmText = '我手改的'
+    s.form.crmUserEdited = true
+    const w = mount(CrmCard, opts)
+    await (w.vm as any).startEdit()
+    expect((w.vm as any).editing).toBe(true)
+    await (w.vm as any).restore()
+    expect((w.vm as any).editing).toBe(false)
+  })
 })
 
 describe('SalesOrderCard', () => {

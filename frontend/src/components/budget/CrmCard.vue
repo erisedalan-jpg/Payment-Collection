@@ -26,9 +26,11 @@ function onInput(): void {
   store.touch()
 }
 
-/** 清掉手改标记并按当前表单重新生成。 */
+/** 清掉手改标记并按当前表单重新生成 —— 恢复自动生成后应回到只读态,
+ *  否则卡片会停在编辑态(按钮还显示「完成编辑」),与"已恢复自动"的语义不符。 */
 function restore(): void {
   store.restoreCrmAuto()
+  editing.value = false
 }
 
 defineExpose({ editing, startEdit, restore })

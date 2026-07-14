@@ -33,6 +33,13 @@ onMounted(async () => {
   }
 })
 
+// 超管在 RateConfigDrawer 保存后,cfgStore.save() 会把 cfgStore.config 换成后端返回的
+// 新对象 —— 但 onMounted 只在挂载那一刻注入过一次,没有任何东西把新对象回灌进 budget
+// store,导致 store.currentConfig 永远停在进页面那一刻的旧配置(费率速查表/新报价计算
+// 结果全部算错)。这里 watch 配置变化就回灌;setCurrentConfig 在 form.basic 已存在时
+// 只更新 currentConfig,不会碰 form,所以不会清掉用户正在填的表单。
+watch(() => cfgStore.config, (c) => { if (c) store.setCurrentConfig(c) })
+
 const ready = computed(() => !!cfgStore.config && !!store.form.basic)
 
 // 表单任何变动 → 重新生成 CRM 建议(用户手改过就不覆盖)
