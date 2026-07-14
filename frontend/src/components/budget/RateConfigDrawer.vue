@@ -10,9 +10,12 @@ import type {
  *
  *  ★ 这个抽屉存在的意义 ★
  *  原工具把汇率(6.8,还直接写在函数体里)、人天成本单价、住宿与差补标准、销售物料单价、
- *  成本比例阈值、19 个产品与 8 项服务的目录**全部硬编码在代码里**,有的还在 HTML 和 JS
- *  里各写一遍(两份真相源)。价格是会变的,而后继管理员根本无从得知这些数字从哪来、更改不动。
+ *  成本比例阈值、19 个产品与 8 项服务的目录、5 个项目经理阶段的工作内容模板**全部硬编码在
+ *  代码里**,有的还在 HTML 和 JS 里各写一遍(两份真相源)。价格是会变的,而后继管理员根本
+ *  无从得知这些数字从哪来、更改不动。
  *  用户钦定:凡「影响关键结果却埋在代码里」的口径,一律提升为可见可配 —— 这个抽屉就是那个「可见」。
+ *  「全部」是字面意思:配置里能进报价的五块(价格与阈值 / 产品目录 / 服务目录 / 项目经理阶段 / 物料)
+ *  都在这五个页签里,一块不留在代码里。
  *
  *  ★ 草稿与生效配置解耦 ★
  *  打开时把 cfgStore.config **深拷贝**成 draft;页面上的费率速查表、输入框占位符、
@@ -107,6 +110,25 @@ function removeService(i: number): void {
   draft.value?.services.splice(i, 1)
 }
 
+// —— 项目经理阶段 ——
+/** 后端只要求阶段 name 非空(不要求唯一) —— 但同名阶段在填表页的下拉里分不清,
+ *  所以新行的默认名也躲开重名。content 允许为空。 */
+function nextPhaseName(): string {
+  const used = new Set(d.value.pmPhases.map((p) => p.name))
+  let n = d.value.pmPhases.length + 1
+  while (used.has(`新阶段 ${n}`)) n++
+  return `新阶段 ${n}`
+}
+
+function addPhase(): void {
+  if (!draft.value) return
+  draft.value.pmPhases.push({ name: nextPhaseName(), content: '' })
+}
+
+function removePhase(i: number): void {
+  draft.value?.pmPhases.splice(i, 1)
+}
+
 // —— 物料 ——
 /** el-table 行槽里的 row 拿不到精确类型,索引 salesPrices(Record<MaterialKey, number>)会被
  *  TS 判为隐式 any —— 这里把读写收敛成两个签名明确的函数,模板只管调。 */
@@ -145,7 +167,8 @@ async function save(): Promise<void> {
 
 defineExpose({
   draft, tab, error, save,
-  addProduct, removeProduct, addService, removeService, addMargin, removeMargin,
+  addProduct, removeProduct, addService, removeService,
+  addPhase, removePhase, addMargin, removeMargin,
 })
 </script>
 
@@ -348,7 +371,39 @@ defineExpose({
           <el-button class="rc-add" @click="addService">新增服务</el-button>
         </el-tab-pane>
 
-        <!-- 4. 物料 -->
+        <!-- 4. 项目经理阶段 -->
+        <el-tab-pane label="项目经理阶段" name="phases">
+          <p class="rc-note">
+            阶段名称与工作内容模板都会进报价：报价页的「项目经理」区按这里的阶段逐行列出，
+            工作内容带入模板作为填表人的起点，导出 Excel 的「项目经理」sheet 也照此渲染。
+            工作内容是多行长文本（换行会原样保留）。
+          </p>
+          <el-table :data="d.pmPhases" size="default" class="rc-table">
+            <el-table-column label="阶段名称" min-width="160">
+              <template #default="{ row }">
+                <el-input v-model="row.name" placeholder="如 项目启动阶段" />
+              </template>
+            </el-table-column>
+            <el-table-column label="工作内容模板" min-width="420">
+              <template #default="{ row }">
+                <!-- 必须是 textarea:模板里带 \n(【标准工作内容】/ 分条 / 客户参与事项),
+                     单行 input 会把换行吃掉 -->
+                <el-input
+                  v-model="row.content" type="textarea" :rows="6"
+                  placeholder="工作内容模板（可多行）"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="80" fixed="right">
+              <template #default="{ $index }">
+                <el-button link type="danger" @click="removePhase($index)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-button class="rc-add" @click="addPhase">新增阶段</el-button>
+        </el-tab-pane>
+
+        <!-- 5. 物料 -->
         <el-tab-pane label="物料" name="materials">
           <p class="rc-note">
             key 不可改：它是 salesPrices 的键，后端强制两者一一对应（销售下单的逆运算靠它对账），
