@@ -2561,22 +2561,28 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
             return
         eid = str(body.get('id') or '').strip()
+        # 锁内只做 load → 判权 → mutate → save;响应一律挪到锁外发 ——
+        # _send_json 是 socket 写,慢客户端能攥着 budget 写锁不放,阻塞其他人保存报价。
+        row = None
+        err = None      # (status, payload):锁内判定,锁外发送
         try:
             with _budget_store_lock:
                 store = budget_store.load_store(BUDGET_ESTIMATES_FILE)
                 if eid:
                     old = budget_store.find_estimate(store, eid)
                     if old is None:
-                        self._send_json(404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
-                        return
-                    if not budget_store.can_touch(old, account, is_super):
-                        self._send_json(403, _error_payload(ERR_FORBIDDEN, "无权修改他人的报价"))
-                        return
-                now = time.strftime('%Y-%m-%d %H:%M:%S')
-                row = budget_store.upsert_estimate(store, body, account, now)
-                budget_store.save_store(BUDGET_ESTIMATES_FILE, store)
+                        err = (404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
+                    elif not budget_store.can_touch(old, account, is_super):
+                        err = (403, _error_payload(ERR_FORBIDDEN, "无权修改他人的报价"))
+                if err is None:
+                    now = time.strftime('%Y-%m-%d %H:%M:%S')
+                    row = budget_store.upsert_estimate(store, body, account, now)
+                    budget_store.save_store(BUDGET_ESTIMATES_FILE, store)
         except ValueError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        if err is not None:
+            self._send_json(err[0], err[1])
             return
         self._audit_set(target=row.get('quoteName', ''),
                         detail=('更新报价' if eid else '新建报价'))
@@ -2589,22 +2595,33 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         is_super = bool(rec.get('isSuper'))
         body = self._read_json_body()
-        eid = str((body or {}).get('id') or '').strip()
+        # body 可能是合法 JSON 但不是对象(5 / "x" / [1])—— 直接 .get 会抛 AttributeError,
+        # 而 do_POST 只有 try/finally 没有 except,异常会逃到 socketserver、客户端拿到断连
+        # 而不是 400。与 handle_budget_estimates_save 统一用 isinstance 判定。
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        eid = str(body.get('id') or '').strip()
         if not eid:
             self._send_json(400, _error_payload(ERR_VALIDATION, "id 必填"))
             return
+        # 同 save:锁内只做 load → 判权 → mutate → save,响应挪到锁外发(别拿 socket 写攥着写锁)
+        name = ''
+        err = None
         with _budget_store_lock:
             store = budget_store.load_store(BUDGET_ESTIMATES_FILE)
             row = budget_store.find_estimate(store, eid)
             if row is None:
-                self._send_json(404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
-                return
-            if not budget_store.can_touch(row, account, is_super):
-                self._send_json(403, _error_payload(ERR_FORBIDDEN, "无权删除他人的报价"))
-                return
-            name = row.get('quoteName', '')
-            budget_store.delete_estimate(store, eid)
-            budget_store.save_store(BUDGET_ESTIMATES_FILE, store)
+                err = (404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
+            elif not budget_store.can_touch(row, account, is_super):
+                err = (403, _error_payload(ERR_FORBIDDEN, "无权删除他人的报价"))
+            else:
+                name = row.get('quoteName', '')
+                budget_store.delete_estimate(store, eid)
+                budget_store.save_store(BUDGET_ESTIMATES_FILE, store)
+        if err is not None:
+            self._send_json(err[0], err[1])
+            return
         self._audit_set(target=name, detail='删除报价')
         self._send_json(200, {"success": True})
 
