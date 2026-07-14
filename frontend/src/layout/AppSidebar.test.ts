@@ -72,6 +72,7 @@ describe('AppSidebar', () => {
     expect(text).toContain('回款项目')
     expect(text).toContain('回款节点')
     expect(text).toContain('数据管理')        // 工具组
+    expect(text).toContain('概算工具')        // 工具组(V3.1.0 新增,数据治理下方/关于产品上方)
     expect(text).toContain('重点项目进展')    // 重点跟进分区
     expect(text).toContain('商机清单')        // 已移入「项目」组
     expect(text).toContain('重点商机跟进')    // 重点跟进分区(新页)
@@ -90,8 +91,8 @@ describe('AppSidebar', () => {
     expect(text).not.toContain('回款进度')    // /payment/plan 已删
     expect(text).not.toContain('风险项目')    // /payment/risk 已删
     expect(text).not.toContain('回款台账')    // /ledger 已删
-    // 七个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+倚天工时(5)+工具(3)+系统管理(1) = 29
-    expect(wrapper.findAll('.nav-sub').length).toBe(29)
+    // 七个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+倚天工时(5)+工具(4,V3.1.0加概算工具)+系统管理(1) = 30
+    expect(wrapper.findAll('.nav-sub').length).toBe(30)
   })
 
   it('toggle button flips uiStore collapsed', async () => {

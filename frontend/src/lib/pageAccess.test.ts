@@ -54,3 +54,7 @@ describe('倚天 pageKey', () => {
     }
   })
 })
+
+it('PAGE_OPTIONS 含概算工具(账号管理里必须能勾选,否则谁都授权不了)', () => {
+  expect(PAGE_OPTIONS.some((o) => o.key === 'budget' && o.label === '概算工具')).toBe(true)
+})

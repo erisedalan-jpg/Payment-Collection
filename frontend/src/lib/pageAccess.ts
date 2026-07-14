@@ -4,7 +4,7 @@ export type PageKey =
   | 'payment' | 'payment-projects' | 'payment-nodes'
   | 'projects-key' | 'opportunities-progress' | 'temp-followup' | 'opportunity-followup' | 'risk-followup' | 'payment-key'
   | 'yitian' | 'yitian-compliance' | 'yitian-analytics' | 'yitian-trend' | 'yitian-customer'
-  | 'data' | 'governance' | 'about'
+  | 'data' | 'governance' | 'budget' | 'about'
 
 /** allowedPages 含 '*' 或该 key → 可访问(isSuper 由调用方先判)。 */
 export function canAccess(allowedPages: string[], key: PageKey): boolean {
