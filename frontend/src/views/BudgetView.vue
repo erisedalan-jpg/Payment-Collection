@@ -1,0 +1,48 @@
+<script setup lang="ts">
+import { computed, onMounted, watch } from 'vue'
+import { useBudgetConfigStore } from '@/stores/budgetConfig'
+import { useBudgetStore } from '@/stores/budget'
+
+const cfgStore = useBudgetConfigStore()
+const store = useBudgetStore()
+
+onMounted(async () => {
+  await cfgStore.load()
+  if (cfgStore.config) {
+    store.reset(cfgStore.config)
+    store.setCurrentConfig(cfgStore.config)
+  }
+})
+
+const ready = computed(() => !!cfgStore.config && !!store.form.basic)
+
+// 表单任何变动 → 重新生成 CRM 建议(用户手改过就不覆盖)
+watch(() => store.result, () => store.syncCrmText(), { deep: false })
+</script>
+
+<template>
+  <div class="budget-view">
+    <el-alert v-if="cfgStore.error" :title="cfgStore.error" type="error" show-icon :closable="false" />
+    <el-skeleton v-else-if="cfgStore.loading && !ready" :rows="8" animated />
+
+    <template v-if="ready">
+      <!-- Task 10:BasicInfoCard / RateReferenceCard / ProductSection / PmSection
+                   / ServiceSection / DirectCostSection
+           Task 11:RatioCard / CrmCard / SummaryCard / SalesOrderCard
+           Task 12:EstimateDrawer + 顶部操作条 + 费率快照横幅
+           Task 13:RateConfigDrawer(超管) -->
+      <h2 class="bd-title">概算工具</h2>
+    </template>
+  </div>
+</template>
+
+<style scoped>
+/* .app-main 自身无内边距 —— 每个页面自己给(见 .projects-view) */
+.budget-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  padding: var(--sp-4);
+}
+.bd-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); }
+</style>

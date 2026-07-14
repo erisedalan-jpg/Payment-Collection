@@ -57,6 +57,7 @@ export const YITIAN_LINKS: NavLink[] = [
 export const TOOL_LINKS: NavLink[] = [
   { label: '数据管理', to: '/data', key: 'data' },
   { label: '数据治理', to: '/governance', key: 'governance' },
+  { label: '概算工具', to: '/budget', key: 'budget' },
   { label: '关于产品', to: '/about', key: 'about' },
 ]
 
