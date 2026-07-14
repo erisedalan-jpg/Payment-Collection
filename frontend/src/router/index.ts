@@ -11,6 +11,7 @@ import CalendarView from '@/views/CalendarView.vue'
 import DataView from '@/views/DataView.vue'
 import AboutView from '@/views/AboutView.vue'
 import DataQualityView from '@/views/DataQualityView.vue'
+import BudgetView from '@/views/BudgetView.vue'
 import ProjectsView from '@/views/ProjectsView.vue'
 import ProjectDetailView from '@/views/ProjectDetailView.vue'
 import ActivityView from '@/views/ActivityView.vue'
@@ -112,6 +113,7 @@ export const router = createRouter({
     { path: '/yitian/customer', name: 'yitian-customer', component: YitianCustomerView, meta: { title: '客户支持分析', hideFilter: true, pageKey: 'yitian-customer' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true, pageKey: 'data' } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true, pageKey: 'governance' } },
+    { path: '/budget', name: 'budget', component: BudgetView, meta: { title: '概算工具', hideFilter: true, pageKey: 'budget' } },
     { path: '/about', name: 'about', component: AboutView, meta: { title: '关于产品', hideFilter: true, pageKey: 'about' } },
     { path: '/admin', name: 'admin', component: AdminView, meta: { title: '账号管理', hideFilter: true, requiresSuper: true } },
     // catch-all(含 '/')渲染项目总览——P4 起 '/' 为项目主域首页,旧回款看板迁 /payment

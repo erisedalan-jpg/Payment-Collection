@@ -41,6 +41,8 @@ import payment_key_followup as _paykey
 import yitian_settings
 import yitian_store
 import yitian
+import budget_config
+import budget_store
 import schema
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
@@ -315,6 +317,14 @@ _yitian_cache_lock = threading.Lock()
 # 持有任一倚天页面授权即可读倚天数据(纵深防御:工时是员工级数据,未授权页面的账号连 curl 也不该拿到)
 _YITIAN_PAGE_KEYS = ('yitian', 'yitian-compliance', 'yitian-analytics',
                      'yitian-trend', 'yitian-customer')
+
+# ── 概算工具 /budget:费率与目录配置(超管可配) + 报价存档(按账号隔离) ──
+# 注意:这两个 path 的 GET 是全体 budget 授权账号可读、POST 才收紧到超管/owner,
+# 所以**不能**进 _SUPER_ONLY_PATHS(那个闸按 path 匹配、不分 method)。判权在 handler 内做。
+BUDGET_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'budget_config.json')
+BUDGET_ESTIMATES_FILE = os.path.join(BASE_DIR, 'data', 'budget_estimates.json')
+_budget_config_lock = threading.RLock()
+_budget_store_lock = threading.RLock()
 
 
 def _load_yitian_cached():
@@ -764,6 +774,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_settings_get()
         elif parsed.path == '/api/yitian/store':
             self.handle_yitian_store_get()
+        elif parsed.path == '/api/budget/config':
+            self.handle_budget_config_get()
+        elif parsed.path == '/api/budget/estimates':
+            self.handle_budget_estimates_get()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -915,6 +929,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_store_clear()
         elif parsed.path == '/api/yitian/store/delete-range':
             self.handle_yitian_store_delete_range()
+        elif parsed.path == '/api/budget/config':
+            self.handle_budget_config_save()
+        elif parsed.path == '/api/budget/estimates':
+            self.handle_budget_estimates_save()
+        elif parsed.path == '/api/budget/estimates/delete':
+            self.handle_budget_estimates_delete()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -2471,6 +2491,140 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                         detail='剔除类型: ' + ('、'.join(clean['excludedTypes']) or '(无)'))
         self._send_json(200, {"success": True, "settings": clean})
 
+    # ── 概算工具 /budget ──
+
+    def handle_budget_config_get(self):
+        """GET /api/budget/config - 费率与目录配置。登录 + budget 授权即可读(页面要用它算);写须超管。"""
+        _account, rec = self._require_budget()
+        if rec is None:
+            return
+        with _budget_config_lock:
+            cfg = budget_config.load_config(BUDGET_CONFIG_FILE)
+        self._send_json(200, {"success": True, "config": cfg})
+
+    def handle_budget_config_save(self):
+        """POST /api/budget/config - 超管专属。改完立即生效,无需点「更新数据」。"""
+        if self._require_super() is None:
+            return
+        body = self._read_json_body()
+        if body is None:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON"))
+            return
+        try:
+            with _budget_config_lock:
+                clean = budget_config.save_config(BUDGET_CONFIG_FILE, body)
+        except ValueError as e:
+            # save_config 先校验后写 → 校验不过时磁盘原样不动
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._audit_set(target='概算工具费率配置',
+                        detail='汇率 %s / 成本比例区间 %s%%~%s%% / 产品 %d 条'
+                               % (clean['fx'], clean['ratio']['min'],
+                                  clean['ratio']['max'], len(clean['products'])))
+        self._send_json(200, {"success": True, "config": clean})
+
+    def handle_budget_estimates_get(self):
+        """GET /api/budget/estimates        → 存档列表(仅元信息,不含 data/rateSnapshot)
+           GET /api/budget/estimates?id=xxx → 整条记录(含 data 与 rateSnapshot)
+           GET /api/budget/estimates?all=1  → 全部账号(仅超管;普通管理员传了也无效)"""
+        account, rec = self._require_budget()
+        if rec is None:
+            return
+        is_super = bool(rec.get('isSuper'))
+        qs = self.parse_path()
+        eid = (qs.get('id') or [''])[0].strip()
+        with _budget_store_lock:
+            store = budget_store.load_store(BUDGET_ESTIMATES_FILE)
+        if eid:
+            row = budget_store.find_estimate(store, eid)
+            if row is None:
+                self._send_json(404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
+                return
+            if not budget_store.can_touch(row, account, is_super):
+                self._send_json(403, _error_payload(ERR_FORBIDDEN, "无权查看他人的报价"))
+                return
+            self._send_json(200, {"success": True, "record": row})
+            return
+        all_accounts = (qs.get('all') or [''])[0] in ('1', 'true')
+        self._send_json(200, {"success": True,
+                              "items": budget_store.list_meta(store, account, is_super,
+                                                              all_accounts)})
+
+    def handle_budget_estimates_save(self):
+        """POST /api/budget/estimates - 带 id 覆盖(owner/超管),无 id 新建。"""
+        account, rec = self._require_budget()
+        if rec is None:
+            return
+        is_super = bool(rec.get('isSuper'))
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        eid = str(body.get('id') or '').strip()
+        # 锁内只做 load → 判权 → mutate → save;响应一律挪到锁外发 ——
+        # _send_json 是 socket 写,慢客户端能攥着 budget 写锁不放,阻塞其他人保存报价。
+        row = None
+        err = None      # (status, payload):锁内判定,锁外发送
+        try:
+            with _budget_store_lock:
+                store = budget_store.load_store(BUDGET_ESTIMATES_FILE)
+                if eid:
+                    old = budget_store.find_estimate(store, eid)
+                    if old is None:
+                        err = (404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
+                    elif not budget_store.can_touch(old, account, is_super):
+                        err = (403, _error_payload(ERR_FORBIDDEN, "无权修改他人的报价"))
+                if err is None:
+                    now = time.strftime('%Y-%m-%d %H:%M:%S')
+                    row = budget_store.upsert_estimate(store, body, account, now)
+                    budget_store.save_store(BUDGET_ESTIMATES_FILE, store)
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        if err is not None:
+            self._send_json(err[0], err[1])
+            return
+        self._audit_set(target=row.get('quoteName', ''),
+                        detail=('更新报价' if eid else '新建报价'))
+        self._send_json(200, {"success": True, "record": row})
+
+    def handle_budget_estimates_delete(self):
+        """POST /api/budget/estimates/delete {id} - owner 或超管。"""
+        account, rec = self._require_budget()
+        if rec is None:
+            return
+        is_super = bool(rec.get('isSuper'))
+        body = self._read_json_body()
+        # body 可能是合法 JSON 但不是对象(5 / "x" / [1])—— 直接 .get 会抛 AttributeError,
+        # 而 do_POST 只有 try/finally 没有 except,异常会逃到 socketserver、客户端拿到断连
+        # 而不是 400。与 handle_budget_estimates_save 统一用 isinstance 判定。
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        eid = str(body.get('id') or '').strip()
+        if not eid:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "id 必填"))
+            return
+        # 同 save:锁内只做 load → 判权 → mutate → save,响应挪到锁外发(别拿 socket 写攥着写锁)
+        name = ''
+        err = None
+        with _budget_store_lock:
+            store = budget_store.load_store(BUDGET_ESTIMATES_FILE)
+            row = budget_store.find_estimate(store, eid)
+            if row is None:
+                err = (404, _error_payload(ERR_NOT_FOUND, "报价不存在: %s" % eid))
+            elif not budget_store.can_touch(row, account, is_super):
+                err = (403, _error_payload(ERR_FORBIDDEN, "无权删除他人的报价"))
+            else:
+                name = row.get('quoteName', '')
+                budget_store.delete_estimate(store, eid)
+                budget_store.save_store(BUDGET_ESTIMATES_FILE, store)
+        if err is not None:
+            self._send_json(err[0], err[1])
+            return
+        self._audit_set(target=name, detail='删除报价')
+        self._send_json(200, {"success": True})
+
     def _rebuild_yitian_data(self, store):
         """用给定的(可能已在内存中变更但**尚未落盘**的)累积库重建 data/yitian_data.json。
 
@@ -2595,6 +2749,24 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(403, _error_payload(ERR_FORBIDDEN, "需要超级管理员权限"))
             return None
         return account
+
+    def _require_budget(self):
+        """概算工具:登录 + 持有 budget 页面授权。返回 (account, rec);无权则已发响应并返回 (None, None)。
+
+        注意 /api/budget/* 的 GET 是全体授权账号可读、POST 才收紧 —— 同一 path 上两种
+        method 权限不同,所以**不能**把这些 path 加进 _SUPER_ONLY_PATHS(那个闸按 path
+        匹配、不分 method,加进去会让普通管理员连读都 403、页面白板)。"""
+        token = auth.parse_cookie_token(self.headers.get('Cookie'))
+        account = auth.validate_session(token)
+        rec = auth.load_accounts().get('users', {}).get(account) if account else None
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return None, None
+        pages = rec.get('allowedPages', [])
+        if not (rec.get('isSuper') or '*' in pages or 'budget' in pages):
+            self._send_json(403, _error_payload(ERR_FORBIDDEN, "无概算工具页面权限"))
+            return None, None
+        return account, rec
 
     def _reset_audit_state(self):
         """逐请求复位审计实例状态,防 keep-alive(HTTP/1.1)下同一 handler 实例

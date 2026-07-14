@@ -158,4 +158,11 @@ describe('stores/auth 访问控制', () => {
     s.user = { account: 'y2', displayName: 'y2', isSuper: false, allowedPages: ['yitian-trend'], allowedL4: [] }
     expect(s.firstAllowedPath()).toBe('/yitian/trend')
   })
+  // 回归:只授权概算工具的账号必须落到 /budget,不得被踢回 /login(否则登录死循环)
+  it('firstAllowedPath:普通账号仅 budget 权限→/budget', () => {
+    const s = useAuthStore()
+    s.user = { account: 'g', displayName: 'g', isSuper: false,
+               allowedPages: ['budget'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/budget')
+  })
 })
