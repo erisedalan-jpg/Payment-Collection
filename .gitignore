@@ -96,6 +96,11 @@ data/budget_config.json
 data/budget_config.json.tmp
 data/budget_estimates.json
 data/budget_estimates.json.tmp
+# 补齐遗漏(V2.3.0/V2.6.x 起就一直没被忽略):跟进数据含真实项目号与跟进正文,同属不入库之列。
+data/risk_followup.json
+data/risk_followup.json.tmp
+data/payment_key_followup.json
+data/payment_key_followup.json.tmp
 # client 本地敏感/用户态/产物:config.json 含真实 cookie(密钥)、gui_settings 含账号设置、dist 为打包产物
 client/config.json
 client/gui_settings.json
