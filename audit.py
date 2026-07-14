@@ -42,6 +42,10 @@ _ACTION_MAP = {
     ('POST', '/api/yitian/settings'): ('yitian.settings', '修改倚天合规检查范围'),
     ('POST', '/api/yitian/store/clear'): ('yitian.store.clear', '清空倚天工时累积库'),
     ('POST', '/api/yitian/store/delete-range'): ('yitian.store.delete', '删除倚天工时累积区间'),
+    # 概算工具(POST):费率配置是对外报价的口径基准、存档删除不可逆,都必须留痕
+    ('POST', '/api/budget/config'): ('budget.config', '修改概算费率配置'),
+    ('POST', '/api/budget/estimates'): ('budget.estimate.save', '保存概算报价'),
+    ('POST', '/api/budget/estimates/delete'): ('budget.estimate.delete', '删除概算报价'),
     ('POST', '/api/pmis/upload'): ('pmis.upload', '上传PMIS包'),
     ('POST', '/api/inputs/upload'): ('inputs.upload', '上传数据文件'),
     ('POST', '/api/data-history/rollback'): ('data.history_rollback', '数据回滚'),
