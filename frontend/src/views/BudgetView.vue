@@ -8,6 +8,10 @@ import ProductSection from '@/components/budget/ProductSection.vue'
 import PmSection from '@/components/budget/PmSection.vue'
 import ServiceSection from '@/components/budget/ServiceSection.vue'
 import DirectCostSection from '@/components/budget/DirectCostSection.vue'
+import RatioCard from '@/components/budget/RatioCard.vue'
+import CrmCard from '@/components/budget/CrmCard.vue'
+import SummaryCard from '@/components/budget/SummaryCard.vue'
+import SalesOrderCard from '@/components/budget/SalesOrderCard.vue'
 
 const cfgStore = useBudgetConfigStore()
 const store = useBudgetStore()
@@ -32,17 +36,23 @@ watch(() => store.result, () => store.syncCrmText(), { deep: false })
     <el-skeleton v-else-if="cfgStore.loading && !ready" :rows="8" animated />
 
     <template v-if="ready">
-      <!-- Task 11:RatioCard / CrmCard / SummaryCard / SalesOrderCard
-           Task 12:EstimateDrawer + 顶部操作条 + 费率快照横幅
+      <!-- Task 12:EstimateDrawer + 顶部操作条 + 费率快照横幅
            Task 13:RateConfigDrawer(超管) -->
       <h2 class="bd-title">概算工具</h2>
 
+      <!-- 输入区 -->
       <BasicInfoCard />
       <RateReferenceCard />
       <ProductSection />
       <PmSection />
       <ServiceSection />
       <DirectCostSection />
+
+      <!-- 结果区(全部实时联动 store.result / store.salesOrder) -->
+      <RatioCard />
+      <CrmCard />
+      <SummaryCard />
+      <SalesOrderCard />
     </template>
   </div>
 </template>
