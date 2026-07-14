@@ -39,6 +39,7 @@ PMIS 9 表(input/pmis/*.xlsx) ┐
 | `schema.py` | pydantic 数据契约 + 导出 JSON Schema 供前端 `npm run gen:types` |
 | `snapshots.py` | 快照 diff → 事件流/周期对比（项目动态） |
 | `data_history.py` / `manual_history.py` / `manual_import.py` | 数据历史快照回滚 / 人工数据备份与导入 |
+| `budget_config.py` / `budget_store.py` | 概算工具:费率与目录配置(超管可配) / 报价存档(按账号隔离 + 费率快照) |
 | `frontend/` | Vue3 前端：`router/`(路由) `views/`(页面) `components/` `lib/`(纯计算口径) `stores/`(Pinia) `charts/` `styles/theme.css`(设计令牌单一落地) |
 | `data/followup_records.json` / `data/project_tags.json` | 本地跟进记录 / 项目标签持久化 |
 | `input/` | 数据源输入（PMIS xlsx + CSV），经页面上传或本地放置；点「更新数据」生效 |
@@ -77,6 +78,12 @@ python server.py --stop     # 停止运行中的服务
 - **回款节点只为在建主域（`dept_projects`=PMIS 在建∩组织架构交付三部）及售前原项目构建**；已关闭/域外项目的收款阶段不进在建回款看板（设计边界，非缺陷）。
 - **回款子域路由**：`/payment`(总览) + `/payment/{board,projects,nodes,plan,risk}`（V1.13.0 由旧 `/panalysis` 拆分；旧路径仍 redirect 兼容）。
 - **日期区间口径（V1.11.0）**：FilterBar 起止日期，计划侧按节点 planDate∈区间、已回款按流水到账日∈区间；"全部"区间≡全时口径（回归安全网）。
+
+### 概算工具口径（2026-07-13 起，V3.1.0）
+- **成本比例 = 销售下单金额（含税）÷ 项目金额**，即 `总成本 × (1 + 毛利率) ÷ (项目金额万元 × 10000)`。原工具此处**漏乘 `(1 + 毛利率)`**（页面文案对、代码错），V3.1.0 已修正 —— 同一份报价的比例比原工具高约 13%（选 6% 档时高 6%），**旧口径落在 13.28%~15% 的报价会翻成「偏高」并强制填异常说明**。
+- **物料单价与毛利率解耦**：单价只有一套，毛利率只作为 `(1 + margin)` 的乘数（原工具选 6% 时会静默回退用 13% 的单价表）。
+- **费率快照**：每条存档冻结当时的完整费率配置；打开旧档用它自己的快照算 —— **报价是要拿去 CRM 上单的对外产物，必须可复现**。改费率不会改写历史报价。
+- 费率/系数/阈值/产品目录/服务目录/物料/PM阶段模板**全部超管可配**（`data/budget_config.json`，`/budget` 页内抽屉），改完立即生效、**无需点「更新数据」**（本域不进数据管线）。
 
 ## 设计底层规范（展示形式）
 
