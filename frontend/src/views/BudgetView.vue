@@ -19,6 +19,7 @@ import CrmCard from '@/components/budget/CrmCard.vue'
 import SummaryCard from '@/components/budget/SummaryCard.vue'
 import SalesOrderCard from '@/components/budget/SalesOrderCard.vue'
 import EstimateDrawer from '@/components/budget/EstimateDrawer.vue'
+import RateConfigDrawer from '@/components/budget/RateConfigDrawer.vue'
 
 const cfgStore = useBudgetConfigStore()
 const store = useBudgetStore()
@@ -187,7 +188,10 @@ defineExpose({ validate, save, onExport, onRestore, onNew, drawerOpen, rateCfgOp
         :is-super="auth.user?.isSuper === true"
         @restore="onRestore"
       />
-      <!-- Task 13:<RateConfigDrawer v-model="rateCfgOpen" /> -->
+      <!-- 费率与目录配置(仅超管)。入口按钮的 isSuper 只是 UI 层面不给入口 ——
+           真正的闸在后端(普通管理员 POST /api/budget/config → 403)。
+           保存后 cfgStore.config 一变,页面的费率速查表/占位符/计算结果(全是 computed)自动跟着变。 -->
+      <RateConfigDrawer v-if="auth.user?.isSuper" v-model="rateCfgOpen" />
     </template>
   </div>
 </template>
