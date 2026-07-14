@@ -82,6 +82,38 @@ describe('RateConfigDrawer', () => {
     expect((w.vm as any).draft.services.length).toBe(2)
   })
 
+  it('项目经理阶段可增删行', async () => {
+    const w = mountIt()
+    await flushPromises()
+    ;(w.vm as any).addPhase()
+    expect((w.vm as any).draft.pmPhases.length).toBe(2)
+    ;(w.vm as any).removePhase(1)
+    expect((w.vm as any).draft.pmPhases.length).toBe(1)
+  })
+
+  it('新增的阶段开箱即合法(name 非空,后端要求)', async () => {
+    const w = mountIt()
+    await flushPromises()
+    ;(w.vm as any).addPhase()
+    const added = (w.vm as any).draft.pmPhases[1]
+    expect(added.name.trim()).not.toBe('')
+    expect(added.content).toBe('')          // content 允许为空
+  })
+
+  it('改了阶段模板并保存 → 提交给后端的配置里带着改后的 pmPhases', async () => {
+    const w = mountIt()
+    await flushPromises()
+    ;(w.vm as any).draft.pmPhases[0].name = '项目复盘阶段'
+    ;(w.vm as any).draft.pmPhases[0].content = '【标准工作内容】\n1、复盘会\n2、总结报告'
+    await (w.vm as any).save()
+    const sent = saveSpy.mock.calls[0][0] as BudgetConfig
+    expect(sent.pmPhases[0].name).toBe('项目复盘阶段')
+    expect(sent.pmPhases[0].content).toContain('复盘会')
+    // 多行长文本:换行不能被吃掉(编辑控件必须是 textarea)
+    expect(sent.pmPhases[0].content).toContain('\n')
+    expect(useBudgetConfigStore().config!.pmPhases[0].name).toBe('项目复盘阶段')
+  })
+
   it('后端拒绝时把可读的校验文案弹出来', async () => {
     saveSpy.mockRejectedValue(new Error('成本比例区间下限必须小于上限'))
     const w = mountIt()
