@@ -71,10 +71,12 @@ export interface PmPhaseRow {
   note: string                   // 工作内容
 }
 
+/** 注意与 ServiceDef.isOther 区分:目录里那条「其他服务」带 isOther(后端 budget_config.py
+ *  的默认目录里就有,配置抽屉据此显示「用户自定义」类型,不能删)。但报价行不需要这个标记 ——
+ *  服务名一律以目录为准、报价页不可改名(原工具同样不能改),留着就是个只写不读的死字段。 */
 export interface ServiceRow {
   uid: string
   name: string
-  isOther: boolean
   content: string
   cells: DayCells
 }

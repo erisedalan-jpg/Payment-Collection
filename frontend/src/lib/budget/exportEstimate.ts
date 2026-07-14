@@ -1,13 +1,18 @@
 import { exportSheets } from '@/lib/exportXlsx'
 import { productTotalDays } from './calc'
+import { ratioStatusText } from './status'
 import type { SalesOrder } from './salesOrder'
 import type { BudgetConfig, BudgetForm, CalcResult, ProductRow } from './types'
 
 type Row = Record<string, unknown>
 export interface Sheet { name: string; rows: Row[] }
 
-const STATUS_TEXT: Record<string, string> = {
-  low: '比例偏低', normal: '比例正常', high: '比例偏高', na: '未判定',
+/** 毛利率的展示文案:优先用配置里那档的 label(如「13%（含产品）」),配置里找不到就按百分比拼。
+ *  Excel 是给审批人看的那一份 —— 总成本(未含税)与销售下单金额(含税)之间差的就是这个数,
+ *  不写出来审批人只能自己反除。 */
+function marginText(margin: number, cfg: BudgetConfig): string {
+  return cfg.margins.find((m) => m.value === margin)?.label
+    ?? `${(margin * 100).toFixed(0)}%`
 }
 
 /** 文件名里的日期用**本地**年月日拼 —— toISOString() 会把本地零点退回前一天(UTC+8 下 off-by-one)。 */
@@ -88,14 +93,17 @@ export function buildSheets(form: BudgetForm, cfg: BudgetConfig,
     { 字段: '外包服务（一类人天）', 内容: r.prodOutDays1 + r.svcOutDays1 },
     { 字段: '外包服务（二类人天）', 内容: r.prodOutDays2 + r.svcOutDays2 },
     { 字段: '直接成本', 内容: r.directCost },
-    { 字段: '总成本', 内容: r.totalCost },
-    { 字段: '销售下单金额', 内容: r.salesAmount },
+    // 含税/未含税的限定词一个都不能丢:页面上写清了,Excel 恰恰是丢掉限定词的那一份,
+    // 而它是给审批人看的 —— 误读的代价直接是钱。中间的毛利率也补上(两者相差的就是它)。
+    { 字段: '总成本（未含税）', 内容: r.totalCost },
+    { 字段: '毛利率', 内容: marginText(form.margin, cfg) },
+    { 字段: '销售下单金额（含税）', 内容: r.salesAmount },
   ]
 
   const ratioRows: Row[] = [
     { 项目: '成本比例', 数值: r.costRatio === null ? '--' : `${r.costRatio.toFixed(2)}%` },
     { 项目: '建议范围', 数值: `${cfg.ratio.min}% - ${cfg.ratio.max}%` },
-    { 项目: '状态', 数值: STATUS_TEXT[r.ratioStatus] },
+    { 项目: '状态', 数值: ratioStatusText(r.ratioStatus) },
   ]
   if (form.ratioExplanation.trim()) {
     ratioRows.push({ 项目: '异常说明', 数值: form.ratioExplanation })

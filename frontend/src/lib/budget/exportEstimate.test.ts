@@ -50,7 +50,7 @@ function fullForm(): BudgetForm {
     customDesc: '用户填的自定义工作内容', custom: cells({ out1: 4 }),
   }]
   f.pmPhases[0].pm1 = 5
-  f.services = [{ uid: 's1', name: '巡检服务', isOther: false,
+  f.services = [{ uid: 's1', name: '巡检服务',
                   content: '季度巡检', cells: cells({ tech1: 2 }) }]
   f.direct.allowanceDomDays = 3
   f.direct.localTransportBase = 100
@@ -84,8 +84,23 @@ describe('buildSheets', () => {
     expect(get('项目金额（万元）')).toBe(100)
     expect(get('项目级别')).toBe('P2')
     expect(get('是否含第三方外采')).toBe('否')
-    expect(get('总成本')).toBeDefined()
-    expect(get('销售下单金额')).toBeDefined()
+    expect(get('总成本（未含税）')).toBeDefined()
+    expect(get('销售下单金额（含税）')).toBeDefined()
+  })
+
+  // 审批人拿到的就是这份 Excel:金额字段丢了含税/未含税的限定词、或不写毛利率,
+  // 只能靠猜或反除 —— 误读的代价直接是钱。
+  it('基本信息 sheet:金额字段带含税/未含税限定词,且写明毛利率', () => {
+    const { sheets, r, f } = sheetsOf()
+    const rows = sheets[0].rows as { 字段: string; 内容: unknown }[]
+    const keys = rows.map((x) => x.字段)
+    const get = (k: string) => rows.find((x) => x.字段 === k)?.内容
+    expect(keys).not.toContain('总成本')            // 不带限定词的旧字段名不许再出现
+    expect(keys).not.toContain('销售下单金额')
+    expect(get('总成本（未含税）')).toBe(r.totalCost)
+    expect(get('销售下单金额（含税）')).toBe(r.salesAmount)
+    expect(f.margin).toBe(0.13)
+    expect(get('毛利率')).toBe('13%')               // CFG.margins 里 0.13 那档的 label
   })
 
   it('产品实施 sheet:标准段与非标段各出一行,类型不同', () => {

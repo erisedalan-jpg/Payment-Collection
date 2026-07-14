@@ -112,7 +112,7 @@ describe('BudgetView', () => {
   // 否则页面上的费率速查表 / 新建报价的计算结果全部停在旧配置上算错钱。
 
   it('超管保存新配置后 → store.effectiveConfig 立即换成新费率(不需要刷新页面)', async () => {
-    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    mount(BudgetView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const s = useBudgetStore()
     const cfg = useBudgetConfigStore()
@@ -121,7 +121,6 @@ describe('BudgetView', () => {
     cfg.config = CFG_B
     await flushPromises()
     expect(s.effectiveConfig?.rates.city1.tech).toBe(2600)
-    expect(w).toBeTruthy()
   })
 
   it('算钱回归:配置回灌后,新建报价按新单价算,不是旧价(29380 那种错法)', async () => {
@@ -148,7 +147,7 @@ describe('BudgetView', () => {
   })
 
   it('配置回灌不会清掉用户正在填的表单', async () => {
-    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    mount(BudgetView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const s = useBudgetStore()
     const cfg = useBudgetConfigStore()
@@ -158,6 +157,18 @@ describe('BudgetView', () => {
     await flushPromises()
     expect(s.form.basic.quoteName).toBe('用户正在填的报价名')
     expect(s.form.pmPhases[0].tech1).toBe(5)
-    expect(w).toBeTruthy()
+  })
+
+  // 配置陈旧回归:同一个 SPA 会话里再次进 /budget,必须重新拉配置(load(true))——
+  // 否则超管改完费率,别人已经打开的页签会继续按旧单价报价,并把旧快照冻进新存档。
+  it('再次进页面 → 重新拉配置(不吃 loaded 缓存)', async () => {
+    mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(getCfg).toHaveBeenCalledTimes(1)
+    getCfg.mockResolvedValue(CFG_B)
+    mount(BudgetView, { global: { plugins: [ElementPlus] } })   // 同一 pinia 实例,模拟再次进页面
+    await flushPromises()
+    expect(getCfg).toHaveBeenCalledTimes(2)
+    expect(useBudgetConfigStore().config?.rates.city1.tech).toBe(2600)
   })
 })

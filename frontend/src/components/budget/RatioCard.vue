@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
+import { RATIO_STATUS } from '@/lib/budget/status'
 import type { RatioStatus } from '@/lib/budget/types'
 
 /** 成本比例 = 销售下单金额（含税）÷ 项目金额。
@@ -22,13 +23,9 @@ const ratioText = computed(() => {
   return v == null ? '--' : `${v.toFixed(2)}%`
 })
 
-// 三态一律「淡底 + 深字」（设计规范：禁止实底状态色配小号白字）
-const BADGE: Record<Exclude<RatioStatus, 'na'>, { text: string; cls: string }> = {
-  normal: { text: '比例正常', cls: 'is-ok' },
-  low: { text: '比例偏低', cls: 'is-warn' },
-  high: { text: '比例偏高', cls: 'is-danger' },
-}
-const badge = computed(() => (status.value === 'na' ? null : BADGE[status.value]))
+// 三态一律「淡底 + 深字」（设计规范：禁止实底状态色配小号白字）。
+// 文案与配色的唯一真相源在 lib/budget/status.ts —— 导出 Excel 用的是同一份。
+const badge = computed(() => (status.value === 'na' ? null : RATIO_STATUS[status.value]))
 
 /** 偏低 / 偏高必须写异常说明；未判定（na）不要求。 */
 const needExplain = computed(() => status.value === 'low' || status.value === 'high')
