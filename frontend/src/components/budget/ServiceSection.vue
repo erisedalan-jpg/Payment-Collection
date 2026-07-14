@@ -25,8 +25,7 @@ function addService(name: string): void {
   const def = cfg.value.services.find((s) => s.name === name)
   if (!def) return
   store.form.services.push({
-    uid: uid(), name: def.name, isOther: !!def.isOther,
-    content: def.desc, cells: emptyCells(),
+    uid: uid(), name: def.name, content: def.desc, cells: emptyCells(),
   })
   store.touch()
 }

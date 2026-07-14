@@ -343,8 +343,7 @@ defineExpose({
         <!-- 3. 服务目录 -->
         <el-tab-pane label="服务目录" name="services">
           <p class="rc-note">
-            说明是添加该服务时带入的默认「工作内容」，报价里可再改。标「用户自定义」的那条
-            （其他服务）在报价页允许自填服务名。
+            说明是添加该服务时带入的默认「工作内容」，报价里可再改。服务名以本目录为准，报价页不可改名。
           </p>
           <el-table :data="d.services" size="default" class="rc-table">
             <el-table-column label="服务名" min-width="160">

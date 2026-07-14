@@ -25,8 +25,11 @@ const cfgStore = useBudgetConfigStore()
 const store = useBudgetStore()
 const auth = useAuthStore()
 
+// force=true:每次进页面都重拉配置。budgetConfig.load() 默认 loaded 就直接返回 —— 同一个
+// SPA 会话里配置只会在第一次进 /budget 时拉一次,超管改完费率,别人已经打开的页签会继续用
+// 旧单价报价、并把旧快照冻进新存档,全程无感。
 onMounted(async () => {
-  await cfgStore.load()
+  await cfgStore.load(true)
   if (cfgStore.config) {
     store.reset(cfgStore.config)
     store.setCurrentConfig(cfgStore.config)
@@ -76,8 +79,11 @@ async function save(saveAsNew: boolean): Promise<void> {
   if (err) { ElMessage.warning(err); return }
   saving.value = true
   try {
-    const rec = await saveEstimate(store.toPayload(saveAsNew))
-    store.markSaved(rec.id)
+    // payload 留在手里:markSaved 要用**提交上去的那份费率**当快照(此刻起这条报价就冻在
+    // 这份费率上,超管之后改费率不再影响它 —— 与服务端存的那条记录同一份快照)。
+    const payload = store.toPayload(saveAsNew)
+    const rec = await saveEstimate(payload)
+    store.markSaved(rec.id, payload.rateSnapshot)
     ElMessage.success(saveAsNew ? '已另存为新报价' : '已保存')
   } catch (e) {
     ElMessage.error('保存失败: ' + (e as Error).message)

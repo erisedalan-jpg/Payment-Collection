@@ -101,7 +101,7 @@ describe('calcBudget:人工成本', () => {
 
   it('其他服务:按四格累加计价', () => {
     const r = calcBudget(form({
-      services: [{ uid: 's1', name: '巡检服务', isOther: false, content: '巡检',
+      services: [{ uid: 's1', name: '巡检服务', content: '巡检',
                    cells: cells({ tech2: 2, out1: 1 }) }],
     }), CFG)
     expect(r.svcTechDays2).toBe(2)

@@ -26,6 +26,9 @@ const CFG: BudgetConfig = {
 }
 const OLD_CFG: BudgetConfig = { ...CFG, fx: 6.0, rates: {
   city1: { pm: 1000, tech: 800, out: 600 }, city2: { pm: 900, tech: 700, out: 500 } } }
+/** 超管改完费率后的新配置(技服一类 1300 → 2600)。与 CFG 不共享 rates 引用,避免断言假过。 */
+const NEW_CFG: BudgetConfig = { ...CFG, rates: {
+  city1: { pm: 2000, tech: 2600, out: 1000 }, city2: { pm: 1500, tech: 1000, out: 800 } } }
 
 describe('useBudgetStore', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -125,7 +128,7 @@ describe('useBudgetStore', () => {
     s.form.basic.quoteName = '某报价'
     expect(s.toPayload(false).id).toBeUndefined()
 
-    s.markSaved('e9')
+    s.markSaved('e9', s.toPayload(false).rateSnapshot)
     expect(s.toPayload(false).id).toBe('e9')               // 保存 = 覆盖
     expect(s.toPayload(true).id).toBeUndefined()           // 另存为 = 新建
   })
@@ -148,8 +151,78 @@ describe('useBudgetStore', () => {
     s.form.basic.quoteName = 'x'
     s.touch()
     expect(s.dirty).toBe(true)
-    s.markSaved('e1')
+    s.markSaved('e1', s.toPayload(false).rateSnapshot)
     expect(s.currentId).toBe('e1')
     expect(s.dirty).toBe(false)
+  })
+})
+
+// ── 回归:存完不关页面,超管改费率 —— 这条报价必须继续按"保存时的那份费率"算 ──
+//
+// 服务端那条记录的快照冻的是保存那一刻的配置 A。若 markSaved 不同时把 A 落进 store 的
+// rateSnapshot,页面上这条已存档的报价会继续跟着全局配置走:超管把费率改成 B 之后,
+// 总成本/成本比例/下单金额当场全变、横幅不出、也不标脏 —— 导出的 Excel 按 B 算,
+// 存档列表里这条却还是 A 算的数;再点一次「保存」,服务端那条历史快照会被从 A 悄悄改写成 B。
+// 「改费率不得改写历史报价」这条不变量,原先只在"重新打开旧档"的路径上守住了。
+describe('useBudgetStore:保存后费率快照(改费率不得改写已存档报价)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  /** 走一遍真实的保存链路:toPayload() 拿到提交上去的那份配置 → API 返回 id → markSaved。 */
+  function saveNew(s: ReturnType<typeof useBudgetStore>, id: string) {
+    const payload = s.toPayload(false)          // 这份 rateSnapshot 就是提交给服务端的快照
+    s.markSaved(id, payload.rateSnapshot)       // API 返回后调用(BudgetView.save 的写法)
+    return payload
+  }
+
+  it('新建保存后:rateSnapshot 落成保存时的那份配置(不再是 null)', () => {
+    const s = useBudgetStore()
+    s.reset(CFG)
+    s.setCurrentConfig(CFG)
+    s.form.basic.quoteName = '某报价'
+    saveNew(s, 'e1')
+    expect(s.rateSnapshot).not.toBeNull()
+    expect(s.rateSnapshot).toEqual(CFG)         // 与服务端那条记录冻的快照同一份
+    expect(s.snapshotStale).toBe(false)         // 与当前配置相同 → 不该弹无谓的横幅
+  })
+
+  it('保存后超管改了费率:effectiveConfig 仍是保存时的 A,并弹「快照已过期」横幅', () => {
+    const s = useBudgetStore()
+    s.reset(CFG)
+    s.setCurrentConfig(CFG)
+    s.form.basic.quoteName = '某报价'
+    saveNew(s, 'e1')
+
+    s.setCurrentConfig(NEW_CFG)                 // 超管保存新配置 → BudgetView 的 watch 回灌
+    expect(s.effectiveConfig?.rates.city1.tech).toBe(1300)   // 仍按 A 算,金额不变
+    expect(s.snapshotStale).toBe(true)                       // 横幅出现
+    expect(s.dirty).toBe(false)                              // 报价本身没被改过
+  })
+
+  it('保存后超管改了费率:金额继续按 A 算,不被新费率静默改价', () => {
+    const s = useBudgetStore()
+    s.reset(CFG)
+    s.setCurrentConfig(CFG)
+    s.form.basic.quoteName = '某报价'
+    s.form.pmPhases[0].tech1 = 10               // 10 个技服一类人天
+    saveNew(s, 'e1')
+
+    s.setCurrentConfig(NEW_CFG)                 // 技服一类 1300 → 2600
+    expect(s.result?.laborCost).toBe(13000)     // 10 × 1300(按快照 A),不是 10 × 2600
+  })
+
+  it('主动点「按最新费率重算」→ 才改用 B,并标脏(不重新保存不落盘)', () => {
+    const s = useBudgetStore()
+    s.reset(CFG)
+    s.setCurrentConfig(CFG)
+    s.form.basic.quoteName = '某报价'
+    s.form.pmPhases[0].tech1 = 10
+    saveNew(s, 'e1')
+    s.setCurrentConfig(NEW_CFG)
+
+    s.useLatestRates()
+    expect(s.rateSnapshot).toBeNull()
+    expect(s.effectiveConfig?.rates.city1.tech).toBe(2600)
+    expect(s.result?.laborCost).toBe(26000)     // 10 × 2600
+    expect(s.dirty).toBe(true)
   })
 })

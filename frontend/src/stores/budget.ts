@@ -46,8 +46,16 @@ export const useBudgetStore = defineStore('budget', () => {
 
   function touch(): void { dirty.value = true }
 
-  function markSaved(id: string): void {
+  /** 保存成功后落地:id + **本次实际提交上去的那份费率**(调用方从 toPayload() 里拿)。
+   *
+   *  快照必须在这里一起落:服务端那条记录冻的是 cfg,页面上这条报价若还跟着全局配置走,
+   *  超管改完费率之后它的总成本/成本比例/下单金额会当场变、横幅不出、也不标脏 ——
+   *  导出的 Excel 与存档列表里的数就对不上了,再点一次保存还会把服务端那条历史快照
+   *  从 cfg 改写成新费率。cfg 由调用方在 toPayload() 时取,不在这里读 effectiveConfig:
+   *  markSaved 是 API 返回**之后**才调的,这期间超管可能已经把全局配置换掉了。 */
+  function markSaved(id: string, cfg: BudgetConfig): void {
     currentId.value = id
+    rateSnapshot.value = cfg
     dirty.value = false
   }
 
