@@ -60,3 +60,20 @@ describe('crossFilter — riskReasons 多值(按类别)', () => {
     expect(res.map((r: any) => r.projectId)).toEqual(['B'])
   })
 })
+
+describe('通用数组列筛选', () => {
+  const rows = [{ code: ['A', 'B'] }, { code: ['A'] }, { code: [] }, { code: ['C'] }]
+  it('cfUniqueValues 摊平去重升序', () => {
+    expect(cfUniqueValues(rows, 'code').map((u) => u.display)).toEqual(['A', 'B', 'C'])
+  })
+  it('applyColumnFilters 元素成员匹配', () => {
+    expect(applyColumnFilters(rows, { code: { value: ['A'] } })).toEqual([{ code: ['A', 'B'] }, { code: ['A'] }])
+  })
+  it('多选取并集', () => {
+    expect(applyColumnFilters(rows, { code: { value: ['B', 'C'] } })).toEqual([{ code: ['A', 'B'] }, { code: ['C'] }])
+  })
+  it('不误伤标量列', () => {
+    const s = [{ x: '1' }, { x: '2' }]
+    expect(applyColumnFilters(s, { x: { value: ['1'] } })).toEqual([{ x: '1' }])
+  })
+})
