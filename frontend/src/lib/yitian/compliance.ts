@@ -95,3 +95,36 @@ export function countByL4(rows: IssueRow[]): { l4: string; count: number }[] {
     .map(([l4, count]) => ({ l4, count }))
     .sort((a, b) => b.count - a.count)
 }
+
+export interface IssueHeatmap {
+  codes: { code: string; label: string }[]
+  l4s: string[]
+  cells: [number, number, number][] // [xL4Index, yCodeIndex, count]
+  max: number
+}
+
+/** 问题码 × L4 热力矩阵。码轴取 countByCode 顺序、L4 轴取 countByL4 顺序(均降序)。 */
+export function issueHeatmap(rows: IssueRow[]): IssueHeatmap {
+  const codeOrder = countByCode(rows)
+  const l4Order = countByL4(rows)
+  const codeIdx = new Map(codeOrder.map((c, i) => [c.code, i]))
+  const l4Idx = new Map(l4Order.map((r, i) => [r.l4, i]))
+  const acc = new Map<string, number>()
+  for (const r of rows) {
+    const li = l4Idx.get(r.l4)
+    if (li === undefined) continue
+    for (const c of r.codes) {
+      const ci = codeIdx.get(c)
+      if (ci === undefined) continue
+      acc.set(ci + '|' + li, (acc.get(ci + '|' + li) ?? 0) + 1)
+    }
+  }
+  let max = 0
+  const cells: [number, number, number][] = []
+  for (const [k, v] of acc) {
+    const [ci, li] = k.split('|').map(Number)
+    cells.push([li, ci, v])
+    if (v > max) max = v
+  }
+  return { codes: codeOrder.map((c) => ({ code: c.code, label: c.label })), l4s: l4Order.map((r) => r.l4), cells, max }
+}

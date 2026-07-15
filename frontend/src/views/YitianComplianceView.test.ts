@@ -9,6 +9,7 @@ vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianComplianceView from './YitianComplianceView.vue'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
+import { STATUS_LIGHT } from '@/charts/echartsTheme'
 
 const DATA = {
   meta: { periodStart: '2026-06-01', periodEnd: '2026-06-02', generatedAt: '', rows: 2,
@@ -76,14 +77,23 @@ describe('YitianComplianceView', () => {
     expect(rows).toHaveLength(0)
   })
 
-  it('提示码(HINT_ 前缀)分布 chip 用 warn 状态色,问题码用 danger(M-5)', async () => {
+  it('提示码(HINT_ 前缀)分布柱用 warn 状态色,问题码用 danger(M-5)', async () => {
+    // 重设计后 pill 列表换成横向柱图(codeBarChartOption),语义色改挂在柱的 itemStyle 上,
+    // 而不是 DOM class——按 yAxis 标签定位对应柱,断言其 itemStyle.color。
     const w = mount(YitianComplianceView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
-    const items = w.findAll('.yt-dist li')
-    const hintItem = items.find((li) => li.text().includes('售前服务类产品类别不应为「其他」'))!
-    const issueItem = items.find((li) => li.text().includes('缺少工作概述'))!
-    expect(hintItem.classes()).toContain('yt-dist--warn')
-    expect(issueItem.classes()).not.toContain('yt-dist--warn')
+    const opt = (w.vm as any).codeBarChartOption as {
+      yAxis: { data: string[] }
+      series: { data: { itemStyle: { color: string } }[] }[]
+    }
+    const labels = opt.yAxis.data
+    const bars = opt.series[0].data
+    const hintIdx = labels.indexOf('售前服务类产品类别不应为「其他」')
+    const issueIdx = labels.indexOf('缺少工作概述')
+    expect(hintIdx).toBeGreaterThanOrEqual(0)
+    expect(issueIdx).toBeGreaterThanOrEqual(0)
+    expect(bars[hintIdx].itemStyle.color).toBe(STATUS_LIGHT.warn)
+    expect(bars[issueIdx].itemStyle.color).toBe(STATUS_LIGHT.danger)
   })
 
   it('页面有内边距(不贴边)', async () => {
