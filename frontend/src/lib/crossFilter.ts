@@ -35,6 +35,16 @@ export function cfUniqueValues(rows: Record<string, any>[], colKey: string): Uni
     for (const r of rows) for (const rr of (r.riskReasons ?? [])) if (rr?.category) set.add(String(rr.category))
     return [...set].sort().map((display) => ({ display, raw: display }))
   }
+  // 通用数组列(如倚天「问题类型」string[]):元素级去重。放在 riskReasons 特例后;
+  // 主域可筛列无数组类型(数组列本被 FILTERABLE 排除),故此分支只对新引入的数组列生效,零回归。
+  if (rows.some((r) => Array.isArray(r[colKey]))) {
+    const set = new Set<string>()
+    for (const r of rows) {
+      const v = r[colKey]
+      if (Array.isArray(v)) for (const item of v) set.add(String(item))
+    }
+    return [...set].sort().map((display) => ({ display, raw: display }))
+  }
   const uvMap: Record<string, unknown> = {}
   for (const r of rows) {
     const v = r[colKey]
@@ -61,7 +71,13 @@ export function applyColumnFilters(
         if (!sel.some((c) => cats.includes(c))) return false
         continue
       }
-      const cv = row[ck]
+      const cv0 = row[ck]
+      if (Array.isArray(cv0)) {
+        const strs = cv0.map((x) => String(x))
+        if (!sel.some((s) => strs.includes(s))) return false
+        continue
+      }
+      const cv = cv0
       const fv = cfFormatValue(ck, cv)
       let match = false
       for (const s of sel) {
