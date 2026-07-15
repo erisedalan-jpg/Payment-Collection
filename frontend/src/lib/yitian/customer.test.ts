@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { top1000ByL4, bgSupport, top1000TotalsRow } from './customer'
-import { topCustomers } from './customer'
+import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from './customer'
 import type { YitianData } from '@/types/yitian'
 
 const DATA = {
@@ -81,6 +80,23 @@ describe('bgSupport', () => {
     const empty = bgSupport(DATA, '2026-07-01', '2026-07-02')
     expect(empty.total).toBe(0)
     expect(empty.thisPct).toBe(0)
+  })
+})
+
+describe('bgSupportByL4', () => {
+  it('按 L4 分组本/跨 BG 工时(与 bgSupport 同口径,管理类不计)', () => {
+    const rows = bgSupportByL4(DATA, S, E)
+    const bank = rows.find((r) => r.l4 === '银行服务组')!
+    const zj = rows.find((r) => r.l4 === '浙江服务组')!
+    expect(bank.thisBg).toBe(6)   // 银行集团军(本BG)
+    expect(bank.crossBg).toBe(2)  // 政企大区(跨BG)
+    expect(bank.thisBg + bank.crossBg).toBe(8) // 管理类 8h 被排除,不是 16
+    expect(zj.thisBg).toBe(4)
+    expect(zj.crossBg).toBe(0)
+  })
+  it('按合计工时升序排列(与横向柱自下而上一致)', () => {
+    const rows = bgSupportByL4(DATA, S, E)
+    expect(rows.map((r) => r.l4)).toEqual(['浙江服务组', '银行服务组']) // 4 < 8
   })
 })
 

@@ -26,7 +26,10 @@ export function useTableMaxHeight(
   }
 
   const onResize = () => recompute()
-  const addListener = () => { if (typeof window !== 'undefined') window.addEventListener('resize', onResize) }
+  const addListener = () => {
+    if (opts.enabled && !opts.enabled()) return
+    if (typeof window !== 'undefined') window.addEventListener('resize', onResize)
+  }
   const removeListener = () => { if (typeof window !== 'undefined') window.removeEventListener('resize', onResize) }
 
   onMounted(() => { addListener(); nextTick(recompute) })

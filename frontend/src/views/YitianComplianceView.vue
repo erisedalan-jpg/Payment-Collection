@@ -58,6 +58,11 @@ const k = computed(() => (store.data
   ? kpi(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes)
   : null))
 const complianceRatio = computed(() => k.value?.complianceRate ?? null)
+// 合规率环按阈值上色(与总览页同口径):≥90% 达标绿,<90% 警示黄,null 交给 RatioRing 默认(mut)。
+const complianceRingColor = computed(() => {
+  const r = complianceRatio.value
+  return r == null ? undefined : (r >= 0.9 ? 'var(--ok)' : 'var(--warn)')
+})
 
 const healthMetrics = computed(() => {
   const r = allRows.value
@@ -145,7 +150,7 @@ function onExport() {
   )
 }
 
-defineExpose({ codeFilter, rows, codeDist, codeBarChartOption })
+defineExpose({ codeFilter, rows, codeDist, codeBarChartOption, complianceRatio, complianceRingColor })
 </script>
 
 <template>
@@ -159,7 +164,7 @@ defineExpose({ codeFilter, rows, codeDist, codeBarChartOption })
       <div class="yt-kpi-row">
         <MetricGrid :items="healthMetrics" col-min="180px" class="yt-kpi-grid" />
         <div class="yt-ring-card">
-          <RatioRing :ratio="complianceRatio" label="合规率" :size="140" />
+          <RatioRing :ratio="complianceRatio" label="合规率" :size="140" :color="complianceRingColor" />
         </div>
       </div>
 
