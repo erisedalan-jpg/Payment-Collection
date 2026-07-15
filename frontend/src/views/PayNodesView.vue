@@ -101,7 +101,7 @@ function onExport() {
       <button class="pv-btn" data-test="pay-nodes-export" @click="onExport">导出Excel</button>
     </div>
     <div class="pv-scroll">
-      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable external-sort
+      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable external-sort sticky-header
         @row-click="onRow" @sort-change="onSortChange" :default-sort="defaultSort">
         <template v-for="col in COLS" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="pv-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>

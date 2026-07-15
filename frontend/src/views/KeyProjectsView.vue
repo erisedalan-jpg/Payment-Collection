@@ -180,7 +180,7 @@ defineExpose({
 
     <div v-if="!fp.rows.value.length" class="kp-empty">暂无重点项目（取数：级别 P1 或 TOP1000 大客户且合同&gt;100万元）。</div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" clickable sticky-header :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}
