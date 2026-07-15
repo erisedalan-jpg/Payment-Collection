@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { ISSUE_LABELS, issueRows, countByCode, countByL4 } from './compliance'
+import { ISSUE_LABELS, issueRows, countByCode, countByL4, issueHeatmap } from './compliance'
 import type { YitianData } from '@/types/yitian'
+import type { IssueRow } from './compliance'
 
 const DATA = {
   meta: { hoursPerDay: 8, thisBgL2: ['交付中心'] },
@@ -110,5 +111,27 @@ describe('issueRows · excludedTypes(I-7,口径与总览/趋势页同源)', () =
     const rows = issueRows(DATA_WITH_EXCLUDABLE_TYPE, '2026-06-01', '2026-06-02', [], [])
     const r3 = rows.find((r) => r.type === '假期类')!
     expect(r3.snippet).toBe('假期类问题行正文')
+  })
+})
+
+const R: IssueRow[] = [
+  { date: '', empId: '', empName: '', l4: '银行组', l31: '', type: '', customer: '', workOrder: '', hours: 0, ok: 2, codes: ['MISS_SUMMARY', 'MISS_NEXT'], msgs: [], snippet: '' },
+  { date: '', empId: '', empName: '', l4: '银行组', l31: '', type: '', customer: '', workOrder: '', hours: 0, ok: 2, codes: ['MISS_SUMMARY'], msgs: [], snippet: '' },
+  { date: '', empId: '', empName: '', l4: '浙江组', l31: '', type: '', customer: '', workOrder: '', hours: 0, ok: 1, codes: ['MISS_NEXT'], msgs: [], snippet: '' },
+]
+
+describe('issueHeatmap', () => {
+  const h = issueHeatmap(R)
+  it('码轴按问题码计数降序', () => {
+    expect(h.codes.map((c) => c.code)).toEqual(['MISS_SUMMARY', 'MISS_NEXT']) // 2 vs 2? 见下:MISS_SUMMARY=2,MISS_NEXT=2
+  })
+  it('L4 轴按问题行数降序', () => {
+    expect(h.l4s).toEqual(['银行组', '浙江组']) // 银行组2行 > 浙江组1行
+  })
+  it('cells 为 [l4Index, codeIndex, count],max 正确', () => {
+    // 银行组(x=0) × MISS_SUMMARY(y=0) = 2
+    const bankSummary = h.cells.find((c) => c[0] === 0 && c[1] === 0)
+    expect(bankSummary?.[2]).toBe(2)
+    expect(h.max).toBe(2)
   })
 })

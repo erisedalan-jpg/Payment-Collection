@@ -111,3 +111,52 @@ export function bgSupport(
     crossPct: total > 0 ? crossBg / total : 0,
   }
 }
+
+export interface BgByL4Row {
+  l4: string
+  thisBg: number
+  crossBg: number
+}
+
+/** 跨 BG 支持按 L4 拆分:与 bgSupport 同口径(仅项目类/售前类工时),按花名册 L4 分组;
+ *  未分配 L4(部门负责人)予以剔除,按合计工时升序排列(与视图横向柱自下而上一致)。 */
+export function bgSupportByL4(
+  data: YitianData, start: string, end: string, l4s: string[] = [],
+): BgByL4Row[] {
+  const l4Of = rosterL4Map(data)
+  const own = new Set(data.meta.thisBgL2 ?? [])
+  const acc = new Map<string, { thisBg: number; crossBg: number }>()
+
+  for (const e of selectEntries(data, start, end, l4s)) {
+    if (!BG_TYPES.includes(typeNameOf(data, e))) continue
+    const l4 = l4Of[e.e] ?? NO_L4
+    if (l4 === NO_L4) continue
+    if (!acc.has(l4)) acc.set(l4, { thisBg: 0, crossBg: 0 })
+    const b = acc.get(l4)
+    if (!b) continue
+    const org = e.bg === null || e.bg === undefined ? '' : (data.dims.salesL2[e.bg] ?? '')
+    if (own.has(org)) b.thisBg += e.h
+    else b.crossBg += e.h
+  }
+
+  return [...acc.entries()]
+    .map(([l4, b]) => ({ l4, ...b }))
+    .sort((a, b) => (a.thisBg + a.crossBg) - (b.thisBg + b.crossBg))
+}
+
+/** TOP 客户排行:按 entries.cu → dims.customers 聚合工时,降序取前 n。无客户名的行(cu=null)不计。 */
+export function topCustomers(
+  data: YitianData, start: string, end: string, l4s: string[], n: number,
+): { name: string; hours: number }[] {
+  const acc = new Map<string, number>()
+  for (const e of selectEntries(data, start, end, l4s)) {
+    if (e.cu === null || e.cu === undefined) continue
+    const name = data.dims.customers[e.cu] ?? ''
+    if (!name) continue
+    acc.set(name, (acc.get(name) ?? 0) + e.h)
+  }
+  return [...acc.entries()]
+    .map(([name, hours]) => ({ name, hours }))
+    .sort((a, b) => b.hours - a.hours)
+    .slice(0, n)
+}

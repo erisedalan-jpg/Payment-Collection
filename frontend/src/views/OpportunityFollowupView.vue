@@ -138,7 +138,7 @@ defineExpose({
       {{ auth.isSuper ? '请点击「范围设置」定义重点商机跟进范围（默认：TOP1000 且 提前介入 且 重点商机 且 状态非赢单）。' : '暂无重点商机跟进。' }}
     </div>
     <div v-else class="kp-scroll">
-      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange">
+      <DataTable :columns="visibleColumns" :rows="fp.paged.value" :show-count="false" sticky-header :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="kp-th">
             {{ c.label }}

@@ -49,7 +49,7 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
       <button class="mpt-btn" data-test="plan-export" @click="onExport">导出Excel</button>
     </div>
     <div class="mpt-scroll">
-      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable @row-click="onRow">
+      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable sticky-header @row-click="onRow">
         <template #cell-projectId="{ value }"><span class="mpt-link">{{ value }}</span></template>
       </DataTable>
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, nextTick, watch } from 'vue'
+import { useTableMaxHeight } from '@/composables/useTableMaxHeight'
 
 export interface DataColumn {
   key: string
@@ -30,8 +31,10 @@ const props = withDefaults(
     summaryMethod?: (ctx: { columns: { property: string }[]; data: Record<string, any>[] }) => string[]
     /** 初始排序(透传 el-table :default-sort);用于持久化恢复表头排序箭头。 */
     defaultSort?: { prop: string; order: 'ascending' | 'descending' } | null
+    /** 首行冻结:为真时给 el-table 设动态 max-height,启用 EP 原生固定表头 + 表体内滚。默认关=零回归。 */
+    stickyHeader?: boolean
   }>(),
-  { showCount: true, clickable: false, externalSort: false, showSummary: false },
+  { showCount: true, clickable: false, externalSort: false, showSummary: false, stickyHeader: false },
 )
 
 const emit = defineEmits<{
@@ -44,16 +47,27 @@ const count = computed(() => props.rows.length)
 function onSortChange(e: { prop: string | null; order: string | null }) {
   emit('sort-change', { prop: e.prop, order: e.order })
 }
+
+const tableRef = ref<any>(null)
+const { maxHeight, recompute } = useTableMaxHeight(
+  () => tableRef.value?.$el as HTMLElement | undefined,
+  { enabled: () => props.stickyHeader },
+)
+const tableMaxHeight = computed(() => (props.stickyHeader ? maxHeight.value : undefined))
+// 数据变化(分页/筛选/排序切片)后表格高度可能变,重算一次
+watch(() => props.rows, () => { if (props.stickyHeader) nextTick(recompute) }, { flush: 'post' })
 </script>
 
 <template>
   <div class="data-table">
     <div v-if="props.showCount" class="dt-count">共 {{ count }} 条</div>
     <el-table
+      ref="tableRef"
       :data="props.rows"
       border
       stripe
       style="width: 100%"
+      :max-height="tableMaxHeight"
       :row-class-name="props.clickable ? 'dt-clickable-row' : ''"
       @row-click="(row: Record<string, any>) => emit('row-click', row)"
       @sort-change="onSortChange"

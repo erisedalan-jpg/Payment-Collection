@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useOpportunitiesStore } from '@/stores/opportunities'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { useTableMaxHeight } from '@/composables/useTableMaxHeight'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { OPP_COLUMNS, DEFAULT_VISIBLE, FILTERABLE, recentUpdateOf } from '@/lib/opportunityColumns'
 import type { OppColumn } from '@/lib/opportunityColumns'
@@ -84,6 +85,13 @@ const paged = computed(() =>
 watch(filtered, () => {
   currentPage.value = 1
 })
+
+// 首行冻结：裸 el-table 手动接入 useTableMaxHeight
+const oppTableRef = ref<any>(null)
+const { maxHeight: oppMaxHeight, recompute: oppRecompute } = useTableMaxHeight(
+  () => oppTableRef.value?.$el as HTMLElement | undefined,
+)
+watch(() => paged.value, () => nextTick(oppRecompute), { flush: 'post' })
 
 // 行选择（超管）
 const selectedRows = ref<Record<string, any>[]>([])
@@ -226,9 +234,11 @@ defineExpose({
     <!-- 表格 -->
     <div class="opp-scroll">
       <el-table
+        ref="oppTableRef"
         :data="paged"
         border
         style="width: 100%"
+        :max-height="oppMaxHeight"
         @selection-change="onSel"
         @sort-change="onSortChange"
         :default-sort="defaultSort"

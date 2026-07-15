@@ -102,10 +102,10 @@ describe('DataView(两条来源重构)', () => {
     expect(calls.some((u: string) => u.includes('/api/pmis/links'))).toBe(false)
   })
 
-  it('主区含「获取与更新数据」，清空数据进维护折叠区', async () => {
+  it('主操作区含「更新看板」，清空数据进维护折叠区', async () => {
     const w = await mountView()
     const heads = w.findAll('.dv-card-head').map((n) => n.text())
-    expect(heads.some((t) => t.includes('获取与更新数据'))).toBe(true)
+    expect(heads.some((t) => t.includes('更新看板'))).toBe(true)
     expect(w.text()).toContain('清空数据')
   })
 
@@ -156,13 +156,14 @@ describe('DataView(两条来源重构)', () => {
     expect(w.find('[data-test="files-card"]').text()).toContain('collection_stages.csv')
   })
 
-  it('下载按钮在更新按钮左侧(DOM 顺序)', async () => {
+  it('更新按钮在顶部主操作区，先于 PMIS 域卡的下载按钮出现(DOM 顺序)', async () => {
     const w = await mountView()
     const btns = w.findAll('button').map((b) => b.text())
     const di = btns.findIndex((t) => t.includes('下载数据'))
     const ui = btns.findIndex((t) => t.includes('更新数据（重新处理）'))
     expect(di).toBeGreaterThanOrEqual(0)
-    expect(ui).toBeGreaterThan(di)
+    expect(ui).toBeGreaterThanOrEqual(0)
+    expect(ui).toBeLessThan(di)
   })
 
   it('渲染状态总览条 DataStatusBar', async () => {
@@ -170,7 +171,7 @@ describe('DataView(两条来源重构)', () => {
     expect(w.findComponent(DataStatusBar).exists()).toBe(true)
   })
 
-  it('维护区四折叠面板标题齐全', async () => {
+  it('项目标签卡 + 维护与历史折叠面板标题齐全', async () => {
     const w = await mountView()
     const t = w.text()
     expect(t).toContain('项目标签')
