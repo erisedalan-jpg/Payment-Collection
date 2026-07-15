@@ -164,3 +164,24 @@ describe('DataTable 表底汇总行数字挂 tabular-nums(M-6)', () => {
     expect(src).toMatch(/:deep\(\.el-table__footer \.cell\)\s*\{\s*font-variant-numeric:\s*tabular-nums/)
   })
 })
+
+const COLS = [{ key: 'a', label: 'A' }]
+const ROWS = [{ a: 1 }, { a: 2 }]
+
+describe('DataTable stickyHeader', () => {
+  it('默认不设 max-height(零回归)', () => {
+    const w = mount(DataTable, { props: { columns: COLS, rows: ROWS }, global: { plugins: [ElementPlus] } })
+    // findComponent(ElTable) 的类型推断在 vue-tsc 下退化为 DOMWrapper(无 .props()，element-plus
+    // withInstall() 导出类型与 @vue/test-utils 的 DefinedComponent 重载不匹配)；改用具名选择器，
+    // 与仓库既有用法一致(见 DataTable.defaultsort.test.ts)。
+    expect(w.findComponent({ name: 'ElTable' }).props('maxHeight')).toBeUndefined()
+  })
+  it('开启后 el-table 拿到数字 max-height', async () => {
+    const w = mount(DataTable, {
+      props: { columns: COLS, rows: ROWS, stickyHeader: true },
+      global: { plugins: [ElementPlus] },
+    })
+    await w.vm.$nextTick()
+    expect(typeof w.findComponent({ name: 'ElTable' }).props('maxHeight')).toBe('number')
+  })
+})

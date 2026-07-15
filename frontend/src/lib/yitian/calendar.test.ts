@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { daysInRange, workdayCount, weekKeyOf, weekBuckets, dataRange } from './calendar'
+import { daysInRange, workdayCount, weekKeyOf, weekBuckets, dataRange, monthBuckets, quarterBuckets } from './calendar'
 import type { YitianDay } from '@/types/yitian'
 
 // 2026-06-01(周一) ~ 2026-06-07(周日);6/3 设为法定假(workday=false)
@@ -61,5 +61,33 @@ describe('dataRange', () => {
   })
   it('空数据跨度为空串', () => {
     expect(dataRange([])).toEqual({ start: '', end: '' })
+  })
+})
+
+// 跨月/跨季夹具:2025-12-31 ~ 2026-04-01
+const SPAN: YitianDay[] = [
+  { d: '2025-12-31', workday: true,  isoWeek: '2026-W01', calcWeek: '2025-CW53' },
+  { d: '2026-01-02', workday: true,  isoWeek: '2026-W01', calcWeek: '2026-CW01' },
+  { d: '2026-02-16', workday: false, isoWeek: '2026-W08', calcWeek: '2026-CW08' },
+  { d: '2026-04-01', workday: true,  isoWeek: '2026-W14', calcWeek: '2026-CW14' },
+]
+
+describe('monthBuckets', () => {
+  it('按 YYYY-MM 分桶,起始日升序,工作日计数', () => {
+    const b = monthBuckets(SPAN, '', '')
+    expect(b.map((x) => x.key)).toEqual(['2025-12', '2026-01', '2026-02', '2026-04'])
+    expect(b[0]).toMatchObject({ key: '2025-12', workdays: 1, start: '2025-12-31', end: '2025-12-31' })
+    expect(b[2].workdays).toBe(0) // 2/16 是假
+  })
+  it('区间过滤后只留命中月', () => {
+    expect(monthBuckets(SPAN, '2026-01-01', '2026-03-31').map((x) => x.key)).toEqual(['2026-01', '2026-02'])
+  })
+})
+
+describe('quarterBuckets', () => {
+  it('按 YYYY-Qn 分桶(1-3=Q1,4-6=Q2)', () => {
+    const b = quarterBuckets(SPAN, '', '')
+    expect(b.map((x) => x.key)).toEqual(['2025-Q4', '2026-Q1', '2026-Q2'])
+    expect(b[1]).toMatchObject({ key: '2026-Q1', start: '2026-01-02', end: '2026-02-16', workdays: 1 })
   })
 })

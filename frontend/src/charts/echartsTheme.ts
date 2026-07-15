@@ -1,10 +1,17 @@
 import { use, registerTheme } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components'
+import { BarChart, LineChart, PieChart, ScatterChart, HeatmapChart } from 'echarts/charts'
+import {
+  GridComponent, TooltipComponent, LegendComponent, TitleComponent,
+  VisualMapComponent, MarkLineComponent, MarkPointComponent, DataZoomComponent,
+} from 'echarts/components'
 
 // 按需注册 ECharts 模块（tree-shaking）
-use([CanvasRenderer, BarChart, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent])
+use([
+  CanvasRenderer, BarChart, LineChart, PieChart, ScatterChart, HeatmapChart,
+  GridComponent, TooltipComponent, LegendComponent, TitleComponent,
+  VisualMapComponent, MarkLineComponent, MarkPointComponent, DataZoomComponent,
+])
 
 // canvas 读不到 CSS 变量:以下取值必须与 theme.css 同名令牌逐项一致(第二落地文件,spec 1.7),
 // 由 echartsTheme.tokens.test.ts 双源契约强制 —— 改 theme.css 没改这里(或反之),测试即红。

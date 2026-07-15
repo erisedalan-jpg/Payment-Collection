@@ -6,7 +6,7 @@ import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
-import { top1000ByL4, bgSupport, top1000TotalsRow } from '@/lib/yitian/customer'
+import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from '@/lib/yitian/customer'
 import { NO_L4 } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
@@ -32,6 +32,37 @@ const topRowsRaw = computed(() => {
 const topRows = computed(() => topRowsRaw.value.map((r) => ({
   ...r, hoursText: hrs(r.hours), topHoursText: hrs(r.topHours), pctText: pct(r.pct),
 })))
+
+// TOP1000 vs 其余:各 L4 横向堆叠柱
+function top1000StackOption(rows: { l4: string; hours: number; topHours: number }[]) {
+  const rs = [...rows].sort((a, b) => a.hours - b.hours)
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { bottom: 0 },
+    grid: { left: 8, right: 24, top: 8, bottom: 40, containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: rs.map((r) => r.l4) },
+    series: [
+      { name: 'TOP1000', type: 'bar', stack: 'x', data: rs.map((r) => Number(r.topHours.toFixed(1))) },
+      { name: '其余客户', type: 'bar', stack: 'x', data: rs.map((r) => Number((r.hours - r.topHours).toFixed(1))) },
+    ],
+  }
+}
+
+// TOP 客户排行:横向柱
+function topCustOption(list: { name: string; hours: number }[]) {
+  const rs = [...list].sort((a, b) => a.hours - b.hours)
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => `${v}h` },
+    grid: { left: 8, right: 24, top: 8, bottom: 8, containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: rs.map((r) => r.name) },
+    series: [{ type: 'bar', data: rs.map((r) => Number(r.hours.toFixed(1))) }],
+  }
+}
+
+const top1000ChartOption = computed(() => top1000StackOption(topRowsRaw.value))
+const top1000Height = computed(() => `${Math.max(240, topRowsRaw.value.length * 36 + 80)}px`)
 
 const topCols: DataColumn[] = [
   { key: 'l4', label: 'L4 组织', width: 150 },
@@ -78,7 +109,35 @@ const bgOption = computed(() => ({
   }],
 }))
 
-defineExpose({ topRows, bg })
+// 本/跨 BG × L4 分组柱:与 bgSupport 同口径(仅项目类/售前类工时),按 L4 拆分;
+// 未分配 L4(部门负责人)与 TOP1000 表一致予以剔除。聚合逻辑下沉到 lib/yitian/customer.ts(bgSupportByL4)。
+const bgByL4Rows = computed(() =>
+  store.data ? bgSupportByL4(store.data, view.start, view.end, view.l4s) : [])
+
+function bgByL4Option(rows: { l4: string; thisBg: number; crossBg: number }[]) {
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => `${v}h` },
+    legend: { bottom: 0 },
+    grid: { left: 8, right: 24, top: 8, bottom: 40, containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: rows.map((r) => r.l4) },
+    series: [
+      { name: '本 BG', type: 'bar', data: rows.map((r) => Number(r.thisBg.toFixed(1))) },
+      { name: '跨 BG', type: 'bar', data: rows.map((r) => Number(r.crossBg.toFixed(1))) },
+    ],
+  }
+}
+
+const bgByL4ChartOption = computed(() => bgByL4Option(bgByL4Rows.value))
+const bgByL4Height = computed(() => `${Math.max(240, bgByL4Rows.value.length * 36 + 80)}px`)
+
+// TOP 客户排行
+const topCustList = computed(() =>
+  store.data ? topCustomers(store.data, view.start, view.end, view.l4s, 10) : [])
+const topCustChartOption = computed(() => topCustOption(topCustList.value))
+const topCustHeight = computed(() => `${Math.max(240, topCustList.value.length * 28 + 96)}px`)
+
+defineExpose({ topRows, bg, topCustList, bgByL4Rows })
 </script>
 
 <template>
@@ -92,6 +151,8 @@ defineExpose({ topRows, bg })
       <section class="yt-card">
         <h3 class="yt-h">TOP1000 大客户支持</h3>
         <p class="yt-note">仅统计项目类 / 售前类 / 售后类工时；客户数按客户去重。</p>
+        <div v-if="!topRowsRaw.length" class="yt-empty">无数据</div>
+        <ChartBox v-else :option="top1000ChartOption" :height="top1000Height" />
         <DataTable :columns="topCols" :rows="topRows" :show-count="false"
           :show-summary="true" :summary-method="topSummaryMethod" />
       </section>
@@ -100,7 +161,18 @@ defineExpose({ topRows, bg })
         <h3 class="yt-h">跨 BG 支持</h3>
         <p class="yt-note">仅统计项目类 / 售前类工时；本 BG 按销售 L2 组织判定。</p>
         <MetricGrid :items="bgMetrics" col-min="200px" />
-        <ChartBox :option="bgOption" height="280px" />
+        <div class="yt-grid">
+          <ChartBox :option="bgOption" height="280px" />
+          <div v-if="!bgByL4Rows.length" class="yt-empty">无数据</div>
+          <ChartBox v-else :option="bgByL4ChartOption" :height="bgByL4Height" />
+        </div>
+      </section>
+
+      <section class="yt-card">
+        <h3 class="yt-h">TOP 客户排行</h3>
+        <p class="yt-note">按客户汇总工时（不限工时类型，只看挂了客户的记录），取前 10。</p>
+        <div v-if="!topCustList.length" class="yt-empty">无数据</div>
+        <ChartBox v-else :option="topCustChartOption" :height="topCustHeight" />
       </section>
     </template>
   </div>
@@ -108,6 +180,7 @@ defineExpose({ topRows, bg })
 
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
+.yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--gap-card); }
 .yt-card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -117,4 +190,5 @@ defineExpose({ topRows, bg })
 }
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 .yt-note { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--gap-stack); }
+.yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 </style>

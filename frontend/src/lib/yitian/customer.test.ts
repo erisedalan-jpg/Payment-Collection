@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { top1000ByL4, bgSupport, top1000TotalsRow } from './customer'
+import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from './customer'
 import type { YitianData } from '@/types/yitian'
 
 const DATA = {
@@ -80,5 +80,38 @@ describe('bgSupport', () => {
     const empty = bgSupport(DATA, '2026-07-01', '2026-07-02')
     expect(empty.total).toBe(0)
     expect(empty.thisPct).toBe(0)
+  })
+})
+
+describe('bgSupportByL4', () => {
+  it('按 L4 分组本/跨 BG 工时(与 bgSupport 同口径,管理类不计)', () => {
+    const rows = bgSupportByL4(DATA, S, E)
+    const bank = rows.find((r) => r.l4 === '银行服务组')!
+    const zj = rows.find((r) => r.l4 === '浙江服务组')!
+    expect(bank.thisBg).toBe(6)   // 银行集团军(本BG)
+    expect(bank.crossBg).toBe(2)  // 政企大区(跨BG)
+    expect(bank.thisBg + bank.crossBg).toBe(8) // 管理类 8h 被排除,不是 16
+    expect(zj.thisBg).toBe(4)
+    expect(zj.crossBg).toBe(0)
+  })
+  it('按合计工时升序排列(与横向柱自下而上一致)', () => {
+    const rows = bgSupportByL4(DATA, S, E)
+    expect(rows.map((r) => r.l4)).toEqual(['浙江服务组', '银行服务组']) // 4 < 8
+  })
+})
+
+describe('topCustomers', () => {
+  it('按客户聚合工时降序取前 n(含管理类等所有带客户名的行)', () => {
+    // 夹具:大客户 = A1 项目类6h + A2 售前类4h = 10;小客户 = A1 项目类2h = 2
+    const t = topCustomers(DATA, S, E, [], 5)
+    expect(t).toEqual([{ name: '大客户', hours: 10 }, { name: '小客户', hours: 2 }])
+  })
+  it('n 截断', () => {
+    expect(topCustomers(DATA, S, E, [], 1)).toEqual([{ name: '大客户', hours: 10 }])
+  })
+  it('无客户名(cu=null)的行不计', () => {
+    // 夹具里 A1 管理类 8h 的 cu=null,不应出现在排行里
+    const names = topCustomers(DATA, S, E, [], 5).map((x) => x.name)
+    expect(names).not.toContain('')
   })
 })
