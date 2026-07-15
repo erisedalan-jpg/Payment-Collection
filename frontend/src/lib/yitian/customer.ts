@@ -111,3 +111,20 @@ export function bgSupport(
     crossPct: total > 0 ? crossBg / total : 0,
   }
 }
+
+/** TOP 客户排行:按 entries.cu → dims.customers 聚合工时,降序取前 n。无客户名的行(cu=null)不计。 */
+export function topCustomers(
+  data: YitianData, start: string, end: string, l4s: string[], n: number,
+): { name: string; hours: number }[] {
+  const acc = new Map<string, number>()
+  for (const e of selectEntries(data, start, end, l4s)) {
+    if (e.cu === null || e.cu === undefined) continue
+    const name = data.dims.customers[e.cu] ?? ''
+    if (!name) continue
+    acc.set(name, (acc.get(name) ?? 0) + e.h)
+  }
+  return [...acc.entries()]
+    .map(([name, hours]) => ({ name, hours }))
+    .sort((a, b) => b.hours - a.hours)
+    .slice(0, n)
+}
