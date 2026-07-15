@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
+import ColumnFilter from '@/components/ColumnFilter.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
+import { useCrossFilterStore } from '@/stores/crossFilter'
+import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
+import { parseDrillQuery } from '@/lib/yitian/drill'
 import { empStats, saturationTop, unfilledList, neverFilledList, type EmpStat } from '@/lib/yitian/metrics'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import { useSettingsStore } from '@/stores/settings'
@@ -14,7 +19,11 @@ const store = useYitianStore()
 const view = useYitianViewStore()
 const themeStore = useSettingsStore()
 
-onMounted(() => { store.load() })
+const TABLE_ID = 'yitian-analytics'
+const cf = useCrossFilterStore()
+const route = useRoute()
+const router = useRouter()
+const FILTERABLE = new Set(['id', 'name', 'l31', 'l4', 'hoursText', 'baseText', 'satText', 'diffText'])
 
 // 图表 option 里显式写死的颜色不随 ChartBox 主题色板联动,须自己按主题选浅/暗两套镜像常量(不新增颜色)。
 const pal = computed(() => (themeStore.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT))
@@ -54,6 +63,45 @@ const headcountSegments = computed(() => {
     { key: 'under', label: '欠填', count: s.filter((x) => x.filled && x.diff < 0).length, color: 'var(--warn)' },
     { key: 'never', label: '完全未填', count: s.filter((x) => !x.filled).length, color: 'var(--danger)' },
   ]
+})
+
+// 员工工时明细:表头列筛选(crossFilter) → 分页
+const filtered = computed(() => applyColumnFilters(empRows.value, cf.tableFilters(TABLE_ID)))
+const pageSize = ref(50)
+const currentPage = ref(1)
+const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+watch(filtered, () => { currentPage.value = 1 })
+
+function scrollTo(id: string) {
+  nextTick(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+}
+// 员工级图表(饱和度TOP柱/发散条/散点)单点下钻:按工号(id)精确筛到该员工,滚到明细表。
+function drillEmp(name: string) {
+  const emp = stats.value.find((s) => s.name === name)
+  if (!emp) return
+  cf.clearAll(TABLE_ID)
+  cf.setColumnFilter(TABLE_ID, 'id', [emp.id], cfUniqueValues(empRows.value, 'id').length)
+  scrollTo('yt-emp')
+}
+function onEmpChartClick(p: any) {
+  const name = p?.name ?? p?.value?.[2] // 柱图=name;散点=value[2]
+  if (name) drillEmp(String(name))
+}
+// HealthSegmentBar 人数结构段点击:滚到对应结构段(欠填/完全未填走各自子表,达标无对应子表→落员工明细)。
+function onSegClick(key: string) {
+  scrollTo(key === 'never' ? 'yt-neverfilled' : key === 'under' ? 'yt-unfilled' : 'yt-emp')
+}
+
+onMounted(() => {
+  store.load()
+  const d = parseDrillQuery(route.query)
+  if (d.l4) {
+    cf.clearAll(TABLE_ID)
+    cf.setColumnFilter(TABLE_ID, 'l4', [d.l4], cfUniqueValues(empRows.value, 'l4').length)
+  }
+  if (d.start && d.end) { view.start = d.start; view.end = d.end }
+  if (d.scroll) scrollTo(d.scroll === 'neverfilled' ? 'yt-neverfilled' : 'yt-diverging')
+  if (Object.keys(route.query).length) router.replace({ query: {} })
 })
 
 // 饱和度 TOP10:横向柱 + 基础工时均值参考线
@@ -138,7 +186,11 @@ const neverCols: DataColumn[] = [
   { key: 'l4', label: 'L4 组织', width: 130 },
 ]
 
-defineExpose({ empRows, topRows, unfilledRows, neverRows, headcountSegments })
+defineExpose({
+  empRows, topRows, unfilledRows, neverRows, headcountSegments,
+  filtered, paged, currentPage, pageSize,
+  drillEmp, onEmpChartClick, onSegClick, scrollTo,
+})
 </script>
 
 <template>
@@ -154,25 +206,25 @@ defineExpose({ empRows, topRows, unfilledRows, neverRows, headcountSegments })
           <h3 class="yt-h">人数结构</h3>
           <span class="yt-sub">共 {{ stats.length }} 人</span>
         </div>
-        <HealthSegmentBar :segments="headcountSegments" />
+        <HealthSegmentBar :segments="headcountSegments" @seg-click="onSegClick" />
       </section>
 
       <section class="yt-card">
         <h3 class="yt-h">饱和度 TOP10</h3>
         <div v-if="!topStats.length" class="yt-empty">无数据</div>
-        <ChartBox v-else :option="satTopChartOption" :height="satTopHeight" />
+        <ChartBox v-else :option="satTopChartOption" :height="satTopHeight" @datapoint-click="onEmpChartClick" />
       </section>
 
-      <section class="yt-card">
+      <section id="yt-diverging" class="yt-card">
         <h3 class="yt-h">加班 / 欠填<span class="yt-sub">（正 = 加班，负 = 欠填）</span></h3>
         <div v-if="!divergingFilledCount" class="yt-empty">无数据</div>
-        <ChartBox v-else :option="divergingChartOption" :height="divergingHeight" />
+        <ChartBox v-else :option="divergingChartOption" :height="divergingHeight" @datapoint-click="onEmpChartClick" />
       </section>
 
       <section class="yt-card">
         <h3 class="yt-h">饱和度分布</h3>
         <div v-if="!scatterPointCount" class="yt-empty">无数据</div>
-        <ChartBox v-else :option="scatterChartOption" height="420px" />
+        <ChartBox v-else :option="scatterChartOption" height="420px" @datapoint-click="onEmpChartClick" />
       </section>
 
       <div class="yt-grid">
@@ -181,22 +233,35 @@ defineExpose({ empRows, topRows, unfilledRows, neverRows, headcountSegments })
           <DataTable :columns="shortCols" :rows="topRows" :show-count="false" />
         </section>
 
-        <section class="yt-card">
+        <section id="yt-unfilled" class="yt-card">
           <h3 class="yt-h">未按时填写<span class="yt-sub">（有记录但工时不足）</span></h3>
           <div v-if="!unfilledRows.length" class="yt-empty">无</div>
           <DataTable v-else :columns="shortCols" :rows="unfilledRows" :show-count="false" />
         </section>
 
-        <section class="yt-card">
+        <section id="yt-neverfilled" class="yt-card">
           <h3 class="yt-h">完全未填<span class="yt-sub">（本区间一条记录都没有）</span></h3>
           <div v-if="!neverRows.length" class="yt-empty">无</div>
           <DataTable v-else :columns="neverCols" :rows="neverRows" :show-count="false" />
         </section>
       </div>
 
-      <section class="yt-card">
-        <h3 class="yt-h">员工工时明细</h3>
-        <DataTable :columns="empCols" :rows="empRows" sticky-header />
+      <section id="yt-emp" class="yt-card">
+        <div class="yt-head">
+          <h3 class="yt-h">员工工时明细</h3>
+          <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
+        </div>
+        <DataTable :columns="empCols" :rows="paged" :show-count="false" sticky-header :max-height-px="560">
+          <template v-for="col in empCols" :key="col.key" #[`header-${col.key}`]="{ col: c }">
+            <span class="yt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="empRows" /></span>
+          </template>
+        </DataTable>
+        <div class="yt-pager">
+          <span class="yt-total u-num">共 {{ filtered.length }} 条</span>
+          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+            :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
+            layout="sizes, prev, pager, next" size="small" background />
+        </div>
       </section>
     </template>
   </div>
@@ -217,4 +282,7 @@ defineExpose({ empRows, topRows, unfilledRows, neverRows, headcountSegments })
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 .yt-sub { font-size: var(--fs-1); font-weight: 400; color: var(--mut); margin-left: var(--sp-2); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
+.yt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.yt-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.yt-total { font-size: var(--fs-1); color: var(--sub); }
 </style>
