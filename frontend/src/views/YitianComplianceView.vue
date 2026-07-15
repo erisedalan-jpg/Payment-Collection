@@ -50,7 +50,10 @@ function applyDrillLanding() {
   drillApplied = true
   const d = parseDrillQuery(q)
   if (d.start && d.end) { view.start = d.start; view.end = d.end }
-  router.replace({ query: {} })
+  // 只删下钻键,保留落地时 query 上其它非下钻参数——不整体清空。
+  const rest: Record<string, any> = { ...route.query }
+  delete rest.dL4; delete rest.dStart; delete rest.dEnd; delete rest.dScroll
+  router.replace({ query: rest })
 }
 watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, flush: 'post' })
 

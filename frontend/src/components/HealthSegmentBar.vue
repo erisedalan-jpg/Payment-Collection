@@ -6,7 +6,10 @@ const props = withDefaults(defineProps<{
   segments: Seg[]
   height?: number
   minSegmentPct?: number
-}>(), { height: 14, minSegmentPct: 4 })
+  /** 为真时无 to 的图例也带悬停/可点手感类(调用方确认自己会接 seg-click 才传)。
+   *  默认 false——之前恒真(|| true)会让没接 seg-click 的页面也显得"能点"却点了没反应。 */
+  clickable?: boolean
+}>(), { height: 14, minSegmentPct: 4, clickable: false })
 
 const emit = defineEmits<{ 'seg-click': [string] }>()
 
@@ -31,7 +34,7 @@ const widths = computed<Record<string, number>>(() => {
     </div>
     <div class="hsb-legend">
       <component :is="s.to ? 'RouterLink' : 'span'" v-for="s in shown" :key="s.key"
-        class="hsb-leg" :class="{ 'hsb-leg--link': s.to || true }" :to="s.to"
+        class="hsb-leg" :class="{ 'hsb-leg--link': s.to || clickable }" :to="s.to"
         @click="!s.to && emit('seg-click', s.key)">
         <span class="hsb-dot" :style="{ background: s.color }"></span>
         <span class="hsb-leg-label">{{ s.label }}</span>

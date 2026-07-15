@@ -147,4 +147,13 @@ describe('YitianComplianceView', () => {
     expect(router.currentRoute.value.query).toEqual({})
     w.unmount()
   })
+
+  it('落地清 query 只删下钻键,保留其它非下钻参数(M-2)', async () => {
+    await router.push('/yitian/compliance?dStart=2026-06-01&dEnd=2026-06-02&keep=1')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({ keep: '1' })
+    w.unmount()
+  })
 })

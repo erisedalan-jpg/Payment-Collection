@@ -53,7 +53,9 @@ function onSortChange(e: { prop: string | null; order: string | null }) {
 const tableRef = ref<any>(null)
 const { maxHeight, recompute } = useTableMaxHeight(
   () => tableRef.value?.$el as HTMLElement | undefined,
-  { enabled: () => props.stickyHeader },
+  // 传了固定 maxHeightPx 就不跑动态测量、不挂 resize 监听(useTableMaxHeight 内 addListener/
+  // recompute 都先查 enabled())——固定值场景下动态测量纯属浪费。
+  { enabled: () => props.stickyHeader && props.maxHeightPx == null },
 )
 const tableMaxHeight = computed(() => {
   if (!props.stickyHeader) return undefined

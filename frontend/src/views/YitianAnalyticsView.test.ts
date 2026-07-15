@@ -137,12 +137,14 @@ describe('YitianAnalyticsView', () => {
     expect((w.vm as any).filtered.length).toBe(30)
   })
 
-  it('员工级图表单点(柱图 name)下钻:按工号精确筛到该员工 + 滚到明细表', async () => {
+  it('员工级图表单点(柱图 data.id)下钻:按工号精确筛到该员工 + 滚到明细表', async () => {
+    // 真实 ECharts 柱图 param 形状:data 是 {value,id,...} 对象,value 已被抽取为标量;
+    // 若还按旧 p.name 查找会漏(柱图 param 无 name)、按姓名反查也会撞同名歧义(I-2)。
     const spy = vi.fn()
     ;(Element.prototype as any).scrollIntoView = spy
     const w = mount(YitianAnalyticsView, { global: { plugins: [ElementPlus, router] }, attachTo: document.body })
     await flushPromises()
-    ;(w.vm as any).onEmpChartClick({ name: '张三' })
+    ;(w.vm as any).onEmpChartClick({ data: { value: 40, id: 'A1' } })
     await w.vm.$nextTick()
     await flushPromises()
     const cf = useCrossFilterStore()
@@ -152,19 +154,22 @@ describe('YitianAnalyticsView', () => {
     w.unmount()
   })
 
-  it('员工级图表单点(散点 value[2])下钻同柱图', async () => {
+  it('员工级图表单点(散点 value[3]=id)下钻:name 键为空串也不影响(I-1)', async () => {
+    // 真实 ECharts 散点 param.name 恒为空串(散点没有类目名维度);若 handler 仍靠
+    // p.name ?? p.value[2] 回退,拿到的是 ''(真值判断为假但仍会走进旧逻辑试图用它查名字),
+    // 现在直接读 value[3] 的工号,连 name 键给不给都不影响结果。
     const w = mountView()
     await flushPromises()
-    ;(w.vm as any).onEmpChartClick({ value: [8, 50, '李四'] })
+    ;(w.vm as any).onEmpChartClick({ value: [8, 50, '', 'A2'] })
     await w.vm.$nextTick()
     const cf = useCrossFilterStore()
     expect(cf.tableFilters('yitian-analytics').id?.value).toEqual(['A2'])
   })
 
-  it('未命中员工名的下钻点击不改变筛选态', async () => {
+  it('无 id 的下钻点击不改变筛选态', async () => {
     const w = mountView()
     await flushPromises()
-    ;(w.vm as any).onEmpChartClick({ name: '不存在的人' })
+    ;(w.vm as any).onEmpChartClick({ name: '张三' }) // 没有 data.id / value[3] → 取不到 id
     await w.vm.$nextTick()
     const cf = useCrossFilterStore()
     expect(cf.hasFilters('yitian-analytics')).toBe(false)
@@ -216,6 +221,15 @@ describe('YitianAnalyticsView', () => {
     expect(view.start).toBe('2026-06-01')
     expect(view.end).toBe('2026-06-02')
     expect(router.currentRoute.value.query).toEqual({})
+  })
+
+  it('落地清 query 只删下钻键(dL4/dStart/dEnd/dScroll),保留其它非下钻参数(M-2)', async () => {
+    await router.push('/yitian/analytics?dL4=浙江服务组&keep=1')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({ keep: '1' })
+    w.unmount()
   })
 
   it('落地读 query: dScroll=neverfilled 滚到完全未填锚点', async () => {

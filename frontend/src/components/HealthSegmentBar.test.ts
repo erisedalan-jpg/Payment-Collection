@@ -50,9 +50,17 @@ describe('HealthSegmentBar', () => {
     expect(w.emitted('seg-click')).toEqual([['ok']])
   })
 
-  it('无 to 的图例也带 hsb-leg--link 悬停手感类', () => {
+  it('无 to 的图例默认不带 hsb-leg--link(clickable 未传,不再恒真)', () => {
     const w = mount(HealthSegmentBar, {
       props: { segments: [{ key: 'ok', label: '达标', count: 5, color: 'var(--ok)' }] },
+      ...opts,
+    })
+    expect(w.find('.hsb-leg').classes()).not.toContain('hsb-leg--link')
+  })
+
+  it('传 clickable 时无 to 的图例带 hsb-leg--link 悬停手感类', () => {
+    const w = mount(HealthSegmentBar, {
+      props: { segments: [{ key: 'ok', label: '达标', count: 5, color: 'var(--ok)' }], clickable: true },
       ...opts,
     })
     expect(w.find('.hsb-leg').classes()).toContain('hsb-leg--link')
