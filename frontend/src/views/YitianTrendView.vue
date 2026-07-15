@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
-import { weekBuckets, monthBuckets, quarterBuckets } from '@/lib/yitian/calendar'
+import { weekBuckets, monthBuckets, quarterBuckets, type WeekBucket } from '@/lib/yitian/calendar'
 import { selectEntries, empStats, complianceRate, isIncluded, unfilledList, neverFilledList } from '@/lib/yitian/metrics'
+import { buildDrillQuery } from '@/lib/yitian/drill'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
+const router = useRouter()
 
 onMounted(() => { store.load(); settings.load() })
 
@@ -25,6 +28,15 @@ const GRAN_OPTS = [
   { value: 'quarter', label: '季' },
 ]
 
+/** 当前粒度(周/月/季)的分桶列表——趋势图 X 轴与「桶 key → 起止日期」下钻查找的唯一同源。 */
+const bucketsList = computed<WeekBucket[]>(() => {
+  const data = store.data
+  if (!data) return []
+  return gran.value === 'month' ? monthBuckets(data.days, view.start, view.end)
+    : gran.value === 'quarter' ? quarterBuckets(data.days, view.start, view.end)
+    : weekBuckets(data.days, view.start, view.end, view.weekMode)
+})
+
 /** 按 gran(周/月/季)分桶,逐桶重算各指标。桶内区间 = [bucket.start, bucket.end],口径与总览页完全同源。 */
 const series = computed(() => {
   const data = store.data
@@ -35,10 +47,7 @@ const series = computed(() => {
   }
   if (!data) return empty
 
-  const buckets =
-    gran.value === 'month' ? monthBuckets(data.days, view.start, view.end)
-    : gran.value === 'quarter' ? quarterBuckets(data.days, view.start, view.end)
-    : weekBuckets(data.days, view.start, view.end, view.weekMode)
+  const buckets = bucketsList.value
   const types = data.dims.types
   const typeAcc: Record<string, number[]> = {}
   for (const t of types) typeAcc[t] = []
@@ -126,13 +135,30 @@ const typePercentOption = computed(() => {
 })
 
 const charts = computed(() => [
-  { title: '合规问题数趋势', option: lineOption('问题数', series.value.issues, ' 条') },
-  { title: '总工时 / 合规率趋势', option: hoursOkRateOption.value },
-  { title: '加班工时趋势', option: lineOption('加班工时', series.value.overtime, ' h') },
-  { title: '平均饱和度趋势', option: lineOption('饱和度', series.value.sat, '%') },
-  { title: '未填人数趋势', option: lineOption('未填人数', series.value.unfilled, ' 人') },
-  { title: '工时类型占比趋势（百分比）', option: typePercentOption.value },
+  { title: '合规问题数趋势', option: lineOption('问题数', series.value.issues, ' 条'), drill: true },
+  { title: '总工时 / 合规率趋势', option: hoursOkRateOption.value, drill: true },
+  { title: '加班工时趋势', option: lineOption('加班工时', series.value.overtime, ' h'), drill: true },
+  { title: '平均饱和度趋势', option: lineOption('饱和度', series.value.sat, '%'), drill: true },
+  { title: '未填人数趋势', option: lineOption('未填人数', series.value.unfilled, ' 人'), drill: true },
+  // 百分比堆叠柱:系列名为工时类型(项目类/售前类…),非指标名,无对应明细页可下钻——不挂点击。
+  { title: '工时类型占比趋势（百分比）', option: typePercentOption.value, drill: false },
 ])
+
+/** 桶 key(X 轴 category,即折线/双轴点击回调的 params.name)→ 起止日期,与 series 计算同源(bucketsList)。 */
+function bucketRangeByKey(key: string): { start: string; end: string } | null {
+  const b = bucketsList.value.find((x) => x.key === key)
+  return b ? { start: b.start, end: b.end } : null
+}
+
+/** 时间点跨页下钻:问题数/合规率→治理页(compliance);工时/饱和度/未填/总工时→工时明细页(analytics)。
+ *  非时间点(如图例)点击 params.name 对不上任何桶 key,直接忽略。 */
+function onTrendClick(p: any) {
+  const r = bucketRangeByKey(String(p?.name ?? ''))
+  if (!r) return
+  const toCompliance = p?.seriesName === '问题数' || p?.seriesName === '合规率'
+  const q = buildDrillQuery({ start: r.start, end: r.end })
+  router.push({ path: toCompliance ? '/yitian/compliance' : '/yitian/analytics', query: q })
+}
 
 defineExpose({ series })
 </script>
@@ -148,7 +174,7 @@ defineExpose({ series })
     <div v-if="ready" class="yt-grid">
       <section v-for="c in charts" :key="c.title" class="yt-card">
         <h3 class="yt-h">{{ c.title }}</h3>
-        <ChartBox :option="c.option" height="280px" />
+        <ChartBox :option="c.option" height="280px" v-on="c.drill ? { 'datapoint-click': onTrendClick } : {}" />
       </section>
     </div>
   </div>
