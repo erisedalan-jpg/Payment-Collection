@@ -69,26 +69,31 @@ describe('YitianOverviewView', () => {
     expect(w.find('.yt-page').exists()).toBe(true)
   })
 
-  it('工时类型占比同时给出环图与柱状图', async () => {
+  it('工时类型占比只出环图(V3.2.0 删除与之同数据的重复柱图)', async () => {
     const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const vm = w.vm as any
     expect(vm.typeOption.series[0].type).toBe('pie')
-    expect(vm.typeBarOption.series[0].type).toBe('bar')
-    // 柱状图的类目与数据必须与占比同源(同一批 typeRows)
-    expect(vm.typeBarOption.xAxis.data).toEqual(vm.typeRows.map((t: any) => t.type))
+    expect(vm.typeBarOption).toBeUndefined()
   })
 
-  it('柱状图逐类目上色,与环图同一套调色板同一顺序', async () => {
+  it('合规率环形:接住 kpi().complianceRate,问题条数同源', async () => {
     const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const vm = w.vm as any
-    // colorBy: 'data' → 每根柱子按数据项取调色板下一色;与饼图逐扇区取色的顺序一致,
-    // 于是"项目类"在两张图里是同一个颜色。不写死色值,颜色仍由 ECharts 主题(--chart-1..8)给。
-    expect(vm.typeBarOption.series[0].colorBy).toBe('data')
-    // 柱子数据带 name,才能与饼图按同一顺序对上调色板
-    expect(vm.typeBarOption.series[0].data.map((d: any) => d.name))
-      .toEqual(vm.typeOption.series[0].data.map((d: any) => d.name))
+    expect(vm.complianceRatio).not.toBeNull()
+    expect(w.text()).toContain('合规率')
+    expect(w.text()).toContain(`问题 ${vm.complianceIssueCount} 条`)
+  })
+
+  it('L4 组织工时分组柱:实际/基础两个系列,与分层汇总表同源(orgRows)', async () => {
+    const w = mount(YitianOverviewView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(w.text()).toContain('L4 组织工时')
+    const opt = vm.orgBarChartOption
+    expect(opt.series.map((s: any) => s.name)).toEqual(['实际工时', '基础工时'])
+    expect(opt.yAxis.data).toEqual(vm.orgRows.map((r: any) => r.name))
   })
 })
 
