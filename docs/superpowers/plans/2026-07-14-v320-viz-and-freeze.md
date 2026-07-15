@@ -720,7 +720,7 @@ function heatmapOption(h: IssueHeatmap) {
 }
 ```
 （色阶 `[card, warn, danger]` 三档全取已导出常量，不新增颜色；`STRUCT_LIGHT` 从 echartsTheme import。）
-5. 「问题明细」大 `<DataTable>` 保留 —— **Task 3 已给它加过 `sticky-header`**，本任务不重复加，只确保重排后它仍在。
+5. 「问题明细」大 `<DataTable>` 保留，**本任务给它加 `sticky-header`**（首行冻结，覆盖 spec §2.4 表 #13；Task 3 未含 yitian 两表，由本重设计任务一并接入）。
 
 - [ ] **Step 6: typecheck + build**
 
@@ -750,7 +750,7 @@ git commit -m "redesign(yitian): 合规页 健康带+问题分布柱+按L4分布
 2. 「饱和度 TOP10」横向柱 + 基础工时 `markLine` 参考线（`saturationTop(stats,10)`）。
 3. **加班/欠填发散条形**（正=加班=`STATUS.danger`、负=欠填=`STATUS.warn`）。
 4. **饱和度分布散点**（x=实际工时、y=饱和度）。
-5. 原 4 张 `<DataTable>` 保留（员工工时明细表 Task 3 已加 `sticky-header`）。
+5. 原 4 张 `<DataTable>` 保留；**本任务给「员工工时明细」DataTable 加 `sticky-header`**（首行冻结，覆盖 spec §2.4 表 #14；Task 3 未含 yitian 两表，由本重设计任务一并接入）。其余 3 张小表不加。
 
 - [ ] **Step 1: 三个 option builder**
 
