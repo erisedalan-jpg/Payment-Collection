@@ -33,6 +33,8 @@ const props = withDefaults(
     defaultSort?: { prop: string; order: 'ascending' | 'descending' } | null
     /** 首行冻结:为真时给 el-table 设动态 max-height,启用 EP 原生固定表头 + 表体内滚。默认关=零回归。 */
     stickyHeader?: boolean
+    /** 首行冻结时的固定 max-height(px);设了就用它、跳过动态测量。仅在 stickyHeader 为真时生效。 */
+    maxHeightPx?: number
   }>(),
   { showCount: true, clickable: false, externalSort: false, showSummary: false, stickyHeader: false },
 )
@@ -53,7 +55,10 @@ const { maxHeight, recompute } = useTableMaxHeight(
   () => tableRef.value?.$el as HTMLElement | undefined,
   { enabled: () => props.stickyHeader },
 )
-const tableMaxHeight = computed(() => (props.stickyHeader ? maxHeight.value : undefined))
+const tableMaxHeight = computed(() => {
+  if (!props.stickyHeader) return undefined
+  return props.maxHeightPx ?? maxHeight.value
+})
 // 数据变化(分页/筛选/排序切片)后表格高度可能变,重算一次
 watch(() => props.rows, () => { if (props.stickyHeader) nextTick(recompute) }, { flush: 'post' })
 </script>
