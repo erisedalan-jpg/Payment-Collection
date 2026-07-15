@@ -43,10 +43,10 @@ describe('YitianTrendView', () => {
     getSpy.mockResolvedValue(DATA)
   })
 
-  it('渲染 7 张图', async () => {
+  it('渲染 6 张图(总工时+合规率合成双轴,减一张卡)', async () => {
     const w = mount(YitianTrendView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
-    expect(w.findAll('.chart-stub')).toHaveLength(7)
+    expect(w.findAll('.chart-stub')).toHaveLength(6)
   })
 
   it('calc 口径下按计算周分桶(6/5 单独一桶)', async () => {

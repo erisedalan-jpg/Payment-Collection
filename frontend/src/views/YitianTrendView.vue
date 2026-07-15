@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
+import SegToggle from '@/components/SegToggle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
-import { weekBuckets } from '@/lib/yitian/calendar'
+import { weekBuckets, monthBuckets, quarterBuckets } from '@/lib/yitian/calendar'
 import { selectEntries, empStats, complianceRate, isIncluded, unfilledList, neverFilledList } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
@@ -16,7 +17,15 @@ onMounted(() => { store.load(); settings.load() })
 
 const ready = computed(() => !!store.data)
 
-/** 按周口径分桶,逐桶重算各指标。桶内区间 = [bucket.start, bucket.end],口径与总览页完全同源。 */
+/** 趋势粒度:局部 ref,不入 store——只影响本页分桶,不影响其他页的周口径(calc/iso 仍走 view.weekMode)。 */
+const gran = ref<'week' | 'month' | 'quarter'>('week')
+const GRAN_OPTS = [
+  { value: 'week', label: '周' },
+  { value: 'month', label: '月' },
+  { value: 'quarter', label: '季' },
+]
+
+/** 按 gran(周/月/季)分桶,逐桶重算各指标。桶内区间 = [bucket.start, bucket.end],口径与总览页完全同源。 */
 const series = computed(() => {
   const data = store.data
   const empty = {
@@ -26,7 +35,10 @@ const series = computed(() => {
   }
   if (!data) return empty
 
-  const buckets = weekBuckets(data.days, view.start, view.end, view.weekMode)
+  const buckets =
+    gran.value === 'month' ? monthBuckets(data.days, view.start, view.end)
+    : gran.value === 'quarter' ? quarterBuckets(data.days, view.start, view.end)
+    : weekBuckets(data.days, view.start, view.end, view.weekMode)
   const types = data.dims.types
   const typeAcc: Record<string, number[]> = {}
   for (const t of types) typeAcc[t] = []
@@ -64,36 +76,62 @@ const series = computed(() => {
   return out
 })
 
+/** 单指标折线:加均值线/峰谷标记/缩放条。markLine/markPoint 不显式设色,继承系列色以保证暗色正确。 */
 function lineOption(name: string, data: (number | null)[], unit = '') {
   return {
     tooltip: { trigger: 'axis', valueFormatter: (v: number) => `${v}${unit}` },
-    grid: { left: 48, right: 16, top: 24, bottom: 32 },
+    grid: { left: 48, right: 16, top: 24, bottom: 56 },
     xAxis: { type: 'category', data: series.value.weeks },
     yAxis: { type: 'value' },
-    series: [{ name, type: 'line', smooth: true, data }],
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 20 }],
+    series: [{
+      name, type: 'line', smooth: true, data,
+      markPoint: { data: [{ type: 'max', name: '峰' }, { type: 'min', name: '谷' }], symbolSize: 36 },
+      markLine: { symbol: 'none', data: [{ type: 'average', name: '均值' }] },
+    }],
   }
 }
 
+/** 总工时 + 合规率合成双轴(减一张卡)。合规率轴锁 0~100%,两指标量纲不同不能共轴。 */
+const hoursOkRateOption = computed(() => ({
+  tooltip: { trigger: 'axis' },
+  legend: { bottom: 0 },
+  grid: { left: 48, right: 48, top: 24, bottom: 56 },
+  xAxis: { type: 'category', data: series.value.weeks },
+  yAxis: [{ type: 'value', name: 'h' }, { type: 'value', name: '%', max: 100 }],
+  dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 20 }],
+  series: [
+    { name: '总工时', type: 'line', smooth: true, yAxisIndex: 0, data: series.value.hours },
+    // connectNulls:false——假期桶合规率为 null 必须断线,不能连成一条假趋势线(与 KPI 卡 '-' 口径一致)
+    { name: '合规率', type: 'line', smooth: true, yAxisIndex: 1, connectNulls: false, data: series.value.okRate },
+  ],
+}))
+
+/** 工时类型占比:逐桶归一到 100%,看结构变化而非绝对量。 */
+const typePercentOption = computed(() => {
+  const stacks = series.value.typeStack
+  const weeks = series.value.weeks
+  const totals = weeks.map((_, bi) => stacks.reduce((s, st) => s + (st.data[bi] ?? 0), 0))
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0 },
+    grid: { left: 48, right: 16, top: 24, bottom: 56 },
+    xAxis: { type: 'category', data: weeks },
+    yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+    series: stacks.map((st) => ({
+      name: st.name, type: 'bar', stack: 'total',
+      data: st.data.map((v, bi) => (totals[bi] > 0 ? Number(((v / totals[bi]) * 100).toFixed(1)) : 0)),
+    })),
+  }
+})
+
 const charts = computed(() => [
   { title: '合规问题数趋势', option: lineOption('问题数', series.value.issues, ' 条') },
-  { title: '合规率趋势', option: lineOption('合规率', series.value.okRate, '%') },
-  { title: '总工时趋势', option: lineOption('总工时', series.value.hours, ' h') },
+  { title: '总工时 / 合规率趋势', option: hoursOkRateOption.value },
   { title: '加班工时趋势', option: lineOption('加班工时', series.value.overtime, ' h') },
   { title: '平均饱和度趋势', option: lineOption('饱和度', series.value.sat, '%') },
   { title: '未填人数趋势', option: lineOption('未填人数', series.value.unfilled, ' 人') },
-  {
-    title: '工时类型占比趋势',
-    option: {
-      tooltip: { trigger: 'axis' },
-      legend: { bottom: 0 },
-      grid: { left: 48, right: 16, top: 24, bottom: 48 },
-      xAxis: { type: 'category', data: series.value.weeks },
-      yAxis: { type: 'value' },
-      series: series.value.typeStack.map((s) => ({
-        name: s.name, type: 'bar', stack: 'total', data: s.data,
-      })),
-    },
-  },
+  { title: '工时类型占比趋势（百分比）', option: typePercentOption.value },
 ])
 
 defineExpose({ series })
@@ -102,6 +140,7 @@ defineExpose({ series })
 <template>
   <div class="yt-page">
     <YitianToolbar v-if="ready" />
+    <SegToggle v-if="ready" v-model="gran" :options="GRAN_OPTS" />
 
     <el-alert v-if="store.error" :title="store.error" type="error" show-icon :closable="false" />
     <el-skeleton v-else-if="store.loading && !ready" :rows="6" animated />
