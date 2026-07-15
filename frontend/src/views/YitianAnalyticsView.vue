@@ -7,12 +7,17 @@ import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { empStats, saturationTop, unfilledList, neverFilledList, type EmpStat } from '@/lib/yitian/metrics'
-import { STATUS_LIGHT } from '@/charts/echartsTheme'
+import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
+import { useSettingsStore } from '@/stores/settings'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
+const themeStore = useSettingsStore()
 
 onMounted(() => { store.load() })
+
+// 图表 option 里显式写死的颜色不随 ChartBox 主题色板联动,须自己按主题选浅/暗两套镜像常量(不新增颜色)。
+const pal = computed(() => (themeStore.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT))
 
 const ready = computed(() => !!store.data)
 
@@ -67,9 +72,10 @@ function satTopOption(top: EmpStat[]) {
   }
 }
 
-// 加班/欠填发散条形:正=加班(danger),负=欠填(warn)
+// 加班/欠填发散条形:正=加班(danger),负=欠填(warn);颜色按当前主题挑浅/暗镜像常量
 function divergingOption(stats: EmpStat[]) {
   const rows = stats.filter((s) => s.filled).sort((a, b) => a.diff - b.diff)
+  const status = pal.value
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => `${v}h` },
     grid: { left: 8, right: 24, top: 8, bottom: 24, containLabel: true },
@@ -79,20 +85,20 @@ function divergingOption(stats: EmpStat[]) {
       type: 'bar',
       data: rows.map((r) => ({
         value: Number(r.diff.toFixed(1)),
-        itemStyle: { color: r.diff >= 0 ? STATUS_LIGHT.danger : STATUS_LIGHT.warn },
+        itemStyle: { color: r.diff >= 0 ? status.danger : status.warn },
       })),
     }],
   }
 }
 
-// 饱和度分布散点:x=实际工时,y=饱和度(百分比)
+// 饱和度分布散点:x=实际工时,y=饱和度(百分比)。grid 留够边距+containLabel,轴名居中避免被裁。
 function scatterOption(stats: EmpStat[]) {
   const pts = stats.filter((s) => s.filled && s.sat !== null).map((s) => [Number(s.hours.toFixed(1)), Number(((s.sat as number) * 100).toFixed(1)), s.name])
   return {
     tooltip: { formatter: (p: any) => `${p.value[2]}<br/>工时 ${p.value[0]}h · 饱和度 ${p.value[1]}%` },
-    grid: { left: 48, right: 24, top: 16, bottom: 40 },
-    xAxis: { type: 'value', name: '实际工时(h)' },
-    yAxis: { type: 'value', name: '饱和度(%)' },
+    grid: { left: 56, right: 40, top: 30, bottom: 48, containLabel: true },
+    xAxis: { type: 'value', name: '实际工时(h)', nameLocation: 'middle', nameGap: 28 },
+    yAxis: { type: 'value', name: '饱和度(%)', nameLocation: 'middle', nameGap: 42 },
     series: [{ type: 'scatter', symbolSize: 10, data: pts }],
   }
 }
