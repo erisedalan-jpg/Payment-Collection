@@ -76,16 +76,16 @@ function scrollTo(id: string) {
   nextTick(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
 }
 // 员工级图表(饱和度TOP柱/发散条/散点)单点下钻:按工号(id)精确筛到该员工,滚到明细表。
-function drillEmp(name: string) {
-  const emp = stats.value.find((s) => s.name === name)
-  if (!emp) return
+// 三张图的每个数据项都自带 id(柱=对象 {value,id};散点=元组第4位),handler 直接读 id——
+// 不再靠 name 反查(同名员工会查到错的人),也绕开散点 params.name 恒为空串的 ECharts 行为。
+function drillEmpById(id: string) {
   cf.clearAll(TABLE_ID)
-  cf.setColumnFilter(TABLE_ID, 'id', [emp.id], cfUniqueValues(empRows.value, 'id').length)
+  cf.setColumnFilter(TABLE_ID, 'id', [id], cfUniqueValues(empRows.value, 'id').length)
   scrollTo('yt-emp')
 }
 function onEmpChartClick(p: any) {
-  const name = p?.name ?? p?.value?.[2] // 柱图=name;散点=value[2]
-  if (name) drillEmp(String(name))
+  const id = p?.data?.id ?? p?.value?.[3] // 柱:data.id;散点:value[3]
+  if (id) drillEmpById(String(id))
 }
 // HealthSegmentBar 人数结构段点击:滚到对应结构段(欠填/完全未填走各自子表,达标无对应子表→落员工明细)。
 function onSegClick(key: string) {
@@ -113,7 +113,10 @@ function applyDrillLanding() {
   }
   if (d.start && d.end) { view.start = d.start; view.end = d.end }
   if (d.scroll) scrollTo(d.scroll === 'neverfilled' ? 'yt-neverfilled' : 'yt-diverging')
-  router.replace({ query: {} })
+  // 只删下钻键,保留落地时 query 上其它非下钻参数(如未来加的分享态)——不整体清空。
+  const rest: Record<string, any> = { ...route.query }
+  delete rest.dL4; delete rest.dStart; delete rest.dEnd; delete rest.dScroll
+  router.replace({ query: rest })
 }
 watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, flush: 'post' })
 
@@ -127,7 +130,7 @@ function satTopOption(top: EmpStat[]) {
     xAxis: { type: 'value' },
     yAxis: { type: 'category', data: rows.map((r) => r.name) },
     series: [{
-      type: 'bar', data: rows.map((r) => Number(r.hours.toFixed(1))),
+      type: 'bar', data: rows.map((r) => ({ value: Number(r.hours.toFixed(1)), id: r.id })),
       markLine: { symbol: 'none', data: [{ xAxis: Number(base.toFixed(1)), name: '基础工时' }], label: { formatter: '基础 {c}h' } },
     }],
   }
@@ -147,6 +150,7 @@ function divergingOption(stats: EmpStat[]) {
       data: rows.map((r) => ({
         value: Number(r.diff.toFixed(1)),
         itemStyle: { color: r.diff >= 0 ? status.danger : status.warn },
+        id: r.id,
       })),
     }],
   }
@@ -154,7 +158,7 @@ function divergingOption(stats: EmpStat[]) {
 
 // 饱和度分布散点:x=实际工时,y=饱和度(百分比)。grid 留够边距+containLabel,轴名居中避免被裁。
 function scatterOption(stats: EmpStat[]) {
-  const pts = stats.filter((s) => s.filled && s.sat !== null).map((s) => [Number(s.hours.toFixed(1)), Number(((s.sat as number) * 100).toFixed(1)), s.name])
+  const pts = stats.filter((s) => s.filled && s.sat !== null).map((s) => [Number(s.hours.toFixed(1)), Number(((s.sat as number) * 100).toFixed(1)), s.name, s.id])
   return {
     tooltip: { formatter: (p: any) => `${p.value[2]}<br/>工时 ${p.value[0]}h · 饱和度 ${p.value[1]}%` },
     grid: { left: 56, right: 40, top: 30, bottom: 48, containLabel: true },
@@ -202,7 +206,7 @@ const neverCols: DataColumn[] = [
 defineExpose({
   empRows, topRows, unfilledRows, neverRows, headcountSegments,
   filtered, paged, currentPage, pageSize,
-  drillEmp, onEmpChartClick, onSegClick, scrollTo,
+  drillEmpById, onEmpChartClick, onSegClick, scrollTo,
 })
 </script>
 
@@ -219,7 +223,7 @@ defineExpose({
           <h3 class="yt-h">人数结构</h3>
           <span class="yt-sub">共 {{ stats.length }} 人</span>
         </div>
-        <HealthSegmentBar :segments="headcountSegments" @seg-click="onSegClick" />
+        <HealthSegmentBar :segments="headcountSegments" clickable @seg-click="onSegClick" />
       </section>
 
       <section class="yt-card">
