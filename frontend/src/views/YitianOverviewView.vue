@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -9,10 +10,32 @@ import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { kpi, typeHours, orgSummary, selectEntries, orgL4SummaryRow, NO_L4 } from '@/lib/yitian/metrics'
+import { buildDrillQuery } from '@/lib/yitian/drill'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
+const router = useRouter()
+
+// 跨页下钻:总览→统计分析(带 L4/滚动锚点)、总览→合规检查(点合规率环)。
+function goAnalytics(q: Record<string, string> = {}) {
+  router.push({ path: '/yitian/analytics', query: q })
+}
+function onOrgBarClick(p: any) {
+  if (p?.name) goAnalytics(buildDrillQuery({ l4: p.name }))
+}
+function onOrgRow(row: any) {
+  if (row?.name) goAnalytics(buildDrillQuery({ l4: row.name }))
+}
+function onKpiClick(i: number) {
+  const kk = metrics.value[i]?.k ?? ''
+  if (kk.includes('未填')) goAnalytics(buildDrillQuery({ scroll: 'neverfilled' }))
+  else if (kk.includes('加班')) goAnalytics(buildDrillQuery({ scroll: 'diverging' }))
+  else goAnalytics()
+}
+function goCompliance() {
+  router.push('/yitian/compliance')
+}
 
 onMounted(() => { store.load(); settings.load() })
 
@@ -34,11 +57,11 @@ const metrics = computed(() => {
   const x = k.value
   if (!x) return []
   return [
-    { k: '总工时', v: hrs(x.totalHours), sub: `人均基础 ${x.baseHours}h` },
-    { k: '平均饱和度', v: pct(x.avgSat), sub: `补全后 ${pct(x.avgSatFilled)}` },
+    { k: '总工时', v: hrs(x.totalHours), sub: `人均基础 ${x.baseHours}h`, clickable: true },
+    { k: '平均饱和度', v: pct(x.avgSat), sub: `补全后 ${pct(x.avgSatFilled)}`, clickable: true },
     { k: '未填人数', v: String(x.unfilledCount), sub: `其中一条未填 ${x.neverFilledCount} 人`,
-      cls: x.unfilledCount > 0 ? 'danger' : undefined },
-    { k: '加班人数', v: String(x.overtimeCount), sub: `累计 ${hrs(x.overtimeHours)}h` },
+      cls: x.unfilledCount > 0 ? 'danger' : undefined, clickable: true },
+    { k: '加班人数', v: String(x.overtimeCount), sub: `累计 ${hrs(x.overtimeHours)}h`, clickable: true },
   ]
 })
 const complianceRatio = computed(() => k.value?.complianceRate ?? null)
@@ -121,7 +144,7 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   return columns.map((c) => disp[c.property] ?? '')
 }
 
-defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount, complianceRingColor })
+defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount, complianceRingColor, metrics, onOrgBarClick, onOrgRow, onKpiClick, goCompliance })
 </script>
 
 <template>
@@ -133,8 +156,9 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
 
     <template v-if="ready">
       <div class="yt-kpi-row">
-        <MetricGrid :items="metrics" col-min="180px" class="yt-kpi-grid" />
-        <div class="yt-ring-card">
+        <MetricGrid :items="metrics" col-min="180px" class="yt-kpi-grid" @item-click="onKpiClick" />
+        <div class="yt-ring-card u-lift u-focus-ring" tabindex="0" role="button"
+          @click="goCompliance" @keydown.enter.prevent="goCompliance" @keydown.space.prevent="goCompliance">
           <RatioRing :ratio="complianceRatio" label="合规率" :size="96" :color="complianceRingColor" />
           <div class="yt-ring-sub u-num">问题 {{ complianceIssueCount }} 条</div>
         </div>
@@ -148,10 +172,10 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
 
         <section class="yt-card">
           <h3 class="yt-h">L4 组织工时</h3>
-          <ChartBox :option="orgBarChartOption" :height="orgBarHeight" />
+          <ChartBox :option="orgBarChartOption" :height="orgBarHeight" @datapoint-click="onOrgBarClick" />
           <h3 class="yt-h yt-h--sub">分层汇总</h3>
-          <DataTable :columns="orgCols" :rows="orgRows" :show-count="false"
-            :show-summary="true" :summary-method="orgSummaryMethod" />
+          <DataTable :columns="orgCols" :rows="orgRows" :show-count="false" clickable
+            :show-summary="true" :summary-method="orgSummaryMethod" @row-click="onOrgRow" />
         </section>
       </div>
     </template>
@@ -174,6 +198,7 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: var(--card-pad);
+  cursor: pointer;
 }
 .yt-ring-sub { font-size: var(--fs-1); color: var(--mut); }
 .yt-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(480px, 2fr); gap: var(--gap-card); }
