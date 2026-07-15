@@ -4,6 +4,7 @@ import YitianToolbar from '@/components/YitianToolbar.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ChartBox from '@/charts/ChartBox.vue'
+import RatioRing from '@/components/RatioRing.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
@@ -28,6 +29,7 @@ function hrs(v: number): string {
   return v.toFixed(1)
 }
 
+// 顶部 KPI 带:4 项文本卡走 MetricGrid;「合规率」值域天然 0-1,改用 RatioRing 单独一卡(见下)。
 const metrics = computed(() => {
   const x = k.value
   if (!x) return []
@@ -37,10 +39,10 @@ const metrics = computed(() => {
     { k: '未填人数', v: String(x.unfilledCount), sub: `其中一条未填 ${x.neverFilledCount} 人`,
       cls: x.unfilledCount > 0 ? 'danger' : undefined },
     { k: '加班人数', v: String(x.overtimeCount), sub: `累计 ${hrs(x.overtimeHours)}h` },
-    { k: '合规率', v: pct(x.complianceRate), sub: `问题 ${x.issueCount} 条`,
-      cls: x.complianceRate !== null && x.complianceRate < 0.9 ? 'warn' : 'ok' },
   ]
 })
+const complianceRatio = computed(() => k.value?.complianceRate ?? null)
+const complianceIssueCount = computed(() => k.value?.issueCount ?? 0)
 
 const typeRows = computed(() =>
   store.data ? typeHours(store.data, selectEntries(store.data, view.start, view.end, view.l4s)) : [])
@@ -53,22 +55,6 @@ const typeOption = computed(() => ({
     radius: ['45%', '70%'],
     data: typeRows.value.map((t) => ({ name: t.type, value: Number(t.hours.toFixed(1)) })),
     label: { formatter: '{b} {d}%' },
-  }],
-}))
-
-const typeBarOption = computed(() => ({
-  tooltip: { trigger: 'item', valueFormatter: (v: number) => `${v} h` },
-  grid: { left: 48, right: 16, top: 24, bottom: 32 },
-  xAxis: { type: 'category', data: typeRows.value.map((t) => t.type) },
-  yAxis: { type: 'value' },
-  series: [{
-    name: '工时',
-    type: 'bar',
-    // colorBy: 'data' → 每根柱子按数据项取调色板下一色。饼图也是逐扇区取色,
-    // 两者数据顺序相同 → 同一个工时类型在两张图里是同一个颜色。
-    // 不写死色值:颜色仍由全站 ECharts 主题(--chart-1..8 令牌)给。
-    colorBy: 'data',
-    data: typeRows.value.map((t) => ({ name: t.type, value: Number(t.hours.toFixed(1)) })),
   }],
 }))
 
@@ -96,6 +82,26 @@ const orgRows = computed(() => l4Rows.value.map((r) => ({
   satText: pct(r.sat),
 })))
 
+/** L4 组织工时:实际 vs 基础分组柱,与「分层汇总」表同源(l4Rows,已剔除未分配L4)。
+ *  横向柱自下而上,按实际工时升序排列读得顺。 */
+function orgBarOption(l4RowsIn: { name: string; hours: number; base: number }[]) {
+  const rows = [...l4RowsIn].sort((a, b) => a.hours - b.hours)
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { bottom: 0 },
+    grid: { left: 8, right: 24, top: 16, bottom: 40, containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: rows.map((r) => r.name) },
+    series: [
+      { name: '实际工时', type: 'bar', data: rows.map((r) => Number(r.hours.toFixed(1))) },
+      { name: '基础工时', type: 'bar', data: rows.map((r) => Number(r.base.toFixed(1))) },
+    ],
+  }
+}
+const orgBarChartOption = computed(() => orgBarOption(l4Rows.value))
+// L4 多时按行数放大高度,少时不小于 360px。
+const orgBarHeight = computed(() => `${Math.max(360, l4Rows.value.length * 32 + 96)}px`)
+
 /** 固定汇总行(el-table 原生 show-summary,恒在表底、不随排序移动)。 */
 function orgSummaryMethod({ columns }: { columns: { property: string }[] }): string[] {
   const t = orgL4SummaryRow(l4Rows.value)
@@ -110,7 +116,7 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   return columns.map((c) => disp[c.property] ?? '')
 }
 
-defineExpose({ typeOption, typeBarOption, typeRows, orgRows, orgSummaryMethod })
+defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount })
 </script>
 
 <template>
@@ -121,19 +127,24 @@ defineExpose({ typeOption, typeBarOption, typeRows, orgRows, orgSummaryMethod })
     <el-skeleton v-else-if="store.loading && !ready" :rows="6" animated />
 
     <template v-if="ready">
-      <MetricGrid :items="metrics" col-min="180px" />
+      <div class="yt-kpi-row">
+        <MetricGrid :items="metrics" col-min="180px" class="yt-kpi-grid" />
+        <div class="yt-ring-card">
+          <RatioRing :ratio="complianceRatio" label="合规率" :size="96" color="var(--ok)" />
+          <div class="yt-ring-sub u-num">问题 {{ complianceIssueCount }} 条</div>
+        </div>
+      </div>
 
       <div class="yt-grid">
         <section class="yt-card">
           <h3 class="yt-h">工时类型占比</h3>
-          <div class="yt-charts">
-            <ChartBox :option="typeOption" height="300px" />
-            <ChartBox :option="typeBarOption" height="300px" />
-          </div>
+          <ChartBox :option="typeOption" height="300px" />
         </section>
 
         <section class="yt-card">
-          <h3 class="yt-h">分层汇总</h3>
+          <h3 class="yt-h">L4 组织工时</h3>
+          <ChartBox :option="orgBarChartOption" :height="orgBarHeight" />
+          <h3 class="yt-h yt-h--sub">分层汇总</h3>
           <DataTable :columns="orgCols" :rows="orgRows" :show-count="false"
             :show-summary="true" :summary-method="orgSummaryMethod" />
         </section>
@@ -144,6 +155,22 @@ defineExpose({ typeOption, typeBarOption, typeRows, orgRows, orgSummaryMethod })
 
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
+.yt-kpi-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: var(--gap-card); }
+@media (max-width: 768px) { .yt-kpi-row { grid-template-columns: 1fr; } }
+.yt-kpi-grid { min-width: 0; }
+.yt-ring-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-width: 180px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--card-pad);
+}
+.yt-ring-sub { font-size: var(--fs-1); color: var(--mut); }
 .yt-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(480px, 2fr); gap: var(--gap-card); }
 @media (max-width: 1200px) { .yt-grid { grid-template-columns: 1fr; } }
 .yt-card {
@@ -154,5 +181,5 @@ defineExpose({ typeOption, typeBarOption, typeRows, orgRows, orgSummaryMethod })
   box-shadow: var(--shadow-1);
 }
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
-.yt-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--gap-card); }
+.yt-h--sub { margin-top: var(--gap-card); }
 </style>
