@@ -43,6 +43,11 @@ const metrics = computed(() => {
 })
 const complianceRatio = computed(() => k.value?.complianceRate ?? null)
 const complianceIssueCount = computed(() => k.value?.issueCount ?? 0)
+// 合规率环按阈值上色(与合规页同口径):≥90% 达标绿,<90% 警示黄,null 交给 RatioRing 默认(mut)。
+const complianceRingColor = computed(() => {
+  const r = complianceRatio.value
+  return r == null ? undefined : (r >= 0.9 ? 'var(--ok)' : 'var(--warn)')
+})
 
 const typeRows = computed(() =>
   store.data ? typeHours(store.data, selectEntries(store.data, view.start, view.end, view.l4s)) : [])
@@ -116,7 +121,7 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   return columns.map((c) => disp[c.property] ?? '')
 }
 
-defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount })
+defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount, complianceRingColor })
 </script>
 
 <template>
@@ -130,7 +135,7 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
       <div class="yt-kpi-row">
         <MetricGrid :items="metrics" col-min="180px" class="yt-kpi-grid" />
         <div class="yt-ring-card">
-          <RatioRing :ratio="complianceRatio" label="合规率" :size="96" color="var(--ok)" />
+          <RatioRing :ratio="complianceRatio" label="合规率" :size="96" :color="complianceRingColor" />
           <div class="yt-ring-sub u-num">问题 {{ complianceIssueCount }} 条</div>
         </div>
       </div>

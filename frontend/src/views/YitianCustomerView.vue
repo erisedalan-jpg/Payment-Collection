@@ -6,8 +6,8 @@ import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
-import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers } from '@/lib/yitian/customer'
-import { NO_L4, rosterL4Map, selectEntries } from '@/lib/yitian/metrics'
+import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from '@/lib/yitian/customer'
+import { NO_L4 } from '@/lib/yitian/metrics'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -110,31 +110,9 @@ const bgOption = computed(() => ({
 }))
 
 // 本/跨 BG × L4 分组柱:与 bgSupport 同口径(仅项目类/售前类工时),按 L4 拆分;
-// 未分配 L4(部门负责人)与 TOP1000 表一致予以剔除。
-const BG_CHART_TYPES = ['项目类', '售前类']
-
-const bgByL4Rows = computed(() => {
-  if (!store.data) return []
-  const data = store.data
-  const l4Of = rosterL4Map(data)
-  const own = new Set(data.meta.thisBgL2 ?? [])
-  const acc = new Map<string, { thisBg: number; crossBg: number }>()
-  for (const e of selectEntries(data, view.start, view.end, view.l4s)) {
-    const typeName = e.t === null || e.t === undefined ? '' : (data.dims.types[e.t] ?? '')
-    if (!BG_CHART_TYPES.includes(typeName)) continue
-    const l4 = l4Of[e.e] ?? NO_L4
-    if (l4 === NO_L4) continue
-    if (!acc.has(l4)) acc.set(l4, { thisBg: 0, crossBg: 0 })
-    const b = acc.get(l4)
-    if (!b) continue
-    const org = e.bg === null || e.bg === undefined ? '' : (data.dims.salesL2[e.bg] ?? '')
-    if (own.has(org)) b.thisBg += e.h
-    else b.crossBg += e.h
-  }
-  return [...acc.entries()]
-    .map(([l4, b]) => ({ l4, ...b }))
-    .sort((a, b) => (a.thisBg + a.crossBg) - (b.thisBg + b.crossBg))
-})
+// 未分配 L4(部门负责人)与 TOP1000 表一致予以剔除。聚合逻辑下沉到 lib/yitian/customer.ts(bgSupportByL4)。
+const bgByL4Rows = computed(() =>
+  store.data ? bgSupportByL4(store.data, view.start, view.end, view.l4s) : [])
 
 function bgByL4Option(rows: { l4: string; thisBg: number; crossBg: number }[]) {
   return {
