@@ -92,17 +92,30 @@ function onSegClick(key: string) {
   scrollTo(key === 'never' ? 'yt-neverfilled' : key === 'under' ? 'yt-unfilled' : 'yt-emp')
 }
 
-onMounted(() => {
-  store.load()
-  const d = parseDrillQuery(route.query)
+onMounted(() => { store.load() })
+
+// 下钻落地:总览/趋势/客户页带 dL4/dStart/dEnd/dScroll query 跳进来时,设筛选/日期区间/
+// 滚动锚点后清 query(免重进/刷新重放)。用 ready 门控的 post-flush 一次性 watcher(而非
+// onMounted 里直设):数据未到时 YitianToolbar(v-if="ready")与各锚点 section 都还没挂载/
+// 渲染,若在 onMounted 里直接设 view.start/end,等 toolbar 挂载后其 hydrate() 会用
+// localStorage 历史区间覆盖掉刚设的下钻值,滚动锚点也因 section 未渲染而落空。
+// flush:'post' + nextTick 确保这段在 toolbar hydrate() 之后、锚点渲染之后才跑。
+let drillApplied = false
+function applyDrillLanding() {
+  if (drillApplied) return
+  const q = route.query
+  if (!Object.keys(q).length) { drillApplied = true; return }
+  drillApplied = true
+  const d = parseDrillQuery(q)
   if (d.l4) {
     cf.clearAll(TABLE_ID)
     cf.setColumnFilter(TABLE_ID, 'l4', [d.l4], cfUniqueValues(empRows.value, 'l4').length)
   }
   if (d.start && d.end) { view.start = d.start; view.end = d.end }
   if (d.scroll) scrollTo(d.scroll === 'neverfilled' ? 'yt-neverfilled' : 'yt-diverging')
-  if (Object.keys(route.query).length) router.replace({ query: {} })
-})
+  router.replace({ query: {} })
+}
+watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, flush: 'post' })
 
 // 饱和度 TOP10:横向柱 + 基础工时均值参考线
 function satTopOption(top: EmpStat[]) {

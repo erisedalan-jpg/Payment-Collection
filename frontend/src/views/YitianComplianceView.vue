@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -30,19 +30,29 @@ const router = useRouter()
 
 onMounted(() => { store.load(); settings.load() })
 
-// 下钻落地:趋势页等带 dStart/dEnd query 跳进来时,设日期区间后清 query(免重进/刷新重放)。
-onMounted(() => {
-  const d = parseDrillQuery(route.query)
-  if (d.start && d.end) { view.start = d.start; view.end = d.end }
-  if (Object.keys(route.query).length) router.replace({ query: {} })
-})
-
 // 图表 option 里显式写死的颜色不随 ChartBox 主题色板联动,须自己按主题选浅/暗两套镜像常量(不新增颜色)。
 const pal = computed(() => themeStore.theme === 'dark'
   ? { status: STATUS_DARK, struct: STRUCT_DARK }
   : { status: STATUS_LIGHT, struct: STRUCT_LIGHT })
 
 const ready = computed(() => !!store.data)
+
+// 下钻落地:趋势页等带 dStart/dEnd query 跳进来时,设日期区间后清 query(免重进/刷新重放)。
+// 用 ready 门控的 post-flush 一次性 watcher(而非 onMounted 里直设):数据未到时
+// YitianToolbar(v-if="ready")还没挂载,若在 onMounted 里直接设 view.start/end,
+// 等 toolbar 挂载后其 hydrate() 会用 localStorage 历史区间覆盖掉刚设的下钻值。
+// flush:'post' + nextTick 确保这段在 toolbar hydrate() 之后才跑。
+let drillApplied = false
+function applyDrillLanding() {
+  if (drillApplied) return
+  const q = route.query
+  if (!Object.keys(q).length) { drillApplied = true; return }
+  drillApplied = true
+  const d = parseDrillQuery(q)
+  if (d.start && d.end) { view.start = d.start; view.end = d.end }
+  router.replace({ query: {} })
+}
+watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, flush: 'post' })
 
 // excludedTypes 必须传进去,否则超管在 /data 剔除某类型后,总览/趋势页的问题数变了,
 // 这里仍原样列出,两页口径漂移(I-7)。
