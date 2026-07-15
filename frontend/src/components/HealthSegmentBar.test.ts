@@ -35,4 +35,34 @@ describe('HealthSegmentBar', () => {
     expect(links).toHaveLength(3)
     expect(links[0].props('to')).toBe('/projects?health=健康')
   })
+
+  it('无 to 的图例点击 emit seg-click(key);有 to 的点击不 emit(仍走 RouterLink)', async () => {
+    const w = mount(HealthSegmentBar, {
+      props: { segments: [
+        { key: 'ok', label: '达标', count: 5, color: 'var(--ok)' },
+        { key: '健康', label: '健康', count: 3, color: 'var(--ok)', to: '/projects?health=健康' },
+      ] },
+      ...opts,
+    })
+    const legs = w.findAll('.hsb-leg')
+    await legs[0].trigger('click') // 无 to → span
+    await legs[1].trigger('click') // 有 to → RouterLinkStub
+    expect(w.emitted('seg-click')).toEqual([['ok']])
+  })
+
+  it('无 to 的图例默认不带 hsb-leg--link(clickable 未传,不再恒真)', () => {
+    const w = mount(HealthSegmentBar, {
+      props: { segments: [{ key: 'ok', label: '达标', count: 5, color: 'var(--ok)' }] },
+      ...opts,
+    })
+    expect(w.find('.hsb-leg').classes()).not.toContain('hsb-leg--link')
+  })
+
+  it('传 clickable 时无 to 的图例带 hsb-leg--link 悬停手感类', () => {
+    const w = mount(HealthSegmentBar, {
+      props: { segments: [{ key: 'ok', label: '达标', count: 5, color: 'var(--ok)' }], clickable: true },
+      ...opts,
+    })
+    expect(w.find('.hsb-leg').classes()).toContain('hsb-leg--link')
+  })
 })

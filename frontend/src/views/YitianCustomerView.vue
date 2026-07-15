@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -8,11 +9,25 @@ import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from '@/lib/yitian/customer'
 import { NO_L4 } from '@/lib/yitian/metrics'
+import { buildDrillQuery } from '@/lib/yitian/drill'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
+const router = useRouter()
 
 onMounted(() => { store.load() })
+
+// 跨页下钻:TOP1000 堆叠柱 / 跨 BG 分组柱 / TOP1000 表行 → 统计分析页,按 L4 落地筛选。
+// TOP 客户排行柱、跨 BG 饼不接(无 L4 目标)。
+function goAnalyticsL4(l4: string) {
+  router.push({ path: '/yitian/analytics', query: buildDrillQuery({ l4 }) })
+}
+function onL4BarClick(p: any) {
+  if (p?.name) goAnalyticsL4(p.name)
+}
+function onTop1000Row(row: any) {
+  if (row?.l4) goAnalyticsL4(row.l4)
+}
 
 const ready = computed(() => !!store.data)
 
@@ -137,7 +152,7 @@ const topCustList = computed(() =>
 const topCustChartOption = computed(() => topCustOption(topCustList.value))
 const topCustHeight = computed(() => `${Math.max(240, topCustList.value.length * 28 + 96)}px`)
 
-defineExpose({ topRows, bg, topCustList, bgByL4Rows })
+defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick, onTop1000Row })
 </script>
 
 <template>
@@ -152,9 +167,9 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows })
         <h3 class="yt-h">TOP1000 大客户支持</h3>
         <p class="yt-note">仅统计项目类 / 售前类 / 售后类工时；客户数按客户去重。</p>
         <div v-if="!topRowsRaw.length" class="yt-empty">无数据</div>
-        <ChartBox v-else :option="top1000ChartOption" :height="top1000Height" />
-        <DataTable :columns="topCols" :rows="topRows" :show-count="false"
-          :show-summary="true" :summary-method="topSummaryMethod" />
+        <ChartBox v-else :option="top1000ChartOption" :height="top1000Height" @datapoint-click="onL4BarClick" />
+        <DataTable :columns="topCols" :rows="topRows" :show-count="false" clickable
+          :show-summary="true" :summary-method="topSummaryMethod" @row-click="onTop1000Row" />
       </section>
 
       <section class="yt-card">
@@ -164,7 +179,7 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows })
         <div class="yt-grid">
           <ChartBox :option="bgOption" height="280px" />
           <div v-if="!bgByL4Rows.length" class="yt-empty">无数据</div>
-          <ChartBox v-else :option="bgByL4ChartOption" :height="bgByL4Height" />
+          <ChartBox v-else :option="bgByL4ChartOption" :height="bgByL4Height" @datapoint-click="onL4BarClick" />
         </div>
       </section>
 

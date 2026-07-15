@@ -185,3 +185,17 @@ describe('DataTable stickyHeader', () => {
     expect(typeof w.findComponent({ name: 'ElTable' }).props('maxHeight')).toBe('number')
   })
 })
+
+describe('DataTable maxHeightPx', () => {
+  const COLS = [{ key: 'a', label: 'A' }]
+  const ROWS = [{ a: 1 }]
+  it('stickyHeader + maxHeightPx 用固定值', async () => {
+    const w = mount(DataTable, { props: { columns: COLS, rows: ROWS, stickyHeader: true, maxHeightPx: 560 }, global: { plugins: [ElementPlus] } })
+    await w.vm.$nextTick()
+    expect(w.findComponent({ name: 'ElTable' }).props('maxHeight')).toBe(560)
+  })
+  it('无 stickyHeader 时 maxHeightPx 不生效(零回归)', () => {
+    const w = mount(DataTable, { props: { columns: COLS, rows: ROWS, maxHeightPx: 560 }, global: { plugins: [ElementPlus] } })
+    expect(w.findComponent({ name: 'ElTable' }).props('maxHeight')).toBeUndefined()
+  })
+})
