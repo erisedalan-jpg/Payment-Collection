@@ -10,14 +10,21 @@ import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { issueRows, countByCode, countByL4, issueHeatmap, ISSUE_LABELS, type IssueHeatmap } from '@/lib/yitian/compliance'
 import { kpi } from '@/lib/yitian/metrics'
-import { STATUS_LIGHT, STRUCT_LIGHT } from '@/charts/echartsTheme'
+import { STATUS_LIGHT, STATUS_DARK, STRUCT_LIGHT, STRUCT_DARK } from '@/charts/echartsTheme'
+import { useSettingsStore } from '@/stores/settings'
 import { exportRows } from '@/lib/exportXlsx'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
+const themeStore = useSettingsStore()
 
 onMounted(() => { store.load(); settings.load() })
+
+// 图表 option 里显式写死的颜色不随 ChartBox 主题色板联动,须自己按主题选浅/暗两套镜像常量(不新增颜色)。
+const pal = computed(() => themeStore.theme === 'dark'
+  ? { status: STATUS_DARK, struct: STRUCT_DARK }
+  : { status: STATUS_LIGHT, struct: STRUCT_LIGHT })
 
 const ready = computed(() => !!store.data)
 const codeFilter = ref<string[]>([])
@@ -64,6 +71,7 @@ const healthMetrics = computed(() => {
 /** 问题分布横向柱:按码前缀上色,HINT_=warn(提示),其余=danger(问题),与旧 pill 列表语义一致(M-5)。 */
 function codeBarOption(codes: { label: string; code: string; count: number }[]) {
   const rows2 = [...codes].sort((a, b) => a.count - b.count)
+  const status = pal.value.status
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 8, right: 24, top: 8, bottom: 24, containLabel: true },
@@ -73,7 +81,7 @@ function codeBarOption(codes: { label: string; code: string; count: number }[]) 
       type: 'bar',
       data: rows2.map((r) => ({
         value: r.count,
-        itemStyle: { color: r.code.startsWith('HINT_') ? STATUS_LIGHT.warn : STATUS_LIGHT.danger },
+        itemStyle: { color: r.code.startsWith('HINT_') ? status.warn : status.danger },
       })),
     }],
   }
@@ -95,8 +103,9 @@ function l4BarOption(rows2: { l4: string; count: number }[]) {
 const l4BarChartOption = computed(() => l4BarOption(l4Dist.value))
 const l4BarHeight = computed(() => `${Math.max(240, l4Dist.value.length * 32 + 96)}px`)
 
-/** 问题码 × L4 热力图,色阶三档全取已导出 echarts 主题常量,不新增颜色。 */
+/** 问题码 × L4 热力图,色阶三档全取已导出 echarts 主题常量(按当前主题挑浅/暗那一套),不新增颜色。 */
 function heatmapOption(h: IssueHeatmap) {
+  const { status, struct } = pal.value
   return {
     tooltip: { position: 'top' },
     grid: { left: 8, right: 8, top: 8, bottom: 60, containLabel: true },
@@ -104,7 +113,7 @@ function heatmapOption(h: IssueHeatmap) {
     yAxis: { type: 'category', data: h.codes.map((c) => c.label) },
     visualMap: {
       min: 0, max: Math.max(1, h.max), calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
-      inRange: { color: [STRUCT_LIGHT.card, STATUS_LIGHT.warn, STATUS_LIGHT.danger] },
+      inRange: { color: [struct.card, status.warn, status.danger] },
     },
     series: [{ type: 'heatmap', data: h.cells, label: { show: true } }],
   }
