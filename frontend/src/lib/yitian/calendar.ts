@@ -25,21 +25,35 @@ export function weekKeyOf(day: YitianDay, mode: WeekMode): string {
   return mode === 'calc' ? day.calcWeek : day.isoWeek
 }
 
-/** 区间内按周分桶(按起始日升序);每桶带工作日数,供趋势图 X 轴与周维度汇总。 */
-export function weekBuckets(days: YitianDay[], start: string, end: string, mode: WeekMode): WeekBucket[] {
+/** 通用分桶:按 keyOf(day) 分组,每桶带工作日数与起止日,按起始日升序。 */
+function bucketBy(days: YitianDay[], start: string, end: string, keyOf: (d: YitianDay) => string): WeekBucket[] {
   const map = new Map<string, WeekBucket>()
   for (const d of daysInRange(days, start, end)) {
-    const k = weekKeyOf(d, mode)
+    const k = keyOf(d)
     const b = map.get(k)
-    if (!b) {
-      map.set(k, { key: k, workdays: d.workday ? 1 : 0, start: d.d, end: d.d })
-    } else {
+    if (!b) map.set(k, { key: k, workdays: d.workday ? 1 : 0, start: d.d, end: d.d })
+    else {
       if (d.workday) b.workdays += 1
       if (d.d < b.start) b.start = d.d
       if (d.d > b.end) b.end = d.d
     }
   }
   return [...map.values()].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
+}
+
+/** 区间内按周分桶(按起始日升序);每桶带工作日数,供趋势图 X 轴与周维度汇总。 */
+export function weekBuckets(days: YitianDay[], start: string, end: string, mode: WeekMode): WeekBucket[] {
+  return bucketBy(days, start, end, (d) => weekKeyOf(d, mode))
+}
+
+/** 按自然月分桶(key='YYYY-MM')。月/季与 iso/calc 周口径无关,不取 mode。 */
+export function monthBuckets(days: YitianDay[], start: string, end: string): WeekBucket[] {
+  return bucketBy(days, start, end, (d) => d.d.slice(0, 7))
+}
+
+/** 按季度分桶(key='YYYY-Qn';1-3 月=Q1,4-6=Q2,7-9=Q3,10-12=Q4)。 */
+export function quarterBuckets(days: YitianDay[], start: string, end: string): WeekBucket[] {
+  return bucketBy(days, start, end, (d) => `${d.d.slice(0, 4)}-Q${Math.floor((Number(d.d.slice(5, 7)) - 1) / 3) + 1}`)
 }
 
 /** 数据实际跨度。日期选择器必须钳制在此范围内——超出范围没有工作日标注,基础工时算不出来。 */
