@@ -1,25 +1,41 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import RatioRing from '@/components/RatioRing.vue'
 import ChartBox from '@/charts/ChartBox.vue'
+import ColumnFilter from '@/components/ColumnFilter.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
+import { useCrossFilterStore } from '@/stores/crossFilter'
+import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { issueRows, countByCode, countByL4, issueHeatmap, ISSUE_LABELS, type IssueHeatmap } from '@/lib/yitian/compliance'
 import { kpi } from '@/lib/yitian/metrics'
+import { parseDrillQuery } from '@/lib/yitian/drill'
 import { STATUS_LIGHT, STATUS_DARK, STRUCT_LIGHT, STRUCT_DARK } from '@/charts/echartsTheme'
 import { useSettingsStore } from '@/stores/settings'
 import { exportRows } from '@/lib/exportXlsx'
 
+const TABLE_ID = 'yitian-compliance'
 const store = useYitianStore()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
 const themeStore = useSettingsStore()
+const cf = useCrossFilterStore()
+const route = useRoute()
+const router = useRouter()
 
 onMounted(() => { store.load(); settings.load() })
+
+// 下钻落地:趋势页等带 dStart/dEnd query 跳进来时,设日期区间后清 query(免重进/刷新重放)。
+onMounted(() => {
+  const d = parseDrillQuery(route.query)
+  if (d.start && d.end) { view.start = d.start; view.end = d.end }
+  if (Object.keys(route.query).length) router.replace({ query: {} })
+})
 
 // 图表 option 里显式写死的颜色不随 ChartBox 主题色板联动,须自己按主题选浅/暗两套镜像常量(不新增颜色)。
 const pal = computed(() => themeStore.theme === 'dark'
@@ -27,7 +43,6 @@ const pal = computed(() => themeStore.theme === 'dark'
   : { status: STATUS_LIGHT, struct: STRUCT_LIGHT })
 
 const ready = computed(() => !!store.data)
-const codeFilter = ref<string[]>([])
 
 // excludedTypes 必须传进去,否则超管在 /data 剔除某类型后,总览/趋势页的问题数变了,
 // 这里仍原样列出,两页口径漂移(I-7)。
@@ -38,20 +53,35 @@ const codeDist = computed(() => countByCode(allRows.value))
 const l4Dist = computed(() => countByL4(allRows.value))
 const heatmap = computed(() => issueHeatmap(allRows.value))
 
-const codeOptions = computed(() =>
-  codeDist.value.map((c) => ({ value: c.code, label: `${c.label} (${c.count})` })))
-
-const rows = computed(() => {
-  const keep = new Set(codeFilter.value)
-  const src = keep.size
-    ? allRows.value.filter((r) => r.codes.some((c) => keep.has(c)))
-    : allRows.value
-  return src.map((r) => ({
+// 全量派生行(含 issueTypes 供列筛选);列筛选交给 applyColumnFilters,不再本地 codeFilter。
+const allDetailRows = computed(() =>
+  allRows.value.map((r) => ({
     ...r,
     okText: r.ok === 2 ? '问题' : '提示',
     issueText: r.msgs.length ? r.msgs.join('；') : r.codes.map((c) => ISSUE_LABELS[c] ?? c).join('；'),
-  }))
-})
+    issueTypes: r.codes.map((c) => ISSUE_LABELS[c] ?? c),
+  })))
+const filtered = computed(() => applyColumnFilters(allDetailRows.value, cf.tableFilters(TABLE_ID)))
+
+const FILTERABLE = new Set(['date', 'empName', 'l4', 'type', 'hours', 'customer', 'workOrder', 'okText'])
+const pageSize = ref(50)
+const currentPage = ref(1)
+const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+watch(filtered, () => { currentPage.value = 1 })
+
+/** 图表下钻→同页列筛选:清空所有既有筛选再按下钻目标设列。 */
+function drillTable(setters: { col: string; val: string }[]) {
+  cf.clearAll(TABLE_ID)
+  for (const s of setters) cf.setColumnFilter(TABLE_ID, s.col, [s.val], cfUniqueValues(allDetailRows.value, s.col).length)
+}
+function onCodeBarClick(p: any) { if (p?.name) drillTable([{ col: 'issueTypes', val: p.name }]) }
+function onL4BarClick(p: any) { if (p?.name) drillTable([{ col: 'l4', val: p.name }]) }
+function onHeatmapClick(p: any) {
+  const d = p?.data as [number, number, number] | undefined
+  if (!d) return
+  const l4 = heatmap.value.l4s[d[0]]; const code = heatmap.value.codes[d[1]]?.label
+  drillTable([{ col: 'l4', val: l4 }, { col: 'issueTypes', val: code }])
+}
 
 // 健康带:合规率环 + 三项计数卡(均取自 issueRows 派生,与问题明细同源,不会对不上)。
 const k = computed(() => (store.data
@@ -143,14 +173,14 @@ function onExport() {
   // 既有签名是 exportRows(filename, rows) —— 文件名在前,别写反
   exportRows(
     `倚天工时合规问题_${view.start}_${view.end}.xlsx`,
-    rows.value.map((r) => ({
+    filtered.value.map((r) => ({
       工作日: r.date, 员工: r.empName, L4组织: r.l4, 工时类型: r.type, 工时: r.hours,
       客户: r.customer, 工单编号: r.workOrder, 状态: r.okText, 问题: r.issueText, 工作成果摘要: r.snippet,
     })),
   )
 }
 
-defineExpose({ codeFilter, rows, codeDist, codeBarChartOption, complianceRatio, complianceRingColor })
+defineExpose({ filtered, paged, codeDist, codeBarChartOption, complianceRatio, complianceRingColor })
 </script>
 
 <template>
@@ -172,32 +202,39 @@ defineExpose({ codeFilter, rows, codeDist, codeBarChartOption, complianceRatio, 
         <div class="yt-head">
           <h3 class="yt-h">问题分布</h3>
           <div class="yt-actions">
-            <el-select v-model="codeFilter" multiple collapse-tags clearable placeholder="全部问题类型"
-              class="yt-code">
-              <el-option v-for="o in codeOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
             <el-button @click="onExport">导出</el-button>
           </div>
         </div>
         <div v-if="!codeDist.length" class="yt-empty">本区间无合规问题</div>
-        <ChartBox v-else :option="codeBarChartOption" :height="codeBarHeight" />
+        <ChartBox v-else :option="codeBarChartOption" :height="codeBarHeight" @datapoint-click="onCodeBarClick" />
       </section>
 
       <section class="yt-card">
         <h3 class="yt-h">问题按 L4 组织分布</h3>
         <div v-if="!l4Dist.length" class="yt-empty">本区间无合规问题</div>
-        <ChartBox v-else :option="l4BarChartOption" :height="l4BarHeight" />
+        <ChartBox v-else :option="l4BarChartOption" :height="l4BarHeight" @datapoint-click="onL4BarClick" />
       </section>
 
       <section class="yt-card">
         <h3 class="yt-h">问题码 × L4 热力图</h3>
         <div v-if="!heatmap.codes.length" class="yt-empty">本区间无合规问题</div>
-        <ChartBox v-else :option="heatmapChartOption" :height="heatmapHeight" />
+        <ChartBox v-else :option="heatmapChartOption" :height="heatmapHeight" @datapoint-click="onHeatmapClick" />
       </section>
 
       <section class="yt-card">
-        <h3 class="yt-h">问题明细</h3>
-        <DataTable :columns="cols" :rows="rows" sticky-header />
+        <div class="yt-head">
+          <h3 class="yt-h">问题明细</h3>
+          <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
+        </div>
+        <DataTable :columns="cols" :rows="paged" sticky-header :max-height-px="560">
+          <template v-for="col in cols" :key="col.key" #[`header-${col.key}`]="{ col: c }">
+            <span class="yt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="allDetailRows" /><ColumnFilter v-else-if="c.key === 'issueText'" :table-id="TABLE_ID" col-key="issueTypes" :source-rows="allDetailRows" /></span>
+          </template>
+        </DataTable>
+        <div class="yt-pager">
+          <span class="yt-total u-num">共 {{ filtered.length }} 条</span>
+          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="filtered.length" layout="prev, pager, next" size="small" background />
+        </div>
       </section>
     </template>
   </div>
@@ -229,7 +266,9 @@ defineExpose({ codeFilter, rows, codeDist, codeBarChartOption, complianceRatio, 
 }
 .yt-head { display: flex; justify-content: space-between; align-items: center; gap: var(--gap-stack); flex-wrap: wrap; }
 .yt-actions { display: flex; gap: var(--gap-stack); align-items: center; }
-.yt-code { min-width: 240px; }
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
+.yt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.yt-pager { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.yt-total { font-size: var(--fs-1); color: var(--sub); }
 </style>
