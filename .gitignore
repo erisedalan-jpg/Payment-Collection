@@ -114,3 +114,4 @@ lts/input/
 lts/release/
 lts/build/
 lts/**/__pycache__/
+lts/*.zip
