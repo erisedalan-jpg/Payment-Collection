@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { configToWorkbook, workbookToConfig, type YitianRulesConfig } from './rulesConfig'
+import { configToWorkbook, workbookToConfig, assertRulesShape, type YitianRulesConfig } from './rulesConfig'
 
 const CFG: YitianRulesConfig = {
   version: 1,
@@ -32,5 +32,12 @@ describe('rulesConfig JSON<->Excel', () => {
     const back = workbookToConfig(configToWorkbook(CFG))
     expect(back.checks.progress.enabled).toBe(false)
     expect(back.checks.presaleProductHint.enabled).toBe(false)
+  })
+
+  it('assertRulesShape 对合法配置放行、对缺关键嵌套键的结构抛错(防导入即崩)', () => {
+    expect(() => assertRulesShape(CFG)).not.toThrow()
+    expect(() => assertRulesShape({ foo: 'bar' })).toThrow()
+    expect(() => assertRulesShape({ checkedTypes: [], checks: { summary: { enabled: true } } })).toThrow()  // 缺其余段
+    expect(() => assertRulesShape(null)).toThrow()
   })
 })

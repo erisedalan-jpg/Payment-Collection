@@ -50,8 +50,9 @@ export async function deleteYitianStoreRange(
   return { deleted: r.deleted, stats: r.stats }
 }
 
-export async function getYitianRules(): Promise<YitianRulesConfig> {
-  const r = await api.get<{ success: boolean; rules: YitianRulesConfig }>('/api/yitian/rules')
+export async function getYitianRules(opts?: { default?: boolean }): Promise<YitianRulesConfig> {
+  const q = opts?.default ? '?default=1' : ''   // default=1 → 后端返回内置出厂默认(供「恢复默认」)
+  const r = await api.get<{ success: boolean; rules: YitianRulesConfig }>('/api/yitian/rules' + q)
   return r.rules
 }
 

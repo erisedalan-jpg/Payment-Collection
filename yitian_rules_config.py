@@ -19,8 +19,6 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # 防呆上限
 _MAX_LIST = 200
 _MAX_ITEM_LEN = 100
-_CHECK_KEYS = ("summary", "progress", "next", "serviceMode",
-               "typeMismatch", "product", "customer", "presaleProductHint")
 
 
 def _re_to_keywords(pattern: str) -> List[str]:
