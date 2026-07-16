@@ -61,6 +61,7 @@ export const FIELD_CATALOG: FieldDef[] = [
   { group: 'project', key: 'paymentRatio', label: '回款完成率', kind: 'number' },
   { group: 'project', key: 'openRisks', label: '未关闭风险数', kind: 'number' },
   { group: 'project', key: 'finalAcceptDate', label: '终验时间', kind: 'date' },
+  { group: 'project', key: 'setupDate', label: '立项日期', kind: 'date' },
   // —— paymentNode 组(存在性) ——
   { group: 'paymentNode', key: 'stage', label: '回款阶段', kind: 'enum' },
   { group: 'paymentNode', key: 'category', label: '回款类型', kind: 'enum' },

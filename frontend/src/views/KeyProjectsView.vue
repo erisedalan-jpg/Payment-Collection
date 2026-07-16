@@ -65,6 +65,8 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'orgL4', label: 'L4组织', width: 110 },
   { key: 'contractWan', label: '合同金额(万)', width: 110, sortable: true, num: true,
     formatter: (v) => (v == null ? '-' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
+  { key: 'setupDate', label: '立项日期', width: 110,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
   { key: 'riskLevel', label: '风险', width: 96, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
   { key: 'weekProgress', label: '本周工作进展', width: 480, wrap: true },
   { key: 'nextPlan', label: '后续工作计划', width: 480, wrap: true },
@@ -72,8 +74,8 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'followBy', label: '跟进人', width: 120 },
 ])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
-const DEFAULT_VISIBLE = ALL_KEYS
-const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate'])
+const DEFAULT_VISIBLE = ALL_KEYS.filter((k) => k !== 'setupDate')
+const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate', 'setupDate'])
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c),

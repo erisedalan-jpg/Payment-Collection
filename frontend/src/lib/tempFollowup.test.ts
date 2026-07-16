@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildTempRows, buildScopeInputs } from './tempFollowup'
 import { buildKeyProjectRows, buildProgressRowBase } from './keyProjects'
-import { projectMatches } from './tempScope'
+import { projectMatches, type ScopeFilter } from './tempScope'
 import type { Project, ProjectPmis } from '@/types/analysis'
 
 const proj = (over: Partial<Project>): Project => ({
@@ -79,5 +79,24 @@ describe('buildScopeInputs 回款节点金额单位', () => {
     ] }] }
     // 元级 600000 显然不在 [50,100]；万元换算后 60 命中——本用例与上用例互补，确保换算生效
     expect(projectMatches(inputs[0], scope)).toBe(true)
+  })
+})
+
+describe('buildScopeInputs 立项日期', () => {
+  const withSetup = () => ({
+    P1: { ...(pmis().P1 as any), status: { ...(pmis().P1 as any).status, 立项日期: '2024-01-15' } },
+  })
+  it('proj.setupDate 取 status.立项日期(归一 10 位)', () => {
+    const inputs = buildScopeInputs([proj({})], withSetup() as any, undefined, undefined)
+    expect(inputs[0].proj.setupDate).toBe('2024-01-15')
+  })
+  it('projectMatches:立项日期 between 命中/不命中', () => {
+    const inputs = buildScopeInputs([proj({})], withSetup() as any, undefined, undefined)
+    const scope = (min: string, max: string): ScopeFilter => ({
+      combinator: 'AND',
+      groups: [{ combinator: 'AND', conditions: [{ group: 'project', field: 'setupDate', op: 'between', min, max } as any] }],
+    })
+    expect(projectMatches(inputs[0], scope('2024-01-01', '2024-12-31'))).toBe(true)
+    expect(projectMatches(inputs[0], scope('2025-01-01', '2025-12-31'))).toBe(false)
   })
 })

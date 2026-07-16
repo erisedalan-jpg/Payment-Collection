@@ -33,6 +33,7 @@ export interface ProjectRow {
   tags?: string[]
   isAnomalous: boolean
   riskReasons: RiskReason[]
+  setupDate: string | null
 }
 
 // 收窄后只保留特殊项筛选（列枚举筛选已迁至 crossFilter 表头）
@@ -74,6 +75,7 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
         : (p.isPresale && typeof p.paymentPmis?.contract === 'number' ? p.paymentPmis.contract : null),
       projectLevel: status.项目级别 || '-',
       projectType: status.项目类型 || '-',
+      setupDate: status.立项日期 ?? null,
       projectManager: p.projectManager || '-',
       orgL4: p.orgL4 || '-',
       stage: prog.项目阶段 || '-',
