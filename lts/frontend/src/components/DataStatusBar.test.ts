@@ -7,7 +7,6 @@ const base = {
   lastPmis: '2026-07-08',
   agentOnline: true,
   cookieStatus: { sessionPreview: 'abc12345', updatedAt: '刚刚' },
-  yitianStatus: { sessionPreview: '', updatedAt: '' },
 }
 
 describe('DataStatusBar', () => {
@@ -33,12 +32,5 @@ describe('DataStatusBar', () => {
     const none = mount(DataStatusBar, { props: { ...base, cookieStatus: { sessionPreview: '', updatedAt: '' } } })
     expect(none.get('[data-test="dsb-cookie"]').classes()).toContain('warn')
     expect(none.get('[data-test="dsb-cookie"]').text()).toBe('未设置')
-  })
-
-  it('倚天 已存/无', () => {
-    const none = mount(DataStatusBar, { props: base })
-    expect(none.get('[data-test="dsb-yitian"]').text()).toBe('-')
-    const has = mount(DataStatusBar, { props: { ...base, yitianStatus: { sessionPreview: 'x', updatedAt: '刚刚' } } })
-    expect(has.get('[data-test="dsb-yitian"]').text()).toContain('已存')
   })
 })

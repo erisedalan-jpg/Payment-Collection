@@ -123,13 +123,6 @@ describe('router', () => {
     expect(cur.path).toBe('/payment')
   })
 
-  it('/projects/key 解析到 KeyProjectsView，pageKey=projects-key', () => {
-    const r = router.resolve('/projects/key')
-    expect(r.name).toBe('projects-key')
-    expect((r.matched[0].components?.default as any).__name).toBe('KeyProjectsView')
-    expect(r.matched[0].meta.pageKey).toBe('projects-key')
-  })
-
   it('resolves project detail with id param', () => {
     const r = router.resolve('/project/QABJ-SS-1')
     expect(r.params.id).toBe('QABJ-SS-1')
@@ -144,12 +137,5 @@ describe('router', () => {
   it('/ resolves overview and /payment resolves dashboard', () => {
     expect(router.resolve('/').name).toBe('overview')
     expect(router.resolve('/payment').name).toBe('payment')
-  })
-
-  it('/payment/key 解析到 payment-key（PaymentKeyFollowupView）', () => {
-    const r = router.resolve('/payment/key')
-    expect(r.name).toBe('payment-key')
-    expect((r.matched[0].components?.default as any).__name).toBe('PaymentKeyFollowupView')
-    expect(r.matched[0].meta.pageKey).toBe('payment-key')
   })
 })

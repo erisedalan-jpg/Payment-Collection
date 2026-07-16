@@ -4,7 +4,6 @@ defineProps<{
   lastPmis: string
   agentOnline: boolean
   cookieStatus: { sessionPreview: string; updatedAt: string }
-  yitianStatus: { sessionPreview: string; updatedAt: string }
 }>()
 </script>
 
@@ -26,10 +25,6 @@ defineProps<{
       <span class="dsb-label">PMIS cookie</span>
       <span v-if="cookieStatus.sessionPreview" class="dsb-badge ok u-num" data-test="dsb-cookie">有效 · {{ cookieStatus.sessionPreview }} · {{ cookieStatus.updatedAt || '-' }}</span>
       <span v-else class="dsb-badge warn" data-test="dsb-cookie">未设置</span>
-    </div>
-    <div class="dsb-item">
-      <span class="dsb-label">倚天 cookie</span>
-      <span class="dsb-val" :class="{ mut: !yitianStatus.sessionPreview }" data-test="dsb-yitian">{{ yitianStatus.sessionPreview ? '已存 · ' + (yitianStatus.updatedAt || '-') : '-' }}</span>
     </div>
   </div>
 </template>

@@ -19,7 +19,6 @@ vi.mock('@/lib/manualApi', () => ({
 vi.mock('@/lib/cookieAgent', () => ({
   pingAgent: vi.fn().mockResolvedValue(true),
   fetchPmisCookie: vi.fn(),
-  fetchYitianCookie: vi.fn(),
 }))
 
 beforeEach(() => {

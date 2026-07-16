@@ -10,8 +10,6 @@ vi.mock('@/lib/auth', () => ({
 import { authenticate, fetchMe, logoutApi, changePassword } from '@/lib/auth'
 import { useAuthStore } from './auth'
 import { useDataStore } from './data'
-import { useRiskFollowupStore } from './riskFollowup'
-import { usePaymentKeyFollowupStore } from './paymentKeyFollowup'
 
 beforeEach(() => setActivePinia(createPinia()))
 afterEach(() => vi.clearAllMocks())
@@ -66,37 +64,6 @@ describe('stores/auth', () => {
     await s.logout()
     expect(data.data).toBeNull()
   })
-  it('login 成功后重置 riskFollowup / paymentKeyFollowup store(杜绝换账号沿用上一账号跟进缓存)', async () => {
-    ;(authenticate as any).mockResolvedValue({ ok: true, user: U })
-    const risk = useRiskFollowupStore()
-    risk.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
-    risk.loaded = true
-    const payKey = usePaymentKeyFollowupStore()
-    payKey.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
-    payKey.loaded = true
-    const s = useAuthStore()
-    await s.login('admin', 'wxtnb')
-    expect(risk.current).toEqual({})
-    expect(risk.loaded).toBe(false)
-    expect(payKey.current).toEqual({})
-    expect(payKey.loaded).toBe(false)
-  })
-  it('logout 后重置 riskFollowup / paymentKeyFollowup store', async () => {
-    ;(fetchMe as any).mockResolvedValue(U)
-    const risk = useRiskFollowupStore()
-    risk.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
-    risk.loaded = true
-    const payKey = usePaymentKeyFollowupStore()
-    payKey.current = { P1: { followAction: '旧', revConclusion: '', nextRevDate: '' } as any }
-    payKey.loaded = true
-    const s = useAuthStore()
-    await s.fetchMe()
-    await s.logout()
-    expect(risk.current).toEqual({})
-    expect(risk.loaded).toBe(false)
-    expect(payKey.current).toEqual({})
-    expect(payKey.loaded).toBe(false)
-  })
   it('changePassword 成功:更新 user 且 mustChangePassword 清零', async () => {
     ;(fetchMe as any).mockResolvedValue({ ...U, mustChangePassword: true })
     const s = useAuthStore()
@@ -143,26 +110,5 @@ describe('stores/auth 访问控制', () => {
     expect(s.firstAllowedPath()).toBe('/data')
     s.user = { account: 'c', displayName: 'c', isSuper: false, allowedPages: [], allowedL4: [] }
     expect(s.firstAllowedPath()).toBe('/login')
-  })
-  it('firstAllowedPath:普通账号仅 projects-key 权限→/projects/key', () => {
-    const s = useAuthStore()
-    s.user = { account: 'k', displayName: 'k', isSuper: false, allowedPages: ['projects-key'], allowedL4: [] }
-    expect(s.firstAllowedPath()).toBe('/projects/key')
-  })
-  // 回归:新增页面分区必须并入 firstAllowedPath 的 nav 全集,否则只授权该分区的账号
-  // 在全集里找不到任何有权链接 → 被踢回 /login → 登录后又被弹回,死循环。
-  it('firstAllowedPath:普通账号仅倚天权限→/yitian(不得被踢回 /login)', () => {
-    const s = useAuthStore()
-    s.user = { account: 'y', displayName: 'y', isSuper: false, allowedPages: ['yitian'], allowedL4: [] }
-    expect(s.firstAllowedPath()).toBe('/yitian')
-    s.user = { account: 'y2', displayName: 'y2', isSuper: false, allowedPages: ['yitian-trend'], allowedL4: [] }
-    expect(s.firstAllowedPath()).toBe('/yitian/trend')
-  })
-  // 回归:只授权概算工具的账号必须落到 /budget,不得被踢回 /login(否则登录死循环)
-  it('firstAllowedPath:普通账号仅 budget 权限→/budget', () => {
-    const s = useAuthStore()
-    s.user = { account: 'g', displayName: 'g', isSuper: false,
-               allowedPages: ['budget'], allowedL4: [] }
-    expect(s.firstAllowedPath()).toBe('/budget')
   })
 })

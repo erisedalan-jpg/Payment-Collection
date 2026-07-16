@@ -5,7 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
 import { api } from '@/api/client'
-import { pingAgent, fetchPmisCookie, fetchYitianCookie } from '@/lib/cookieAgent'
+import { pingAgent, fetchPmisCookie } from '@/lib/cookieAgent'
 import { usePmisSync } from '@/composables/usePmisSync'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
@@ -16,8 +16,6 @@ import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
 import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
-import YitianScopeCard from '@/components/YitianScopeCard.vue'
-import YitianStoreCard from '@/components/YitianStoreCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -47,11 +45,9 @@ async function onPmisUpload() {
 
 // —— 项目域文件(input/ 根) ——
 const { upload: inputsUpload, INPUT_FILE_NAMES } = useInputFiles()
-const YITIAN_FILE_NAMES = ['工时.xlsx', 'holidays.csv']
 // 展示名单:legacy xlsx 仅作上传兼容不展示
 const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES
   .filter((n) => n !== 'delivery_analysis.xlsx')
-  .filter((n) => !YITIAN_FILE_NAMES.includes(n))   // 倚天两文件单独成组展示
 const inputsInput = ref<HTMLInputElement | null>(null)
 const inputsUploadMsg = ref('')
 async function onUploadInputs() {
@@ -61,35 +57,6 @@ async function onUploadInputs() {
   inputsUploadMsg.value = `已上传 ${ok}/${files.length} 个项目域文件,请点[更新数据]生效`
   if (inputsInput.value) inputsInput.value.value = ''
   loadFileStatus()
-}
-
-// —— 倚天工时域文件(input/yitian/) ——
-const yitianInput = ref<HTMLInputElement | null>(null)
-const yitianUploadMsg = ref('')
-async function onUploadYitian() {
-  const files = Array.from(yitianInput.value?.files || [])
-  if (!files.length) return
-  const ok = await inputsUpload(files)      // 复用既有 useInputFiles().upload,白名单已含倚天两文件
-  yitianUploadMsg.value = `已上传 ${ok}/${files.length} 个倚天文件，请点[更新数据]生效`
-  if (yitianInput.value) yitianInput.value.value = ''
-  loadFileStatus()
-}
-
-/** holidays.csv 模板:前端生成 Blob 下载,不需要后端。 */
-function onDownloadHolidayTemplate() {
-  const lines = [
-    '日期,类型',
-    '2026-01-01,休',
-    '2026-02-16,休',
-    '2026-02-14,班',
-  ]
-  // BOM 让 Excel 打开不乱码
-  const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = 'holidays.csv'
-  a.click()
-  URL.revokeObjectURL(a.href)
 }
 
 // —— 更新数据 / 设置 ——
@@ -102,15 +69,9 @@ const cookieStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessio
 const cookieMsg = ref('')
 const cookieErr = ref(false)
 const agentOnline = ref(false)
-const yitianStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessionPreview: '', updatedAt: '' })
-const yitianMsg = ref('')
-const yitianErr = ref(false)
 
 async function checkAgent() {
   agentOnline.value = await pingAgent()
-}
-async function loadYitianStatus() {
-  try { yitianStatus.value = await api.get('/api/yitian/cookie') } catch { /* 未登录/缺接口静默 */ }
 }
 
 async function onFetchPmisCookie() {
@@ -128,19 +89,6 @@ async function onFetchPmisCookie() {
     cookieMsg.value = `已获取并推送 PMIS cookie（${res.names.length} 项）`
   } catch (e) {
     cookieErr.value = true; cookieMsg.value = '推送失败：' + (e instanceof Error ? e.message : String(e))
-  }
-}
-
-async function onFetchYitianCookie() {
-  yitianMsg.value = ''; yitianErr.value = false
-  const res = await fetchYitianCookie()
-  if (!res.ok) { yitianErr.value = true; yitianMsg.value = '倚天 cookie 获取失败：' + res.error; return }
-  try {
-    const r = await api.post<{ sessionPreview: string }>('/api/yitian/cookie', { cookie: res.cookie })
-    yitianStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
-    yitianMsg.value = `已获取并存储倚天 cookie（${res.names.length} 项，备用）`
-  } catch (e) {
-    yitianErr.value = true; yitianMsg.value = '存储失败：' + (e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -247,8 +195,8 @@ const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => f
 const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
 
 onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load(); loadCookieStatus() })
-onMounted(() => { checkAgent(); loadYitianStatus() })
-defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
+onMounted(() => { checkAgent() })
+defineExpose({ onFetchPmisCookie, checkAgent })
 </script>
 
 <template>
@@ -258,7 +206,7 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
     </div>
 
     <DataStatusBar :last-update="lastUpdate" :last-pmis="lastPmis" :agent-online="agentOnline"
-      :cookie-status="cookieStatus" :yitian-status="yitianStatus" />
+      :cookie-status="cookieStatus" />
 
     <!-- 主操作:更新看板 -->
     <div class="dv-card dv-primary">
@@ -327,44 +275,6 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
           <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
           <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
         </div>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">倚天工时域</div>
-        <div class="dv-sub-head">倚天工时域（input/yitian/）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in YITIAN_FILE_NAMES" :key="name" class="dv-fcell" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
-          </div>
-        </div>
-        <div class="dv-row dv-actions">
-          <input ref="yitianInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-          <button class="dv-btn" @click="onUploadYitian">上传倚天文件</button>
-          <button class="dv-btn" @click="onDownloadHolidayTemplate">下载 holidays.csv 模板</button>
-          <span v-if="yitianUploadMsg" class="dv-hint">{{ yitianUploadMsg }}</span>
-        </div>
-        <div class="dv-hint dv-fmt">
-          holidays.csv 格式（UTF-8，两列）：<code>日期,类型</code>；类型只有两种——
-          <code>休</code>=法定假/调休放假（即使落在周一~周五），<code>班</code>=调休上班（即使落在周末）。
-          未列出的日期按「周一~周五为工作日」处理。不提供该文件时全站按纯周一~周五近似，
-          含节假日的周期饱和度会偏低。
-        </div>
-
-        <div class="dv-row dv-actions">
-          <button class="dv-btn" data-test="btn-fetch-yitian-cookie" @click="onFetchYitianCookie">获取本机倚天 cookie 并存储</button>
-          <span class="dv-hint">当前 {{ yitianStatus.sessionPreview || '-' }} · 更新于 {{ yitianStatus.updatedAt || '-' }}</span>
-        </div>
-        <div v-if="yitianMsg" class="dv-row dv-hint" :class="yitianErr ? 'err' : 'ok'">{{ yitianMsg }}</div>
-
-        <el-collapse v-if="auth.isSuper" class="dv-more">
-          <el-collapse-item name="yitian-scope" title="合规检查范围（超管）">
-            <YitianScopeCard />
-          </el-collapse-item>
-          <el-collapse-item name="yitian-store" title="累积数据管理（超管）">
-            <YitianStoreCard />
-          </el-collapse-item>
-        </el-collapse>
       </div>
 
       <div class="dv-card">
@@ -512,7 +422,7 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 }
 .dv-primary .dv-card-head { color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
 
-/* 六大功能卡:①更新看板独占一行,②-⑥按功能域自适应换列 */
+/* 五大功能卡:①更新看板独占一行,②-⑤按功能域自适应换列 */
 .dv-domain-grid {
   display: grid;
   gap: var(--gap-card);

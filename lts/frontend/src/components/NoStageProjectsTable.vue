@@ -19,7 +19,7 @@ const rows = computed(() => noStageProjects(data.data?.projects ?? [], data.data
 
 const { paged, currentPage, pageSize } = usePagedRows(rows, 20)
 
-// contractWan 已是万元(noStageProjects 内已 /10000)，此处只格式化千分位，不再用 fmtWan 二次除万（同 KeyProjectsView.vue contractWan 列约定）
+// contractWan 已是万元(noStageProjects 内已 /10000)，此处只格式化千分位，不再用 fmtWan 二次除万
 const COLS: DataColumn[] = [
   { key: 'projectId', label: '项目编号', width: 160, sortable: true },
   { key: 'projectName', label: '项目名称', wrap: true, sortable: true },

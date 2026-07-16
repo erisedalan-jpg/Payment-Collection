@@ -3,26 +3,20 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
+import { PROJECT_LINKS, ANALYSIS_LINKS, PAYMENT_LINKS, TOOL_LINKS } from '@/nav'
 
 const ui = useUiStore()
 const auth = useAuthStore()
 const route = useRoute()
 const projectLinks = computed(() => PROJECT_LINKS.filter((l) => auth.canAccess(l.key)))
 const analysisLinks = computed(() => ANALYSIS_LINKS.filter((l) => auth.canAccess(l.key)))
-const keyFollowupLinks = computed(() => KEY_FOLLOWUP_LINKS.filter((l) => auth.canAccess(l.key)))
 const paymentLinks = computed(() => PAYMENT_LINKS.filter((l) => auth.canAccess(l.key)))
-const yitianLinks = computed(() => YITIAN_LINKS.filter((l) => auth.canAccess(l.key)))
 const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key)))
 
 const activeSectionKey = computed(() => {
   const p = route.path
-  if (p.startsWith('/projects/key')) return 'keyfollowup'
-  if (p.startsWith('/opportunities/key')) return 'keyfollowup'
-  if (p.startsWith('/opportunities/board')) return 'analysis'
   if (p.startsWith('/insight')) return 'analysis'
   if (p.startsWith('/payment')) return 'payment'
-  if (p.startsWith('/yitian')) return 'yitian'
   if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
   if (p.startsWith('/admin')) return 'admin'
   return 'project'
@@ -59,32 +53,12 @@ function onToggle(key: string) {
         </div>
       </div>
 
-      <div v-if="keyFollowupLinks.length" class="section" :class="{ collapsed: !expanded('keyfollowup') }">
-        <button type="button" class="section-label" @click="onToggle('keyfollowup')">
-          <span class="section-caret">{{ expanded('keyfollowup') ? '▾' : '▸' }}</span>重点跟进
-        </button>
-        <div v-show="expanded('keyfollowup')" class="section-links">
-          <RouterLink v-for="link in keyFollowupLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
       <div v-if="paymentLinks.length" class="section" :class="{ collapsed: !expanded('payment') }">
         <button type="button" class="section-label" @click="onToggle('payment')">
           <span class="section-caret">{{ expanded('payment') ? '▾' : '▸' }}</span>回款<span class="section-tag">重点子域</span>
         </button>
         <div v-show="expanded('payment')" class="section-links">
           <RouterLink v-for="link in paymentLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
-      <div v-if="yitianLinks.length" class="section" :class="{ collapsed: !expanded('yitian') }">
-        <button type="button" class="section-label" @click="onToggle('yitian')">
-          <span class="section-caret">{{ expanded('yitian') ? '▾' : '▸' }}</span>倚天工时
-        </button>
-        <div v-show="expanded('yitian')" class="section-links">
-          <RouterLink v-for="link in yitianLinks" :key="link.to" :to="link.to"
             class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
         </div>
       </div>
@@ -126,7 +100,7 @@ function onToggle(key: string) {
 .section-caret { display: inline-block; width: 12px; margin-right: var(--sp-2); color: var(--mut); font-size: var(--fs-1); }
 .group-label { font-size: var(--fs-1); color: var(--sub); padding: var(--sp-2) var(--sp-4) 2px; }
 /* 全部分区子项统一为二级缩进样式(.nav-sub):字号 --fs-1、左缩进 30px,
-   六个分区(项目/项目分析/重点跟进/回款/工具/系统管理)子项对齐一致。 */
+   各分区(项目/项目分析/回款/工具/系统管理)子项对齐一致。 */
 .nav-sub { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4) var(--sp-2) 30px;
   font-size: var(--fs-1); color: var(--txt); text-decoration: none;
   transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
