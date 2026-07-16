@@ -90,6 +90,7 @@ data/yitian_config.json
 data/yitian_config.json.tmp
 data/yitian_settings.json
 data/yitian_settings.json.tmp
+data/yitian_rules.json
 # 概算工具(V3.1.0):费率配置 = 对外销售单价;报价存档 = 客户名称/项目金额/销售姓名/整份报价明细。
 # 都是对外商务数据,绝不入库(一次 git add -A 就洗不掉了)。
 data/budget_config.json
