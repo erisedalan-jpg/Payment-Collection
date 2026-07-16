@@ -6,7 +6,7 @@
 
 ## 1. 这是什么
 
-一个**单机/内网离线**运行的项目管理与回款（收款）跟踪看板。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**。数据来源 = PMIS 导出 + CSV，经页面上传或本地放置进入 `input/`（PMIS 9 表放 `input/pmis/`，收款阶段/回款流水/预算等 CSV 放 `input/`），`组织架构.xlsx` 决定项目花名册，`A.xlsx` 售前↔原项目映射；登录后在「数据管理」页点「更新数据」（`/api/reprocess`，SSE 流式进度）生效。可用 PyInstaller 打包成单 exe 分发。
+一个**单机/内网离线**运行的项目管理与回款（收款）跟踪看板。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**。数据来源 = PMIS 导出 + CSV，经页面上传或本地放置进入 `input/`（PMIS 9 表放 `input/pmis/`，收款阶段/回款流水/预算等 CSV 放 `input/`），`组织架构.xlsx` 决定项目花名册，`A.xlsx` 售前↔原项目映射；登录后在「数据管理」页点「更新数据」（`/api/reprocess`，SSE 流式进度）生效。（可选）如需可用 PyInstaller 打包为单 exe 分发，须按当前保留模块自备打包 spec。
 
 - 当前版本：见 `frontend/src/version.ts`（撰写时 **LTS-1.0.0**；单一来源，改版本只改此处）。
 - 访问地址：`http://localhost:8080`
