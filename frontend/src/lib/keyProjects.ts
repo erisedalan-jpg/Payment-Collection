@@ -17,6 +17,7 @@ export interface KeyProjectRow {
   weekProgress: string; weekProgressEditTime: string; weekProgressEditBy: string
   nextPlan: string; nextPlanEditTime: string; nextPlanEditBy: string
   followDate: string; followBy: string
+  setupDate: string | null
 }
 
 /** 重点项目:级别 P1 或(TOP1000 大客户 且 合同>100万元)。合同已由 paymentPmis.contract 上游回退原项目(售前)。 */
@@ -48,6 +49,7 @@ export function buildProgressRowBase(
     customer: v(p.customer, '-'),
     projectName: p.projectName || p.projectId,
     projectLevel: v(st.项目级别, '-'),
+    setupDate: st.立项日期 ?? null,
     projectManager: v(p.projectManager, '-'),
     ar: v(team.AR, '-'),
     sr: v(team.SR, '-'),
