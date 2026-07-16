@@ -39,6 +39,7 @@ import opportunity_followup as _oppf
 import risk_followup as _riskfu
 import payment_key_followup as _paykey
 import yitian_settings
+import yitian_rules_config
 import yitian_store
 import yitian
 import budget_config
@@ -214,6 +215,7 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/pmis/cookie', '/api/pmis/download',
     '/api/yitian/cookie',
     '/api/yitian/store/clear', '/api/yitian/store/delete-range',
+    '/api/yitian/rules',
     '/api/portal/upload',
 })
 
@@ -307,8 +309,10 @@ def _load_analysis_cached():
 
 YITIAN_DATA_FILE = os.path.join(BASE_DIR, 'data', 'yitian_data.json')
 YITIAN_SETTINGS_FILE = os.path.join(BASE_DIR, 'data', 'yitian_settings.json')
+YITIAN_RULES_FILE = os.path.join(BASE_DIR, 'data', 'yitian_rules.json')
 YITIAN_STORE_FILE = os.path.join(BASE_DIR, 'data', 'yitian_store.json')
 _yitian_settings_lock = threading.RLock()
+_yitian_rules_lock = threading.RLock()
 _yitian_store_lock = threading.RLock()
 
 _yitian_cache = {'mtime': None, 'data': None}
@@ -772,6 +776,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_data()
         elif parsed.path == '/api/yitian/settings':
             self.handle_yitian_settings_get()
+        elif parsed.path == '/api/yitian/rules':
+            self.handle_yitian_rules_get()
         elif parsed.path == '/api/yitian/store':
             self.handle_yitian_store_get()
         elif parsed.path == '/api/budget/config':
@@ -925,6 +931,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_yitian_cookie_save()
         elif parsed.path == '/api/yitian/settings':
             self.handle_yitian_settings_save()
+        elif parsed.path == '/api/yitian/rules':
+            self.handle_yitian_rules_save()
         elif parsed.path == '/api/yitian/store/clear':
             self.handle_yitian_store_clear()
         elif parsed.path == '/api/yitian/store/delete-range':
@@ -2491,6 +2499,42 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                         detail='剔除类型: ' + ('、'.join(clean['excludedTypes']) or '(无)'))
         self._send_json(200, {"success": True, "settings": clean})
 
+    def handle_yitian_rules_get(self):
+        """GET /api/yitian/rules - 合规规则配置。超管专属(路径已在 _SUPER_ONLY_PATHS)。"""
+        if self._require_super() is None:
+            return
+        self._send_json(200, {"success": True,
+                              "rules": yitian_rules_config.load_config(YITIAN_RULES_FILE)})
+
+    def handle_yitian_rules_save(self):
+        """POST /api/yitian/rules - 超管专属。先算通再落盘:新规则先在内存 build+schema 跑通,
+        成功才落 yitian_rules.json + yitian_data.json;任一步失败两文件都不动。改完立即生效,无需更新数据。"""
+        if self._require_super() is None:
+            return
+        body = self._read_json_body()
+        if body is None:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON"))
+            return
+        try:
+            cfg = yitian_rules_config.validate_config(body)
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        with _yitian_rules_lock:
+            store = yitian_store.load_store(YITIAN_STORE_FILE)
+            try:
+                data = self._rebuild_yitian_data(store, rules_cfg=cfg)   # 先算通(并写 yitian_data)
+            except Exception as e:
+                self._send_json(500, _error_payload(
+                    ERR_INTERNAL, "规则未生效,配置与下发数据均未变更: %s" % e))
+                return
+            clean = yitian_rules_config.save_config(YITIAN_RULES_FILE, cfg)   # 跑通才落配置
+        problem = sum(1 for e in data["entries"] if e["ok"] == 2) if data else 0
+        disabled = [k for k, v in clean["checks"].items() if not v["enabled"]]
+        self._audit_set(target='倚天合规规则',
+                        detail='保存合规规则；停用: ' + ('、'.join(disabled) or '(无)'))
+        self._send_json(200, {"success": True, "rules": clean, "problemCount": problem})
+
     # ── 概算工具 /budget ──
 
     def handle_budget_config_get(self):
@@ -2625,19 +2669,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._audit_set(target=name, detail='删除报价')
         self._send_json(200, {"success": True})
 
-    def _rebuild_yitian_data(self, store):
-        """用给定的(可能已在内存中变更但**尚未落盘**的)累积库重建 data/yitian_data.json。
-
-        I-2:"先算通再落盘"两阶段提交 —— build/schema 校验全部在内存里做完,调用方
-        (两个写端点)只在本方法**不抛异常**时才把 store 落盘;任一步失败,磁盘上的
-        累积库文件和下发 JSON 都保持原样,不会出现"库已改并落盘、下发数据却还是旧的"
-        三方不一致。异常不吞、原样向上抛,由调用方决定 500 响应文案。
-        缓存置空放进 finally:缓存宁可空(下次重新读)也不能脏。
-        累积库空 → 删掉下发文件(M-5:写/删同一目录统一用 YITIAN_DATA_FILE 派生,
-        不再各自维护一份 os.path.join(BASE_DIR,'data'),避免测试只 monkeypatch 一个
-        导致写到真实 data/yitian_data.json)。"""
+    def _rebuild_yitian_data(self, store, rules_cfg=None):
+        """用给定累积库(可能内存已改未落盘)重建 data/yitian_data.json。rules_cfg 传入则用之(保存规则的
+        「先算通再落盘」),否则 build 内部读 data/yitian_rules.json 或默认。返回 build 出的 data(或 None)。"""
+        data = None
         try:
-            data = yitian.build_yitian_data(BASE_DIR, store=store)
+            data = yitian.build_yitian_data(BASE_DIR, store=store, rules_cfg=rules_cfg)
             if data is None:
                 try:
                     os.remove(YITIAN_DATA_FILE)
@@ -2649,6 +2686,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             with _yitian_cache_lock:
                 _yitian_cache['mtime'] = None
                 _yitian_cache['data'] = None
+        return data
 
     def handle_yitian_store_get(self):
         """GET /api/yitian/store - 累积状态(行数/覆盖区间)。登录 + 任一倚天页面授权。"""
