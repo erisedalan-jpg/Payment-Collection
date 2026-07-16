@@ -18,6 +18,7 @@ import config
 import yitian_calendar as CAL
 import yitian_check as CHK
 import yitian_rules as R
+import yitian_rules_config as RCFG
 import yitian_store as STORE
 from projects import read_org_roster, read_sheet_by_header, read_sheet_headers, read_top1000
 
@@ -147,7 +148,8 @@ def ingest(base_dir: str) -> Optional[dict]:
     return {"added": added, "updated": updated, "skipped": skipped, "total": len(store["rows"])}
 
 
-def build_yitian_data(base_dir: str, store: Optional[dict] = None) -> Optional[dict]:
+def build_yitian_data(base_dir: str, store: Optional[dict] = None,
+                      rules_cfg: Optional[dict] = None) -> Optional[dict]:
     """完整倚天数据 dict,**从累积库构建**(每周导出先 ingest() 进库,这里读全量库)。
     累积库为空 → None(调用方跳过,不阻断主管线)。
 
@@ -156,6 +158,8 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None) -> Optional[d
     server.py 的两个写端点先在内存里改 store、用它 build 出新数据、校验通过才落盘,
     build/schema 校验失败就不会出现"累积库已改、下发 JSON 还是旧的"三方不一致。"""
     input_dir = os.path.join(base_dir, "input")
+    if rules_cfg is None:
+        rules_cfg = RCFG.load_config(os.path.join(base_dir, "data", "yitian_rules.json"))
     if store is None:
         store = STORE.load_store(store_path(base_dir))
     rows = store["rows"]
@@ -188,7 +192,7 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None) -> Optional[d
         # 对每一行都跑判定 —— 是否计入合规率由超管配置的 excludedTypes 决定,前端现算。
         # 后端绝不预判:那等于把"剔除哪些类型"这条口径二次硬编码进数据文件,改配置也不生效。
         # 管理类/业务类/假期类没有必填字段规则,check_row 对它们天然返回空码。
-        codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""))
+        codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""), rules_cfg)
         ok = CHK.ok_of(codes)
         entries.append({
             "d": r["date"],
