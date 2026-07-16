@@ -1,6 +1,7 @@
-"""打包服务器部署 zip:含运行所需全部代码 + frontend/dist(/pm 构建) + 全部数据文件(data/、input/)。
+"""打包全量部署 zip(对外交付,**不含业务数据**):含运行所需全部代码 + frontend/(源码 + 已构建 dist)。
+不含 data/、input/(业务数据,部署后按 deploy/ 手册准备并放入);
 排除 node_modules/.git/.venv/__pycache__/build/docs/log/tests 等无关项。
-用法: python make_deploy_zip.py
+用法: 先构建前端(cd frontend && npm run build) → python make_deploy_zip.py
 产物: pmplatform-deploy-<版本>.zip(版本取自 frontend/src/version.ts;解压出 pmplatform/ 顶层目录)。"""
 import os
 import re
@@ -35,11 +36,11 @@ TOP_FILES = [
     "manual_history.py",
     "manual_import.py", "reset_super_password.py",
     "conftest.py", "requirements.txt", "requirements-dev.txt", "ruff.toml",
-    "verify.sh", "schema.json", "feature_list.json", "CLAUDE.md", "PROGRESS.md",
+    "verify.sh", "schema.json", "README.md", "CLAUDE.md",
     "app_icon.ico", "app_logo.png",
 ]
-# 顶层要打包的目录(递归;内部 SKIP_DIRS 名跳过)
-TOP_DIRS = ["frontend", "deploy", "data", "input", "fonts"]
+# 顶层要打包的目录(递归;内部 SKIP_DIRS 名跳过)。不含 data/、input/(对外交付无数据)
+TOP_DIRS = ["frontend", "deploy", "fonts"]
 SKIP_DIRS = {"node_modules", "__pycache__", ".git", ".pytest_cache", ".cache"}
 
 # pmisdata 按白名单纳入(避免打进时间戳备份目录与日志)
