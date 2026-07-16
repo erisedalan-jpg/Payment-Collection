@@ -1,9 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { MilestoneItem } from '@/types/analysis'
 
-// 项目里程碑表(R2 spec §3;S1 去行级三色——priority 仅数据保留供后续统计,UI 用通用表格色)
+// 项目里程碑表:整表按计划时间升序(缺计划时间排末尾);阶段验收款项(stage)整行淡强调底区分。
 const props = defineProps<{ items: MilestoneItem[] }>()
 const done = (i: MilestoneItem) => !!i.actualDate
+const sorted = computed(() => [...props.items].sort((a, b) => {
+  const pa = a.planDate || '', pb = b.planDate || ''
+  if (!pa && !pb) return 0
+  if (!pa) return 1
+  if (!pb) return -1
+  return pa < pb ? -1 : pa > pb ? 1 : 0
+}))
 </script>
 
 <template>
@@ -12,7 +20,7 @@ const done = (i: MilestoneItem) => !!i.actualDate
       <tr><th>里程碑</th><th>计划时间</th><th>实际时间</th><th>关联回款阶段</th><th>状态</th></tr>
     </thead>
     <tbody>
-      <tr v-for="(i, idx) in props.items" :key="idx">
+      <tr v-for="(i, idx) in sorted" :key="idx" :class="{ 'ms-stage': i.stage }">
         <td class="ms-name">{{ i.name }}</td>
         <td class="u-num">{{ i.planDate || '-' }}</td>
         <td class="u-num">{{ i.actualDate || '-' }}</td>
@@ -30,4 +38,6 @@ const done = (i: MilestoneItem) => !!i.actualDate
 .ms-name { color: var(--txt); font-weight: 600; }
 .ms-status { color: var(--mut); font-size: var(--fs-1); }
 .ms-status.done { color: var(--ok-text); font-weight: 600; }
+/* 阶段验收款项整行淡强调底(引用令牌,与状态语义色分离) */
+.ms-stage { background: var(--selected-tint); }
 </style>
