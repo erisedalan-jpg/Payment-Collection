@@ -18,6 +18,7 @@ import DataStatusBar from '@/components/DataStatusBar.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
 import YitianScopeCard from '@/components/YitianScopeCard.vue'
 import YitianStoreCard from '@/components/YitianStoreCard.vue'
+import YitianRulesCard from '@/components/YitianRulesCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -363,6 +364,9 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
           </el-collapse-item>
           <el-collapse-item name="yitian-store" title="累积数据管理（超管）">
             <YitianStoreCard />
+          </el-collapse-item>
+          <el-collapse-item v-if="auth.isSuper" name="yitian-rules" title="合规规则配置（超管）">
+            <YitianRulesCard />
           </el-collapse-item>
         </el-collapse>
       </div>
