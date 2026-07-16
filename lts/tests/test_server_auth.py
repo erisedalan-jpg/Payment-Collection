@@ -15,7 +15,7 @@ def test_login_me_logout_flow(tmp_path, monkeypatch):
     t.start()
     try:
         conn = http.client.HTTPConnection("127.0.0.1", port)
-        conn.request("POST", "/api/login", json.dumps({"account": "admin", "password": "wxtnb"}),
+        conn.request("POST", "/api/login", json.dumps({"account": "admin", "password": "admin123!"}),
                      {"Content-Type": "application/json"})
         r = conn.getresponse()
         assert r.status == 200
@@ -92,7 +92,7 @@ def test_auth_gate_blocks_unauthenticated(tmp_path, monkeypatch):
         assert ri.status == 401
         ri.read()
         # 登录拿 cookie
-        conn.request("POST", "/api/login", json.dumps({"account": "admin", "password": "wxtnb"}),
+        conn.request("POST", "/api/login", json.dumps({"account": "admin", "password": "admin123!"}),
                      {"Content-Type": "application/json"})
         r2 = conn.getresponse()
         cookie = r2.getheader("Set-Cookie").split(";")[0]
