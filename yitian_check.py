@@ -1,5 +1,6 @@
 # yitian_check.py
-"""倚天工时域:合规判定(纯函数)。规则常量全部来自 yitian_rules,本模块只写判定逻辑。
+"""倚天工时域:合规判定(纯函数)。判定所用规则全部来自传入的 cfg(yitian_rules_config 结构);
+本模块只写判定逻辑。cfg=None 时回落 default_config()。
 
 入参 row 是归一化后的 dict,键:work_type/content/date/service_mode/customer/
 product_line/product_name/project_type/work_type3/work_order。
@@ -9,19 +10,11 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Tuple
 
-import yitian_rules as R
-
-# 一级表的全量关键词(去掉云安全专属词),用于"正文是否含他家产品词"的判断
-_ALL_LINE_KWS = {
-    kw.lower()
-    for _, kws in R.PRODUCT_LINE_KEYWORDS
-    for kw in kws
-    if kw not in R.EXCLUSIVE_KWS
-}
+import yitian_rules as R   # 仅用非规则常量:ISSUE_LABELS / HINT_PREFIX / PRESALE_PROJECT_TYPE_KEY
 
 
 def corrected_work_type(project_type: str, work_type: str) -> str:
-    """数据校正:项目类型含「售前服务」→ 工时类型强制为「项目类」(纳入项目类检查与统计口径)。"""
+    """数据校正:项目类型含「售前服务」→ 工时类型强制为「项目类」。"""
     if R.PRESALE_PROJECT_TYPE_KEY in str(project_type or ""):
         return "项目类"
     return work_type
@@ -38,44 +31,54 @@ def peer_contents(rows: List[dict]) -> Dict[str, str]:
     return out
 
 
-def _check_product(row: dict, peer: str) -> Tuple[List[str], List[str]]:
+def _keywords_re(keywords: List[str]) -> str:
+    """关键词列表拼成 (a|b|c),各词 re.escape(默认词无特殊字符,行为与旧正则一致)。"""
+    return "(" + "|".join(re.escape(k) for k in keywords) + ")"
+
+
+def _all_line_kws(cfg: dict) -> set:
+    """他家产品词全集(去专属词),按 cfg 现算(不再 import 期固化为模块常量)。"""
+    exclusive = set(cfg["checks"]["product"].get("exclusiveKws", []))
+    return {kw.lower()
+            for entry in cfg["checks"]["product"]["lineKeywords"]
+            for kw in entry["keywords"]
+            if kw not in exclusive}
+
+
+def _check_product(row: dict, peer: str, cfg: dict) -> Tuple[List[str], List[str]]:
     """产品类别:两级复核 + 同工单关联。返回 ([code], [msg]) 或 ([], [])。"""
+    pc = cfg["checks"]["product"]
     line = str(row.get("product_line") or "").strip()
     name = str(row.get("product_name") or "").strip()
     content = str(row.get("content") or "")
     if not line or line.lower() in ("nan", "none", "-"):
         return [], []
-
-    # 正文含"项目管理" → 不做产品归属判断
     if "项目管理" in content:
         return [], []
 
     own = None
-    for patterns, kws in R.PRODUCT_LINE_KEYWORDS:
-        if any(p in line for p in patterns):
-            own = kws
+    for entry in pc["lineKeywords"]:
+        if any(p in line for p in entry["linePatterns"]):
+            own = entry["keywords"]
             break
     if own is None:
-        return [], []            # 产品线不在表中 → 跳过
+        return [], []
 
     low = content.lower()
     if any(kw.lower() in low for kw in own):
-        return [], []            # 一级命中本产品词 → 合格
-
-    # 同工单关联:同工单其他工时的正文命中本产品词 → 合格
+        return [], []
     if peer and any(kw.lower() in peer.lower() for kw in own):
         return [], []
 
     own_low = {kw.lower() for kw in own}
-    hits = sorted(kw for kw in (_ALL_LINE_KWS - own_low) if kw in low)
+    hits = sorted(kw for kw in (_all_line_kws(cfg) - own_low) if kw in low)
     if not hits:
-        return [], []            # 既无本产品词也无他家词 → 无法判断,不报错
+        return [], []
 
-    # 二级复核:按产研侧产品名称匹配,命中则覆盖一级报错
     if name and name.lower() not in ("nan", "none", "-", "其他"):
-        for patterns, kws in R.PRODUCT_NAME_KEYWORDS:
-            if any(p in name for p in patterns):
-                if any(kw.lower() in low for kw in kws):
+        for entry in pc["nameKeywords"]:
+            if any(p in name for p in entry["namePatterns"]):
+                if any(kw.lower() in low for kw in entry["keywords"]):
                     return [], []
                 break
 
@@ -86,66 +89,77 @@ def _check_product(row: dict, peer: str) -> Tuple[List[str], List[str]]:
     return ["PRODUCT_MISMATCH"], [msg]
 
 
-def check_row(row: dict, peer: str = "") -> Tuple[List[str], List[str]]:
-    """单行合规判定 → (问题码列表, 中文消息列表),两者一一对应。
-    仅项目类/售前类/售后类进入检查,其余类型(含管理类)直接合规(无必填字段规则,无可检之处)。"""
+def check_row(row: dict, peer: str = "", cfg: dict = None) -> Tuple[List[str], List[str]]:
+    """单行合规判定 → (问题码列表, 中文消息列表)。cfg=None 用默认配置。
+    仅 cfg['checkedTypes'] 内的工时类型进检查;每检查项先看 enabled。"""
+    if cfg is None:
+        import yitian_rules_config as RC
+        cfg = RC.default_config()
+
     work_type = str(row.get("work_type") or "")
-    if work_type not in R.CHECKED_TYPES:
+    if work_type not in cfg["checkedTypes"]:
         return [], []
 
     content = str(row.get("content") or "")
+    checks = cfg["checks"]
     codes: List[str] = []
     msgs: List[str] = []
 
-    # 1) 必填三段(全文模糊匹配)
-    for code, pattern in (
-        ("MISS_SUMMARY", R.SUMMARY_RE),
-        ("MISS_PROGRESS", R.PROGRESS_RE),
-        ("MISS_NEXT", R.NEXT_RE),
-    ):
-        if not re.search(pattern, content, re.IGNORECASE):
-            codes.append(code)
-            msgs.append(R.ISSUE_LABELS[code])
+    # 1) 必填三段(全文模糊匹配,大小写不敏感)
+    for key, code in (("summary", "MISS_SUMMARY"), ("progress", "MISS_PROGRESS"), ("next", "MISS_NEXT")):
+        c = checks[key]
+        if c["enabled"] and c["keywords"]:
+            if not re.search(_keywords_re(c["keywords"]), content, re.IGNORECASE):
+                codes.append(code)
+                msgs.append(R.ISSUE_LABELS[code])
 
     # 2) 服务方式:读列非空;早于生效日豁免(ISO 日期串字典序可直接比较)
-    date_s = str(row.get("date") or "")
-    if date_s >= R.SERVICE_MODE_EFFECTIVE_DATE:
-        if not str(row.get("service_mode") or "").strip():
-            codes.append("MISS_SERVICE_MODE")
-            msgs.append(R.ISSUE_LABELS["MISS_SERVICE_MODE"])
+    sm = checks["serviceMode"]
+    if sm["enabled"]:
+        if str(row.get("date") or "") >= sm["effectiveDate"]:
+            if not str(row.get("service_mode") or "").strip():
+                codes.append("MISS_SERVICE_MODE")
+                msgs.append(R.ISSUE_LABELS["MISS_SERVICE_MODE"])
 
-    # 3) 工时类型一致性(仅售前类/售后类)
-    forbidden = R.TYPE_MISMATCH_RULES.get(work_type)
-    if forbidden:
-        by_target: Dict[str, List[str]] = {}
-        for kw, target in forbidden:
-            if kw in content:
-                by_target.setdefault(target, []).append(kw)
-        if by_target:
-            parts = []
-            for target, kws in by_target.items():
-                parts.append("%s工时疑似含%s内容:%s"
-                             % (work_type, target, "、".join("[%s]" % k for k in kws)))
-            codes.append("TYPE_MISMATCH")
-            msgs.append(";".join(parts))
+    # 3) 工时类型一致性(禁止词 → 疑似填错类型)
+    tm = checks["typeMismatch"]
+    if tm["enabled"]:
+        forbidden = tm["rules"].get(work_type)
+        if forbidden:
+            by_target: Dict[str, List[str]] = {}
+            for kw, target in forbidden:
+                if kw in content:
+                    by_target.setdefault(target, []).append(kw)
+            if by_target:
+                parts = []
+                for target, kws in by_target.items():
+                    parts.append("%s工时疑似含%s内容:%s"
+                                 % (work_type, target, "、".join("[%s]" % k for k in kws)))
+                codes.append("TYPE_MISMATCH")
+                msgs.append(";".join(parts))
 
     # 4) 产品类别
-    pcodes, pmsgs = _check_product(row, peer)
-    codes.extend(pcodes)
-    msgs.extend(pmsgs)
+    if checks["product"]["enabled"]:
+        pcodes, pmsgs = _check_product(row, peer, cfg)
+        codes.extend(pcodes)
+        msgs.extend(pmsgs)
 
-    # 5) 客户名称一致性
-    if not str(row.get("customer") or "").strip():
-        if re.search(R.CUSTOMER_HINT_RE, content):
-            codes.append("MISS_CUSTOMER")
-            msgs.append("客户名称未填写,但工作内容中提到客户")
+    # 5) 客户名称一致性(客户列空但正文提到客户;大小写敏感,与旧口径一致)
+    cu = checks["customer"]
+    if cu["enabled"] and cu["hintKeywords"]:
+        if not str(row.get("customer") or "").strip():
+            if re.search(_keywords_re(cu["hintKeywords"]), content):
+                codes.append("MISS_CUSTOMER")
+                msgs.append("客户名称未填写,但工作内容中提到客户")
 
     # 6) 售前服务产品类别提示(只提示,不计不合规)
-    if R.PRESALE_PROJECT_TYPE_KEY in str(row.get("project_type") or ""):
-        if str(row.get("work_type3") or "") not in R.PRESALE_SKIP_WORKTYPES:
-            if str(row.get("product_line") or "").strip() == "其他":
-                codes.append("HINT_PRESALE_PRODUCT")
-                msgs.append(R.ISSUE_LABELS["HINT_PRESALE_PRODUCT"])
+    ph = checks["presaleProductHint"]
+    if ph["enabled"]:
+        if R.PRESALE_PROJECT_TYPE_KEY in str(row.get("project_type") or ""):
+            if str(row.get("work_type3") or "") not in ph["skipWorkTypes"]:
+                if str(row.get("product_line") or "").strip() == "其他":
+                    codes.append("HINT_PRESALE_PRODUCT")
+                    msgs.append(R.ISSUE_LABELS["HINT_PRESALE_PRODUCT"])
 
     return codes, msgs
 

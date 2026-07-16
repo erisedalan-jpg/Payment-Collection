@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """yitian_check.py 合规判定纯函数单测。"""
 import yitian_check as K
+import yitian_rules_config as RC
 
 
 def _row(**kw):
@@ -174,3 +175,83 @@ class TestOkOf:
 
     def test_issue_wins(self):
         assert K.ok_of(["HINT_PRESALE_PRODUCT", "MISS_SUMMARY"]) == 2
+
+
+# —— 回归安全网:默认 cfg(由 yitian_rules 装配)喂 check_row 必须与旧硬编码行为一致 ——
+# 复用文件顶部的 _row 辅助;新用例统一走 K.check_row(row, "", cfg)。
+def test_all_three_sections_present_ok():
+    r = _row(content="工作概述:巡检。工作进展:完成。下一步计划:复盘。")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert codes == []
+
+
+def test_missing_summary_and_next():
+    r = _row(content="工作进展:完成了部署。")   # 缺概述、缺下一步
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert "MISS_SUMMARY" in codes and "MISS_NEXT" in codes and "MISS_PROGRESS" not in codes
+
+
+def test_service_mode_missing_after_effective_date():
+    r = _row(content="工作概述x工作进展x下一步x", service_mode="", date="2026-05-10")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert "MISS_SERVICE_MODE" in codes
+
+
+def test_service_mode_exempt_before_effective_date():
+    r = _row(content="工作概述x工作进展x下一步x", service_mode="", date="2026-05-08")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert "MISS_SERVICE_MODE" not in codes
+
+
+def test_type_mismatch_presale_has_acceptance():
+    r = _row(work_type="售前类", content="工作概述x工作进展x下一步x 项目验收完成")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert "TYPE_MISMATCH" in codes
+
+
+def test_customer_missing_but_mentioned():
+    r = _row(content="工作概述x工作进展x下一步x 与客户沟通", customer="")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert "MISS_CUSTOMER" in codes
+
+
+def test_mgmt_type_not_checked():
+    codes, _ = K.check_row(_row(work_type="管理类", content=""), "", RC.default_config())
+    assert codes == []
+
+
+def test_product_mismatch_other_line_kw():
+    r = _row(content="工作概述x工作进展x下一步x 配置了防火墙策略", product_line="NGSOC")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert "PRODUCT_MISMATCH" in codes
+
+
+# —— 开关与词表可配 ——
+def test_disable_summary_check():
+    cfg = RC.default_config()
+    cfg["checks"]["summary"]["enabled"] = False
+    r = _row(content="工作进展x下一步x")     # 缺概述
+    codes, _ = K.check_row(r, "", cfg)
+    assert "MISS_SUMMARY" not in codes
+
+
+def test_disable_product_check():
+    cfg = RC.default_config()
+    cfg["checks"]["product"]["enabled"] = False
+    r = _row(content="工作概述x工作进展x下一步x 配置了防火墙策略", product_line="NGSOC")
+    codes, _ = K.check_row(r, "", cfg)
+    assert "PRODUCT_MISMATCH" not in codes
+
+
+def test_custom_summary_keyword():
+    cfg = RC.default_config()
+    cfg["checks"]["summary"]["keywords"] = ["今日小结"]
+    ok = _row(content="今日小结:做了A。工作进展x下一步x")
+    bad = _row(content="工作概述:做了A。工作进展x下一步x")   # 旧词不再算命中
+    assert "MISS_SUMMARY" not in K.check_row(ok, "", cfg)[0]
+    assert "MISS_SUMMARY" in K.check_row(bad, "", cfg)[0]
+
+
+def test_cfg_none_uses_default():
+    r = _row(content="工作进展x下一步x")
+    assert "MISS_SUMMARY" in K.check_row(r)[0]
