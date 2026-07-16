@@ -114,6 +114,13 @@ describe('buildProjectRows', () => {
     expect(rows[0].signUnit).toBe('上海伟仕佳杰科技有限公司')
     expect(rows[1].signUnit).toBe('-')
   })
+  it('setupDate 取 status.立项日期(缺 pmis → null)', () => {
+    const withDate = buildProjectRows([proj()], {
+      'QABJ-SS-1': { ...(PMIS['QABJ-SS-1'] as any), status: { ...(PMIS['QABJ-SS-1'] as any).status, 立项日期: '2019-06-24' } },
+    } as any)[0]
+    expect(withDate.setupDate).toBe('2019-06-24')
+    expect(buildProjectRows([proj()], {})[0].setupDate).toBeNull()
+  })
 })
 
 // Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags/riskCategory）
