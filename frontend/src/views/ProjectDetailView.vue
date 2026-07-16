@@ -372,7 +372,7 @@ const originInfo = computed(() => [
             <div class="pd-chips">
               <div v-for="it in progressInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
             </div>
-            <div class="pd-section-title">项目里程碑（来源：PMIS 里程碑计划；行色=优先级 红高/棕中/绿低）</div>
+            <div class="pd-section-title">项目里程碑（按计划时间排序；阶段验收款节点高亮）</div>
             <MilestoneTable v-if="myMilestones.length" :items="myMilestones" />
             <div v-else class="pd-note">未提供项目里程碑数据（input/pmis/ 里程碑两表）。</div>
           </section>
