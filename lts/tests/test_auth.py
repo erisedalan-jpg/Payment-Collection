@@ -25,36 +25,34 @@ def test_seed_then_authenticate(tmp_path, monkeypatch):
     assert auth.seed_default_accounts() is True
     assert os.path.exists(str(f))
     data = json.loads(f.read_text(encoding="utf-8"))
-    assert "admin" in data["users"] and "wangxutong" in data["users"]
+    assert "admin" in data["users"]
     assert data["users"]["admin"]["isSuper"] is True
     raw = f.read_text(encoding="utf-8")
-    assert "wxtnb" not in raw and "niubi" not in raw      # 明文不落盘
-    u = auth.authenticate("admin", "wxtnb")
+    assert "admin123!" not in raw                          # 明文不落盘
+    u = auth.authenticate("admin", "admin123!")
     assert u is not None and u["account"] == "admin" and u["isSuper"] is True
     assert "salt" not in u and "hash" not in u            # public_user 无哈希材料
     assert auth.authenticate("admin", "wrong") is None
     assert auth.authenticate("nobody", "x") is None
-    assert auth.authenticate("wangxutong", "niubi") is not None
     assert auth.seed_default_accounts() is False           # 已存在且无缺失→不动
 
 
 def test_seed_reconciles_missing_super(tmp_path, monkeypatch):
-    """已存在的账号库缺某个种子超管时,再次 seed 应补齐(不动既有账号/密码/权限)。"""
+    """已存在的账号库缺种子超管时,再次 seed 应补齐(不动既有账号/密码/权限)。"""
     f = _fresh(tmp_path, monkeypatch)
     assert auth.seed_default_accounts() is True
-    # 删掉一个种子超管,模拟新增配置超管前的旧库
+    # 追加一个非种子的既有账号,并删掉种子超管 admin,模拟缺失种子超管的旧库
     data = auth.load_accounts()
-    removed = auth._SEED_SUPERS[-1][0]
-    data["users"].pop(removed)
-    # 改一个既有超管的显示名,验证 reconcile 不覆盖既有
-    data["users"]["admin"]["displayName"] = "改过的名字"
+    data["users"]["operator"] = auth._make_user("op-pw", "运营", is_super=False)
+    data["users"].pop("admin")
     auth.save_accounts(data)
-    assert removed not in auth.load_accounts()["users"]
-    # 再次 seed:补回缺失的,返回 True;既有不动
+    assert "admin" not in auth.load_accounts()["users"]
+    # 再次 seed:补回缺失的 admin,返回 True;既有非种子账号不动
     assert auth.seed_default_accounts() is True
     after = auth.load_accounts()["users"]
-    assert removed in after and after[removed]["isSuper"] is True
-    assert after["admin"]["displayName"] == "改过的名字"   # 既有账号未被覆盖
+    assert "admin" in after and after["admin"]["isSuper"] is True
+    assert after["operator"]["isSuper"] is False           # 既有非种子账号未被覆盖
+    assert after["operator"]["displayName"] == "运营"      # 既有账号字段未被覆盖
     assert auth.seed_default_accounts() is False            # 再次无缺失
 
 

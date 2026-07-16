@@ -38,7 +38,6 @@ const SECTIONS = [
       <div class="about-k">产品名称</div><div class="about-v">项目管理平台</div>
       <div class="about-k">版本号</div><div class="about-v">{{ APP_VERSION }}</div>
       <div class="about-k">发布日期</div><div class="about-v">{{ RELEASE_DATE }}</div>
-      <div class="about-k">作者</div><div class="about-v">王叙潼牛逼</div>
     </div>
 
     <div v-for="sec in SECTIONS" :key="sec.title" class="about-feat-box">

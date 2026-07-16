@@ -6,11 +6,11 @@ import reset_super_password as rsp
 
 def test_reset_password_updates_hash(tmp_path, monkeypatch):
     monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(tmp_path / "accounts.json"))
-    auth.seed_default_accounts()              # 建种子超管 admin/wxtnb
-    assert auth.authenticate("admin", "wxtnb") is not None
+    auth.seed_default_accounts()              # 建种子超管 admin/admin123!
+    assert auth.authenticate("admin", "admin123!") is not None
     rsp.reset_password("admin", "NewStr0ngPass!")
     # 旧口令失效、新口令生效;盐已轮换
-    assert auth.authenticate("admin", "wxtnb") is None
+    assert auth.authenticate("admin", "admin123!") is None
     assert auth.authenticate("admin", "NewStr0ngPass!") is not None
 
 

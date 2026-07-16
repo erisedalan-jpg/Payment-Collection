@@ -35,7 +35,7 @@ def _start(tmp_path, monkeypatch):
     return srv, port
 
 
-def _login(port, account="admin", password="wxtnb"):
+def _login(port, account="admin", password="admin123!"):
     conn = http.client.HTTPConnection("127.0.0.1", port)
     conn.request("POST", "/api/login", json.dumps({"account": account, "password": password}),
                  {"Content-Type": "application/json"})

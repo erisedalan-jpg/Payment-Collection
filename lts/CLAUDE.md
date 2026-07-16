@@ -1,4 +1,4 @@
-# CLAUDE.md — 项目管理与回款跟踪平台（LTS 精简版）
+# CLAUDE.md — 项目管理与回款跟踪平台（LTS）
 
 > 本文件是 AI 代理在本仓库工作的**指令层**（harness: Instructions）。
 > 每次开始任务前先读本文件；完成后按「验证」一节跑 `verify.sh`。

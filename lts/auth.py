@@ -26,9 +26,7 @@ COOKIE_NAME = 'pmp_session'
 
 # 首次种子的超级管理员(离线内网工具的初始凭据来源;新增超管在此追加,随后对已存在的 accounts.json 另行补齐)
 _SEED_SUPERS = [
-    ('admin', 'wxtnb', '超级管理员'),
-    ('wangxutong', 'niubi', 'wangxutong'),
-    ('zhangyingzhe', 'venus600', 'zhangyingzhe'),
+    ('admin', 'admin123!', '超级管理员'),
 ]
 
 _file_lock = threading.Lock()
