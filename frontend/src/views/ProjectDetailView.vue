@@ -304,6 +304,7 @@ const originInfo = computed(() => [
           </div>
           <div class="pd-meta">
             <span>编号 <b>{{ p.projectId }}</b></span>
+            <span>立项日期 <b>{{ fmtDateCell(m.status?.立项日期) }}</b></span>
             <span>合同编号 <b>{{ p.合同编号 || '-' }}</b></span>
             <span>客户 <b>{{ p.customer || '-' }}</b></span>
             <span>TOP1000大客户 <b>{{ p.top1000 || '否' }}</b></span>

@@ -50,6 +50,8 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'projectId', label: '项目编号', width: 175 },
   { key: 'contractAmount', label: '合同金额(万)', width: 110, sortable: true,
     formatter: (v) => (v == null ? '-' : (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
+  { key: 'setupDate', label: '立项日期', width: 110, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
   { key: 'projectManager', label: '项目经理', width: 96, sortable: true },
   { key: 'orgL4', label: 'L4组', width: 110, sortable: true },
   { key: 'stage', label: '阶段', width: 100 },
@@ -71,7 +73,7 @@ const ALL_COLUMNS: DataColumn[] = [
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
-const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit'])
+const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate'])
 
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>

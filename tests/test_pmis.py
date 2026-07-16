@@ -502,3 +502,28 @@ def test_reconcile_无cost维度不崩():
     pp = {"NOCOST": {}}                                        # 项目无 cost 键
     profit = {"NOCOST": {"summary": {"预算成本": 7728.5}}}
     assert M.reconcile_cost_budget(pp, profit) == []
+
+
+class TestSetupDate:
+    def _tab(self, base_extra=None, status_extra=None):
+        base = {"项目编号": "SS-1", "项目名称": "甲"}
+        if base_extra:
+            base.update(base_extra)
+        status = {"项目编号": "SS-1"}
+        if status_extra:
+            status.update(status_extra)
+        return {"base": [base], "center": [{"项目编号": "SS-1"}], "status": [status], "risk": []}
+
+    def test_setup_date_from_base(self):
+        # base 与 status 都有时,取 base(基础信息 100% 填充,权威)
+        pm = M.build_project_pmis(self._tab({"立项日期": "2019-06-24"}, {"立项日期": "2000-01-01"}), {}, {"SS-1"})
+        assert pm["SS-1"]["status"]["立项日期"] == "2019-06-24"
+
+    def test_setup_date_fallback_status(self):
+        # base 无、status 有 → 取 status
+        pm = M.build_project_pmis(self._tab(None, {"立项日期": "2020-03-19"}), {}, {"SS-1"})
+        assert pm["SS-1"]["status"]["立项日期"] == "2020-03-19"
+
+    def test_setup_date_absent_is_none(self):
+        pm = M.build_project_pmis(self._tab(), {}, {"SS-1"})
+        assert pm["SS-1"]["status"]["立项日期"] is None

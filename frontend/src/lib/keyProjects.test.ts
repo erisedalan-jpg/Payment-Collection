@@ -96,3 +96,11 @@ describe('followDate / followBy', () => {
     expect(followBy({})).toBe('')
   })
 })
+
+describe('buildProgressRowBase setupDate', () => {
+  it('setupDate 取 st.立项日期(缺→null)', () => {
+    const r = buildProgressRowBase(proj(), pmis({ status: { 项目级别: 'P3', 立项日期: '2020-03-19' } }), {})
+    expect(r.setupDate).toBe('2020-03-19')
+    expect(buildProgressRowBase(proj(), pmis(), {}).setupDate).toBeNull()
+  })
+})
