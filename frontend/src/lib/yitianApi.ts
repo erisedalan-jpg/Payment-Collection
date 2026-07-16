@@ -1,5 +1,6 @@
 import { api } from '@/api/client'
 import type { YitianData } from '@/types/yitian'
+import type { YitianRulesConfig } from '@/lib/yitian/rulesConfig'
 
 /** 后端已按 allowedL4 切过数据;前端拿到什么就是该账号该看的全部。 */
 export async function getYitianData(): Promise<YitianData> {
@@ -47,4 +48,14 @@ export async function deleteYitianStoreRange(
   const r = await api.post<{ success: boolean; deleted: number; stats: YitianStoreStats }>(
     '/api/yitian/store/delete-range', { start, end })
   return { deleted: r.deleted, stats: r.stats }
+}
+
+export async function getYitianRules(): Promise<YitianRulesConfig> {
+  const r = await api.get<{ success: boolean; rules: YitianRulesConfig }>('/api/yitian/rules')
+  return r.rules
+}
+
+export async function saveYitianRules(cfg: YitianRulesConfig): Promise<{ rules: YitianRulesConfig; problemCount: number }> {
+  const r = await api.post<{ success: boolean; rules: YitianRulesConfig; problemCount: number }>('/api/yitian/rules', cfg)
+  return { rules: r.rules, problemCount: r.problemCount }
 }
