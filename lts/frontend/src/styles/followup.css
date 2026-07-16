@@ -1,0 +1,19 @@
+.kp-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
+.kp-label { font-size: var(--fs-1); color: var(--sub); }
+.kp-scroll { overflow-x: auto; }
+.kp-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.kp-empty { padding: var(--sp-5); color: var(--mut); text-align: center; }
+.kp-prog-cell { display: inline-block; white-space: pre-wrap; }
+.kp-prog-cell.editable { cursor: pointer; color: var(--accent); }
+.kp-archive-btn, .kp-export-btn, .kp-cancel {
+  font-size: var(--fs-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 2px var(--sp-3);
+  cursor: pointer;
+  background: var(--card2);
+  color: var(--accent);
+}
+.kp-archive-btn:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
+.kp-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kp-pager .u-num { font-size: var(--fs-1); color: var(--sub); }

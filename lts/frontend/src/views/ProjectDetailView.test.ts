@@ -1,0 +1,510 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import { createRouter, createMemoryHistory, type Router } from 'vue-router'
+import ProjectDetailView from './ProjectDetailView.vue'
+import { useDataStore } from '@/stores/data'
+import { useProjectTagsStore } from '@/stores/projectTags'
+
+vi.mock('@/lib/projectTagsApi', () => ({
+  getTags: () => Promise.resolve({ tags: [], assignments: {} }),
+  saveTags: () => Promise.resolve({ success: true }),
+}))
+
+let router: Router
+beforeEach(() => {
+  setActivePinia(createPinia())
+  router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div />' } },
+      { path: '/projects', component: { template: '<div />' } },
+      { path: '/project/:id', component: ProjectDetailView },
+    ],
+  })
+})
+
+function seed() {
+  const ds = useDataStore()
+  ds.data = {
+    meta: {}, dashboard: {}, summary: {},
+    displayColumns: {}, followupRecords: {},
+    rawNodes: [
+      { projectId: 'P-1', nodeName: '初验款', planDate: '2026-03-31', expectedPayment: 500000, actualPayment: 0, nodeStatus: '延期', delayDays: 30, tier: '50-100万', isPaymentRelated: true, expectedMilestoneDate: '2026-03-01', isMilestoneAchieved: '否', completionStatus: '未到期' },
+      { projectId: 'OLD-9', nodeName: '终验款', planDate: '2024-01-01', expectedPayment: 200000, actualPayment: 200000, nodeStatus: '已全额回款', tier: '50万以下', isPaymentRelated: true },
+    ],
+    projects: [
+      { projectId: 'P-1', projectName: '终端安全项目', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '', 合同编号: 'HT-2026-001', customer: '海聚博源',
+        payment: { relatedNodeCount: 1, expectedTotal: 500000, actualTotal: 0, remainingTotal: 500000, paymentRatio: 0, delayedCount: 1 },
+        deliveryCosts: [{ 类别: '内部人员成本', 预算金额: 122641.51, 实际发生: 0.0, 剩余预算: 122641.51, 消耗率: 0.0 }],
+        top1000: '是', quadrant: 'M1 战略核心区',
+        health: { overall: '风险' } },
+      { projectId: 'P-2', projectName: '售前服务-某局', projectManager: '李四', orgL4: 'B组', isPresale: true, relatedClosedId: 'OLD-9',
+        payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+        deliveryCosts: [], health: { overall: '关注' } },
+    ],
+    projectPmis: {
+      'P-1': {
+        progress: { 完工进展: 0.2, 里程碑进度状态: '延期', 项目阶段: '项目执行', 终验时间: '2028-01-31' },
+        status: { 项目状态: '实施中', 是否暂停: true, 评级: 'C' },
+        cost: { 总预算: 654051.9, 核算: 208745.13, 剩余预算: 445306.77, 消耗比: 0.319, 超支: false, 成本状态: '正常' },
+        risk: { 未关闭风险数: 1, 风险记录数: 2, 最高等级: '中', 闭环率: 0.5 },
+        customer: { 最终客户: '海聚博源', 合同总额: 5276000.0 },
+        team: { 项目经理: '何平', L4部门: '安全A组', L3部门: '安全事业部', L3_1部门: '三部一组', AR: 'AR张', SR: 'SR李', CSR: 'CSR王', CDR: 'CDR赵', Sponsor: 'Sponsor陈' },
+        riskRecords: [
+          { 风险编码: 'FX-1', 风险名称: '工期风险', 风险描述: '这是一段较长的风险描述文本用于验证换行展示不被截断', 风险等级: '中', 风险状态: '已识别', 风险大类: '进度', 识别日期: '2025-09-19T00:00:00', 计划应对完成日期: '2025-10-01T00:00:00', 实际应对完成日期: null, 是否超期: '否', 责任人: '何平', 备注: '附加说明列应作为全量列出现' },
+        ],
+      },
+      'OLD-9': { source: '已关闭', team: { 项目名称: '某局一期', 项目经理: '王五' }, customer: { 最终客户: '某局', 合同总额: 1000000 }, status: { 项目状态: '已验收' }, progress: { 项目阶段: '项目收尾', 完工进展: 1 } },
+    },
+    projectMilestones: {
+      'P-1': [
+        { name: '到货', planDate: '2026-06-19', actualDate: '', payStage: '到货款1，70.00%', pct: null, priority: 'high' },
+        { name: '终验', planDate: '2026-07-01', actualDate: '', payStage: '', pct: null, priority: 'high' },
+        { name: '项目关闭', planDate: '2026-08-01', actualDate: '', payStage: '', pct: null, priority: 'mid' },
+      ],
+      'OLD-9': [
+        { name: '服务完成', planDate: '2024-01-01', actualDate: '2024-01-02', payStage: '', pct: null, priority: 'high' },
+      ],
+    },
+    paymentRecords: {
+      'P-1': { total: 3250, count: 2, lastDate: '2026-06-04', records: [
+        { type: '实际回款', serial: 'BANK-1', payer: '某公司', amount: 2250, date: '2026-06-04', claimer: '马春艳', orderNo: 'N-1', currency: 'CNY', rate: 1, note: '' },
+        { type: '实际回款', serial: 'BANK-2', payer: '某公司', amount: 1000, date: '2026-05-27', claimer: '赵岩', orderNo: 'N-2', currency: 'USD', rate: 7.1, note: '' },
+      ] },
+    },
+    projectProfit: {
+      'P-1': { summary: { 预算收入: 1000000, 预算成本: 600000, 实际成本: 200000, 成本消耗率: 0.33, 预算毛利: 400000, 实际毛利: 100000, 预算毛利率: 0.4, 剩余预算: 400000 },
+        rows: [
+          { code: '1', name: '项目收入', level: 1, budget: 1000000, estimate: 900000, final: 950000, actual: 0, remaining: 1000000, rate: 0 },
+          { code: '2.1', name: '产品、商品成本', level: 2, budget: 100000, estimate: null, final: null, actual: 50000, remaining: 50000, rate: 0.5 },
+          { code: '2.1.1', name: '自有产品成本', level: 3, budget: 80000, estimate: null, final: null, actual: 40000, remaining: 40000, rate: 0.5 },
+          { code: '2.3', name: '人工成本', level: 2, budget: 200000, estimate: null, final: null, actual: 0, remaining: 200000, rate: 0 },
+          { code: '2.3.2', name: '交付部门人工成本', level: 3, budget: 150000, estimate: null, final: null, actual: 0, remaining: 150000, rate: 0 },
+        ], bridge: null },
+      'P-2': { summary: { 预算收入: null, 预算成本: null, 实际成本: null, 成本消耗率: null, 预算毛利: null, 实际毛利: null, 预算毛利率: null, 剩余预算: null },
+        rows: [], bridge: { ssId: 'OLD-9', summary: { 预算收入: 500000, 预算成本: 300000, 预算毛利: 200000, 预算毛利率: 0.4, 实际成本: 250000 },
+          rows: [{ code: '1', name: '项目收入', level: 1, budget: 500000, estimate: null, final: null, actual: 0, remaining: 500000, rate: 0 }] } },
+    },
+    events: [
+      { date: '2026-06-11', type: '到账', domain: 'payment', projectId: 'P-1', projectName: '终端安全项目', summary: '「初验款」到账 25 万' },
+      { date: '2026-06-10', type: '阶段变更', domain: 'project', projectId: 'P-9', projectName: '他人项目', summary: '不应出现' },
+    ],
+  } as any
+}
+
+async function mountAt(path: string) {
+  await router.push(path)
+  await router.isReady()
+  const w = mount(ProjectDetailView, {
+    global: { plugins: [ElementPlus, router], stubs: { FollowupRecords: true } },
+  })
+  await flushPromises()
+  return w
+}
+
+describe('ProjectDetailView', () => {
+  it('头部+指标条+默认回款 tab(节点表/汇总/跟进记录)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('终端安全项目')
+    expect(w.text()).toContain('海聚博源')
+    expect(w.text()).toContain('已暂停')      // 是否暂停=true 徽章
+    expect(w.text()).toContain('评级 C')
+    expect(w.text()).toContain('项目执行')
+    expect(w.find('.health-badge').text()).toBe('风险')
+    expect(w.text()).toContain('初验款')       // 项目动态事件
+    expect(w.text()).toContain('系统核心口径')  // 回款（系统核心口径）区块标题
+    expect(w.findComponent({ name: 'FollowupRecords' }).exists()).toBe(true)
+  })
+
+  it('进度里程碑 tab:仅 PMIS 项目里程碑表(3A 已下线回款里程碑表)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '进度里程碑')!.trigger('click')
+    expect(w.text()).toContain('项目里程碑')
+    expect(w.text()).toContain('到货款1，70.00%')   // PMIS 里程碑关联回款阶段
+    expect(w.text()).not.toContain('回款里程碑')     // 旧云文档口径表已下线
+  })
+
+  it('回款数据 tab:流水汇总 chips+明细表+非 CNY 汇率(R2)', async () => {
+    seed()
+    const ds0 = useDataStore()
+    ;(ds0.data as any).paymentRecords['P-1'].records[0] = {
+      ...(ds0.data as any).paymentRecords['P-1'].records[0],
+      billType: '背书', billDueDate: '2026-03-10', billProtocol: '',
+    }
+    ;(ds0.data as any).paymentRecords['P-1'].records[1] = {
+      ...(ds0.data as any).paymentRecords['P-1'].records[1],
+      billType: '', billDueDate: '', billProtocol: 'PROT-9',
+    }
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '回款数据')!.trigger('click')
+    expect(w.text()).toContain('累计回款(万)')
+    expect(w.text()).toContain('BANK-1')
+    expect(w.text()).toContain('马春艳')
+    expect(w.text()).toContain('USD(汇率 7.1)')
+    expect(w.text()).toContain('票据')            // 列表头
+    expect(w.text()).toContain('背书·2026-03-10')  // 类型·到期日
+    expect(w.text()).toContain('互抵:PROT-9')      // 仅协议号兜底
+  })
+
+  it('回款数据 tab:无流水显示未提供空态(R2)', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '回款数据')!.trigger('click')
+    expect(w.text()).toContain('未提供回款流水数据')
+  })
+
+  it('预算核算 tab:全预算汇总+科目树(默认展开 2.3 折叠 2.1)+PMIS/delivery 保留(R2)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '预算核算')!.trigger('click')
+    expect(w.text()).toContain('预算收入(元)')
+    expect(w.text()).toContain('交付部门人工成本')      // 2.3.2 默认可见
+    expect(w.text()).not.toContain('自有产品成本')       // 2.1.1 默认折叠
+    expect(w.text()).toContain('概算')
+    expect(w.text()).toContain('内部人员成本')           // delivery 明细保留
+    expect(w.text()).toContain('总预算(元)')             // PMIS 汇总保留
+  })
+
+  it('售前项目预算核算 tab:桥接原项目块(R2)', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '预算核算')!.trigger('click')
+    expect(w.text()).toContain('原项目预算核算')
+    expect(w.text()).toContain('OLD-9')
+    expect(w.text()).toContain('不计入当前汇总')
+  })
+
+  it('售前原项目 tab:原项目里程碑块(R2)', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '原项目')!.trigger('click')
+    expect(w.text()).toContain('原项目里程碑')
+    expect(w.text()).toContain('服务完成')
+  })
+
+  it('切风险 tab 显示聚合与明细行', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '风险')!.trigger('click')
+    expect(w.text()).toContain('工期风险')
+    expect(w.text()).toContain('2025-09-19') // fmtDateCell 截断
+    expect(w.text()).toContain('未关闭风险')
+  })
+
+  it('风险 tab:全量列(含非精选列 备注)展示 + 长文本换行不截断', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '风险')!.trigger('click')
+    await flushPromises()
+    const html = w.html()
+    // 非精选列(备注:不在 RISK_COLUMNS 13 列里)也作为表头出现 = 全量 43 列展示
+    expect(html).toContain('备注')
+    expect(w.text()).toContain('附加说明列应作为全量列出现')
+    // 长文本风险描述全文渲染(不截断)且挂换行类 dt-wrap-col
+    expect(w.text()).toContain('这是一段较长的风险描述文本用于验证换行展示不被截断')
+    expect(html).toContain('dt-wrap-col')
+  })
+
+  it('切预算核算 tab 显示成本汇总与明细', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    await w.findAll('.pd-tab').find((b) => b.text() === '预算核算')!.trigger('click')
+    expect(w.text()).toContain('内部人员成本')
+    expect(w.text()).toContain('总预算(元)')
+  })
+
+  it('售前整合项目：原项目 tab 展示已关闭信息(3E-2 原项目回款节点表已下线)', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    const originTab = w.findAll('.pd-tab').find((b) => b.text() === '原项目')
+    expect(originTab).toBeTruthy()
+    await originTab!.trigger('click')
+    expect(w.text()).toContain('某局一期')
+    expect(w.text()).toContain('OLD-9')
+    expect(w.text()).toContain('不计入当前')
+    // closedNodes 表（原项目回款节点）已于 3E-2 下线：经调研确认结构性恒空
+    expect(w.text()).not.toContain('原项目回款节点（不计入当前汇总）')
+  })
+
+  it('非售前项目不显示原项目 tab', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    expect(w.findAll('.pd-tab').some((b) => b.text() === '原项目')).toBe(false)
+  })
+
+  it('路由参数变化(同组件复用) → tab 重置为回款', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '原项目')!.trigger('click')
+    expect(w.find('.pd-tab.active').text()).toBe('原项目')
+    await router.push('/project/P-1')
+    await flushPromises()
+    expect(w.find('.pd-tab.active').text()).toBe('回款')
+    expect(w.text()).toContain('初验款')
+  })
+
+  it('未知 id → 404 空态 + 返回清单链接', async () => {
+    seed()
+    const w = await mountAt('/project/NOPE')
+    expect(w.text()).toContain('未找到该项目')
+    const link = w.find('a[href="/projects"]')
+    expect(link.exists()).toBe(true)
+  })
+
+  it('右栏只显示本项目动态', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-aside').exists()).toBe(true)
+    expect(w.text()).toContain('「初验款」到账 25 万')
+    expect(w.text()).not.toContain('不应出现')
+  })
+
+  it('本项目无事件 → 右栏空态', async () => {
+    seed()
+    const w = await mountAt('/project/P-2')
+    expect(w.find('.pd-aside').text()).toContain('暂无该项目动态')
+  })
+
+  it('头部超支徽章:总体超支>5000 红', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].overspendAmount = 60000
+    const w = await mountAt('/project/P-1')
+    const badge = w.find('.pd-badge.over-danger')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('总体预算超支')
+    expect(badge.text()).toContain('6万')
+  })
+
+  it('头部超支徽章:总体超支≤5000 黄', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].overspendAmount = 3000
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-badge.over-warn').exists()).toBe(true)
+    expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
+    expect(w.text()).toContain('总体预算超支')
+  })
+
+  it('头部超支徽章:未超支(负/缺)不显示总体徽章', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].overspendAmount = -500
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
+    expect(w.find('.pd-badge.over-warn').exists()).toBe(false)
+    expect(w.text()).not.toContain('总体预算超支')
+  })
+
+  it('头部超支徽章:两类交付超支按白名单出标签,非白名单不出', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].deliveryCosts = [
+      { 类别: '交付外包服务成本', 预算金额: 100, 实际发生: 200, 剩余预算: -100, 消耗率: 2 },
+      { 类别: '交付部门人工成本', 预算金额: 100, 实际发生: 150, 剩余预算: -50, 消耗率: 1.5 },
+      { 类别: '差旅费', 预算金额: 100, 实际发生: 300, 剩余预算: -200, 消耗率: 3 },
+    ]
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('交付外包服务成本超支')
+    expect(w.text()).toContain('交付部门人工成本超支')
+    expect(w.text()).not.toContain('差旅费超支')
+  })
+
+  it('头部超支徽章:基线项目(无超支金额+无交付超支)不渲染任何超支徽章', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    expect(w.find('.pd-badge.over-danger').exists()).toBe(false)
+    expect(w.find('.pd-badge.over-warn').exists()).toBe(false)
+  })
+
+  it('售前无原项目预算 → 显「未获取原项目预算」徽标、不显超支徽标', async () => {
+    seed()
+    const ds = useDataStore()
+    // P-2 为售前项目，relatedClosedId='OLD-9'；seed 中 OLD-9 的 projectPmis 无 cost.总预算 字段 → 原项目总预算=0
+    // 额外挂总体超支与交付超支金额，验证：若无 noOrigBudget 判定，本会渲染超支徽标；有判定后应被中性徽标替代
+    ;(ds.data as any).projects[1].overspendAmount = 60000
+    ;(ds.data as any).projects[1].deliveryCosts = [
+      { 类别: '交付外包服务成本', 预算金额: 100, 实际发生: 200, 剩余预算: -100, 消耗率: 2 },
+    ]
+    const w = await mountAt('/project/P-2')
+    expect(w.text()).toContain('未获取原项目预算')
+    expect(w.text()).not.toContain('总体预算超支')
+    expect(w.text()).not.toContain('交付外包服务成本超支')
+    expect(w.find('.pd-badge.mut').exists()).toBe(true)
+  })
+
+  it('回款 tab:PMIS 回款摘要与节点表(2A)', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].paymentPmis = {
+      contract: 1000000, actualTotal: 700000, paymentCount: 2,
+      expectedTotal: 1000000, nodeCount: 2, reachedCount: 1, delayedCount: 1,
+      lastPaymentDate: '2026-06-04', fromOrigin: false,
+    }
+    ;(ds.data as any).paymentNodes = { 'P-1': [
+      { stage: '到货款', category: '到货款', planDate: '2026-01-01', actualDate: '2026-01-02',
+        payRatio: 0.7, expectedPayment: 700000, receivedAmount: 700000, unpaidAmount: 0,
+        actualRatio: 1, termDays: 90, payTerm: '到货后20天内付款70%', reached: true, status: '已回款' },
+      { stage: '终验款', category: '终验款', planDate: '2020-01-01', actualDate: '',
+        payRatio: 0.3, expectedPayment: 300000, receivedAmount: 0, unpaidAmount: 300000,
+        actualRatio: 0, termDays: 20, reached: false, status: '延期' },
+    ] }
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('系统核心口径')
+    expect(w.text()).toContain('到货')
+    expect(w.text()).toContain('已回款')
+    expect(w.text()).toContain('延期')
+    expect(w.text()).toContain('收款条件')          // 列表头
+    expect(w.text()).toContain('到货后20天内付款70%') // 收款条件全文显示
+    expect(w.text()).toContain('回款类型')           // S7 新增列表头
+    expect(w.text()).toContain('实际比例')           // S7 新增列表头
+  })
+
+  it('回款节点表金额列以「元」展示原始值(精度,非万)', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[0].paymentPmis = {
+      contract: 1000000, actualTotal: 700000, paymentCount: 1,
+      expectedTotal: 1000000, nodeCount: 1, reachedCount: 1, delayedCount: 0,
+      lastPaymentDate: '2026-06-04', fromOrigin: false,
+    }
+    ;(ds.data as any).paymentNodes = { 'P-1': [
+      { stage: '到货款', category: '到货款', planDate: '2026-01-01', actualDate: '2026-01-02',
+        payRatio: 0.7, expectedPayment: 123456, receivedAmount: 123456, unpaidAmount: 0,
+        actualRatio: 1, termDays: 90, payTerm: '到货后付款', reached: true, status: '已回款' },
+    ] }
+    const w = await mountAt('/project/P-1')
+    // 三列表头改为「元」
+    expect(w.text()).toContain('计划回款(元)')
+    expect(w.text()).toContain('已收(元)')
+    expect(w.text()).toContain('未收(元)')
+    // 这两列不再有「万」表头(它们只作为节点列存在,不在汇总卡片中)
+    expect(w.text()).not.toContain('已收(万)')
+    expect(w.text()).not.toContain('未收(万)')
+    // 展示原始元值(精确,无万元四舍五入: 123456 元 → 123,456, 而非 12.35)
+    expect(w.text()).toContain('123,456')
+    expect(w.text()).not.toContain('12.35')
+    // 账期仍为天(不动)
+    expect(w.text()).toContain('账期(天)')
+  })
+
+  it('渲染项目标签块，显示已挂标签(2C)', async () => {
+    seed()
+    const tags = useProjectTagsStore()
+    tags.tags = [{ name: 'BH项目' }, { name: '框架合同' }] as any
+    tags.assignments = { 'P-1': ['BH项目'] } as any
+    tags.loaded = true
+    const w = await mountAt('/project/P-1')
+    expect(w.text()).toContain('项目标签')
+    expect(w.text()).toContain('BH项目')
+  })
+
+  it('团队块:渲染 L3-1部门 标签(连字符)且值来自 team.L3_1部门(下划线键)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    const team = w.find('.pd-team')
+    expect(team.exists()).toBe(true)
+    // 验证模板标签使用连字符「L3-1部门」
+    expect(team.text()).toContain('L3-1部门')
+    // 验证读取的是下划线键 team.L3_1部门，值为 '三部一组'
+    expect(team.text()).toContain('三部一组')
+    // 同时验证其它团队字段值，确保整体渲染正确
+    expect(team.text()).toContain('AR张')
+    expect(team.text()).toContain('Sponsor陈')
+  })
+
+  it('售前详情回款数据 tab:本项目无流水时回退原项目(relatedClosedId)流水(T3)', async () => {
+    seed()
+    const ds = useDataStore()
+    // 给原项目 OLD-9 挂流水，P-2(售前) 本身无流水
+    ;(ds.data as any).paymentRecords['OLD-9'] = {
+      total: 8800,
+      count: 1,
+      lastDate: '2024-01-15',
+      records: [
+        { type: '实际回款', serial: 'BANK-OLD-1', payer: '某局', amount: 8800, date: '2024-01-15', claimer: '王五', orderNo: 'N-OLD-1', currency: 'CNY', rate: 1, note: '' },
+      ],
+    }
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '回款数据')!.trigger('click')
+    // 售前项目本身无流水，应回退读 relatedClosedId=OLD-9 的流水
+    expect(w.text()).not.toContain('未提供回款流水数据')
+    expect(w.text()).toContain('BANK-OLD-1')
+    expect(w.text()).toContain('8,800')
+  })
+
+  it('详情头部 pd-meta 渲染 TOP1000大客户/象限(客户与签约单位之间)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    const meta = w.find('.pd-meta')
+    expect(meta.text()).toContain('TOP1000大客户')
+    expect(meta.text()).toContain('是')
+    expect(meta.text()).toContain('象限')
+    expect(meta.text()).toContain('M1 战略核心区')
+  })
+
+  it('详情头部 pd-meta 渲染合同编号(与项目编号同级,取自 project.合同编号)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    const meta = w.find('.pd-meta')
+    expect(meta.exists()).toBe(true)
+    // 与项目编号(编号)同处 pd-meta(同级别),位于项目名称与卡片之间
+    expect(meta.text()).toContain('编号')
+    expect(meta.text()).toContain('合同编号')
+    // 值取自 project.合同编号
+    expect(meta.text()).toContain('HT-2026-001')
+  })
+
+  it('售前项目签约单位显示回退后的 signUnit(非本项目 PMIS 的 m.customer.签约单位)', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).projects[1].signUnit = '上海伟仕佳杰科技有限公司'
+    const w = await mountAt('/project/P-2')
+    const meta = w.find('.pd-meta')
+    expect(meta.text()).toContain('上海伟仕佳杰科技有限公司')
+  })
+
+  it('规则标签(seed)只读展示,无删除入口;删手动标签不写入 seed', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).tagSeed = { 'P-1': ['佳杰'] }
+    const tags = useProjectTagsStore()
+    tags.assignments = { 'P-1': ['BH项目'] } as any
+    tags.loaded = true
+    const w = await mountAt('/project/P-1')
+    // 两个标签都显示
+    expect(w.text()).toContain('佳杰')
+    expect(w.text()).toContain('BH项目')
+    // 规则标签只读:只有手动标签(BH项目)带删除入口,佳杰所在 chip 无 .tag-x
+    expect(w.findAll('.tag-x').length).toBe(1)
+    const ruleChip = w.findAll('.tag-chip-rule').find((c) => c.text().includes('佳杰'))
+    expect(ruleChip).toBeTruthy()
+    expect(ruleChip!.find('.tag-x').exists()).toBe(false)
+    // 删除手动标签(BH项目)后,写入的 assignments 不含规则标签「佳杰」
+    await w.find('.tag-x').trigger('click')
+    expect(tags.assignments['P-1']).toEqual([])
+    expect(tags.assignments['P-1']).not.toContain('佳杰')
+  })
+
+  it('手动与规则同名(佳杰)时只显示一枚只读 chip,不重复', async () => {
+    seed()
+    const ds = useDataStore()
+    ;(ds.data as any).tagSeed = { 'P-1': ['佳杰'] }
+    const tags = useProjectTagsStore()
+    tags.assignments = { 'P-1': ['BH项目', '佳杰'] } as any
+    tags.loaded = true
+    const w = await mountAt('/project/P-1')
+    const pdTags = w.find('.pd-tags')
+    // 佳杰 只出现一次(只读版),不出现可删版
+    expect(pdTags.findAll('.tag-chip').filter((c) => c.text().includes('佳杰')).length).toBe(1)
+    const jj = pdTags.findAll('.tag-chip').find((c) => c.text().includes('佳杰'))!
+    expect(jj.classes()).toContain('tag-chip-rule')
+    expect(jj.find('.tag-x').exists()).toBe(false)
+    // 可删的 .tag-x 只剩 BH项目 一个
+    expect(pdTags.findAll('.tag-x').length).toBe(1)
+  })
+})
