@@ -29,10 +29,9 @@ TOP = "pmplatform"  # 解压后顶层目录名
 # 顶层要打包的文件(运行/部署所需 + 参考)
 TOP_FILES = [
     "server.py", "auth.py", "schema.py", "preprocess_data.py", "config.py",
-    "pmis_config.py",
-    "opportunity_followup.py",
+    "pmis_config.py", "portal.py", "audit.py",
     "pmis.py", "projects.py", "collection_stages.py", "milestones.py", "profit.py",
-    "snapshots.py", "data_history.py", "data_scope.py", "opportunities.py", "temp_followup.py",
+    "snapshots.py", "data_history.py", "data_scope.py",
     "manual_history.py",
     "manual_import.py", "reset_super_password.py",
     "conftest.py", "requirements.txt", "requirements-dev.txt", "ruff.toml",

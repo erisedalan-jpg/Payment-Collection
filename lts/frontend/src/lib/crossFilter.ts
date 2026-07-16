@@ -35,7 +35,7 @@ export function cfUniqueValues(rows: Record<string, any>[], colKey: string): Uni
     for (const r of rows) for (const rr of (r.riskReasons ?? [])) if (rr?.category) set.add(String(rr.category))
     return [...set].sort().map((display) => ({ display, raw: display }))
   }
-  // 通用数组列(如倚天「问题类型」string[]):元素级去重。放在 riskReasons 特例后;
+  // 通用数组列(string[]):元素级去重。放在 riskReasons 特例后;
   // 主域可筛列无数组类型(数组列本被 FILTERABLE 排除),故此分支只对新引入的数组列生效,零回归。
   if (rows.some((r) => Array.isArray(r[colKey]))) {
     const set = new Set<string>()

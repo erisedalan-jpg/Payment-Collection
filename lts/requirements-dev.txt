@@ -1,0 +1,5 @@
+# 开发依赖（含运行时依赖）
+-r requirements.txt
+
+pytest>=7.0      # 单元测试（tests/）
+ruff>=0.1        # 代码静态检查（verify.sh，渐进式采用，配置见 ruff.toml）
