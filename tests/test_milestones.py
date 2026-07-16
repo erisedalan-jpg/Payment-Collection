@@ -45,7 +45,7 @@ class TestRowToMilestones:
         assert [i["name"] for i in items] == ["项目启动", "终验"]
         assert items[0] == {"name": "项目启动", "planDate": "2026-01-01",
                             "actualDate": "2026-01-02", "payStage": "", "pct": None,
-                            "payRatio": None, "priority": "low"}
+                            "payRatio": None, "priority": "low", "stage": False}
         assert items[1]["priority"] == "high"
 
     def test_paystage_newline_normalized_and_pct(self):
