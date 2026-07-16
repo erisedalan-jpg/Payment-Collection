@@ -350,11 +350,8 @@ def _load_yitian_cached():
 _tags_lock = threading.RLock()
 
 
-def _build_initial_tags():
-    """首次播种：读 analysis_data.json 的 tagSeed，标签库(vocab)=实际出现的白名单项(按白名单序)。
-    规则派生标签(tagSeed，如签约单位=佳杰)**只用于生成标签库 vocab、不写入 assignments**——
-    per-project 挂载由前端运行期合并 tagSeed 供应，保证签约单位纠正后自动回收、不被固化为手动标签
-    (与「规则不写 project_tags.json」的设计一致；否则全新部署/文件丢失时会把规则标签冻结成手动)。"""
+def _appeared_whitelist_tags():
+    """当前 analysis_data.json 的 tagSeed 里出现过、且在白名单内的规则标签(按白名单序)。"""
     seed = {}
     try:
         with open(ANALYSIS_FILE, 'r', encoding='utf-8') as f:
@@ -364,21 +361,48 @@ def _build_initial_tags():
     appeared = set()
     for tags in seed.values():
         appeared.update(tags)
-    vocab = [{"name": n} for n in config.TAG_SEED_WHITELIST if n in appeared]
-    return {"version": 1, "tags": vocab, "assignments": {}}
+    return [n for n in config.TAG_SEED_WHITELIST if n in appeared]
+
+
+def _build_initial_tags():
+    """首次播种：标签库(vocab)=当前 tagSeed 里出现的白名单项(按白名单序)。
+    规则派生标签(tagSeed，如签约单位=佳杰)**只用于生成标签库 vocab、不写入 assignments**——
+    per-project 挂载由前端运行期合并 tagSeed 供应，保证签约单位纠正后自动回收、不被固化为手动标签。"""
+    return {"version": 1, "tags": [{"name": n} for n in _appeared_whitelist_tags()], "assignments": {}}
+
+
+def _reconcile_vocab(store):
+    """自愈：把当前 tagSeed 出现的白名单规则标签中、vocab 尚缺的补进标签库。只增不删、不动 assignments。
+    修升级路径缺口——新增白名单规则标签(如「产品超支」)在**已存在**的 project_tags.json 上永不进 vocab，
+    致「按标签排除」/各页标签筛选下拉选不到(「佳杰」亦曾此坑)。补一次后即在库、不再写。返回是否有新增。"""
+    names = {t.get('name') for t in store.get('tags', [])}
+    added = False
+    for n in _appeared_whitelist_tags():
+        if n not in names:
+            store.setdefault('tags', []).append({"name": n})
+            added = True
+    return added
 
 
 def _load_project_tags():
     """本地标签 store；不存在则按 tagSeed 首次播种并落盘，此后本地为准。
-    种子为空(analysis 尚未处理/无 tagSeed)时只返回空 store 不落盘，避免空文件永久
-    local-wins——否则首次启动早于"更新数据"会让标签永不播种。"""
+    读到既有 store 时自愈补进新出现的白名单规则标签(见 _reconcile_vocab)。
+    种子为空(analysis 尚未处理/无 tagSeed)时只返回空 store 不落盘，避免空文件永久 local-wins。"""
     with _tags_lock:
         if os.path.exists(PROJECT_TAGS_FILE):
+            store = None
             try:
                 with open(PROJECT_TAGS_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    store = json.load(f)
             except Exception:
-                pass
+                store = None
+            if store is not None:
+                try:
+                    if _reconcile_vocab(store):
+                        _atomic_write_json(PROJECT_TAGS_FILE, store)
+                except Exception:
+                    pass     # 自愈落盘失败不影响返回(内存已含补进的 vocab)
+                return store
         store = _build_initial_tags()
     if store.get('tags') or store.get('assignments'):
         _save_project_tags(store)

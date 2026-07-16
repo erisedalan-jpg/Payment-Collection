@@ -59,6 +59,27 @@ def test_load_tags_empty_seed_not_persisted(tmp_path, monkeypatch):
     assert os.path.exists(str(tags_file))
 
 
+def test_load_tags_reconciles_new_whitelist_tag_on_existing_store(tmp_path, monkeypatch):
+    """升级路径:既有 project_tags.json 的 vocab 缺某个新出现的白名单规则标签(如产品超支)时,
+    load 应自愈补进 vocab(供「按标签排除/筛选」下拉可选),且不动 assignments、已落盘。"""
+    tags_file = tmp_path / "project_tags.json"
+    tags_file.write_text(json.dumps({
+        "version": 1, "tags": [{"name": "佳杰"}], "assignments": {"Z": ["自定义"]}
+    }, ensure_ascii=False), encoding="utf-8")
+    analysis_file = tmp_path / "analysis_data.json"
+    analysis_file.write_text(json.dumps({
+        "tagSeed": {"A": ["佳杰"], "B": ["产品超支"]}      # 更新数据后新出现「产品超支」
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(server, "PROJECT_TAGS_FILE", str(tags_file))
+    monkeypatch.setattr(server, "ANALYSIS_FILE", str(analysis_file))
+
+    store = server._load_project_tags()
+    assert {t["name"] for t in store["tags"]} == {"佳杰", "产品超支"}   # 自愈补进
+    assert store["assignments"] == {"Z": ["自定义"]}                    # 不动手动挂载
+    on_disk = json.loads(tags_file.read_text(encoding="utf-8"))
+    assert "产品超支" in {t["name"] for t in on_disk["tags"]}          # 已落盘
+
+
 def test_save_tags_roundtrip(tmp_path, monkeypatch):
     tags_file = tmp_path / "project_tags.json"
     monkeypatch.setattr(server, "PROJECT_TAGS_FILE", str(tags_file))
