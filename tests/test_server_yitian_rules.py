@@ -85,3 +85,25 @@ def test_post_saves_and_returns_problem_count(tmp_path, monkeypatch):
         assert os.path.exists(str(tmp_path / "yitian_rules.json"))       # 已落库
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_get_default_returns_factory_even_after_saving_custom(tmp_path, monkeypatch):
+    """保存过自定义(停用 product)后,GET ?default=1 仍应返回内置默认(product.enabled=True)。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    try:
+        conn, cookie = _login(port)
+        cfg = RC.default_config()
+        cfg["checks"]["product"]["enabled"] = False
+        conn.request("POST", "/api/yitian/rules", json.dumps(cfg),
+                     {"Content-Type": "application/json", "Cookie": cookie})
+        conn.getresponse().read()
+        # 无参 GET → 已保存的自定义(product 停用)
+        conn.request("GET", "/api/yitian/rules", headers={"Cookie": cookie})
+        saved = json.loads(conn.getresponse().read())["rules"]
+        assert saved["checks"]["product"]["enabled"] is False
+        # ?default=1 → 内置默认(product 启用)
+        conn.request("GET", "/api/yitian/rules?default=1", headers={"Cookie": cookie})
+        default = json.loads(conn.getresponse().read())["rules"]
+        assert default["checks"]["product"]["enabled"] is True
+    finally:
+        srv.shutdown(); srv.server_close()

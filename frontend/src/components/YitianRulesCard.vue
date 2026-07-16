@@ -4,6 +4,7 @@ import { ElMessageBox } from 'element-plus'
 import { useYitianRulesStore } from '@/stores/yitianRules'
 import { useYitianStore } from '@/stores/yitian'
 import { downloadJson, downloadXlsx, parseImportFile, type YitianRulesConfig } from '@/lib/yitian/rulesConfig'
+import { getYitianRules } from '@/lib/yitianApi'
 
 const store = useYitianRulesStore()
 const yitian = useYitianStore()
@@ -45,14 +46,14 @@ async function onSave() {
 }
 
 async function onReset() {
-  await ElMessageBox.confirm('恢复为系统内置默认规则？未保存的改动将丢失。', '恢复默认', { type: 'warning' }).catch(() => 'cancel')
-    .then(async (v) => {
-      if (v === 'cancel') return
-      // 恢复默认 = 重新拉后端(缺文件时后端回落默认);若已存过配置,先删再拉不在本次范围——以后端默认为准需清空文件,
-      // 简化:请管理员导入「默认模板」或后端返回默认。这里重新 load 强制拉当前后端值。
-      store.reset(); await store.load(); if (store.config) draft.value = clone(store.config)
-      msg.value = '已载入后端当前默认'; err.value = false
-    })
+  const ok = await ElMessageBox.confirm('恢复为系统内置默认规则？未保存的改动将丢失（保存后才真正生效）。', '恢复默认', { type: 'warning' })
+    .then(() => true).catch(() => false)
+  if (!ok) return
+  try {
+    // 拿后端「出厂默认」(default=1),而非 load_config 返回的已保存自定义配置;仅落编辑区,点保存才生效。
+    draft.value = clone(await getYitianRules({ default: true }))
+    msg.value = '已载入内置默认，核对后点「保存」生效'; err.value = false
+  } catch (e) { err.value = true; msg.value = e instanceof Error ? e.message : '载入默认失败' }
 }
 
 function triggerImport() { fileInput.value?.click() }

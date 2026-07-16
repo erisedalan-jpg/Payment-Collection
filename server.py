@@ -2500,11 +2500,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True, "settings": clean})
 
     def handle_yitian_rules_get(self):
-        """GET /api/yitian/rules - 合规规则配置。超管专属(路径已在 _SUPER_ONLY_PATHS)。"""
+        """GET /api/yitian/rules[?default=1] - 合规规则配置。超管专属(路径已在 _SUPER_ONLY_PATHS)。
+        default=1 → 返回内置出厂默认(供「恢复默认」拿到真默认,而非已保存的自定义配置)。"""
         if self._require_super() is None:
             return
-        self._send_json(200, {"success": True,
-                              "rules": yitian_rules_config.load_config(YITIAN_RULES_FILE)})
+        want_default = bool(parse_qs(urlparse(self.path).query).get('default'))
+        rules = (yitian_rules_config.default_config() if want_default
+                 else yitian_rules_config.load_config(YITIAN_RULES_FILE))
+        self._send_json(200, {"success": True, "rules": rules})
 
     def handle_yitian_rules_save(self):
         """POST /api/yitian/rules - 超管专属。先算通再落盘:新规则先在内存 build+schema 跑通,

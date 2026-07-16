@@ -133,10 +133,32 @@ export function downloadXlsx(cfg: YitianRulesConfig, filename = '倚天合规规
   XLSX.writeFile(configToWorkbook(cfg), filename)
 }
 
+const CHECK_KEYS = ['summary', 'progress', 'next', 'serviceMode',
+  'typeMismatch', 'product', 'customer', 'presaleProductHint'] as const
+
+/** 最小结构校验:导入内容缺关键嵌套键会让编辑区模板在 render 阶段崩(onFile 的 try 兜不到),
+ * 故在落 draft 前先卡住。语义合法性仍以后端 validate_config 为准(保存时兜底)。 */
+export function assertRulesShape(cfg: unknown): asserts cfg is YitianRulesConfig {
+  const c = cfg as Record<string, any>
+  const ck = c?.checks as Record<string, any> | undefined
+  const ok = c && typeof c === 'object' && Array.isArray(c.checkedTypes) && ck && typeof ck === 'object'
+    && CHECK_KEYS.every((k) => ck[k] && typeof ck[k] === 'object' && typeof ck[k].enabled === 'boolean')
+    && Array.isArray(ck.summary.keywords) && Array.isArray(ck.progress.keywords) && Array.isArray(ck.next.keywords)
+    && typeof ck.serviceMode.effectiveDate === 'string'
+    && ck.typeMismatch.rules && typeof ck.typeMismatch.rules === 'object'
+    && Array.isArray(ck.product.lineKeywords) && Array.isArray(ck.product.nameKeywords) && Array.isArray(ck.product.exclusiveKws)
+    && Array.isArray(ck.customer.hintKeywords) && Array.isArray(ck.presaleProductHint.skipWorkTypes)
+  if (!ok) throw new Error('导入内容不是合法的合规规则配置结构')
+}
+
 export async function parseImportFile(file: File): Promise<YitianRulesConfig> {
+  let cfg: YitianRulesConfig
   if (file.name.toLowerCase().endsWith('.json')) {
-    return JSON.parse(await file.text()) as YitianRulesConfig
+    cfg = JSON.parse(await file.text()) as YitianRulesConfig
+  } else {
+    const buf = await file.arrayBuffer()
+    cfg = workbookToConfig(XLSX.read(buf, { type: 'array' }))
   }
-  const buf = await file.arrayBuffer()
-  return workbookToConfig(XLSX.read(buf, { type: 'array' }))
+  assertRulesShape(cfg)
+  return cfg
 }

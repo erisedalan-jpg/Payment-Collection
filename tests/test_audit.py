@@ -11,6 +11,7 @@ def test_map_action_hits_and_misses():
     assert audit.map_action('POST', '/api/admin/accounts/create') == ('account.create', '创建账号')
     assert audit.map_action('POST', '/api/tags') == ('tags.save', '保存标签')
     assert audit.map_action('GET', '/api/reprocess') == ('data.reprocess', '数据更新')
+    assert audit.map_action('POST', '/api/yitian/rules') == ('yitian.rules', '修改倚天合规规则')
     # 登录/登出不入表(由 handler 显式补录)
     assert audit.map_action('POST', '/api/login') is None
     assert audit.map_action('POST', '/api/logout') is None
