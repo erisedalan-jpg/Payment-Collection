@@ -334,85 +334,6 @@ class AnalysisData(_Base):
     tagSeed: Dict[str, List[str]] = {}
 
 
-# ── 倚天工时域(V3.0.0):与 AnalysisData 并列的第二个根模型,独立产物 data/yitian_data.json ──
-
-class YitianMeta(_Base):
-    periodStart: Optional[str]      # 可空(无数据行时为 None),但键必须出现
-    periodEnd: Optional[str]        # 同上
-    generatedAt: str
-    rows: int
-    employees: int
-    droppedRows: int                # 工号不在花名册而被丢弃的行数(治理可见)
-    calendarSource: str              # "csv" | "fallback"(holidays.csv 缺失,退化为纯周一~周五)
-    hoursPerDay: int
-    thisBgL2: List[str]              # 本BG销售L2组织(跨BG判定常量,随数据下发)
-    storeRows: int                   # 累积库总行数(供 /data 展示"累积了多久")
-    storeStart: Optional[str]        # 累积库覆盖区间起(可空,但键必须出现)
-    storeEnd: Optional[str]          # 累积库覆盖区间止(同上)
-
-
-class YitianRosterItem(_Base):
-    id: str                          # 工号(大写归一),跨域连接键
-    name: str
-    l2: str
-    l3: str
-    l31: str
-    l4: str
-    category: str
-
-
-class YitianDay(_Base):
-    d: str
-    workday: bool
-    isoWeek: str
-    calcWeek: str
-
-
-class YitianDims(_Base):
-    types: List[str]
-    workTypes: List[str]
-    customers: List[str]
-    products: List[str]
-    productNames: List[str]
-    projectTypes: List[str]
-    salesL2: List[str]
-    serviceModes: List[str]
-
-
-class YitianEntry(_Base):
-    d: str                           # 工作日 YYYY-MM-DD
-    e: str                           # 工号 → roster
-    t: Optional[int]                 # → dims.types(可空,键必须出现)
-    h: float
-    wt: Optional[int]                # → dims.workTypes(可空)
-    cu: Optional[int]                # → dims.customers(可空)
-    pl: Optional[int]                # → dims.products(可空)
-    pn: Optional[int]                # → dims.productNames(可空)
-    pt: Optional[int]                # → dims.projectTypes(可空)
-    sm: Optional[int]                # → dims.serviceModes(可空)
-    bg: Optional[int]                # → dims.salesL2(可空)
-    wo: str                          # 工单编号
-    top: bool                        # 客户 ∈ TOP1000
-    ok: int                          # 0 合规 / 1 合规(提示) / 2 问题
-    iss: List[str]                   # 问题码
-
-
-class YitianIssue(_Base):
-    i: int                           # entries 下标
-    codes: List[str]
-    msgs: List[str]
-    snippet: str                     # 工作成果前 120 字(仅问题行)
-
-
-class YitianData(_Base):
-    meta: YitianMeta
-    roster: List[YitianRosterItem]
-    days: List[YitianDay]
-    dims: YitianDims
-    entries: List[YitianEntry]
-    issues: List[YitianIssue]
-
-
 def validate_and_write_json(final_data: dict, output_dir: str) -> str:
     """用 AnalysisData 校验 final_data，校验通过后写出 analysis_data.json。
     返回输出文件路径。校验失败抛 pydantic.ValidationError。"""
@@ -431,29 +352,6 @@ def dump_json_schema(out_path: str) -> None:
         json.dump(sch, f, ensure_ascii=False, indent=2)
 
 
-def validate_and_write_yitian_json(data: dict, output_dir: str) -> str:
-    """用 YitianData 校验后写出 yitian_data.json。返回输出文件路径。校验失败抛 ValidationError。
-
-    注意:这里**不用** indent(与 analysis_data.json 的写法不同)。倚天 entries 每行 16 个键,
-    indent=1 会把每个键各占一行 —— 实测同一份数据 indent=1 是 210KB/周、紧凑是 155KB/周(省 26%)。
-    该文件是机器读的(前端 fetch),不需要人眼可读性。"""
-    YitianData.model_validate(data)
-    os.makedirs(output_dir, exist_ok=True)
-    out_path = os.path.join(output_dir, "yitian_data.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-    return out_path
-
-
-def dump_yitian_schema(out_path: str) -> None:
-    """导出倚天域 JSON Schema(供前端 json-schema-to-typescript 生成 TS 类型)。"""
-    sch = YitianData.model_json_schema()
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(sch, f, ensure_ascii=False, indent=2)
-
-
 if __name__ == "__main__":
     dump_json_schema("schema.json")
     print("[OK] JSON Schema 已写出: schema.json")
-    dump_yitian_schema("yitian_schema.json")
-    print("[OK] JSON Schema 已写出: yitian_schema.json")
