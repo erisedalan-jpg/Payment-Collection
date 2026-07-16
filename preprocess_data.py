@@ -106,6 +106,31 @@ def derive_sign_unit_tag_seed(project_rows):
     return seed
 
 
+def derive_product_overspend_tag_seed(project_profit):
+    """损益科目「产品、商品成本」(code==PRODUCT_COST_SUBJECT_CODE)剩余<0 → {pid:['产品超支']}。规则派生,不写标签文件。"""
+    seed = {}
+    for pid, data in (project_profit or {}).items():
+        for r in (data or {}).get("rows", []):
+            if r.get("code") == config.PRODUCT_COST_SUBJECT_CODE:
+                rem = r.get("remaining")
+                if isinstance(rem, (int, float)) and rem < 0:
+                    seed[pid] = [config.PRODUCT_OVERSPEND_TAG]
+                break     # 2.1 单行
+    return seed
+
+
+def merge_tag_seeds(*seeds):
+    """合并多个 {pid:[tag]} 规则种子,按 pid 并集去重保序。"""
+    out = {}
+    for seed in seeds:
+        for pid, tags in seed.items():
+            cur = out.setdefault(pid, [])
+            for t in tags:
+                if t not in cur:
+                    cur.append(t)
+    return out
+
+
 def _pay_projects_from_collection(collection_stages):
     """回款项目清单换源:取收款阶段台账(collection_stages.csv)的项目号。
     取代旧的 yundocs project_overview 派生,语义=回款项目即收款台账里的项目。"""
@@ -264,7 +289,9 @@ def main():
         "paymentRecords": payment_records,
         "paymentNodes": payment_nodes,
         "projectProfit": project_profit,
-        "tagSeed": derive_sign_unit_tag_seed(dept_projects),
+        "tagSeed": merge_tag_seeds(
+            derive_sign_unit_tag_seed(dept_projects),
+            derive_product_overspend_tag_seed(project_profit)),
     }
 
     # === 9d. 快照/diff/事件流/周期对比(Phase P3) ===

@@ -99,7 +99,10 @@ DELIVERY_COST_CATEGORIES = [
 STAGE_ORDER = ("项目启动", "项目规划", "项目执行", "项目收尾")
 
 # 2C 项目标签：种子标签白名单（用户钦定）
-TAG_SEED_WHITELIST = ["BH项目", "框架合同", "退换货项目", "项目已关闭", "SM项目", "0元订单项目", "佳杰"]
+TAG_SEED_WHITELIST = ["BH项目", "框架合同", "退换货项目", "项目已关闭", "SM项目", "0元订单项目", "佳杰", "产品超支"]
 
 # 签约单位 → 自动标签 规则(精确等于全称,trim 后比对)。当前仅佳杰一条。
 SIGN_UNIT_TAG_RULES = {"上海伟仕佳杰科技有限公司": "佳杰"}
+
+PRODUCT_OVERSPEND_TAG = "产品超支"
+PRODUCT_COST_SUBJECT_CODE = "2.1"   # 损益科目「产品、商品成本」
