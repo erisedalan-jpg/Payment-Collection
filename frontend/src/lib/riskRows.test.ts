@@ -120,3 +120,22 @@ describe('buildRiskRows — 项目级 scope 字段(补齐 /projects 列)', () =>
     expect(riskRowMatches(r, numScope)).toBe(true)
   })
 })
+
+describe('buildRiskRows 立项日期 + scope date', () => {
+  const ps = [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: '一组', paymentPmis: { contract: 2_000_000 } }] as any
+  const mk = (立项日期?: string) => ({
+    P1: { status: { 项目级别: 'P1', ...(立项日期 ? { 立项日期 } : {}) },
+          riskRecords: [{ 风险编码: 'FX-1', 风险名称: 'x', 风险等级: '高', 风险状态: '未关闭', 项目编号: 'P1' }] },
+  }) as any
+  it('行含 立项日期(取自项目域 setupDate)', () => {
+    expect(buildRiskRows(ps, mk('2019-06-24'), {})[0]['立项日期']).toBe('2019-06-24')
+    expect(buildRiskRows(ps, mk(), {})[0]['立项日期']).toBeNull()
+  })
+  it('RISK_SCOPE_CATALOG 含 立项日期(date) + riskRowMatches between', () => {
+    expect(RISK_SCOPE_CATALOG.find((f) => f.key === '立项日期')?.kind).toBe('date')
+    const row = buildRiskRows(ps, mk('2019-06-24'), {})[0]
+    const scope: ScopeFilter = { combinator: 'AND', groups: [{ combinator: 'AND',
+      conditions: [{ field: '立项日期', op: 'between', min: '2019-01-01', max: '2019-12-31' } as any] }] }
+    expect(riskRowMatches(row, scope)).toBe(true)
+  })
+})
