@@ -117,6 +117,6 @@ watch(() => props.rows, () => { if (props.stickyHeader) nextTick(recompute) }, {
 :deep(.dt-wrap-col) { white-space: normal; word-break: break-word; }
 /* el-table 原生表底汇总行(show-summary)不吃 cell-class-name，普通列靠 col.num→.u-num
    的路子在 footer 上不生效；数字列必须 tabular-nums(CLAUDE.md 硬约束)，这里直接兜底(M-6)。
-   同时惠及复用 DataTable 的 PaymentL4Table / YitianOverviewView / YitianCustomerView。 */
+   同时惠及复用 DataTable 的 PaymentL4Table 等页面。 */
 :deep(.el-table__footer .cell) { font-variant-numeric: tabular-nums; }
 </style>

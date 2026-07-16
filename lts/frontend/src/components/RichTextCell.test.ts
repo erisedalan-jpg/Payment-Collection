@@ -22,8 +22,7 @@ afterEach(() => {
 })
 
 function mountCell(props: Record<string, unknown>) {
-  // props 是松散 Record 与默认值合并，严格 prop 类型推不出 content 必填；沿用仓库既有先例
-  // (ScopeBuilder.test.ts) 用 `as any` 桥接，运行期行为不变。
+  // props 是松散 Record 与默认值合并，严格 prop 类型推不出 content 必填；用 `as any` 桥接，运行期行为不变。
   const w = mount(RichTextCell as any, { props: { editable: true, saveHandler: vi.fn(), ...props }, global: { plugins: [ElementPlus] } })
   mountedWrappers.push(w)
   return w

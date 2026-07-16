@@ -31,7 +31,3 @@ async function agentGet(path: string): Promise<AgentCookieResult> {
 export function fetchPmisCookie(): Promise<AgentCookieResult> {
   return agentGet('/pmis-cookie')
 }
-
-export function fetchYitianCookie(): Promise<AgentCookieResult> {
-  return agentGet('/yitian-cookie')
-}

@@ -8,11 +8,11 @@ function fakeFile(name: string): File {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('useInputFiles', () => {
-  it('包含十二个固定文件名(含核心回款源/TOP1000/倚天工时域)', () => {
+  it('包含十个固定文件名(核心回款源/TOP1000)', () => {
     expect(INPUT_FILE_NAMES).toEqual([
       '组织架构.xlsx', 'A.xlsx', 'delivery_analysis.csv', 'delivery_analysis.xlsx',
       'payment_records.csv', 'profit_loss_direct.csv', 'profit_loss_bridge.csv', 'budget_data.csv',
-      'collection_stages.csv', 'TOP1000.xlsx', '工时.xlsx', 'holidays.csv',
+      'collection_stages.csv', 'TOP1000.xlsx',
     ])
   })
 
