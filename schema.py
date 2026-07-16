@@ -239,6 +239,7 @@ class MilestoneItem(_Base):
     payRatio: Optional[float] = None
     pct: Optional[float] = None  # 0-100 原值
     priority: str = "low"  # high | mid | low
+    stage: bool = False  # true=阶段验收款项(列38/39派生),供前端换色
 
 
 class PaymentRecord(_Base):
