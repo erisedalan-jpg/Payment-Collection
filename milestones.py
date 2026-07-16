@@ -88,8 +88,43 @@ def parse_pay_stage_ratio(pay_stage):
     return round(sum(float(p) for p in pcts) / 100, 4)
 
 
+STAGE_PLAN_COL = "阶段计划完成时间"
+STAGE_ACTUAL_COL = "阶段实际完成时间"
+# 每段: 名称[：日期]。名称=冒号前(如 阶段验收款1（20.00%）);日期在中文/英文冒号后,可缺(未完成)。
+_STAGE_ENTRY_RE = re.compile(r"^(.*?)\s*[：:]\s*(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\s*$")
+
+
+def _parse_stage_entries(cell: Any) -> Dict[str, str]:
+    """'阶段计划/实际完成时间'单元格 → {段名: 日期}(多行按换行拆;无冒号日期段→日期空串=未完成)。"""
+    out: Dict[str, str] = {}
+    for line in str(cell or "").splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        m = _STAGE_ENTRY_RE.match(s)
+        if m:
+            name, date = m.group(1).strip(), _norm_date(m.group(2))
+        else:
+            name, date = s, ""
+        if name:
+            out[name] = date
+    return out
+
+
+def stage_milestones(row: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """列 38/39 阶段验收款 → 里程碑项(计划为准,按段名配实际日期;视为关联回款→高优先)。"""
+    plans = _parse_stage_entries(row.get(STAGE_PLAN_COL))
+    actuals = _parse_stage_entries(row.get(STAGE_ACTUAL_COL))
+    out: List[Dict[str, Any]] = []
+    for name, plan in plans.items():
+        out.append({"name": name, "planDate": plan, "actualDate": actuals.get(name, ""),
+                    "payStage": name, "pct": None, "payRatio": parse_pay_stage_ratio(name),
+                    "priority": milestone_priority(name, name), "stage": True})
+    return out
+
+
 def row_to_milestones(row: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """一行宽表 → 非全空类目的里程碑列表(按 MILESTONE_DEFS 顺序)。"""
+    """一行宽表 → 非全空类目里程碑(按 MILESTONE_DEFS 顺序) + 阶段验收款项。"""
     out = []
     for name, pcol, acol, paycol, pctcol in MILESTONE_DEFS:
         plan = _norm_date(row.get(pcol))
@@ -100,7 +135,8 @@ def row_to_milestones(row: Dict[str, Any]) -> List[Dict[str, Any]]:
             continue
         out.append({"name": name, "planDate": plan, "actualDate": actual,
                     "payStage": pay, "pct": pct, "payRatio": parse_pay_stage_ratio(pay),
-                    "priority": milestone_priority(name, pay)})
+                    "priority": milestone_priority(name, pay), "stage": False})
+    out.extend(stage_milestones(row))
     return out
 
 
