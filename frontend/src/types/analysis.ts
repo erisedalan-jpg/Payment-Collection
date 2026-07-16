@@ -148,6 +148,7 @@ export type Paystage = string;
 export type Payratio = number | null;
 export type Pct = number | null;
 export type Priority = string;
+export type Stage = boolean;
 export type Total = number;
 export type Count = number;
 export type Lastdate = string;
@@ -165,7 +166,7 @@ export type Billtype = string;
 export type Billduedate = string;
 export type Billprotocol = string;
 export type Records = PaymentRecord[];
-export type Stage = string;
+export type Stage1 = string;
 export type Category = string;
 export type Plandate1 = string;
 export type Actualdate1 = string;
@@ -545,6 +546,7 @@ export interface MilestoneItem {
   payRatio?: Payratio;
   pct?: Pct;
   priority?: Priority;
+  stage?: Stage;
   [k: string]: unknown;
 }
 export interface Paymentrecords {
@@ -577,7 +579,7 @@ export interface Paymentnodes {
   [k: string]: PaymentNodePmis[];
 }
 export interface PaymentNodePmis {
-  stage: Stage;
+  stage: Stage1;
   category?: Category;
   planDate?: Plandate1;
   actualDate?: Actualdate1;
