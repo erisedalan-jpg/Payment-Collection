@@ -1,0 +1,13 @@
+# 运行时依赖
+# 说明：server.py / preprocess_data.py 本体仅用 Python 标准库。
+#   - pydantic / openpyxl：数据契约校验 + 读取 PMIS xlsx（项目域处理，服务器必需）。
+#   - requests / openpyxl：V2.1.1 起，/data「下载数据」在服务器端跑 pmisdata/run_pmis_pipeline.sh
+#       （内部 fetch_*.py 用 requests 调 PMIS、openpyxl 写 xlsx）。服务器跑下载的那个 python3 必须装这两个。
+#   - playwright：仅「抓 PMIS cookie 的机器」需要（update_cookie.py 弹浏览器登录抓 cookie）；
+#       服务器端不需要 playwright（V1.16.2 起已不在服务端使用）。安装后还需 playwright install chromium。
+#
+# 锁定精确版本：在可用环境里运行 `pip freeze > requirements.lock.txt`
+pydantic>=2          # 数据契约校验（schema.py）
+openpyxl>=3.0        # pmis.py 读取 PMIS xlsx；PMIS 下载脚本写 xlsx
+requests>=2          # PMIS 下载脚本 fetch_*.py 调用 PMIS 接口（服务器端下载必需）
+playwright>=1.40     # 仅抓 cookie 的机器需要（update_cookie.py）；服务器端不需要

@@ -105,3 +105,12 @@ data/payment_key_followup.json.tmp
 client/config.json
 client/gui_settings.json
 client/dist/
+
+# LTS 精简副本(lts/)的构建产物与运行数据(源码入库,产物/数据不入库)
+lts/frontend/node_modules/
+lts/frontend/dist/
+lts/data/
+lts/input/
+lts/release/
+lts/build/
+lts/**/__pycache__/

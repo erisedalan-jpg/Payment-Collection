@@ -1,0 +1,280 @@
+/* 全局主题变量（设计底层规范令牌）+ 基线 reset + Element Plus 桥接 + 滚动条适配。
+   令牌取值与角色见 docs/superpowers/specs/2026-06-10-design-foundation-design.md。
+   :root 为浅色；html.dark 覆盖为深色。
+   --fs-base 由 settings store 运行时写到 <html>（小16/中18/大20），六级字号按 rem 整体缩放。
+   本文件须在 main.ts 中于 element-plus 的 index.css 与 dark/css-vars.css 之后引入，
+       使下面对 --el-* 的覆盖按源码顺序生效。 */
+
+:root {
+  --fs-base: 18px;
+  --font-sans: -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+
+  /* 调色板 · 结构色（浅色，蓝色系基调） */
+  --bg: #f6f6f0;
+  --card: #fbfbfd;
+  --card2: #f1f1ef;
+  --line: #e4e4e2;
+  --line2: #d4d4d2;
+  --txt: #121212;
+  --sub: #474747;
+  --mut: #6b6b6b;
+  --accent: #0d3a69;
+  --accent2: #002fa7;
+  --highlight: #f9d46c;
+  --cyan: #018b8d;
+  --on-accent: #fbfbfd;
+
+  /* 状态语义色（固定，不随基调变） */
+  --ok: #6ecc54;
+  --warn: #f9d46c;
+  --danger: #c8161d;
+  --c-paid: var(--ok);
+  --c-pending: var(--warn);
+  --c-remaining: var(--danger);
+  --c-delayed: var(--danger);
+  --c-plan: #002fa7;        /* 计划回款 */
+  --c-urgent: #eb5c20;
+  --c-advance: var(--cyan); /* 可提前(原 --cyan 收编,旧名保留兼容) */
+
+  /* 状态三态(V2):填充=上方本色;淡底 12% 自适应底色;文字深字达 4.5:1 */
+  --ok-bg: color-mix(in srgb, var(--ok) 12%, transparent);
+  --warn-bg: color-mix(in srgb, var(--warn) 12%, transparent);
+  --danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
+  --urgent-bg: color-mix(in srgb, var(--c-urgent) 12%, transparent);
+  --advance-bg: color-mix(in srgb, var(--c-advance) 12%, transparent);
+  --ok-text: #2f6b27;
+  --warn-text: #492d22;
+  --danger-text: #470125;
+  --urgent-text: #8a3a18;
+  --advance-text: #056d6e;
+
+  /* 图表分类色（8 支，源自 5 套基调） */
+  --chart-1: #0d3a69;
+  --chart-2: #eb5c20;
+  --chart-3: #018b8d;
+  --chart-4: #f9d46c;
+  --chart-5: #c8161d;
+  --chart-6: #71e2d1;
+  --chart-7: #6ecc54;
+  --chart-8: #492d22;
+
+  /* 字号 rem 令牌（随 --fs-base 缩放；px 标注 @16基准，当前默认中=18 整体 ×1.125） */
+  --fs-1: 0.75rem;   /* 12 角标/标签/列头 */
+  --fs-2: 0.875rem;  /* 14 次要/表格元信息 */
+  --fs-3: 1rem;      /* 16 正文基准 */
+  --fs-4: 1.2rem;    /* 19 卡片标题/小节头 */
+  --fs-5: 1.55rem;   /* 25 区块/页面标题 */
+  --fs-6: 2.15rem;   /* 34 大数字/KPI 主值 */
+
+  /* 行高三档 + 字距(V2):tight=fs-5/6 大数字标题,dense=fs-1/2/4 表格标签,base=fs-3 正文;字距仅拉丁/数字大写标签 */
+  --lh-tight: 1.15;
+  --lh-dense: 1.4;
+  --lh-base: 1.6;
+  --ls-wide: 0.05em;
+
+  /* 间距阶梯（4px 基 / 8px 节奏） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* 卡片（统一） */
+  --card-pad: 20px;
+  --gap-card: 16px;
+  --gap-stack: 12px;
+  --gap-section: 24px;
+
+  /* 圆角 */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+
+  /* 阴影（仅两级，每级 ≤2 层） */
+  --shadow-1: 0 1px 2px rgba(30,42,51,.06), 0 2px 8px rgba(30,42,51,.05);
+  --shadow-2: 0 2px 4px rgba(30,42,51,.08), 0 12px 28px rgba(30,42,51,.12);
+
+  /* 动效 */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --ease: cubic-bezier(.2, 0, 0, 1);
+
+  /* 交互状态层(V2):自绘件五态 default/hover/selected/disabled/focus */
+  --hover-tint: color-mix(in srgb, var(--accent) 6%, transparent);
+  --selected-tint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --disabled-opacity: 0.45;
+
+  /* 微交互/质感令牌(V2.5.2):卡片上浮位移、柔光 focus 环、浮层毛玻璃。
+     全用既有结构色/状态色派生,不引入新色;动效复用 --dur-*/--ease。 */
+  --lift: -2px;                                          /* 可交互卡片 hover 上浮位移 */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); /* 柔光 focus 环 */
+  --glass-backdrop: blur(3px);                          /* 浮层遮罩:背后页面轻模糊(弹窗本身不透明) */
+  --hairline: var(--line);                              /* 发丝分隔线色(retina 下细化为 0.5px) */
+
+  /* 层叠阶梯(V2):自绘浮层只准用这三级;弹窗/抽屉/下拉优先用 EP(自带 2000+ 动态管理) */
+  --z-sticky: 100;
+  --z-panel: 1500;
+  --z-toast: 4000;
+
+  /* Element Plus 桥接：主色用我们的 accent；亮/暗色阶用 color-mix 派生，
+     不支持 color-mix 的浏览器会忽略这些声明、自动回退 EP 内置值（安全降级）。 */
+  --el-color-primary: var(--accent);
+  --el-color-primary-light-3: color-mix(in srgb, var(--accent) 70%, #fff);
+  --el-color-primary-light-5: color-mix(in srgb, var(--accent) 50%, #fff);
+  --el-color-primary-light-7: color-mix(in srgb, var(--accent) 30%, #fff);
+  --el-color-primary-light-8: color-mix(in srgb, var(--accent) 20%, #fff);
+  --el-color-primary-light-9: color-mix(in srgb, var(--accent) 10%, #fff);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--accent) 80%, #000);
+  --el-border-radius-base: var(--r-md);
+}
+
+html.dark {
+  /* 结构色（深色） */
+  --bg: #1c1a18;
+  --card: #1a1d24;
+  --card2: #232730;
+  --line: #272b31;
+  --line2: #343a44;
+  --txt: #fbfbfd;
+  --sub: #bcbec1;
+  --mut: #8b8e93;
+  --accent: #7891ac;
+  --accent2: #7e95d2;
+  --highlight: #f9d46c;
+  --cyan: #71e2d1;
+
+  /* 状态语义色（深色提亮） */
+  --ok: #6ecc54;
+  --warn: #f9d46c;
+  --danger: #d34947;
+  --c-plan: #7e95d2;
+  --c-urgent: #eb5c20;
+
+  /* 状态三态(暗色,V2):淡底提至 16%;warn/urgent/advance 文字用状态本色,ok/danger 用提亮专值(16% 淡底上实测 ≥4.5:1) */
+  --ok-bg: color-mix(in srgb, var(--ok) 16%, transparent);
+  --warn-bg: color-mix(in srgb, var(--warn) 16%, transparent);
+  --danger-bg: color-mix(in srgb, var(--danger) 16%, transparent);
+  --urgent-bg: color-mix(in srgb, var(--c-urgent) 16%, transparent);
+  --advance-bg: color-mix(in srgb, var(--c-advance) 16%, transparent);
+  --ok-text: #8fd97a;
+  --warn-text: var(--warn);
+  --danger-text: #e8918f;
+  --urgent-text: var(--c-urgent);
+  --advance-text: var(--c-advance);
+
+  /* 图表分类色（深色） */
+  --chart-1: #3e6fa8;
+  --chart-2: #eb5c20;
+  --chart-3: #1fa6a8;
+  --chart-4: #f9d46c;
+  --chart-5: #d34947;
+  --chart-6: #71e2d1;
+  --chart-7: #6ecc54;
+  --chart-8: #8a5a45;
+
+  /* 阴影（深色加重） */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.5), 0 12px 28px rgba(0,0,0,.45);
+
+  /* EP 暗色：把 EP 自带深灰统一到我们的深蓝调色板 */
+  --el-bg-color: var(--card);
+  --el-bg-color-overlay: var(--card);
+  --el-bg-color-page: var(--bg);
+  --el-fill-color-blank: var(--card);
+  --el-text-color-primary: var(--txt);
+  --el-text-color-regular: var(--sub);
+  --el-text-color-secondary: var(--mut);
+  --el-border-color: var(--line);
+  --el-border-color-light: var(--line);
+  --el-border-color-lighter: var(--line);
+  --el-border-color-extra-light: var(--line);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: var(--fs-base, 18px); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--dur-1), color var(--dur-1);
+}
+
+/* 选区 / 焦点 */
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 滚动条（暗色适配） */
+* { scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: var(--r-sm); }
+::-webkit-scrollbar-thumb:hover { background: var(--mut); }
+
+/* 自适应栅格：无断点自动换列，--col-min 控制单列最小宽，供卡片/指标区复用。
+   断点约定（页面按需用 @media）：窄屏 <=768px，常规 <=1200px。 */
+.u-grid-auto {
+  display: grid;
+  gap: var(--gap-card);
+  grid-template-columns: repeat(auto-fit, minmax(var(--col-min, 200px), 1fr));
+}
+
+/* 数字排版(V2):金额/百分比/KPI/表格数字列必须挂 —— 等宽数字,列对齐、刷新不跳动。 */
+.u-num { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   微交互/质感(V2.5.2):统一动效,EP 与自绘件共享;全部走 --dur-*/--ease,
+   prefers-reduced-motion 由文末媒体查询统一关停(位移/动画归零)。
+   ============================================================ */
+
+/* 按下回弹:EP 按钮全站生效;自绘按钮挂 .u-press 同款触觉 */
+.el-button { transition: transform var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+.el-button:active { transform: scale(0.97); }
+.u-press { transition: transform var(--dur-1) var(--ease); }
+.u-press:active { transform: scale(0.96); }
+
+/* 可交互卡片悬浮上浮(opt-in:仅可点卡片挂,静态信息卡不挂,避免无意义动效) */
+.u-lift { transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
+.u-lift:hover { transform: translateY(var(--lift)); box-shadow: var(--shadow-2); }
+.u-lift:active { transform: translateY(0) scale(0.997); }
+
+/* 柔光 focus 环(自绘可交互件键盘聚焦;替代默认实线 outline,对比仍达 ~3:1) */
+.u-focus-ring:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* 状态点脉冲:同步/运行中等"实时"态(用状态色 --ok,不引 Apple 绿) */
+@keyframes u-pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent); }
+  70% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 0%, transparent); }
+}
+.u-pulse { animation: u-pulse-ring 1.8s var(--ease) infinite; }
+
+/* 发丝分隔线:retina 屏把 1px chrome 边框细化为 0.5px(更接近桌面 App 质感) */
+@media (min-resolution: 2dppx) {
+  .u-hairline-b { border-bottom-width: 0.5px; }
+  .u-hairline-r { border-right-width: 0.5px; }
+}
+
+/* P2 浮层:EP 遮罩背后页面轻模糊(聚焦弹窗;弹窗本身保持不透明,可读性不降)。
+   prefers-reduced-transparency 下退化为无模糊。 */
+.el-overlay { backdrop-filter: var(--glass-backdrop); -webkit-backdrop-filter: var(--glass-backdrop); }
+@media (prefers-reduced-transparency: reduce) {
+  .el-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* 减少动态效果：尊重系统「prefers-reduced-motion」，关闭过渡与动画位移。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
