@@ -144,6 +144,35 @@ describe('RiskFollowupView', () => {
     expect(filteredKeys).not.toContain('revConclusion')
     expect(filteredKeys).toContain('nextRevDate')
   })
+  it('冷加载(F5:业务数据挂载后才到达):持久化的风险列与排序在数据到达后完整恢复', async () => {
+    // 复现 F5 冷加载:auth 已就绪(路由守卫保证),但 data.data 尚未到达。
+    // 持久化一份含「非默认风险列」的自定义选列 + 一个按风险列的排序。
+    const account = 'admin'
+    localStorage.setItem('colprefs:' + account + ':risk-followup',
+      JSON.stringify(['风险编码', '风险等级', '备注', '项目编号', '项目名称']))
+    localStorage.setItem('colsort:' + account + ':risk-followup',
+      JSON.stringify({ prop: '风险等级', order: 'asc' }))
+    const auth = useAuthStore(); (auth as any).user = { account, isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const risk = useRiskFollowupStore(); risk.loaded = true; risk.scope = { combinator: 'AND', groups: [] }
+    const data = useDataStore()
+    vi.spyOn(data, 'load').mockResolvedValue(undefined as any)   // data.data=null → onMounted 会调 load,置空避免真实拉取
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    // 业务数据到达(异步)
+    ;(data as any).data = {
+      projects: [{ projectId: 'P1', projectName: '甲', projectManager: '张', orgL4: '一组', paymentPmis: { contract: 2_000_000 } }],
+      projectPmis: { P1: { status: { 项目级别: 'P1' }, riskRecords: [
+        { 风险编码: 'FX-1', 风险名称: '进度风险', 风险等级: '高', 风险状态: '未关闭', 风险大类: '进度', 风险小类: '排期', 风险描述: '长文本', 备注: '附加列' },
+      ] } },
+    }
+    await flushPromises()
+    const vm = w.vm as any
+    // 选列:全部持久化列(含非默认风险列 风险等级/备注)在数据到达后完整恢复,顺序不变
+    expect(vm.prefs.visibleKeys.value).toEqual(['风险编码', '风险等级', '备注', '项目编号', '项目名称'])
+    // 排序:被排序的风险列存在于可见列 → el-table :default-sort 才能落地;defaultSort 保持持久化值
+    expect(vm.prefs.visibleKeys.value).toContain('风险等级')
+    expect(vm.psort.defaultSort.value).toEqual({ prop: '风险等级', order: 'ascending' })
+  })
   it('点行下钻到该风险项目 /project/:id', async () => {
     seed()
     const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })

@@ -92,7 +92,12 @@ const riskCols = computed<DataColumn[]>(() => {
     return { key: k, label: c?.label ?? k, width: c?.width ?? 160, wrap: true, sortable: true, formatter } as DataColumn
   })
 })
-const ALL_COLUMNS = computed<DataColumn[]>(() => [...riskCols.value, ...PROJECT_COLS, ...FOLLOW_COLS])
+// 冷加载(F5)修复:PROJECT_COLS/FOLLOW_COLS 是静态常量,若数据未到位就把它俩并入 allKeys,
+// useColumnPrefsDynamic 会在这份「非空但不完整(缺全部动态风险列)」的 allKeys 上就地 init 并锁定,
+// 把持久化里的风险列永久过滤掉(数据到达后 inited 已真、不再 reconcile)。故业务数据到位前令列集为空,
+// 保证 allKeys 一次性从空→完整,组合式据此一次性从 localStorage 还原完整选列(排序列也随之在场,default-sort 得以落地)。
+const ALL_COLUMNS = computed<DataColumn[]>(() =>
+  data.data ? [...riskCols.value, ...PROJECT_COLS, ...FOLLOW_COLS] : [])
 const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
@@ -152,7 +157,7 @@ defineExpose({
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
-  allRows, scopedRows, hasScope, allKeys, prefs, FILTERABLE,
+  allRows, scopedRows, hasScope, allKeys, prefs, psort, FILTERABLE,
   filtered: fp.filtered, paged: fp.paged, currentPage: fp.currentPage, pageSize: fp.pageSize,
 })
 </script>
