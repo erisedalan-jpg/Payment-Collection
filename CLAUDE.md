@@ -6,9 +6,9 @@
 
 ## 1. 这是什么
 
-一个**单机/内网离线**运行的项目管理与回款（收款）跟踪看板。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**（旧原生 JS 前端 app.js/index.html/analysis_data.js 已退役删除；后端输出 `data/analysis_data.json`）。数据来源 = PMIS 导出 + CSV，经页面上传或本地放置进入 `input/`（PMIS 9 表放 `input/pmis/`，收款阶段/回款流水/预算等 CSV 放 `input/`），`组织架构.xlsx` 决定项目花名册，`A.xlsx` 售前↔原项目映射；点「更新数据」（`/api/reprocess`）生效。可用 PyInstaller 打包成单 exe 分发。
+一个**单机/内网离线**运行的**项目管理平台**：从最初的回款（收款）跟踪看板，已扩展为覆盖 **项目主域 / 回款 / 商机 / 概算工具 / 倚天工时 / 首页门户** 的多域平台。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**（旧原生 JS 前端 app.js/index.html/analysis_data.js 已退役删除）。数据分**三条脉络**（数据血缘详见 §2）：① **主域管线** PMIS 导出 + CSV → `preprocess_data.py` → `data/analysis_data.json`（前端主业务数据源）；② **倚天工时管线** `input/yitian/工时.xlsx` → 累积库 `data/yitian_store.json` → `data/yitian_data.json`（独立数据源，脉络②在「更新数据」里与主域一并跑，只是产出独立文件）；③ **配置/存档/跟进/门户类** 不进管线，经 `server.py` 的 `/api/*` 直接读写 `data/*.json`，改完即时生效。主域/倚天数据经页面上传或本地放置进入 `input/`（PMIS 9 表放 `input/pmis/`，收款阶段/回款流水/预算等 CSV 放 `input/`，倚天工时放 `input/yitian/`），`组织架构.xlsx` 决定项目/员工花名册，`A.xlsx` 售前↔原项目映射；点「更新数据」（`/api/reprocess`，SSE）生效。可用 PyInstaller 打包成单 exe 分发。
 
-- 当前版本：见 `frontend/src/version.ts`（撰写时 **V1.15.0**；单一来源，改版本只改此处，本文件不逐版同步）；版本史/各期结论见 `PROGRESS.md`
+- 当前版本：见 `frontend/src/version.ts`（本文刷新时 **V3.2.1**；单一来源，改版本只改此处，本文件不逐版同步）；版本史/各期结论见 `PROGRESS.md`
 - 产品名称：**项目管理平台**（2026-06-12 起；桌面快捷方式/.vbs/.bat/exe 文件名仍为旧名「项目回款跟踪与管控平台」，随下次打包专项更名）
 - 访问地址：`http://localhost:8080`
 - 交流语言：**简体中文**
@@ -16,33 +16,45 @@
 ## 2. 架构地图（按数据流）
 
 ```
-PMIS 9 表(input/pmis/*.xlsx) ┐
-组织架构.xlsx / A.xlsx(售前映射) │
-收款阶段 collection_stages.csv  ├─ preprocess_data.py(各域解析+计算+快照diff)
-回款流水 payment_records.csv    │     模块: pmis/projects/collection_stages/
-预算 profit_loss_*/budget/delivery┘           milestones/profit/snapshots
-                                                     │
-                                                     v
-                                   data/analysis_data.json  (前端唯一数据源, 经 schema 校验)
-                                                     │  fetch('/data/analysis_data.json')
-                                                     v
-   frontend/ Vue3+Vite+TS (router / views / components / lib(纯计算口径) / stores / charts) + ECharts + xlsx
-                                                     ▲
-        server.py(本地HTTP: 静态 + /data + /api/*) ┘
+脉络① 主域管线 —— 点「更新数据」(/api/reprocess, SSE) 触发
+  PMIS 9 表(input/pmis/*.xlsx) ┐
+  组织架构.xlsx / A.xlsx(售前映射) │
+  收款阶段 collection_stages.csv   ├─ preprocess_data.py(各域解析+计算+快照diff)
+  回款流水 payment_records.csv     │    模块: pmis/projects/collection_stages/milestones/profit/snapshots
+  预算 profit_loss_*/budget/delivery┘
+     └──────────────> data/analysis_data.json  (主业务数据源, schema 校验, 按 allowedL4 切分)
+
+脉络② 倚天工时管线 —— 同在「更新数据」内一并跑(preprocess 末段调 yitian); 超管在 /data 增删累积库亦即时重建
+  input/yitian/工时.xlsx(当周快照) ─yitian.ingest─> data/yitian_store.json(累积库, 按工时ID去重, 服务端私有不下发)
+     └─ yitian.build_yitian_data(工号 join 花名册 + 合规判定) ─> data/yitian_data.json  (独立数据源, schema 校验, 按 allowedL4 切分)
+
+脉络③ 配置/存档/跟进/门户 —— 不进管线; 经 server.py 的 /api/* 直接读写 data/*.json, 改完即时生效
+  budget_config/budget_estimates(概算) · portal_links + portal_files/(门户) · opportunities(商机)
+  followup_records + {risk,temp,payment_key,opportunity}_followup + project_progress(各域跟进)
+  project_tags(标签) · accounts(账号) · audit_log.jsonl(审计) · yitian_settings(倚天合规范围, 超管可配)
+
+  三脉络产物统一下发:
+  server.py(本地HTTP: 静态 dist + /data/*.json + /api/*)  ──fetch/请求──>
+  frontend/ Vue3+Vite+TS (router / views / components / lib(纯计算口径) / stores / charts) + ECharts + xlsx
 ```
 
 | 文件/目录 | 职责 |
 |---|---|
-| `server.py` | 本地 HTTP：静态 + `/data` + `/api/reprocess`(更新数据,SSE) / `/api/inputs/upload`(文件上传) / `/api/pmis/upload`(PMIS 包上传) / `/api/files/status`(文件状态) / `/api/clear-data` / `/api/followup/*` / `/api/tags` / `/api/manual/*` / 历史回滚 / `/api/stop` |
-| `preprocess_data.py` | **核心管线**：摄取各源→项目主域/回款/健康/治理指标→`data/analysis_data.json`（经 schema 校验）；末段 9f 系统核心口径回款回填 |
-| `pmis.py` / `projects.py` / `collection_stages.py` / `milestones.py` / `profit.py` | 各数据域解析：PMIS 项目域 / 主域 join / 收款阶段节点 / 里程碑 / 预算流水 |
-| `schema.py` | pydantic 数据契约 + 导出 JSON Schema 供前端 `npm run gen:types` |
+| `server.py` | 本地 HTTP：静态 dist + `/data/*.json` + `/api/*`。含 `/api/reprocess`(更新数据,SSE) / `/api/inputs/upload` / `/api/pmis/upload` / `/api/files/status` / `/api/clear-data` / 各域跟进 `/api/{followup,risk-followup,temp-followup,payment-key-followup,opportunity-followup,progress}/*` / `/api/opportunities/*` / `/api/tags` / `/api/budget/*` / `/api/portal/*` / `/api/yitian/{data,store,settings,cookie}` / `/api/admin/*`(超管账号+审计) / `/api/login`·`/api/auth/me` / `/api/manual/*` / 历史回滚 / `/api/stop`。**打包(frozen)/开发两套代码路径见 §5** |
+| `preprocess_data.py` | **主域核心管线**：摄取各源→项目主域/回款/健康/治理指标→`data/analysis_data.json`（经 schema 校验）；末段 9f 系统核心口径回款回填；**末段并调 `yitian.ingest/build_yitian_data` 产出 `data/yitian_data.json`**（脉络②，缺倚天源不阻断主管线） |
+| `pmis.py` / `projects.py` / `collection_stages.py` / `milestones.py` / `profit.py` | 主域各域解析：PMIS 项目域 / 主域 join / 收款阶段节点 / 里程碑 / 预算流水 |
+| `yitian.py` + `yitian_calendar/check/rules/store/settings/config.py` | **倚天工时域**：`yitian.py` 管线组装(ingest 当周工时→累积库、build→`yitian_data.json`)；`calendar` 工作日/双周(年度无关,不写死年份)；`rules` 合规规则常量 + `check` 判定(纯函数)；`store` 累积库(按工时ID去重,服务端私有)；`settings` 合规检查范围(超管可配)；`config` cookie |
+| `opportunities.py` / `opportunity_followup.py` / `risk_followup.py` / `temp_followup.py` / `payment_key_followup.py` / `followup_store.py` | 商机进展(线上可编辑表格) + 各域跟进(薄封装统一 `followup_store`：分组/单表 scope、归档留存或清空) |
+| `portal.py` | 首页门户/快捷入口(Launchpad)：配置校验 + 可见性过滤 + 文件名消毒 + 下载头 |
+| `budget_config.py` / `budget_store.py` | 概算工具：费率与目录配置(超管可配,`budget_config.json`) / 报价存档(按账号隔离 + 费率快照,`budget_estimates.json`) |
+| `auth.py` / `audit.py` / `data_scope.py` | 账号鉴权(PBKDF2+会话) / 操作审计(绝不记密码token) / 按 allowedL4 切 `analysis_data`(L4 数据隔离,SP-4) |
+| `schema.py` | pydantic 数据契约(主域 + 倚天两套) + 导出 JSON Schema 供前端 `npm run gen:types` |
 | `snapshots.py` | 快照 diff → 事件流/周期对比（项目动态） |
 | `data_history.py` / `manual_history.py` / `manual_import.py` | 数据历史快照回滚 / 人工数据备份与导入 |
-| `budget_config.py` / `budget_store.py` | 概算工具:费率与目录配置(超管可配) / 报价存档(按账号隔离 + 费率快照) |
-| `frontend/` | Vue3 前端：`router/`(路由) `views/`(页面) `components/` `lib/`(纯计算口径) `stores/`(Pinia) `charts/` `styles/theme.css`(设计令牌单一落地) |
-| `data/followup_records.json` / `data/project_tags.json` | 本地跟进记录 / 项目标签持久化 |
-| `input/` | 数据源输入（PMIS xlsx + CSV），经页面上传或本地放置；点「更新数据」生效 |
+| `config.py` / `pmis_config.py` | 集中配置常量(消除硬编码) / PMIS 下载 cookie 读写 |
+| `frontend/` | Vue3 前端：`router/`(路由) `views/`(页面) `components/` `lib/`(纯计算口径,含 `lib/yitian`·`lib/budget`) `stores/`(Pinia) `charts/` `styles/theme.css`(设计令牌单一落地) |
+| `data/*.json` | 管线产物 `analysis_data`·`yitian_data`；配置/存档/跟进类 `budget_config`·`budget_estimates`·`portal_links`·`opportunities`·`followup_records`·`*_followup`·`project_progress`·`project_tags`·`yitian_settings`·`yitian_store`(私有)·`accounts`·`events` 等（部分含敏感数据,已 gitignore） |
+| `input/` | 数据源输入：`input/pmis/`(PMIS 9 表 xlsx)、`input/`(收款阶段/回款流水/预算 CSV + 组织架构/A/TOP1000 xlsx)、`input/yitian/`(工时.xlsx)；经页面上传或本地放置，点「更新数据」生效 |
 | `停止服务.py/.bat/.command`、`*_启动.bat/.command` | 启停脚本（Windows / macOS） |
 
 ## 3. 运行 / 调试
@@ -60,7 +72,7 @@ python server.py --stop     # 停止运行中的服务
 - 安装：`cd frontend && npm install`
 - 开发：先 `python server.py`(:8080) 提供 /api 与 /data，再 `cd frontend && npm run dev`(:5173，已代理 /api、/data)
 - 类型同源：改了 `schema.py` 后运行 `cd frontend && npm run gen:types` 重新生成 `src/types/analysis.ts`
-- 测试/构建：`npm run test:run` / `npm run typecheck` / `npm run build`（dist/ 由 Phase C 接入 server.py 与打包）
+- 测试/构建：`npm run test:run` / `npm run typecheck` / `npm run build`（`dist/` 已接入 server.py 静态服务；打包见 `make_update_zip.py` / `make_deploy_zip.py`）
 
 ## 4. 关键约定（违反会被用户打回，来源：`.clinerules/memories.md`）
 
