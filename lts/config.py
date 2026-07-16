@@ -71,22 +71,14 @@ TOP1000_LEVEL = "TOP1000大客户"          # top1000 判定级别
 DELIVERY_FILE = "delivery_analysis.csv"
 DELIVERY_FILE_LEGACY = "delivery_analysis.xlsx"  # csv 缺失时回退(R 批次过渡)
 
-# ── 倚天工时域(V3.0.0,位于 input/yitian/)──
-YITIAN_DIRNAME = "yitian"
-YITIAN_TIMESHEET_FILE = "工时.xlsx"
-YITIAN_HOLIDAYS_FILE = "holidays.csv"
-
-# 上传白名单 → 子目录映射:命中则写 input/<subdir>/,未命中写 input/ 根(项目主域既有行为)
-INPUT_SUBDIR_MAP = {
-    YITIAN_TIMESHEET_FILE: YITIAN_DIRNAME,
-    YITIAN_HOLIDAYS_FILE: YITIAN_DIRNAME,
-}
+# 上传白名单 → 子目录映射:命中则写 input/<subdir>/,未命中写 input/ 根(项目主域既有行为)。
+# 当前无子目录域(倚天专属映射已随域删除),保留空字典维持机制/消费方(server.py)可用。
+INPUT_SUBDIR_MAP = {}
 
 # 上传白名单含 legacy:R 批次过渡期 csv/xlsx 两式 delivery 均可上传(读侧 read_delivery 同款回退)
 INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY,
                       PAYMENT_RECORDS_FILE, PROFIT_DIRECT_FILE, PROFIT_BRIDGE_FILE, BUDGET_FILE,
-                      COLLECTION_STAGES_FILE, TOP1000_FILE,
-                      YITIAN_TIMESHEET_FILE, YITIAN_HOLIDAYS_FILE]
+                      COLLECTION_STAGES_FILE, TOP1000_FILE]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
 PRESALE_PROJECT_TYPE = "售前服务类"  # 售前判定(取代 name.startswith);与终验时间取列共用
