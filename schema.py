@@ -54,6 +54,7 @@ class PmisStatus(_Base):
     评级: Optional[str] = None
     项目级别: Optional[str] = None
     项目类型: Optional[str] = None
+    立项日期: Optional[str] = None
     评分: Optional[float] = None
     关键动作: Optional[str] = None
     交付物: Optional[str] = None
