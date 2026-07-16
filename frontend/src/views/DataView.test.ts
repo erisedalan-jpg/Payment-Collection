@@ -6,6 +6,7 @@ import DataView from './DataView.vue'
 import DataStatusBar from '@/components/DataStatusBar.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
+import { useAuthStore } from '@/stores/auth'
 import * as cookieAgent from '@/lib/cookieAgent'
 
 vi.mock('@/lib/manualApi', () => ({
@@ -206,5 +207,19 @@ describe('DataView 本机取 cookie', () => {
     await (w.vm as unknown as { onFetchPmisCookie: () => Promise<void> }).onFetchPmisCookie()
     await flushPromises()
     expect(postSpy).not.toHaveBeenCalledWith('/api/pmis/cookie', expect.anything())
+  })
+})
+
+describe('DataView 倚天合规规则卡', () => {
+  // 复用文件级 beforeEach(已建 pinia + stub fetch + ds.data);此处仅置超管身份。
+  // stub 掉子卡片(含无关的 PortalConfigCard,其 reload 对空配置会抛,不 stub 会逸出未处理拒绝),
+  // 并 await flushPromises 收敛所有 onMounted 异步,避免污染 vitest 退出码。
+  it('超管可见「合规规则配置」折叠项', async () => {
+    const auth = useAuthStore(); (auth as any).user = { account: 'admin', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const w = mount(DataView, { global: { plugins: [ElementPlus], stubs: {
+      'el-switch': true, YitianRulesCard: true, YitianScopeCard: true, YitianStoreCard: true, PortalConfigCard: true,
+    } } })
+    await flushPromises()
+    expect(w.text()).toContain('合规规则配置')
   })
 })
