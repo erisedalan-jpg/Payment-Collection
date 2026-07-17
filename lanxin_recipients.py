@@ -26,6 +26,21 @@ MAX_FIELDS = 10
 
 SIGNATURE = "项目管理平台"
 
+# 卡片 fields 的 key 上限 18 字节(蓝信硬限)。八类关注原因里这三类超限,
+# 其中「总成本超支大于/小于5000」截断后【完全相同】(都成「总成本超支…」),收件人分不清 —— 目验才发现。
+# 故卡内用短标签。注意:这【不改口径】,riskReasons 的 RiskCategory 一个字不动,
+# 仅组卡时把长名映射成短名显示;bodyContent 里仍用全名列项目,信息不丢。
+REASON_SHORT_LABELS = {
+    "总成本超支大于5000": "成本超支>5k",     # 25 → 15 字节
+    "总成本超支小于5000": "成本超支<5k",     # 25 → 15 字节
+    "未获取原项目预算": "未获原项目预",     # 24 → 18 字节
+}
+
+
+def short_reason(reason: str) -> str:
+    """卡片 fields 的 key 显示名。超 18 字节的三类用短标签,其余原样。"""
+    return REASON_SHORT_LABELS.get(reason, reason)
+
 
 def fit_bytes(s: str, limit: int) -> str:
     """按 UTF-8 字节截断(中文 3 字节/字)。超出时末尾加 '…'(自身 3 字节)。
@@ -139,7 +154,7 @@ def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, 
     fields 按【原因】排(共 8 类,恒 ≤10 对) —— 不能按项目名排:实测单人最多背 49 个项目。
     具体项目名进 bodyContent(3000 字节/八行),超出显式写「另有 N 个未列出」。"""
     rows = sorted(by_reason.items(), key=lambda kv: -len(kv[1]))
-    fields = [_field(r, "%d 个项目" % len(ps)) for r, ps in rows]
+    fields = [_field(short_reason(r), "%d 个项目" % len(ps)) for r, ps in rows]
     distinct = len({p for ps in by_reason.values() for p in ps})
 
     lines: List[str] = []
@@ -174,7 +189,7 @@ def build_summary_card(name: str, rows: List[Dict[str, Any]],
 
     fields: List[Dict[str, str]] = []
     for r in shown:
-        parts = ["%s %d" % (c, n) for c, n in sorted(r["reasons"], key=lambda x: -x[1])]
+        parts = ["%s %d" % (short_reason(c), n) for c, n in sorted(r["reasons"], key=lambda x: -x[1])]
         value = "%d 项：%s" % (int(r["total"]), " · ".join(parts))
         # value 超 192 字节时逐个丢掉最小的原因,末尾以「等」示意
         while len(value.encode("utf-8")) > LIMIT_FIELD_VALUE and len(parts) > 1:

@@ -158,3 +158,33 @@ def test_all_cards_respect_key_18_bytes():
     rows = [{"name": "姓名特别长的一个人", "total": 1, "reasons": [("回款延期", 1)]}]
     card = LR.build_summary_card("组长", rows, "直接上级（+1）")
     assert len(card["fields"][0]["key"].encode("utf-8")) <= 18
+
+
+def test_short_labels_fit_18_bytes_and_are_distinct():
+    """key 上限 18 字节。原「总成本超支大于/小于5000」都是 25 字节,截断后都成「总成本超支…」
+    —— 两行长得一样、收件人分不清。这是目验才发现的缺陷。"""
+    # 验证映射中的所有短标签都不超 18 字节
+    for orig, short in LR.REASON_SHORT_LABELS.items():
+        assert len(short.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, \
+            "%s 短标签仍超 18 字节" % orig
+    # 关键:显示名必须两两不同,不能有两类撞成同一串
+    shown = list(LR.REASON_SHORT_LABELS.values())
+    assert len(set(shown)) == len(shown), "短标签中有撞车: %s" % shown
+
+
+def test_short_label_used_in_project_card_fields_but_not_bodycontent():
+    """短标签只用于 fields 的 key;bodyContent 里仍须全名,信息不丢。"""
+    card = LR.build_project_card("张三", {"总成本超支大于5000": ["P1"], "总成本超支小于5000": ["P2"]})
+    keys = [f["key"] for f in card["fields"]]
+    assert "成本超支>5k" in keys and "成本超支<5k" in keys
+    assert "总成本超支…" not in keys                    # 不再有截断撞车
+    assert "总成本超支大于5000：P1" in card["bodyContent"]   # 全名仍在正文
+    assert "总成本超支小于5000：P2" in card["bodyContent"]
+
+
+def test_short_label_used_in_summary_card_value():
+    rows = [{"name": "李四", "total": 2,
+             "reasons": [("总成本超支大于5000", 1), ("总成本超支小于5000", 1)]}]
+    card = LR.build_summary_card("组长", rows, "直接上级（+1）")
+    v = card["fields"][0]["value"]
+    assert "成本超支>5k 1" in v and "成本超支<5k 1" in v
