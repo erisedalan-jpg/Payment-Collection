@@ -17,6 +17,19 @@ export interface RiskReason {
 /** 「总成本超支」两档 category（按 overspendAmount 是否 > 5000 元拆分）。判定「是否总成本超支」的消费方须用此常量，勿散写字面量。 */
 export const TOTAL_OVERSPEND_CATS = ['总成本超支大于5000', '总成本超支小于5000'] as const
 
+/** 全部关注原因（8 类）。UI 选项源需要运行时可枚举的列表，而 RiskCategory 是类型、枚举不出来。
+ *  下方 _exhaustive 是编译期护栏：往 RiskCategory 加了新类却忘了加进本数组 → typecheck 报错。
+ *  注意：后端 lanxin_config.REASON_WHITELIST 是本列表的跨语言副本（Python 读不了 TS，无法消除），
+ *  两边必须一致；若不一致，后端 validate_config 会以 400 明确拒绝，不会静默。 */
+export const ALL_RISK_CATEGORIES = [
+  '回款延期', '里程碑滞后', '总成本超支大于5000', '总成本超支小于5000',
+  '交付成本超支', '风险未闭环', '数据异常', '未获取原项目预算',
+] as const satisfies readonly RiskCategory[]
+
+type _MissingCategory = Exclude<RiskCategory, typeof ALL_RISK_CATEGORIES[number]>
+const _exhaustive: _MissingCategory extends never ? true : never = true
+void _exhaustive
+
 /** 里程碑滞后关键词 */
 const MILESTONE_LAG_KEYWORDS = ['滞后', '延期', '超期']
 
