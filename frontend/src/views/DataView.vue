@@ -13,11 +13,14 @@ import PortalConfigCard from '@/components/PortalConfigCard.vue'
 import YitianScopeCard from '@/components/YitianScopeCard.vue'
 import YitianRulesCard from '@/components/YitianRulesCard.vue'
 import MaintenanceCard from '@/components/MaintenanceCard.vue'
+import LanxinConfigCard from '@/components/LanxinConfigCard.vue'
+import LanxinPushDrawer from '@/components/LanxinPushDrawer.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
 const auth = useAuthStore()
+const lanxinOpen = ref(false)
 
 // tab 不持久化:每次进入默认落「数据源」签(更新数据已常驻,签只在偶尔改配置/回滚时才切)
 const activeTab = ref('sources')
@@ -114,6 +117,10 @@ defineExpose({
             </el-collapse>
           </div>
 
+          <div v-if="auth.isSuper" class="dv-span-all">
+            <LanxinConfigCard @open-push="lanxinOpen = true" />
+          </div>
+
           <div v-if="auth.isSuper" class="dv-card dv-span-all">
             <div class="dv-card-head">首页门户</div>
             <el-collapse class="dv-more">
@@ -129,6 +136,8 @@ defineExpose({
         <MaintenanceCard @data-changed="reloadSources" />
       </el-tab-pane>
     </el-tabs>
+
+    <LanxinPushDrawer v-model="lanxinOpen" />
   </div>
 </template>
 
