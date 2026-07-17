@@ -83,6 +83,10 @@ _ACTION_MAP = {
     ('POST', '/api/opportunities/import'): ('opportunities.import', '导入商机'),
     ('POST', '/api/portal/config'): ('portal.save', '保存门户配置'),
     ('POST', '/api/portal/upload'): ('portal.upload', '上传门户文件'),
+    # 蓝信推送
+    ('POST', '/api/lanxin/config'): ('lanxin.config', '蓝信推送配置'),
+    ('POST', '/api/lanxin/selftest'): ('lanxin.selftest', '蓝信连通性自检'),
+    ('POST', '/api/lanxin/send'): ('lanxin.send', '蓝信推送发送'),
 }
 
 

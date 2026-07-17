@@ -117,3 +117,6 @@ lts/release/
 lts/build/
 lts/**/__pycache__/
 lts/*.zip
+# 蓝信推送配置(含 AppSecret,绝不入库)
+data/lanxin_config.json
+data/lanxin_config.json.tmp

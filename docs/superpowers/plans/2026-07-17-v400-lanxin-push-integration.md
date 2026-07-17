@@ -171,8 +171,26 @@ def test_default_config_shape():
     # 默认值:工时不发汇总;项目发到直接上级
     assert ts["recipients"]["supervisorLevels"] == 0
     assert pj["recipients"]["supervisorLevels"] == 1
-    assert len(ts["issueCodes"]) == 7
     assert len(pj["reasons"]) == 8
+
+
+def test_default_issue_codes_exclude_hint():
+    """HINT_ 是「合规(提示)」不是问题(yitian_check.ok_of:含任一非 HINT_ 码才算问题)。
+    实测 HINT_PRESALE_PRODUCT 96 条 > 全部真问题 63 条 —— 默认推它就是给「合规」的人
+    发「你有问题」,且数量上还压过真问题。故默认不勾。"""
+    from yitian_rules import ISSUE_LABELS
+    ts = next(r for r in LC.default_config()["routes"] if r["key"] == "timesheet")
+    assert all(not c.startswith("HINT_") for c in ts["issueCodes"])
+    assert set(ts["issueCodes"]) == {k for k in ISSUE_LABELS if not k.startswith("HINT_")}
+    assert "HINT_PRESALE_PRODUCT" not in ts["issueCodes"]
+
+
+def test_hint_code_still_selectable():
+    """默认不勾 ≠ 不可勾:超管想推提示,页面上勾了必须能存下来。"""
+    c = LC.default_config()
+    c["routes"][0]["issueCodes"] = ["MISS_SUMMARY", "HINT_PRESALE_PRODUCT"]
+    saved = LC.validate_config(c)
+    assert "HINT_PRESALE_PRODUCT" in saved["routes"][0]["issueCodes"]
 
 
 def test_validate_accepts_default():
@@ -308,6 +326,14 @@ from typing import Any, Dict, List
 
 from yitian_rules import ISSUE_LABELS
 
+# ISSUE_LABELS 实测共 8 项,其中 HINT_ 前缀的是「合规(提示)」而不是问题 ——
+# yitian_check.ok_of 的原话:「0=合规 / 1=合规(提示) / 2=问题。含任一非 HINT_ 码即为问题」。
+# 默认只推真问题:实测 HINT_PRESALE_PRODUCT 有 96 条,比全部真问题(63 条)还多;
+# 默认推它 = 给系统判定为「合规」的人发一张写着「你有 N 条工时填报存在问题」的卡,
+# 一次就会砸掉功能信任。超管想推可在页面自行勾选。
+# 用 startswith 派生而非硬编码 7 项:将来若新增 HINT_ 码,自动排除、无需改这里。
+DEFAULT_ISSUE_CODES = [k for k in ISSUE_LABELS if not k.startswith("HINT_")]
+
 # 前端 lib/riskReasons.ts 的 RiskCategory 八类。
 # 注意:这里只用于「校验超管勾选的取值是否合法」,不做任何判定 —— 判定口径的单一来源仍是前端。
 REASON_WHITELIST = [
@@ -336,7 +362,8 @@ def default_config() -> Dict[str, Any]:
         "routes": [
             {
                 "key": "timesheet", "label": "倚天工时问题", "enabled": True,
-                "issueCodes": list(ISSUE_LABELS.keys()),
+                # 只含真问题;HINT_(合规提示)默认不勾,但仍在白名单里、页面可自行勾选
+                "issueCodes": list(DEFAULT_ISSUE_CODES),
                 # 默认不发汇总:工时问题是本人可自纠的,先不惊动上级
                 "recipients": {"primary": True, "supervisorLevels": 0},
             },
@@ -2445,14 +2472,16 @@ onMounted(load)
         <el-select v-model="r.recipients.supervisorLevels" size="small" style="width: 220px">
           <el-option v-for="o in LEVEL_OPTS" :key="o.v" :value="o.v" :label="o.t" />
         </el-select>
-        <el-select v-if="r.key === 'timesheet'" v-model="r.issueCodes" size="small"
-          multiple collapse-tags style="width: 200px" placeholder="参与推送的问题类型">
-          <el-option v-for="c in ALL_ISSUE_CODES" :key="c" :value="c" :label="issueLabel(c)" />
-        </el-select>
-        <el-select v-else v-model="r.reasons" size="small"
-          multiple collapse-tags style="width: 200px" placeholder="参与推送的关注原因">
-          <el-option v-for="c in ALL_REASONS" :key="c" :value="c" :label="c" />
-        </el-select>
+        <!-- 用 el-checkbox-group 而非 el-select multiple:EP 的 select 下拉是 teleport +
+             惰性挂载,不点开下拉选项根本不进 DOM,测试断言不到「未勾选项也在选项里」。
+             本仓已有先例:YitianScopeCard.vue / FollowupModals.vue。
+             附带好处:8 个选项平铺可见,超管不点开就知道有哪些可勾。 -->
+        <el-checkbox-group v-if="r.key === 'timesheet'" v-model="r.issueCodes" class="lx-opts">
+          <el-checkbox v-for="c in ALL_ISSUE_CODES" :key="c" :value="c" :label="c">{{ issueLabel(c) }}</el-checkbox>
+        </el-checkbox-group>
+        <el-checkbox-group v-else v-model="r.reasons" class="lx-opts">
+          <el-checkbox v-for="c in ALL_REASONS" :key="c" :value="c" :label="c">{{ c }}</el-checkbox>
+        </el-checkbox-group>
       </div>
 
       <div class="dv-row dv-actions">
@@ -2660,7 +2689,13 @@ async function buildItems(): Promise<PushItem[]> {
   }
   const rTs = cfg.routes.find((r) => r.key === 'timesheet')
   if (rTs?.enabled && yitian.data) {
-    const rows = issueRows(yitian.data, '', '', [], yitianSettings.excludedTypes ?? [])
+    // 口径必须与倚天总览/合规页同源:excludedTypes 在 store 的 settings 里,
+    // 【不是】顶层字段 —— 写成 yitianSettings.excludedTypes 会静默读到 undefined,
+    // issueRows 落默认 [] = 一个类型都不剔除,两页问题数当场对不上且不报错。
+    // 既有消费方 YitianComplianceView.vue 用的也是 settings.settings.excludedTypes。
+    // 空区间 '' , '' 等价全时口径:compliance.ts 里是 if (start && e.d < start) return,
+    // 空串 falsy → 过滤不生效(源码级确定,非数据巧合)。
+    const rows = issueRows(yitian.data, '', '', [], yitianSettings.settings.excludedTypes ?? [])
     out.push(...timesheetItems(rows, rTs.issueCodes ?? []))
   }
   return out
@@ -2783,7 +2818,11 @@ watch(() => props.modelValue, (v) => { if (v) doPreview() }, { immediate: true }
 </style>
 ```
 
-> **实现者须核实**：`useYitianStore` / `useYitianSettingsStore` 的**确切导出名与状态字段**（`data` / `excludedTypes`）以本仓现有代码为准；`issueRows` 的空区间参数（`'' , ''`）是否等价「全时口径」也须核实 —— 若不是，改为传 `yitian.data.meta.periodStart` / `periodEnd`。
+> **已核实（执行时查证，无需再验）**：
+> - `useYitianSettingsStore` 导出 `{ settings, loaded, saving, load, save, reset }` —— **没有顶层 `excludedTypes`**，正确路径是 `yitianSettings.settings.excludedTypes`（默认 `['管理类','业务类','假期类']`）。既有消费方 `YitianComplianceView.vue` 亦然。
+> - `issueRows(data, '', '', ...)` **等价全时口径**：`compliance.ts` 的过滤是 `if (start && e.d < start) return` / `if (end && e.d > end) return`，空串 falsy → 两个过滤均不生效。**源码级确定，非数据巧合**，无需改传 `meta.periodStart/periodEnd`。
+> - 模板内**不要**写跨行的内联类型断言（`(r.card as Record<...>).fields as {...}[] ?? []`）—— `vue-tsc` 报 `TS1005`。用脚本层小函数（`cardStr` / `cardFields`）代替。
+> - 测试须 `vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue(...)`（不 mock 会在 jsdom 里永久挂起，本仓 `YitianStoreCard.test.ts` 同款），且「预览前按钮禁用」那条要 `await nextTick()` 后再断言（`el-drawer` 的 slot 内容需一个 tick 才渲染）。
 
 - [ ] **Step 4: 运行确认通过 + typecheck**
 
@@ -2862,7 +2901,8 @@ cd frontend && npm run dev
 超管进 `/data`「配置」签，确认：
 - [ ] 「蓝信推送」卡渲染，总开关/凭证/两条路由/汇总级别下拉（0..5 六个选项）齐全
 - [ ] AppSecret 框显示「未配置」，输入并保存后再刷新显示「已配置」且**不回显明文**
-- [ ] 点「预览并推送」→ 抽屉打开 → 列出收件人与卡片全文、未解析清单（实测应有约 6 个「经理不在花名册」）
+- [ ] 点「预览并推送」→ 抽屉打开 → 列出收件人与卡片全文
+- [ ] **注意：未解析清单在当前数据下应为 0 项，不是「约 6 个」** ——  的 6 个项目不在主域  里（主域定义即「经理 ∈ 花名册」），实测主域 74 位经理 100% 在册。看到「未解析 0 项」是**正确**的，不要当成解析失灵。
 - [ ] 点「确认推送」→ 二次确认弹窗 → 确认后因 `enabled=false` 或网关为空而被拒，**错误提示可见**
 - [ ] light / dark 双主题正常；console 无报错
 
