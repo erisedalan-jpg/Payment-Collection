@@ -45,6 +45,9 @@ import yitian
 import budget_config
 import budget_store
 import schema
+import lanxin
+import lanxin_config
+import lanxin_recipients
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -217,6 +220,8 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/yitian/store/clear', '/api/yitian/store/delete-range',
     '/api/yitian/rules',
     '/api/portal/upload',
+    '/api/lanxin/config', '/api/lanxin/selftest',
+    '/api/lanxin/preview', '/api/lanxin/send',
 })
 
 
@@ -327,6 +332,12 @@ _YITIAN_PAGE_KEYS = ('yitian', 'yitian-compliance', 'yitian-analytics',
 # 所以**不能**进 _SUPER_ONLY_PATHS(那个闸按 path 匹配、不分 method)。判权在 handler 内做。
 BUDGET_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'budget_config.json')
 BUDGET_ESTIMATES_FILE = os.path.join(BASE_DIR, 'data', 'budget_estimates.json')
+
+# ── 蓝信推送 /lanxin:凭证/路由配置(超管可配) ──
+LANXIN_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'lanxin_config.json')
+# M-4:send 是不可撤销的对外动作,双击或两个超管同时点会重复触达全员。非阻塞 acquire——
+# 抢不到锁立即 400,绝不排队等待(服务是单线程 HTTPServer,排队会把整站堵死)。
+_lanxin_send_lock = threading.Lock()
 _budget_config_lock = threading.RLock()
 _budget_store_lock = threading.RLock()
 
@@ -808,6 +819,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_budget_config_get()
         elif parsed.path == '/api/budget/estimates':
             self.handle_budget_estimates_get()
+        elif parsed.path == '/api/lanxin/config':
+            self.handle_lanxin_config_get()
         elif parsed.path == '/api/pmis/download':
             self.handle_pmis_download()
         elif parsed.path == '/api/reprocess':
@@ -967,6 +980,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_budget_estimates_save()
         elif parsed.path == '/api/budget/estimates/delete':
             self.handle_budget_estimates_delete()
+        elif parsed.path == '/api/lanxin/config':
+            self.handle_lanxin_config_save()
+        elif parsed.path == '/api/lanxin/selftest':
+            self.handle_lanxin_selftest()
+        elif parsed.path == '/api/lanxin/preview':
+            self.handle_lanxin_preview()
+        elif parsed.path == '/api/lanxin/send':
+            self.handle_lanxin_send()
         elif parsed.path == '/api/pmis/upload':
             self.handle_pmis_upload()
         elif parsed.path == '/api/inputs/upload':
@@ -2695,6 +2716,150 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._audit_set(target=name, detail='删除报价')
         self._send_json(200, {"success": True})
+
+    # ── 蓝信推送 /lanxin:凭证/路由配置 + 自检 + 预览/发送(均超管专属,路径已在 _SUPER_ONLY_PATHS) ──
+
+    def _lanxin_tree(self):
+        """现读 input/组织架构.xlsx 建树。不缓存:花名册是人工维护的 xlsx,
+        推送是低频操作,现读保证拿到最新;也免去缓存失效的心智负担。"""
+        return lanxin_recipients.read_org_tree(
+            os.path.join(BASE_DIR, 'input', config.ORG_FILE))
+
+    def _lanxin_pmis(self):
+        """projectPmis 用于 projectId → 项目经理。读整份 analysis_data 即可(已有缓存路径)。"""
+        data = _load_analysis_cached()
+        return (data or {}).get('projectPmis') or {}
+
+    def handle_lanxin_config_get(self):
+        """GET /api/lanxin/config - 凭证/路由配置。超管专属。appSecret 经 public_config 脱敏下发。"""
+        cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
+        self._send_json(200, {"success": True, "config": lanxin_config.public_config(cfg)})
+
+    def handle_lanxin_config_save(self):
+        """POST /api/lanxin/config {config} - 超管专属。appSecret 传空串=沿用旧值(save_config 已处理)。"""
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        try:
+            saved = lanxin_config.save_config(LANXIN_CONFIG_FILE, body.get('config'))
+        except ValueError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
+            return
+        self._audit_set(target='蓝信推送配置', detail='已保存')
+        self._send_json(200, {"success": True, "config": lanxin_config.public_config(saved)})
+
+    def handle_lanxin_selftest(self):
+        """POST /api/lanxin/selftest {employId} - 超管专属。
+        三步自检:取 appToken → 用测试工号换 staffId → 给该工号本人发一条 text。
+        全程不触碰他人。测试工号由超管手填(data/accounts.json 无工号字段,不能从账号推)。"""
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        emp = str(body.get('employId') or '').strip().upper()
+        cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
+        steps = []
+        token = None
+        try:
+            token = lanxin.get_app_token(cfg)
+            steps.append({'name': '取应用访问TOKEN', 'ok': True, 'msg': '成功'})
+        except lanxin.LanxinError as e:
+            steps.append({'name': '取应用访问TOKEN', 'ok': False,
+                          'msg': '%s (%s)' % (e.err_msg, e.err_code)})
+        sid = None
+        if token:
+            if not emp:
+                steps.append({'name': '工号换人员ID', 'ok': False, 'msg': '请填写测试工号'})
+            else:
+                try:
+                    sid = lanxin.id_mapping(cfg, token, emp)
+                    steps.append({'name': '工号换人员ID', 'ok': bool(sid),
+                                  'msg': sid or '未换到 staffId'})
+                except lanxin.LanxinError as e:
+                    steps.append({'name': '工号换人员ID', 'ok': False,
+                                  'msg': '%s (%s)' % (e.err_msg, e.err_code)})
+        if sid:
+            try:
+                lanxin.send_message(cfg, token, [sid],
+                                    {'text': {'content': '项目管理平台 · 蓝信接入自检成功'}})
+                steps.append({'name': '发测试消息给本人', 'ok': True, 'msg': '已发送,请查收'})
+            except lanxin.LanxinError as e:
+                steps.append({'name': '发测试消息给本人', 'ok': False,
+                              'msg': '%s (%s)' % (e.err_msg, e.err_code)})
+        self._audit_set(target='蓝信连通性自检',
+                        detail='工号 %s · %d/%d 步通过' % (emp or '-',
+                                                          sum(1 for s in steps if s['ok']),
+                                                          len(steps)))
+        self._send_json(200, {"success": True, "steps": steps})
+
+    def handle_lanxin_preview(self):
+        """POST /api/lanxin/preview {items} - 超管专属。纯计算,不发任何网络请求。
+        build_plan 不打网络,故只需兜住花名册缺失/事项格式两类本地异常
+        (不会遇到 LanxinError —— 那只在 dispatch 里发生,见 handle_lanxin_send)。"""
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
+        try:
+            plan = lanxin.build_plan(body.get('items') or [], cfg,
+                                     self._lanxin_tree(), self._lanxin_pmis())
+        except FileNotFoundError:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "未找到 input/组织架构.xlsx，无法解析收件人"))
+            return
+        except (KeyError, ValueError, TypeError) as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "事项数据格式有误：%s" % type(e).__name__))
+            return
+        self._send_json(200, {"success": True, "plan": plan})
+
+    def handle_lanxin_send(self):
+        """POST /api/lanxin/send {items} - 超管专属。与 preview 走同一个 build_plan —— 所见即所发。
+        do_POST 没有全局 except(V4.0.0 前无先例),凭证错/花名册缺失/畸形事项都会让异常直穿
+        socketserver、断开连接、前端只看到「Failed to fetch」——本函数兜住三类,转 400 结构化错误。
+        铁律:errMsg 是蓝信自己的文案,不含 appSecret/appToken(已核 _http/_unwrap 三个 except)；
+        其余异常只透出 type(e).__name__,不透出内部 repr。
+        M-4:加服务端并发锁 —— 推送不可撤销,双击或两个超管同时点会导致重复触达全员。
+        非阻塞 acquire,抢不到直接 400,不排队(单线程排队 = 把全站堵死)。"""
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
+            return
+        cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
+        if not cfg.get('enabled'):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "蓝信推送未启用"))
+            return
+        if not (cfg.get('credentials') or {}).get('apiGateway'):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "未配置开放平台网关地址"))
+            return
+        if not _lanxin_send_lock.acquire(blocking=False):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "另一次推送正在进行中，请稍候"))
+            return
+        try:
+            plan = lanxin.build_plan(body.get('items') or [], cfg,
+                                     self._lanxin_tree(), self._lanxin_pmis())
+            result = lanxin.dispatch(plan, cfg)
+        except lanxin.LanxinError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "蓝信接口错误：%s (%s)" % (e.err_msg, e.err_code)))
+            return
+        except FileNotFoundError:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "未找到 input/组织架构.xlsx，无法解析收件人"))
+            return
+        except (KeyError, ValueError, TypeError) as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "事项数据格式有误：%s" % type(e).__name__))
+            return
+        finally:
+            _lanxin_send_lock.release()
+        self._audit_set(target='蓝信推送发送',
+                        detail='成功 %d · 失败 %d · 未解析 %d'
+                               % (result['sent'], len(result['failed']),
+                                  len(plan['unresolved'])))
+        self._send_json(200, {"success": True, "plan": plan, "result": result})
 
     def _rebuild_yitian_data(self, store, rules_cfg=None):
         """用给定累积库(可能内存已改未落盘)重建 data/yitian_data.json。rules_cfg 传入则用之(保存规则的
