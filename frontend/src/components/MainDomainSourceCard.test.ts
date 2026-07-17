@@ -5,6 +5,16 @@ import ElementPlus from 'element-plus'
 import MainDomainSourceCard from './MainDomainSourceCard.vue'
 import * as cookieAgent from '@/lib/cookieAgent'
 
+// jsdom 未实现 File.prototype.arrayBuffer;合并上传测试会经 onUploadMain 走真实
+// pmisUpload/inputsUpload(内部靠 arrayBuffer 读文件内容再 POST)。沿用 usePmisSync.test.ts
+// 同款处理思路垫一个最小 polyfill(内容不影响断言,只看 URL)。用纯微任务 resolve——
+// 若走 FileReader(jsdom 内部用 setImmediate 两级宏任务)则单次 flushPromises() 冲不掉。
+if (!File.prototype.arrayBuffer) {
+  File.prototype.arrayBuffer = function () {
+    return Promise.resolve(new ArrayBuffer(0))
+  }
+}
+
 vi.mock('@/lib/cookieAgent', () => ({
   pingAgent: vi.fn().mockResolvedValue(true),
   fetchPmisCookie: vi.fn(),
@@ -91,5 +101,43 @@ describe('MainDomainSourceCard', () => {
     await flushPromises()
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
     expect(calls.some((u: string) => u.includes('/api/pmis/download'))).toBe(true)
+  })
+})
+
+describe('MainDomainSourceCard 合并上传', () => {
+  it('只剩一个上传框与一个上传按钮', async () => {
+    const w = await mountCard()
+    expect(w.findAll('input[type="file"]')).toHaveLength(1)
+    expect(w.find('[data-test="btn-upload-main"]').exists()).toBe(true)
+    expect(w.text()).toContain('上传主域数据文件')
+  })
+
+  it('混合投放:九表与根文件分别打两个端点,倚天/未知文件不发请求且列入已跳过', async () => {
+    const w = await mountCard()
+    const input = w.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['x'], '项目中心.xlsx'), new File(['x'], 'budget_data.csv'),
+              new File(['x'], '工时.xlsx'), new File(['x'], 'x.txt')],
+    })
+    await w.find('[data-test="btn-upload-main"]').trigger('click')
+    await flushPromises()
+    const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
+    expect(calls.filter((u: string) => u.includes('/api/pmis/upload'))).toHaveLength(1)
+    expect(calls.filter((u: string) => u.includes('/api/inputs/upload'))).toHaveLength(1)
+    // 倚天/未知文件绝不能被静默塞进 inputs 端点
+    expect(calls.some((u: string) => u.includes(encodeURIComponent('工时.xlsx')))).toBe(false)
+    const msg = w.find('[data-test="upload-main-msg"]').text()
+    expect(msg).toContain('已上传 1 个 PMIS 九表 + 1 个项目域文件')
+    expect(msg).toContain('工时.xlsx（属倚天工时域')
+    expect(msg).toContain('x.txt（不在主域白名单）')
+  })
+
+  it('有跳过项时不阻断已识别文件的上传', async () => {
+    const w = await mountCard()
+    const input = w.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [new File(['x'], '项目中心.xlsx'), new File(['x'], 'x.txt')] })
+    await w.find('[data-test="btn-upload-main"]').trigger('click')
+    await flushPromises()
+    expect((fetch as any).mock.calls.map((c: any) => String(c[0])).some((u: string) => u.includes('/api/pmis/upload'))).toBe(true)
   })
 })

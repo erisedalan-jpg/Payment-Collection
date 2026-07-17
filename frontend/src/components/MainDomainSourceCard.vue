@@ -6,6 +6,7 @@ import { usePmisSync } from '@/composables/usePmisSync'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
 import { usePmisDownload } from '@/composables/usePmisDownload'
+import { dispatchMainDomainFiles, formatDispatchMessage, YITIAN_FILE_NAMES } from '@/lib/uploadDispatch'
 
 defineProps<{ repRunning: boolean }>()
 const emit = defineEmits<{
@@ -20,7 +21,6 @@ const { files: fileStatus, load: loadFileStatus } = useFileStatus()
 const ftime = (name: string) => fileStatus.value[name] || '-'
 
 // 展示名单:legacy xlsx 仅作上传兼容不展示;倚天两文件属另一张卡
-const YITIAN_FILE_NAMES = ['工时.xlsx', 'holidays.csv']
 const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES
   .filter((n) => n !== 'delivery_analysis.xlsx')
   .filter((n) => !YITIAN_FILE_NAMES.includes(n))
@@ -71,25 +71,18 @@ async function onDownload() {
   await startDownload()
 }
 
-const pmisInput = ref<HTMLInputElement | null>(null)
-const pmisUploadMsg = ref('')
-async function onPmisUpload() {
-  const files = Array.from(pmisInput.value?.files || [])
+const mainInput = ref<HTMLInputElement | null>(null)
+const mainUploadMsg = ref('')
+const mainSkipped = ref(false)
+async function onUploadMain() {
+  const files = Array.from(mainInput.value?.files || [])
   if (!files.length) return
-  const ok = await pmisUpload(files)
-  pmisUploadMsg.value = `已上传 ${ok}/${files.length} 个 PMIS 文件,请点[更新数据]生效`
-  if (pmisInput.value) pmisInput.value.value = ''
-  loadFileStatus()
-}
-
-const inputsInput = ref<HTMLInputElement | null>(null)
-const inputsUploadMsg = ref('')
-async function onUploadInputs() {
-  const files = Array.from(inputsInput.value?.files || [])
-  if (!files.length) return
-  const ok = await inputsUpload(files)
-  inputsUploadMsg.value = `已上传 ${ok}/${files.length} 个项目域文件,请点[更新数据]生效`
-  if (inputsInput.value) inputsInput.value.value = ''
+  const r = dispatchMainDomainFiles(files)
+  const okPmis = r.pmis.length ? await pmisUpload(r.pmis) : 0
+  const okInputs = r.inputs.length ? await inputsUpload(r.inputs) : 0
+  mainUploadMsg.value = formatDispatchMessage(r, okPmis, okInputs)
+  mainSkipped.value = r.skipped.length > 0
+  if (mainInput.value) mainInput.value.value = ''
   loadFileStatus()
 }
 
@@ -119,12 +112,6 @@ defineExpose({ reload: loadFileStatus, onFetchPmisCookie })
         <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
       </div>
     </div>
-    <div class="dv-row dv-actions">
-      <input ref="pmisInput" type="file" accept=".xlsx" multiple class="dv-file" />
-      <button class="dv-btn" @click="onPmisUpload">上传 PMIS 文件</button>
-      <span v-if="pmisUploadMsg" class="dv-hint">{{ pmisUploadMsg }}</span>
-    </div>
-
     <div class="dv-sub-head">项目域文件（input/ 根）</div>
     <div class="dv-fgrid">
       <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-fcell" :title="name">
@@ -133,10 +120,10 @@ defineExpose({ reload: loadFileStatus, onFetchPmisCookie })
       </div>
     </div>
     <div class="dv-row dv-actions">
-      <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-      <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
-      <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
+      <input ref="mainInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
+      <button class="dv-btn" data-test="btn-upload-main" @click="onUploadMain">上传主域数据文件</button>
     </div>
+    <div v-if="mainUploadMsg" class="dv-row dv-hint" :class="{ warn: mainSkipped }" data-test="upload-main-msg">{{ mainUploadMsg }}</div>
 
     <el-collapse class="dv-more">
       <el-collapse-item name="pmis-cookie-manual" title="更多：手动粘贴 PMIS cookie（取备用）">
