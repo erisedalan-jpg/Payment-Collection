@@ -2689,7 +2689,13 @@ async function buildItems(): Promise<PushItem[]> {
   }
   const rTs = cfg.routes.find((r) => r.key === 'timesheet')
   if (rTs?.enabled && yitian.data) {
-    const rows = issueRows(yitian.data, '', '', [], yitianSettings.excludedTypes ?? [])
+    // 口径必须与倚天总览/合规页同源:excludedTypes 在 store 的 settings 里,
+    // 【不是】顶层字段 —— 写成 yitianSettings.excludedTypes 会静默读到 undefined,
+    // issueRows 落默认 [] = 一个类型都不剔除,两页问题数当场对不上且不报错。
+    // 既有消费方 YitianComplianceView.vue 用的也是 settings.settings.excludedTypes。
+    // 空区间 '' , '' 等价全时口径:compliance.ts 里是 if (start && e.d < start) return,
+    // 空串 falsy → 过滤不生效(源码级确定,非数据巧合)。
+    const rows = issueRows(yitian.data, '', '', [], yitianSettings.settings.excludedTypes ?? [])
     out.push(...timesheetItems(rows, rTs.issueCodes ?? []))
   }
   return out
@@ -2812,7 +2818,11 @@ watch(() => props.modelValue, (v) => { if (v) doPreview() }, { immediate: true }
 </style>
 ```
 
-> **实现者须核实**：`useYitianStore` / `useYitianSettingsStore` 的**确切导出名与状态字段**（`data` / `excludedTypes`）以本仓现有代码为准；`issueRows` 的空区间参数（`'' , ''`）是否等价「全时口径」也须核实 —— 若不是，改为传 `yitian.data.meta.periodStart` / `periodEnd`。
+> **已核实（执行时查证，无需再验）**：
+> - `useYitianSettingsStore` 导出 `{ settings, loaded, saving, load, save, reset }` —— **没有顶层 `excludedTypes`**，正确路径是 `yitianSettings.settings.excludedTypes`（默认 `['管理类','业务类','假期类']`）。既有消费方 `YitianComplianceView.vue` 亦然。
+> - `issueRows(data, '', '', ...)` **等价全时口径**：`compliance.ts` 的过滤是 `if (start && e.d < start) return` / `if (end && e.d > end) return`，空串 falsy → 两个过滤均不生效。**源码级确定，非数据巧合**，无需改传 `meta.periodStart/periodEnd`。
+> - 模板内**不要**写跨行的内联类型断言（`(r.card as Record<...>).fields as {...}[] ?? []`）—— `vue-tsc` 报 `TS1005`。用脚本层小函数（`cardStr` / `cardFields`）代替。
+> - 测试须 `vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue(...)`（不 mock 会在 jsdom 里永久挂起，本仓 `YitianStoreCard.test.ts` 同款），且「预览前按钮禁用」那条要 `await nextTick()` 后再断言（`el-drawer` 的 slot 内容需一个 tick 才渲染）。
 
 - [ ] **Step 4: 运行确认通过 + typecheck**
 
