@@ -188,3 +188,13 @@ def test_short_label_used_in_summary_card_value():
     card = LR.build_summary_card("组长", rows, "直接上级（+1）")
     v = card["fields"][0]["value"]
     assert "成本超支>5k 1" in v and "成本超支<5k 1" in v
+
+def test_short_labels_are_not_mangled_words():
+    """字节合规 ≠ 可读。「未获原项目预」是 18 字节但缺了「算」,是残词 ——
+    光断言 <=18 字节抓不到这种,只有人眼或本测试能挡。
+    规则:短标签若以中文结尾,不得是把某个词砍掉末字得来的(此处用白名单锁死具体取值)。"""
+    assert LR.REASON_SHORT_LABELS["总成本超支大于5000"] == "成本超支>5k"
+    assert LR.REASON_SHORT_LABELS["总成本超支小于5000"] == "成本超支<5k"
+    assert LR.REASON_SHORT_LABELS["未获取原项目预算"] == "无原项目预算"
+    # 残词回归护栏:曾经用过的「未获原项目预」不得复现
+    assert "未获原项目预" not in LR.REASON_SHORT_LABELS.values()
