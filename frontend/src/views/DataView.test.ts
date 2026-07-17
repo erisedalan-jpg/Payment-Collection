@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import DataView from './DataView.vue'
 import DataStatusBar from '@/components/DataStatusBar.vue'
+import MainDomainSourceCard from '@/components/MainDomainSourceCard.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useAuthStore } from '@/stores/auth'
@@ -150,6 +151,20 @@ describe('DataView(两条来源重构)', () => {
     expect(calls.some((u: string) => u.includes('/api/pmis/download'))).toBe(true)
   })
 
+  it('下载运行中 → 「更新数据」禁用(互斥不得丢失,I-2 端到端锚点)', async () => {
+    // 覆盖 MainDomainSourceCard.vue 的 dlRunning → emit('running-change') → DataView.dlRunning
+    // → :disabled 这条 3 跳链;此前全仓零测试覆盖,链上任一环被后人碰掉都不会被任何测试逮到。
+    const w = await mountView()
+    const upd = () => w.findAll('button').find((b) => b.text().includes('更新数据（重新处理）'))!
+    expect(upd().attributes('disabled')).toBeUndefined()
+    const card = w.findComponent(MainDomainSourceCard)
+    // setupState 是 proxyRefs(setupResult):读时自动解包 ref,写非 ref 值时代理会转写回 ref.value,
+    // 故此处直接赋值(不加 .value)。
+    ;(card.vm as any).$.setupState.dlRunning = true
+    await flushPromises()
+    expect(upd().attributes('disabled')).toBeDefined()
+  })
+
   it('文件清单为多列网格(.dv-fgrid)，PMIS 仍 9 行且保留全名', async () => {
     const w = await mountView()
     expect(w.findAll('.dv-fgrid').length).toBeGreaterThanOrEqual(2)  // PMIS + 项目域两组
@@ -179,6 +194,38 @@ describe('DataView(两条来源重构)', () => {
     expect(t).toContain('人工数据导入')
     expect(t).toContain('数据历史')
     expect(t).toContain('清空数据')
+  })
+
+  it('三个页签齐全,默认落「数据源」签', async () => {
+    const w = await mountView()
+    const labels = w.findAll('.el-tabs__item').map((n) => n.text())
+    expect(labels).toEqual(['数据源', '配置', '维护'])
+    // 三签内容全在 DOM(el-tab-pane 未设 lazy),故 text()/find() 恒命中 —— 必须用 isVisible() 断可见性
+    expect(w.find('#pane-sources').isVisible()).toBe(true)
+    expect(w.find('#pane-config').isVisible()).toBe(false)
+    expect(w.find('#pane-maint').isVisible()).toBe(false)
+  })
+
+  it('栅格不再用 auto-fit(改显式两栏)', async () => {
+    const w = await mountView()
+    expect(w.find('.dv-domain-grid').exists()).toBe(false)
+    expect(w.find('.dv-pane-grid').exists()).toBe(true)
+  })
+
+  it('倚天累积数据管理归入「维护」签,合规范围/规则归入「配置」签', async () => {
+    const auth = useAuthStore()
+    ;(auth as any).user = { account: 'admin', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const w = mount(DataView, { global: { plugins: [ElementPlus], stubs: {
+      'el-switch': true, YitianRulesCard: true, YitianScopeCard: true, YitianStoreCard: true, PortalConfigCard: true,
+    } } })
+    await flushPromises()
+    expect(w.find('#pane-maint').text()).toContain('倚天累积数据管理')
+    expect(w.find('#pane-config').text()).toContain('合规检查范围')
+    expect(w.find('#pane-config').text()).toContain('合规规则配置')
+    expect(w.find('#pane-config').text()).toContain('首页门户')
+    // 倚天源卡里不再有这三块
+    expect(w.find('#pane-sources').text()).not.toContain('累积数据管理')
+    expect(w.find('#pane-sources').text()).not.toContain('合规规则配置')
   })
 })
 

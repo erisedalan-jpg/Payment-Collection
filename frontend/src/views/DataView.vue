@@ -1,111 +1,42 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import { useFilterStore } from '@/stores/filter'
 import { api } from '@/api/client'
-import { pingAgent, fetchPmisCookie, fetchYitianCookie } from '@/lib/cookieAgent'
-import { usePmisSync } from '@/composables/usePmisSync'
-import { useInputFiles } from '@/composables/useInputFiles'
-import { useFileStatus } from '@/composables/useFileStatus'
+import { pingAgent } from '@/lib/cookieAgent'
 import { useReprocess } from '@/composables/useReprocess'
-import { usePmisDownload } from '@/composables/usePmisDownload'
-import { useDataHistory } from '@/composables/useDataHistory'
-import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
-import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
+import MainDomainSourceCard from '@/components/MainDomainSourceCard.vue'
+import YitianSourceCard from '@/components/YitianSourceCard.vue'
+import ProjectTagsCard from '@/components/ProjectTagsCard.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
 import YitianScopeCard from '@/components/YitianScopeCard.vue'
-import YitianStoreCard from '@/components/YitianStoreCard.vue'
 import YitianRulesCard from '@/components/YitianRulesCard.vue'
+import MaintenanceCard from '@/components/MaintenanceCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
-const filter = useFilterStore()
 const auth = useAuthStore()
+
+// tab 不持久化:每次进入默认落「数据源」签(更新数据已常驻,签只在偶尔改配置/回滚时才切)
+const activeTab = ref('sources')
+
+const mainCard = ref<InstanceType<typeof MainDomainSourceCard> | null>(null)
+const yitianCard = ref<InstanceType<typeof YitianSourceCard> | null>(null)
+const dlRunning = ref(false)
 
 const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 const lastPmis = computed(() => (data.data as any)?.dataQuality?.summary?.lastPmisUpdate || '-')
 
-const { upload: pmisUpload, PMIS_FILE_NAMES } = usePmisSync()
-const { files: fileStatus, load: loadFileStatus } = useFileStatus()
-
-const ftime = (name: string) => fileStatus.value[name] || '-'
-
-// —— PMIS 九表 ——
-const pmisInput = ref<HTMLInputElement | null>(null)
-const pmisUploadMsg = ref('')
-async function onPmisUpload() {
-  const files = Array.from(pmisInput.value?.files || [])
-  if (!files.length) return
-  const ok = await pmisUpload(files)
-  pmisUploadMsg.value = `已上传 ${ok}/${files.length} 个 PMIS 文件,请点[更新数据]生效`
-  if (pmisInput.value) pmisInput.value.value = ''
-  loadFileStatus()
-}
-
-// —— 项目域文件(input/ 根) ——
-const { upload: inputsUpload, INPUT_FILE_NAMES } = useInputFiles()
-const YITIAN_FILE_NAMES = ['工时.xlsx', 'holidays.csv']
-// 展示名单:legacy xlsx 仅作上传兼容不展示
-const INPUT_DISPLAY_NAMES = INPUT_FILE_NAMES
-  .filter((n) => n !== 'delivery_analysis.xlsx')
-  .filter((n) => !YITIAN_FILE_NAMES.includes(n))   // 倚天两文件单独成组展示
-const inputsInput = ref<HTMLInputElement | null>(null)
-const inputsUploadMsg = ref('')
-async function onUploadInputs() {
-  const files = Array.from(inputsInput.value?.files || [])
-  if (!files.length) return
-  const ok = await inputsUpload(files)
-  inputsUploadMsg.value = `已上传 ${ok}/${files.length} 个项目域文件,请点[更新数据]生效`
-  if (inputsInput.value) inputsInput.value.value = ''
-  loadFileStatus()
-}
-
-// —— 倚天工时域文件(input/yitian/) ——
-const yitianInput = ref<HTMLInputElement | null>(null)
-const yitianUploadMsg = ref('')
-async function onUploadYitian() {
-  const files = Array.from(yitianInput.value?.files || [])
-  if (!files.length) return
-  const ok = await inputsUpload(files)      // 复用既有 useInputFiles().upload,白名单已含倚天两文件
-  yitianUploadMsg.value = `已上传 ${ok}/${files.length} 个倚天文件，请点[更新数据]生效`
-  if (yitianInput.value) yitianInput.value.value = ''
-  loadFileStatus()
-}
-
-/** holidays.csv 模板:前端生成 Blob 下载,不需要后端。 */
-function onDownloadHolidayTemplate() {
-  const lines = [
-    '日期,类型',
-    '2026-01-01,休',
-    '2026-02-16,休',
-    '2026-02-14,班',
-  ]
-  // BOM 让 Excel 打开不乱码
-  const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = 'holidays.csv'
-  a.click()
-  URL.revokeObjectURL(a.href)
-}
-
 // —— 更新数据 / 设置 ——
 const { progress: repProgress, message: repMessage, running: repRunning, start: startReprocess } =
-  useReprocess({ onDone: () => { data.reload(); loadFileStatus(); projectTags.load() } })
+  useReprocess({ onDone: () => { data.reload(); mainCard.value?.reload(); yitianCard.value?.reload(); projectTags.load() } })
 
 // —— PMIS 在线下载 ——
-const pmisCookie = ref('')
 const cookieStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessionPreview: '', updatedAt: '' })
-const cookieMsg = ref('')
-const cookieErr = ref(false)
 const agentOnline = ref(false)
 const yitianStatus = ref<{ sessionPreview: string; updatedAt: string }>({ sessionPreview: '', updatedAt: '' })
-const yitianMsg = ref('')
-const yitianErr = ref(false)
 
 async function checkAgent() {
   agentOnline.value = await pingAgent()
@@ -114,142 +45,19 @@ async function loadYitianStatus() {
   try { yitianStatus.value = await api.get('/api/yitian/cookie') } catch { /* 未登录/缺接口静默 */ }
 }
 
-async function onFetchPmisCookie() {
-  cookieMsg.value = ''; cookieErr.value = false
-  const res = await fetchPmisCookie()
-  if (!res.ok) { cookieErr.value = true; cookieMsg.value = 'PMIS cookie 获取失败：' + res.error; return }
-  if (!res.hasSession) {
-    cookieErr.value = true
-    cookieMsg.value = '未检测到 PMIS 登录态（cookie 无 SESSION），请先在零信任内登录 PMIS'
-    return
-  }
-  try {
-    const r = await api.post<{ sessionPreview: string }>('/api/pmis/cookie', { cookie: res.cookie })
-    cookieStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
-    cookieMsg.value = `已获取并推送 PMIS cookie（${res.names.length} 项）`
-  } catch (e) {
-    cookieErr.value = true; cookieMsg.value = '推送失败：' + (e instanceof Error ? e.message : String(e))
-  }
-}
-
-async function onFetchYitianCookie() {
-  yitianMsg.value = ''; yitianErr.value = false
-  const res = await fetchYitianCookie()
-  if (!res.ok) { yitianErr.value = true; yitianMsg.value = '倚天 cookie 获取失败：' + res.error; return }
-  try {
-    const r = await api.post<{ sessionPreview: string }>('/api/yitian/cookie', { cookie: res.cookie })
-    yitianStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
-    yitianMsg.value = `已获取并存储倚天 cookie（${res.names.length} 项，备用）`
-  } catch (e) {
-    yitianErr.value = true; yitianMsg.value = '存储失败：' + (e instanceof Error ? e.message : String(e))
-  }
-}
-
-const { progress: dlProgress, message: dlMessage, running: dlRunning, start: startDownload } =
-  usePmisDownload({ onDone: () => { loadFileStatus(); loadCookieStatus() } })
-
 async function loadCookieStatus() {
   try { cookieStatus.value = await api.get('/api/pmis/cookie') } catch { /* 未登录/缺接口静默 */ }
 }
-async function onDownload() {
-  cookieMsg.value = ''; cookieErr.value = false
-  const ck = pmisCookie.value.trim()
-  if (ck) {
-    try {
-      const r = await api.post<{ sessionPreview: string }>('/api/pmis/cookie', { cookie: ck })
-      cookieStatus.value = { sessionPreview: r.sessionPreview, updatedAt: '刚刚' }
-      pmisCookie.value = ''
-    } catch (e) {
-      cookieErr.value = true
-      cookieMsg.value = 'Cookie 保存失败：' + (e instanceof Error ? e.message : String(e))
-      return  // cookie 失败则中止,不进入下载
-    }
-  }
-  await startDownload()
-}
-const { versions: historyVersions, preRollback: historyPre, source: historySource, busy: historyBusy,
-        message: historyMsg, load: loadHistory, rollback: doRollback, undo: doUndo } =
-  useDataHistory({ onChange: () => { data.reload(); loadFileStatus() } })
-function fmtMB(bytes?: number) { return bytes ? (bytes / 1048576).toFixed(1) + ' MB' : '-' }
-async function onRollback(id: string) {
-  try {
-    await ElMessageBox.confirm(`确定回滚到 ${id}？将用该版本覆盖当前数据与源数据，当前状态会先备份可撤销。`, '确认', { type: 'warning' })
-  } catch {
-    return
-  }
-  await doRollback(id)
-}
-async function onUndoRollback() {
-  try {
-    await ElMessageBox.confirm('确定撤销上次回滚，恢复回滚前的状态？', '确认', { type: 'warning' })
-  } catch {
-    return
-  }
-  await doUndo()
-}
 
-// —— 人工数据导入 / 快照回滚 ——
-const manImportInput = ref<HTMLInputElement | null>(null)
-const manErrors = ref<ManualError[]>([])
-const manMsg = ref('')
-const manBackups = ref<ManualBackup[]>([])
-const manBusy = ref(false)
-async function loadManBackups() {
-  try { manBackups.value = (await manualApi.backups()).versions ?? [] } catch { /* 无快照时忽略 */ }
-}
-async function onManImport() {
-  const f = manImportInput.value?.files?.[0]; if (!f) return
-  manBusy.value = true; manErrors.value = []; manMsg.value = ''
-  try {
-    const buf = await f.arrayBuffer()
-    const sheets = parseManualSheets(readWorkbook(buf))
-    if (!Object.keys(sheets).length) { manMsg.value = '未发现「项目标签」或「跟进记录」sheet'; return }
-    const res = await manualApi.import(sheets, f.name)
-    if (!res.success) { manErrors.value = res.errors ?? []; manMsg.value = res.message || '校验未通过'; return }
-    manMsg.value = `导入成功（${res.tags ? '标签 ' + res.tags.projects + ' 项' : ''}${res.followup ? ' 跟进 ' + res.followup.count + ' 条' : ''}）`
-    await loadManBackups(); await data.reload(); await projectTags.load()
-  } catch (e) {
-    manMsg.value = '导入异常：' + (e instanceof Error ? e.message : String(e))
-  } finally { manBusy.value = false; if (manImportInput.value) manImportInput.value.value = '' }
-}
-async function onManRollback(id: string) {
-  manBusy.value = true
-  try { await manualApi.rollback(id); manMsg.value = '已回滚'; await data.reload(); await projectTags.load() }
-  catch (e) { manMsg.value = '回滚失败：' + (e instanceof Error ? e.message : String(e)) }
-  finally { manBusy.value = false }
-}
+function reloadSources() { mainCard.value?.reload(); yitianCard.value?.reload() }
 
-const clearState = ref('')
-const clearing = ref(false)
-async function onClear() {
-  try {
-    await ElMessageBox.confirm('确定要清空所有数据吗？此操作不可撤销!', '确认', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await ElMessageBox.confirm('再次确认：是否清空所有数据？', '确认', { type: 'warning' })
-  } catch {
-    return
-  }
-  clearing.value = true
-  data.clearBusinessData()
-  try { await api.get('/api/clear-data'); clearState.value = '已清空(含数据文件)' }
-  catch { clearState.value = '内存已清空' }
-  clearing.value = false
-  setTimeout(() => { clearState.value = '' }, 2000)
-}
-
-const newTag = ref('')
-function onAddTag() { const n = newTag.value.trim(); if (n) { projectTags.addTag(n); projectTags.save(); newTag.value = '' } }
-function onRename(oldN: string, e: Event) { const v = (e.target as HTMLInputElement).value.trim(); if (v && v !== oldN) { projectTags.renameTag(oldN, v); projectTags.save() } }
-function onDisable(name: string, on: boolean) { projectTags.disableTag(name, on); projectTags.save() }
-const excludeOn = computed({ get: () => filter.excludeOn, set: (v: boolean) => filter.setExclude(v, filter.excludeTags) })
-const excludeTags = computed({ get: () => filter.excludeTags, set: (v: string[]) => filter.setExclude(filter.excludeOn, v) })
-
-onMounted(() => { if (!data.data) data.load(); loadFileStatus(); loadHistory(); loadManBackups(); if (!projectTags.loaded) projectTags.load(); loadCookieStatus() })
+onMounted(() => { if (!data.data) data.load(); if (!projectTags.loaded) projectTags.load(); loadCookieStatus() })
 onMounted(() => { checkAgent(); loadYitianStatus() })
-defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
+defineExpose({
+  onFetchPmisCookie: () => mainCard.value?.onFetchPmisCookie(),
+  onFetchYitianCookie: () => yitianCard.value?.onFetchYitianCookie(),
+  checkAgent,
+})
 </script>
 
 <template>
@@ -275,238 +83,61 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
       <div v-if="repRunning || repProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
     </div>
 
-    <!-- 按功能域拆分的功能卡 -->
-    <div class="dv-domain-grid">
-      <div class="dv-card">
-        <div class="dv-card-head">PMIS 域</div>
-        <div class="dv-row">
-          <button class="dv-btn primary" data-test="btn-fetch-pmis-cookie" @click="onFetchPmisCookie">获取本机 PMIS cookie 并推送</button>
-          <span class="dv-badge" :class="agentOnline ? 'ok' : 'warn'">本机代理{{ agentOnline ? '已连接' : '未运行' }}</span>
-        </div>
-        <div v-if="cookieMsg" class="dv-row dv-hint" :class="cookieErr ? 'err' : 'ok'">{{ cookieMsg }}</div>
-        <div class="dv-row">
-          <button class="dv-btn" data-test="btn-download" :disabled="dlRunning || repRunning" @click="onDownload">下载数据</button>
-          <span class="dv-hint">从 PMIS 抓取并覆盖 input/（只抓取不重算）</span>
-        </div>
-        <div v-if="dlRunning || dlProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
+    <el-tabs v-model="activeTab" class="dv-tabs">
+      <!-- 注意:绝不给 el-tab-pane 设 lazy(EP 2.14.1 默认 false=全渲染+v-show 隐藏);
+           一旦设 lazy,现有 data-test 查询与冷加载行为同时改变。 -->
+      <el-tab-pane label="数据源" name="sources">
+        <div class="dv-pane-grid">
+          <MainDomainSourceCard ref="mainCard" :rep-running="repRunning"
+            @cookie-change="(v) => cookieStatus = v"
+            @download-done="loadCookieStatus"
+            @running-change="(v: boolean) => dlRunning = v" />
 
-        <div class="dv-sub-head">PMIS 九表（input/pmis/）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-fcell" data-test="pmis-row" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+          <YitianSourceCard ref="yitianCard" :yitian-status="yitianStatus"
+            @cookie-change="(v) => yitianStatus = v" />
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="配置" name="config">
+        <div class="dv-pane-grid">
+          <ProjectTagsCard />
+
+          <div v-if="auth.isSuper" class="dv-card">
+            <div class="dv-card-head">倚天合规</div>
+            <el-collapse class="dv-more">
+              <el-collapse-item name="yitian-scope" title="合规检查范围（超管）">
+                <YitianScopeCard />
+              </el-collapse-item>
+              <el-collapse-item name="yitian-rules" title="合规规则配置（超管）">
+                <YitianRulesCard />
+              </el-collapse-item>
+            </el-collapse>
+          </div>
+
+          <div v-if="auth.isSuper" class="dv-card dv-span-all">
+            <div class="dv-card-head">首页门户</div>
+            <el-collapse class="dv-more">
+              <el-collapse-item name="portal" title="首页门户 / 快捷入口">
+                <PortalConfigCard />
+              </el-collapse-item>
+            </el-collapse>
           </div>
         </div>
-        <div class="dv-row dv-actions">
-          <input ref="pmisInput" type="file" accept=".xlsx" multiple class="dv-file" />
-          <button class="dv-btn" @click="onPmisUpload">上传 PMIS 文件</button>
-          <span v-if="pmisUploadMsg" class="dv-hint">{{ pmisUploadMsg }}</span>
-        </div>
+      </el-tab-pane>
 
-        <el-collapse class="dv-more">
-          <el-collapse-item name="pmis-cookie-manual" title="更多：手动粘贴 PMIS cookie（取备用）">
-            <div class="dv-row dv-cookie">
-              <span class="dv-label">手动 cookie</span>
-              <textarea v-model="pmisCookie" data-test="pmis-cookie" class="dv-cookie-box" rows="2"
-                placeholder="粘贴完整 PMIS cookie 串（高级兜底；正常用上方「获取本机 cookie」）"></textarea>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-
-      <div class="dv-card" data-test="files-card">
-        <div class="dv-card-head">项目域文件</div>
-        <div class="dv-sub-head">项目域文件（input/ 根）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-fcell" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
-          </div>
-        </div>
-        <div class="dv-row dv-actions">
-          <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-          <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
-          <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
-        </div>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">倚天工时域</div>
-        <div class="dv-sub-head">倚天工时域（input/yitian/）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in YITIAN_FILE_NAMES" :key="name" class="dv-fcell" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
-          </div>
-        </div>
-        <div class="dv-row dv-actions">
-          <input ref="yitianInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-          <button class="dv-btn" @click="onUploadYitian">上传倚天文件</button>
-          <button class="dv-btn" @click="onDownloadHolidayTemplate">下载 holidays.csv 模板</button>
-          <span v-if="yitianUploadMsg" class="dv-hint">{{ yitianUploadMsg }}</span>
-        </div>
-        <div class="dv-hint dv-fmt">
-          holidays.csv 格式（UTF-8，两列）：<code>日期,类型</code>；类型只有两种——
-          <code>休</code>=法定假/调休放假（即使落在周一~周五），<code>班</code>=调休上班（即使落在周末）。
-          未列出的日期按「周一~周五为工作日」处理。不提供该文件时全站按纯周一~周五近似，
-          含节假日的周期饱和度会偏低。
-        </div>
-
-        <div class="dv-row dv-actions">
-          <button class="dv-btn" data-test="btn-fetch-yitian-cookie" @click="onFetchYitianCookie">获取本机倚天 cookie 并存储</button>
-          <span class="dv-hint">当前 {{ yitianStatus.sessionPreview || '-' }} · 更新于 {{ yitianStatus.updatedAt || '-' }}</span>
-        </div>
-        <div v-if="yitianMsg" class="dv-row dv-hint" :class="yitianErr ? 'err' : 'ok'">{{ yitianMsg }}</div>
-
-        <el-collapse v-if="auth.isSuper" class="dv-more">
-          <el-collapse-item name="yitian-scope" title="合规检查范围（超管）">
-            <YitianScopeCard />
-          </el-collapse-item>
-          <el-collapse-item name="yitian-store" title="累积数据管理（超管）">
-            <YitianStoreCard />
-          </el-collapse-item>
-          <el-collapse-item v-if="auth.isSuper" name="yitian-rules" title="合规规则配置（超管）">
-            <YitianRulesCard />
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">项目标签</div>
-        <div class="dv-row dv-tags-mgr">
-          <span class="dv-label">标签库</span>
-          <span v-for="t in projectTags.tags" :key="t.name" class="dv-tag" :class="{ off: t.disabled }">
-            <input class="dv-tag-name" :value="t.name" @change="onRename(t.name, $event)" />
-            <el-switch :model-value="!t.disabled" size="small" @update:model-value="(v: boolean) => onDisable(t.name, !v)" />
-          </span>
-          <el-input v-model="newTag" size="small" placeholder="新标签" style="width: 120px" @keyup.enter="onAddTag" />
-          <button class="dv-btn" @click="onAddTag">添加</button>
-        </div>
-        <div class="dv-row">
-          <span class="dv-label">按标签排除</span>
-          <el-switch v-model="excludeOn" />
-          <el-select v-model="excludeTags" size="small" multiple collapse-tags clearable placeholder="选要排除的标签" style="width: 220px">
-            <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
-          </el-select>
-          <span class="dv-hint">开启后，挂有所选标签的项目从所有看板隐藏（替代旧纳管）</span>
-        </div>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">维护与历史</div>
-        <el-collapse class="dv-maint">
-          <el-collapse-item name="manual" title="人工数据导入 / 回滚">
-            <div data-test="manual-import-card">
-              <div class="dv-row">
-                <span class="dv-label">导入 xlsx</span>
-                <input ref="manImportInput" type="file" accept=".xlsx,.xls" class="dv-file" @change="onManImport" :disabled="manBusy" />
-                <span class="dv-hint">仅「项目标签」「跟进记录」sheet 整表替换；导入前自动快照</span>
-              </div>
-              <div v-if="manMsg" class="dv-row dv-hint ok">{{ manMsg }}</div>
-              <table v-if="manErrors.length" class="dv-err u-num">
-                <thead><tr><th>Sheet</th><th>行</th><th>列</th><th>错误</th></tr></thead>
-                <tbody>
-                  <tr v-for="(e, i) in manErrors" :key="i">
-                    <td>{{ e.sheet }}</td><td>{{ e.row }}</td><td>{{ e.col || '-' }}</td><td>{{ e.message }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-for="b in manBackups" :key="b.id" class="dv-row" data-test="man-backup-row">
-                <span class="dv-label u-num">{{ b.createdAt || b.id }}（标签{{ b.tagProjects ?? 0 }}/跟进{{ b.followupCount ?? 0 }}）</span>
-                <button class="dv-btn" :disabled="manBusy" @click="onManRollback(b.id)">回滚到此</button>
-              </div>
-            </div>
-          </el-collapse-item>
-
-          <el-collapse-item name="history" title="数据历史 / 回滚">
-            <div v-if="historyPre" class="dv-row">
-              <span class="dv-label">撤销</span>
-              <button class="dv-btn ghost" :disabled="historyBusy" @click="onUndoRollback">撤销上次回滚</button>
-              <span class="dv-hint">恢复到最近一次回滚前的状态</span>
-            </div>
-            <div v-if="!historyVersions.length" class="dv-row dv-hint">暂无历史版本，"更新数据"成功后会自动保存（保留最近 5 份）。</div>
-            <div v-for="v in historyVersions" :key="v.id" class="dv-row" data-test="history-row">
-              <span class="dv-label u-num">{{ v.createdAt || v.id }}</span>
-              <span class="dv-hint u-num">项目 {{ v.projectCount ?? '-' }} · 节点 {{ v.paymentNodeCount ?? '-' }} · {{ fmtMB(v.sizeBytes) }}</span>
-              <button class="dv-btn" :disabled="historyBusy" data-test="history-rollback" @click="onRollback(v.id)">回滚到此</button>
-            </div>
-            <div class="dv-row dv-hint" data-test="history-source-note">
-              源数据仅保留最新 1 份<template v-if="historySource?.refreshedAt">（来自 {{ historySource.refreshedAt }}{{ historySource.sizeBytes ? ' · ' + fmtMB(historySource.sizeBytes) : '' }}）</template>，回滚仅还原看板数据。
-            </div>
-            <div v-if="historyMsg" class="dv-row dv-hint ok">{{ historyMsg }}</div>
-          </el-collapse-item>
-
-          <el-collapse-item v-if="auth.isSuper" name="portal" title="首页门户 / 快捷入口">
-            <PortalConfigCard />
-          </el-collapse-item>
-
-          <el-collapse-item name="clear">
-            <template #title><span class="dv-danger-title">清空数据 ⚠</span></template>
-            <div class="dv-row">
-              <button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button>
-              <span v-if="clearState" class="dv-hint ok">{{ clearState }}</span>
-              <span class="dv-hint">删除所有已获取数据与看板，不可撤销（两步确认）。</span>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-    </div>
+      <el-tab-pane label="维护" name="maint">
+        <MaintenanceCard @data-changed="reloadSources" />
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <style scoped>
+@import '@/styles/dataview.css';
+
 .data-view { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--gap-card); }
 .dv-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2); }
 .dv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
-.dv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1); }
-.dv-card-head { font-weight: 700; font-size: var(--fs-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--txt); }
-.dv-sub-head { font-size: var(--fs-1); font-weight: 700; color: var(--sub); padding: var(--sp-2) var(--sp-4) 0; }
-.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-2); flex-wrap: wrap; }
-.dv-actions { border-top: 1px solid var(--line); }
-.dv-label { width: 70px; flex-shrink: 0; color: var(--sub); font-weight: 600; font-size: var(--fs-1); }
-.dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); cursor: pointer; color: var(--txt); }
-.dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); transition: transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
-.dv-btn.ghost { color: var(--sub); }
-.dv-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
-.dv-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
-.dv-hint { font-size: var(--fs-1); color: var(--mut); }
-.dv-hint.ok { color: var(--ok-text); }
-.dv-file { font-size: var(--fs-1); }
-.dv-progress { padding: 0 var(--sp-4) var(--sp-3); }
-.dv-bar { height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
-.dv-bar-fill { height: 100%; background: var(--accent); transition: width var(--dur-2) var(--ease); }
-.dv-msg { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-2); }
-.dv-tags-mgr { flex-wrap: wrap; gap: var(--sp-2); }
-.dv-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); }
-.dv-tag.off { opacity: .5; }
-.dv-tag-name { width: 84px; border: none; background: transparent; color: var(--txt); font-size: var(--fs-1); }
-.dv-err { width: 100%; border-collapse: collapse; font-size: var(--fs-1); margin: var(--sp-2) 0; }
-.dv-err th, .dv-err td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; color: var(--danger-text); }
-.dv-cookie { align-items: flex-start; }
-.dv-cookie-box { flex: 1 1 320px; min-width: 220px; font-size: var(--fs-1); font-family: var(--font-sans);
-  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--txt);
-  padding: var(--sp-2); resize: vertical; }
-.dv-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px var(--sp-4); padding: var(--sp-2) var(--sp-4); }
-.dv-fcell { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); padding: 3px 0; border-bottom: 1px dashed var(--line); min-width: 0; }
-.dv-fname2 { color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dv-ftime2 { color: var(--mut); font-size: var(--fs-1); flex-shrink: 0; }
-@media (max-width: 768px) { .dv-fgrid { grid-template-columns: 1fr; } }
-.dv-fmt { padding: var(--sp-1) var(--sp-4) var(--sp-2); line-height: var(--lh-base); }
-.dv-fmt code { background: var(--card2, var(--card)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0 4px; }
-.dv-badge { font-size: var(--fs-1); font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); }
-.dv-badge.ok { background: var(--ok-bg); color: var(--ok-text); }
-.dv-badge.warn { background: var(--warn-bg); color: var(--warn-text); }
-.dv-hint.err { color: var(--danger-text); }
-.dv-btn-lg { font-size: var(--fs-3); padding: var(--sp-2) var(--sp-5); }
-.dv-btn.primary:hover:not(:disabled) { transform: translateY(var(--lift)); box-shadow: var(--shadow-2); }
-.dv-danger-title { color: var(--danger-text); font-weight: 700; }
-.dv-more, .dv-maint { margin: 0; }
-.dv-more :deep(.el-collapse-item__header),
-.dv-maint :deep(.el-collapse-item__header) { font-size: var(--fs-2); font-weight: 700; color: var(--txt); padding-left: var(--sp-4); }
-.dv-more :deep(.el-collapse-item__content),
-.dv-maint :deep(.el-collapse-item__content) { padding-bottom: var(--sp-2); }
-.dv-maint { background: transparent; border: none; box-shadow: none; }
-.dv-more { border-top: 1px solid var(--line); margin-top: var(--sp-1); }
 
 /* 主操作:更新看板,提为显眼主操作区(色调+更粗边框,不引入新色号) */
 .dv-primary {
@@ -516,12 +147,15 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 }
 .dv-primary .dv-card-head { color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
 
-/* 六大功能卡:①更新看板独占一行,②-⑥按功能域自适应换列 */
-.dv-domain-grid {
+/* 显式两栏:卡的位置由设计决定,不由浏览器宽度决定(旧 auto-fit 让 5 张高度差 4~5 倍的卡排出参差) */
+.dv-pane-grid {
   display: grid;
   gap: var(--gap-card);
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: 1fr 1fr;
   align-items: start;
 }
-@media (max-width: 768px) { .dv-domain-grid { grid-template-columns: 1fr; } }
+.dv-span-all { grid-column: 1 / -1; }
+@media (max-width: 768px) { .dv-pane-grid { grid-template-columns: 1fr; } }
+.dv-tabs :deep(.el-tabs__item) { font-size: var(--fs-2); font-weight: 700; }
+.dv-tabs :deep(.el-tabs__content) { padding-top: var(--gap-section); }
 </style>
