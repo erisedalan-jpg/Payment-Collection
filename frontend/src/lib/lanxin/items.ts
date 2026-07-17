@@ -6,7 +6,8 @@ import type { Project, ProjectPmis } from '@/types/analysis'
  *  —— 后端不接受前端传来的 staffId,前端出错最多是算错异常,不会推给错的人。 */
 export type PushItem =
   | { kind: 'project'; projectId: string; reasons: string[] }
-  | { kind: 'timesheet'; employId: string; issues: { code: string; label: string; count: number }[] }
+  | { kind: 'timesheet'; employId: string; start: string; end: string;
+      issues: { code: string; label: string; count: number }[] }
 
 /** 项目关注原因 → 事项。口径复用 riskReasons(单一来源),此处只做「配置勾选」过滤。 */
 export function projectItems(
@@ -25,8 +26,11 @@ export function projectItems(
   return out
 }
 
-/** 工时问题 → 事项。按工号聚合、按问题码计数;label 一并带上,后端组卡不必再查表。 */
-export function timesheetItems(rows: IssueRow[], allowedCodes: string[]): PushItem[] {
+/** 工时问题 → 事项。按工号聚合、按问题码计数;label 一并带上,后端组卡不必再查表。
+ *  start/end 是统计区间的真实边界(供卡片副标题用),留空则卡片不出该行 —— 宁可不显示,不显示空区间。 */
+export function timesheetItems(
+  rows: IssueRow[], allowedCodes: string[], start = '', end = '',
+): PushItem[] {
   const allow = new Set(allowedCodes)
   const byEmp = new Map<string, Map<string, number>>()
   for (const r of rows) {
@@ -42,6 +46,8 @@ export function timesheetItems(rows: IssueRow[], allowedCodes: string[]): PushIt
     .map(([employId, m]) => ({
       kind: 'timesheet' as const,
       employId,
+      start,
+      end,
       issues: [...m.entries()].map(([code, count]) => ({
         code, label: ISSUE_LABELS[code] ?? code, count,
       })),

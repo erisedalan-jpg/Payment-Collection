@@ -72,6 +72,27 @@ describe('timesheetItems', () => {
                                  ['MISS_SUMMARY'])
     expect(items.map((i) => (i as { employId: string }).employId)).toEqual(['A1', 'B2'])
   })
+
+  // I-2:工时卡副标题此前恒为「统计区间  ~ 」——PushItem 的 timesheet 分支根本没有 start/end 字段。
+  it('带 start/end 时原样透传到每条事项(供后端拼「统计区间」副标题)', () => {
+    const items = timesheetItems([row('A1', ['MISS_SUMMARY'])], ['MISS_SUMMARY'],
+                                 '2026-07-01', '2026-07-07')
+    expect(items[0]).toMatchObject({ start: '2026-07-01', end: '2026-07-07' })
+  })
+
+  it('不传 start/end 时默认空串,不是 undefined(后端据此判断是否显示副标题)', () => {
+    const items = timesheetItems([row('A1', ['MISS_SUMMARY'])], ['MISS_SUMMARY'])
+    expect(items[0]).toMatchObject({ start: '', end: '' })
+  })
+
+  it('多人共享同一次传入的 start/end', () => {
+    const items = timesheetItems(
+      [row('B2', ['MISS_SUMMARY']), row('A1', ['MISS_SUMMARY'])],
+      ['MISS_SUMMARY'], '2026-07-01', '2026-07-07')
+    for (const it of items) {
+      expect(it).toMatchObject({ start: '2026-07-01', end: '2026-07-07' })
+    }
+  })
 })
 
 describe('ALL_RISK_CATEGORIES', () => {

@@ -7,7 +7,7 @@ import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { issueRows } from '@/lib/yitian/compliance'
 import { projectItems, timesheetItems, type PushItem } from '@/lib/lanxin/items'
 import { getLanxinConfig, lanxinPreview, lanxinSend,
-         type LanxinPlan, type LanxinSendResult } from '@/lib/lanxinApi'
+         type LanxinConfig, type LanxinPlan, type LanxinSendResult } from '@/lib/lanxinApi'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
@@ -28,9 +28,9 @@ const open = computed({
 
 /** 前端只算「哪些项目/工时行有什么异常」;「发给谁」由后端解析花名册决定。
  *  issueRows 的 start/end 传空串 → 函数内 `start && ...`/`end && ...` 判断为假,
- *  不做任何日期过滤 = 与「全时口径」等价(已核实,见 lib/yitian/compliance.ts issueRows)。 */
-async function buildItems(): Promise<PushItem[]> {
-  const cfg = await getLanxinConfig()
+ *  不做任何日期过滤 = 与「全时口径」等价(已核实,见 lib/yitian/compliance.ts issueRows)。
+ *  cfg 由调用方传入并复用(doPreview 已拉过一次),避免同一次预览打两遍 /api/lanxin/config。 */
+function buildItems(cfg: LanxinConfig): PushItem[] {
   const out: PushItem[] = []
   const rProj = cfg.routes.find((r) => r.key === 'project')
   if (rProj?.enabled && data.data) {
@@ -41,7 +41,8 @@ async function buildItems(): Promise<PushItem[]> {
   const rTs = cfg.routes.find((r) => r.key === 'timesheet')
   if (rTs?.enabled && yitian.data) {
     const rows = issueRows(yitian.data, '', '', [], yitianSettings.settings.excludedTypes ?? [])
-    out.push(...timesheetItems(rows, rTs.issueCodes ?? []))
+    out.push(...timesheetItems(rows, rTs.issueCodes ?? [],
+                               yitian.data.meta.periodStart ?? '', yitian.data.meta.periodEnd ?? ''))
   }
   return out
 }
@@ -50,7 +51,16 @@ async function doPreview() {
   busy.value = true
   result.value = null
   try {
-    items.value = await buildItems()
+    const cfg = await getLanxinConfig()
+    const rTs = cfg.routes.find((r) => r.key === 'timesheet')
+    // C-1:yitian store 是惰性加载(只在进入 /yitian 时触发),/data 页从不主动 load,
+    // 若这里不显式拉一次,yitian.data 恒为 null → 工时事项静默产出 0 条、超管毫无察觉。
+    if (rTs?.enabled) await Promise.all([yitian.load(), yitianSettings.load()])
+    items.value = buildItems(cfg)
+    // 路由开着却因数据没到而一条工时事项都没有 → 必须显式告知,不能静默为 0
+    if (rTs?.enabled && !yitian.data) {
+      ElMessage.warning('倚天工时数据未加载，工时问题未纳入本次推送')
+    }
     plan.value = await lanxinPreview(items.value)
   } catch (e) {
     ElMessage.error('预览失败：' + (e instanceof Error ? e.message : String(e)))
