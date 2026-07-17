@@ -15,7 +15,6 @@ def test_default_config_shape():
     # 默认值:工时不发汇总;项目发到直接上级
     assert ts["recipients"]["supervisorLevels"] == 0
     assert pj["recipients"]["supervisorLevels"] == 1
-    assert len(ts["issueCodes"]) == 8
     assert len(pj["reasons"]) == 8
 
 
@@ -125,3 +124,22 @@ def test_save_is_atomic_no_tmp_left(tmp_path):
     LC.save_config(p, LC.default_config())
     assert os.path.exists(p)
     assert not os.path.exists(p + ".tmp")
+
+
+def test_default_issue_codes_exclude_hint():
+    """HINT_ 是「合规(提示)」不是问题(yitian_check.ok_of:含任一非 HINT_ 码才算问题)。
+    实测 HINT_PRESALE_PRODUCT 96 条 > 全部真问题 63 条 —— 默认推它就是给「合规」的人
+    发「你有问题」,且数量上还压过真问题。故默认不勾。"""
+    from yitian_rules import ISSUE_LABELS
+    ts = next(r for r in LC.default_config()["routes"] if r["key"] == "timesheet")
+    assert all(not c.startswith("HINT_") for c in ts["issueCodes"])
+    assert set(ts["issueCodes"]) == {k for k in ISSUE_LABELS if not k.startswith("HINT_")}
+    assert "HINT_PRESALE_PRODUCT" not in ts["issueCodes"]
+
+
+def test_hint_code_still_selectable():
+    """默认不勾 ≠ 不可勾:超管想推提示,页面上勾了必须能存下来。"""
+    c = LC.default_config()
+    c["routes"][0]["issueCodes"] = ["MISS_SUMMARY", "HINT_PRESALE_PRODUCT"]
+    saved = LC.validate_config(c)
+    assert "HINT_PRESALE_PRODUCT" in saved["routes"][0]["issueCodes"]
