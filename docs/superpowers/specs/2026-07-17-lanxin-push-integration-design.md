@@ -90,7 +90,13 @@
 **口径归属（决定架构的关键事实）**
 - **后端完全没有 `riskReasons` 口径** —— 8 类关注原因只活在前端 `frontend/src/lib/riskReasons.ts`：`回款延期` `里程碑滞后` `总成本超支大于5000` `总成本超支小于5000` `交付成本超支` `风险未闭环` `数据异常` `未获取原项目预算`
 - 后端只有粗口径 `projects[].health`（`progressAbnormal`/`riskAbnormal`/`costAbnormal`/`paymentAbnormal`/`overall`），**与前端「关注原因」不同源**
-- 倚天问题码在**后端** `yitian_rules.ISSUE_LABELS`（7 类）：`MISS_SUMMARY` 缺少工作概述 / `MISS_PROGRESS` 缺少工作进展 / `MISS_NEXT` 缺少下一步工作计划 / `MISS_SERVICE_MODE` 缺少服务方式 / `TYPE_MISMATCH` 工时类型填报有误 / `PRODUCT_MISMATCH` 产品类别填写错误 / `MISS_CUSTOMER` 客户名称未填写；前端消费口径在 `lib/yitian/compliance.ts`（`issueRows`/`countByCode`/`countByL4`）
+- 倚天问题码在**后端** `yitian_rules.ISSUE_LABELS`，**实测共 8 项，但只有 7 项是「问题」**：
+  - **问题（`ok=2`）7 项**：`MISS_SUMMARY` 缺少工作概述 / `MISS_PROGRESS` 缺少工作进展 / `MISS_NEXT` 缺少下一步工作计划 / `MISS_SERVICE_MODE` 缺少服务方式 / `TYPE_MISMATCH` 工时类型填报有误 / `PRODUCT_MISMATCH` 产品类别填写错误 / `MISS_CUSTOMER` 客户名称未填写
+  - **提示（`ok=1`，非问题）1 项**：`HINT_PRESALE_PRODUCT` 售前服务类产品类别不应为「其他」
+  - **`yitian_check.ok_of` 的判定原话**：「`0=合规 / 1=合规(提示) / 2=问题`。**含任一非 `HINT_` 码即为问题**」—— 即 `HINT_` 前缀的码，系统判定该行**合规**。
+  - **真实数据分布（实测）**：`ok=0` 正常 974 条 / **`ok=1` 提示 96 条** / `ok=2` 问题 59 条。各码次数：`HINT_PRESALE_PRODUCT` **96**（单码最多，比全部真问题 63 条还多）/ `PRODUCT_MISMATCH` 36 / `MISS_SERVICE_MODE` 16 / `MISS_PROGRESS` 5 / `MISS_NEXT` 3 / `MISS_SUMMARY` 2 / `TYPE_MISMATCH` 1。
+  - **故 `timesheet` 路由默认只勾 7 个真问题**（用 `not k.startswith("HINT_")` 派生，将来新增 HINT_ 自动排除）；`HINT_` 仍在白名单内、页面可自行勾选。**默认推 HINT_ = 给系统判定「合规」的人发「你有 N 条工时填报存在问题」，且在数量上压过真问题** —— 一次就会砸掉功能信任。
+- 前端消费口径在 `lib/yitian/compliance.ts`（`issueRows`/`countByCode`/`countByL4`）。**注意 `issueRows` 返回的是「`ok≠0` 的行」，即同时含提示与问题** —— 过滤由 `issueCodes` 配置在 `timesheetItems` 里完成。
 - 倚天花名册 `YitianRosterItem`：`id`(工号,大写归一,跨域连接键) `name` `l2` `l3` `l31` `l4` `category` —— **无直接上级**
 - `projects.read_org_roster` / `read_org_names` **均硬过滤 `新L3组织 == config.DEPT_L3`**
 - **`schema._Base` 是 `extra="allow"`** —— 给花名册加字段**不会报错**，但会**静默流进 `yitian_data.json`**（本仓已有「`extra=allow` 让 typecheck 假绿」的教训）
@@ -165,6 +171,8 @@
   "routes": [
     {
       "key": "timesheet", "label": "倚天工时问题", "enabled": true,
+      // 默认 = ISSUE_LABELS 中所有非 HINT_ 的码(7 项真问题)。
+      // HINT_PRESALE_PRODUCT 是「合规(提示)」,在白名单内可勾,但默认不勾(见 §1.2)。
       "issueCodes": ["MISS_SUMMARY","MISS_PROGRESS","MISS_NEXT","MISS_SERVICE_MODE",
                      "TYPE_MISMATCH","PRODUCT_MISMATCH","MISS_CUSTOMER"],
       "recipients": { "primary": true, "supervisorLevels": 0 }

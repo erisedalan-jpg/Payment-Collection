@@ -171,8 +171,26 @@ def test_default_config_shape():
     # 默认值:工时不发汇总;项目发到直接上级
     assert ts["recipients"]["supervisorLevels"] == 0
     assert pj["recipients"]["supervisorLevels"] == 1
-    assert len(ts["issueCodes"]) == 7
     assert len(pj["reasons"]) == 8
+
+
+def test_default_issue_codes_exclude_hint():
+    """HINT_ 是「合规(提示)」不是问题(yitian_check.ok_of:含任一非 HINT_ 码才算问题)。
+    实测 HINT_PRESALE_PRODUCT 96 条 > 全部真问题 63 条 —— 默认推它就是给「合规」的人
+    发「你有问题」,且数量上还压过真问题。故默认不勾。"""
+    from yitian_rules import ISSUE_LABELS
+    ts = next(r for r in LC.default_config()["routes"] if r["key"] == "timesheet")
+    assert all(not c.startswith("HINT_") for c in ts["issueCodes"])
+    assert set(ts["issueCodes"]) == {k for k in ISSUE_LABELS if not k.startswith("HINT_")}
+    assert "HINT_PRESALE_PRODUCT" not in ts["issueCodes"]
+
+
+def test_hint_code_still_selectable():
+    """默认不勾 ≠ 不可勾:超管想推提示,页面上勾了必须能存下来。"""
+    c = LC.default_config()
+    c["routes"][0]["issueCodes"] = ["MISS_SUMMARY", "HINT_PRESALE_PRODUCT"]
+    saved = LC.validate_config(c)
+    assert "HINT_PRESALE_PRODUCT" in saved["routes"][0]["issueCodes"]
 
 
 def test_validate_accepts_default():
@@ -308,6 +326,14 @@ from typing import Any, Dict, List
 
 from yitian_rules import ISSUE_LABELS
 
+# ISSUE_LABELS 实测共 8 项,其中 HINT_ 前缀的是「合规(提示)」而不是问题 ——
+# yitian_check.ok_of 的原话:「0=合规 / 1=合规(提示) / 2=问题。含任一非 HINT_ 码即为问题」。
+# 默认只推真问题:实测 HINT_PRESALE_PRODUCT 有 96 条,比全部真问题(63 条)还多;
+# 默认推它 = 给系统判定为「合规」的人发一张写着「你有 N 条工时填报存在问题」的卡,
+# 一次就会砸掉功能信任。超管想推可在页面自行勾选。
+# 用 startswith 派生而非硬编码 7 项:将来若新增 HINT_ 码,自动排除、无需改这里。
+DEFAULT_ISSUE_CODES = [k for k in ISSUE_LABELS if not k.startswith("HINT_")]
+
 # 前端 lib/riskReasons.ts 的 RiskCategory 八类。
 # 注意:这里只用于「校验超管勾选的取值是否合法」,不做任何判定 —— 判定口径的单一来源仍是前端。
 REASON_WHITELIST = [
@@ -336,7 +362,8 @@ def default_config() -> Dict[str, Any]:
         "routes": [
             {
                 "key": "timesheet", "label": "倚天工时问题", "enabled": True,
-                "issueCodes": list(ISSUE_LABELS.keys()),
+                # 只含真问题;HINT_(合规提示)默认不勾,但仍在白名单里、页面可自行勾选
+                "issueCodes": list(DEFAULT_ISSUE_CODES),
                 # 默认不发汇总:工时问题是本人可自纠的,先不惊动上级
                 "recipients": {"primary": True, "supervisorLevels": 0},
             },
