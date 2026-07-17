@@ -73,7 +73,8 @@ async function onDownload() {
 
 const mainInput = ref<HTMLInputElement | null>(null)
 const mainUploadMsg = ref('')
-const mainSkipped = ref(false)
+// 有跳过或有失败(HTTP 层被服务端拒收)都要黄字提醒,故名 mainWarn 而非 mainSkipped
+const mainWarn = ref(false)
 async function onUploadMain() {
   const files = Array.from(mainInput.value?.files || [])
   if (!files.length) return
@@ -81,7 +82,8 @@ async function onUploadMain() {
   const okPmis = r.pmis.length ? await pmisUpload(r.pmis) : 0
   const okInputs = r.inputs.length ? await inputsUpload(r.inputs) : 0
   mainUploadMsg.value = formatDispatchMessage(r, okPmis, okInputs)
-  mainSkipped.value = r.skipped.length > 0
+  const failed = (r.pmis.length - okPmis) + (r.inputs.length - okInputs)
+  mainWarn.value = r.skipped.length > 0 || failed > 0
   if (mainInput.value) mainInput.value.value = ''
   loadFileStatus()
 }
@@ -123,7 +125,7 @@ defineExpose({ reload: loadFileStatus, onFetchPmisCookie })
       <input ref="mainInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
       <button class="dv-btn" data-test="btn-upload-main" @click="onUploadMain">上传主域数据文件</button>
     </div>
-    <div v-if="mainUploadMsg" class="dv-row dv-hint" :class="{ warn: mainSkipped }" data-test="upload-main-msg">{{ mainUploadMsg }}</div>
+    <div v-if="mainUploadMsg" class="dv-row dv-hint" :class="{ warn: mainWarn }" data-test="upload-main-msg">{{ mainUploadMsg }}</div>
 
     <el-collapse class="dv-more">
       <el-collapse-item name="pmis-cookie-manual" title="更多：手动粘贴 PMIS cookie（取备用）">

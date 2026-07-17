@@ -30,9 +30,12 @@ const SKIP_TEXT: Record<SkipReason, string> = {
   unknown: '不在主域白名单',
 }
 
-/** 上传反馈文案。okPmis/okInputs 是端点实际成功数(可能小于分发数)。 */
+/** 上传反馈文案。okPmis/okInputs 是端点实际成功数(可能小于分发数——分发出的文件个个都过了
+ *  白名单,分子分母之差只能是 HTTP 层失败,须显式报出,否则用户以为全成功、点更新数据后拿旧文件重算)。 */
 export function formatDispatchMessage(r: DispatchResult, okPmis: number, okInputs: number): string {
   let msg = `已上传 ${okPmis} 个 PMIS 九表 + ${okInputs} 个项目域文件,请点[更新数据]生效`
+  const failed = (r.pmis.length - okPmis) + (r.inputs.length - okInputs)
+  if (failed > 0) msg += `;失败 ${failed} 个（服务端未接收,请重试）`
   if (r.skipped.length) {
     msg += ';已跳过:' + r.skipped.map((s) => `${s.name}（${SKIP_TEXT[s.reason]}）`).join('、')
   }

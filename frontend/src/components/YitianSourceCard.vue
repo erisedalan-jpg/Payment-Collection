@@ -17,17 +17,20 @@ const ftime = (name: string) => fileStatus.value[name] || '-'
 
 const yitianInput = ref<HTMLInputElement | null>(null)
 const yitianUploadMsg = ref('')
-const yitianSkipped = ref(false)
+// 有跳过或有失败(HTTP 层被服务端拒收)都要黄字提醒,故名 yitianWarn 而非 yitianSkipped
+const yitianWarn = ref(false)
 async function onUploadYitian() {
   const files = Array.from(yitianInput.value?.files || [])
   if (!files.length) return
   const accepted = files.filter((f) => YITIAN_FILE_NAMES.includes(f.name))
   const skipped = files.filter((f) => !YITIAN_FILE_NAMES.includes(f.name))
   const ok = accepted.length ? await inputsUpload(accepted) : 0
-  let msg = `已上传 ${ok} 个倚天文件，请点[更新数据]生效`
+  const failed = accepted.length - ok
+  let msg = `已上传 ${ok} 个倚天文件,请点[更新数据]生效`
+  if (failed > 0) msg += `;失败 ${failed} 个（服务端未接收,请重试）`
   if (skipped.length) msg += ';已跳过:' + skipped.map((f) => `${f.name}（不在倚天白名单）`).join('、')
   yitianUploadMsg.value = msg
-  yitianSkipped.value = skipped.length > 0
+  yitianWarn.value = skipped.length > 0 || failed > 0
   if (yitianInput.value) yitianInput.value.value = ''
   loadFileStatus()
 }
@@ -78,7 +81,7 @@ defineExpose({ reload: loadFileStatus, onFetchYitianCookie })
       <button class="dv-btn" data-test="btn-upload-yitian" @click="onUploadYitian">上传倚天文件</button>
       <button class="dv-btn" @click="onDownloadHolidayTemplate">下载 holidays.csv 模板</button>
     </div>
-    <div v-if="yitianUploadMsg" class="dv-row dv-hint" :class="{ warn: yitianSkipped }" data-test="upload-yitian-msg">{{ yitianUploadMsg }}</div>
+    <div v-if="yitianUploadMsg" class="dv-row dv-hint" :class="{ warn: yitianWarn }" data-test="upload-yitian-msg">{{ yitianUploadMsg }}</div>
 
     <div class="dv-row dv-actions">
       <button class="dv-btn" data-test="btn-fetch-yitian-cookie" @click="onFetchYitianCookie">获取本机倚天 cookie 并存储</button>

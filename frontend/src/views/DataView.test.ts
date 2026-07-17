@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import DataView from './DataView.vue'
 import DataStatusBar from '@/components/DataStatusBar.vue'
+import MainDomainSourceCard from '@/components/MainDomainSourceCard.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useAuthStore } from '@/stores/auth'
@@ -148,6 +149,20 @@ describe('DataView(两条来源重构)', () => {
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
     expect(calls.some((u: string) => u.includes('/api/pmis/cookie'))).toBe(true)
     expect(calls.some((u: string) => u.includes('/api/pmis/download'))).toBe(true)
+  })
+
+  it('下载运行中 → 「更新数据」禁用(互斥不得丢失,I-2 端到端锚点)', async () => {
+    // 覆盖 MainDomainSourceCard.vue 的 dlRunning → emit('running-change') → DataView.dlRunning
+    // → :disabled 这条 3 跳链;此前全仓零测试覆盖,链上任一环被后人碰掉都不会被任何测试逮到。
+    const w = await mountView()
+    const upd = () => w.findAll('button').find((b) => b.text().includes('更新数据（重新处理）'))!
+    expect(upd().attributes('disabled')).toBeUndefined()
+    const card = w.findComponent(MainDomainSourceCard)
+    // setupState 是 proxyRefs(setupResult):读时自动解包 ref,写非 ref 值时代理会转写回 ref.value,
+    // 故此处直接赋值(不加 .value)。
+    ;(card.vm as any).$.setupState.dlRunning = true
+    await flushPromises()
+    expect(upd().attributes('disabled')).toBeDefined()
   })
 
   it('文件清单为多列网格(.dv-fgrid)，PMIS 仍 9 行且保留全名', async () => {

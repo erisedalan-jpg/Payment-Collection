@@ -95,4 +95,22 @@ describe('YitianSourceCard', () => {
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
     expect(calls.some((u: string) => u.includes('/api/inputs/upload'))).toBe(true)
   })
+
+  it('HTTP 层失败(白名单内文件被服务端拒收)时提示行走 warn 且文案含失败数(I-1)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.includes('/api/files/status')) return { ok: true, json: async () => ({ files: {} }) } as any
+      if (u.includes('/api/inputs/upload')) return { ok: false, json: async () => ({}) } as any
+      return { ok: true, json: async () => ({}) } as any
+    }))
+    const w = await mountCard()
+    const input = w.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [new File(['x'], '工时.xlsx')] })
+    await w.find('[data-test="btn-upload-yitian"]').trigger('click')
+    await flushPromises()
+    const msgEl = w.find('[data-test="upload-yitian-msg"]')
+    expect(msgEl.text()).toContain('已上传 0 个倚天文件')
+    expect(msgEl.text()).toContain('失败 1 个（服务端未接收,请重试）')
+    expect(msgEl.classes()).toContain('warn')
+  })
 })
