@@ -124,6 +124,36 @@ def test_project_card_bodycontent_truncates_with_notice():
     assert "未列出" in card["bodyContent"]
 
 
+# ── M-3:「另有 N 个项目未列出」此前按原因逐条累加,同一项目撞两个原因会被数两次 ──
+
+def test_project_card_omitted_count_deduplicates_projects_across_reasons():
+    """两个原因各自都超预算被整行丢弃,但都命中同一个项目 —— 未列出数必须按项目去重算 1,
+    不能像旧实现 omitted += len(names) 那样按原因累加成 2。"""
+    huge_name = "占位符" * 900        # 单个项目名已远超 2940 字节预算,该行必被整行丢弃
+    by_reason = {"回款延期": [huge_name], "交付成本超支": [huge_name]}
+    card = LR.build_project_card("李四", by_reason)
+    assert "另有 1 个项目未列出" in card["bodyContent"]
+
+
+def test_project_card_omitted_excludes_names_already_shown_elsewhere():
+    """P1 同时命中「交付成本超支」(该行因陪衬项目过长被整行丢弃)和「回款延期」(该行进了正文)——
+    P1 已经在正文里出现过,不应计入「未列出」;只有完全没出现在正文里的项目才算。"""
+    huge_padding = "占位符" * 900      # 单独一个就足以把所在行挤出预算
+    by_reason = {
+        "回款延期": ["P1"],
+        "交付成本超支": ["P1", huge_padding],
+    }
+    card = LR.build_project_card("李四", by_reason)
+    assert "回款延期：P1" in card["bodyContent"]
+    assert "另有 1 个项目未列出" in card["bodyContent"]     # 只有 huge_padding 那一个,不含 P1
+
+
+def test_project_card_no_omitted_notice_when_everything_fits():
+    by_reason = {"回款延期": ["P1", "P2"], "交付成本超支": ["P3"]}
+    card = LR.build_project_card("李四", by_reason)
+    assert "未列出" not in card["bodyContent"]
+
+
 def test_summary_card_nested_shape():
     rows = [{"name": "隋文宇", "total": 14, "reasons": [("回款延期", 6), ("成本超支", 5)]},
             {"name": "于岩", "total": 9, "reasons": [("回款延期", 3)]}]

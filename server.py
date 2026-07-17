@@ -335,6 +335,9 @@ BUDGET_ESTIMATES_FILE = os.path.join(BASE_DIR, 'data', 'budget_estimates.json')
 
 # ── 蓝信推送 /lanxin:凭证/路由配置(超管可配) ──
 LANXIN_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'lanxin_config.json')
+# M-4:send 是不可撤销的对外动作,双击或两个超管同时点会重复触达全员。非阻塞 acquire——
+# 抢不到锁立即 400,绝不排队等待(服务是单线程 HTTPServer,排队会把整站堵死)。
+_lanxin_send_lock = threading.Lock()
 _budget_config_lock = threading.RLock()
 _budget_store_lock = threading.RLock()
 
@@ -2817,7 +2820,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         do_POST 没有全局 except(V4.0.0 前无先例),凭证错/花名册缺失/畸形事项都会让异常直穿
         socketserver、断开连接、前端只看到「Failed to fetch」——本函数兜住三类,转 400 结构化错误。
         铁律:errMsg 是蓝信自己的文案,不含 appSecret/appToken(已核 _http/_unwrap 三个 except)；
-        其余异常只透出 type(e).__name__,不透出内部 repr。"""
+        其余异常只透出 type(e).__name__,不透出内部 repr。
+        M-4:加服务端并发锁 —— 推送不可撤销,双击或两个超管同时点会导致重复触达全员。
+        非阻塞 acquire,抢不到直接 400,不排队(单线程排队 = 把全站堵死)。"""
         body = self._read_json_body()
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
@@ -2828,6 +2833,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         if not (cfg.get('credentials') or {}).get('apiGateway'):
             self._send_json(400, _error_payload(ERR_VALIDATION, "未配置开放平台网关地址"))
+            return
+        if not _lanxin_send_lock.acquire(blocking=False):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "另一次推送正在进行中，请稍候"))
             return
         try:
             plan = lanxin.build_plan(body.get('items') or [], cfg,
@@ -2845,6 +2853,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_VALIDATION,
                             "事项数据格式有误：%s" % type(e).__name__))
             return
+        finally:
+            _lanxin_send_lock.release()
         self._audit_set(target='蓝信推送发送',
                         detail='成功 %d · 失败 %d · 未解析 %d'
                                % (result['sent'], len(result['failed']),

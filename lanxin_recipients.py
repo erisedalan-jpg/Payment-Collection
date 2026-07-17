@@ -172,24 +172,31 @@ def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
 def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, Any]:
     """项目卡 → 项目经理本人。
     fields 按【原因】排(共 8 类,恒 ≤10 对) —— 不能按项目名排:实测单人最多背 49 个项目。
-    具体项目名进 bodyContent(3000 字节/八行),超出显式写「另有 N 个未列出」。"""
+    具体项目名进 bodyContent(3000 字节/八行),超出显式写「另有 N 个未列出」。
+    「未列出」按项目去重计数(M-3):一个项目可能同时命中多个原因,若它已经靠某一行挤进了
+    bodyContent,就不算「未列出」——即便它在另一行(被截断丢弃的原因)里也出现过。旧实现按
+    原因逐条累加(omitted += len(names)),同一项目撞两个原因就会被数两次,曾在「单人49个
+    项目×8类原因」的实测上界下出现「标题49个、正文却说另有60个未列出」的自相矛盾。"""
     rows = sorted(by_reason.items(), key=lambda kv: -len(kv[1]))
     fields = [_field(short_reason(r), "%d 个项目" % len(ps)) for r, ps in rows]
     distinct = len({p for ps in by_reason.values() for p in ps})
 
     lines: List[str] = []
     used = 0
-    omitted = 0
+    shown: set = set()      # 已经写进 bodyContent 某一行的项目名
+    dropped: set = set()    # 因超预算被丢弃那一行涉及的项目名
     for reason, names in rows:
         line = "%s：%s" % (reason, "、".join(names))
         n = len(line.encode("utf-8")) + 1
         if used + n > LIMIT_BODY_CONTENT - 60:      # 预留「另有…」的位置
-            omitted += len(names)
+            dropped.update(names)
             continue
         lines.append(line)
         used += n
+        shown.update(names)
+    omitted = dropped - shown      # 只统计【完全没出现在正文里】的项目
     if omitted:
-        lines.append("另有 %d 个项目未列出" % omitted)
+        lines.append("另有 %d 个项目未列出" % len(omitted))
     return _card("项目关注提醒",
                  "你名下 %d 个项目存在关注原因" % distinct,
                  "",

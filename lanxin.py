@@ -71,7 +71,9 @@ def _unwrap(resp: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_app_token(cfg: Dict[str, Any]) -> str:
-    """GET /v1/apptoken/create。按 appId 缓存(expiresIn 7200s,提前 300s 视为过期)。"""
+    """GET /v1/apptoken/create。按 appId 缓存(expiresIn 7200s,提前 300s 视为过期)。
+    errCode==0 但响应体没有 appToken(字段改名/网关裁剪/灰度返回空)时必须当失败处理 ——
+    否则会缓存空 token 并在自检里显示「第①步通过」,后面的步骤无声中止,超管无从判断坏在哪(M-1)。"""
     cred = cfg.get("credentials") or {}
     app_id = cred.get("appId") or ""
     with _token_lock:
@@ -83,6 +85,8 @@ def get_app_token(cfg: Dict[str, Any]) -> str:
                                 "appid": app_id, "secret": cred.get("appSecret") or ""})
     data = _unwrap(_http("%s/v1/apptoken/create?%s" % (gw, q)))
     token = data.get("appToken") or ""
+    if not token:
+        raise LanxinError(-1, "响应未含 appToken")
     expires = int(data.get("expiresIn") or 7200)
     with _token_lock:
         _token_cache[app_id] = {"token": token, "exp": time.time() + expires - TOKEN_EARLY_EXPIRE}
