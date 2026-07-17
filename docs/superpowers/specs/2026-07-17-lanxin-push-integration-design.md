@@ -82,7 +82,8 @@
 **项目域（`data/analysis_data.json`）**
 - **实测 PMIS 1260 个项目，全部有 `项目经理`（0 缺失），172 位不同经理**
 - **主域 `projects` 638 个，74 位不同经理，人均 8.6 个，单人最多 49 个**
-- `projectsQuality.managerNotInOrg` **实测 6 个项目**（项目经理不在花名册）
+- `projectsQuality.managerNotInOrg` **实测 6 个项目**（项目经理不在花名册）。**但它们不在主域 `projects` 里** —— 主域的定义就是「PMIS 在建 ∩ 项目经理 ∈ 组织架构花名册」，经理不在册的项目根本进不来。**实测：这 6 个落在主域的有 0 个；主域 74 位经理 100% 在册。**
+  → **推论（执行时实测修正）**：项目路由的 `unresolved` 在当前数据下**恒为 0**，不是「约 6 个」。「经理不在花名册」这条 unresolved 分支仍必须实现（花名册是人工维护的 xlsx，随时可能有人离职被删而项目还在），但**不要拿它当验收指标**。
 - `projects[]` 键：`projectId` `projectName` `projectManager` `customer` `orgL4` `orgL3_1` `health` `payment` `paymentPmis` `overspendAmount` `isPresale` `top1000` `quadrant` `signUnit` `deliveryCosts` `合同金额` `relatedClosedId`
 - `projectPmis[pid].team.项目经理` 是**姓名字符串**（`schema.PmisTeam`），非工号
 - **`analysis_data.json` 顶层无花名册**（键：`meta` `projects` `projectPmis` `projectProfit` `projectMilestones` `paymentNodes` `paymentRecords` `closedProjects` `followupRecords` `events` `periodCompare` `dataQuality` `projectsQuality` `tagSeed`）
