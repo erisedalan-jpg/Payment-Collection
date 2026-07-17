@@ -1,4 +1,5 @@
 import pytest
+import lanxin_config as LC
 import lanxin_recipients as LR
 
 
@@ -198,3 +199,86 @@ def test_short_labels_are_not_mangled_words():
     assert LR.REASON_SHORT_LABELS["未获取原项目预算"] == "无原项目预算"
     # 残词回归护栏:曾经用过的「未获原项目预」不得复现
     assert "未获原项目预" not in LR.REASON_SHORT_LABELS.values()
+
+
+# ── I-3:工时问题标签同款短标签处理(修前 7 类里 5 类超 18 字节,卡上显示省略号残词) ──
+
+def test_every_issue_label_fits_field_key_without_truncation():
+    """护栏:不论将来 yitian_rules.ISSUE_LABELS 怎么改文案/加码,short_issue 的产物都必须
+    不超 18 字节、且不被 fit_bytes 二次截断(截断=残词)。"""
+    from yitian_rules import ISSUE_LABELS
+    for code, lab in ISSUE_LABELS.items():
+        s = LR.short_issue(lab)
+        assert len(s.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, "%s(%s) → %s 仍超限" % (code, lab, s)
+        assert LR._field(s, "1 条")["key"] == s, "%s 被 fit_bytes 截成残词" % lab
+
+
+def test_issue_short_labels_are_distinct():
+    """短标签必须两两不同,不能像修前那样多类撞成同一串导致卡片列名分不清。"""
+    shown = list(LR.ISSUE_SHORT_LABELS.values())
+    assert len(set(shown)) == len(shown), "工时短标签中有撞车: %s" % shown
+
+
+def test_issue_short_labels_are_not_mangled_words():
+    """同 test_short_labels_are_not_mangled_words 的护栏,锁死工时侧的具体取值,
+    防止将来有人图省事直接砍字节数导致读不通的残词。"""
+    assert LR.ISSUE_SHORT_LABELS["缺少下一步工作计划"] == "缺下一步计划"
+    assert LR.ISSUE_SHORT_LABELS["工时类型填报有误"] == "工时类型有误"
+    assert LR.ISSUE_SHORT_LABELS["产品类别填写错误"] == "产品类别有误"
+    assert LR.ISSUE_SHORT_LABELS["客户名称未填写"] == "缺客户名称"
+    assert LR.ISSUE_SHORT_LABELS["售前服务类产品类别不应为「其他」"] == "售前类别有误"
+
+
+def test_timesheet_card_uses_short_issue_label_in_fields():
+    issues = [{"code": "MISS_NEXT", "label": "缺少下一步工作计划", "count": 3}]
+    card = LR.build_timesheet_card("张三", issues, "2026-07-01", "2026-07-07")
+    assert card["fields"][0]["key"] == "缺下一步计划"
+    assert "…" not in card["fields"][0]["key"]
+
+
+# ── 同款护栏也补给 REASON_WHITELIST(此前三个短标签是人肉算的字节数,没有测试锁住) ──
+
+def test_every_reason_fits_field_key_without_truncation():
+    for reason in LC.REASON_WHITELIST:
+        s = LR.short_reason(reason)
+        assert len(s.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, "%s → %s 仍超限" % (reason, s)
+        assert LR._field(s, "1 个项目")["key"] == s, "%s 被 fit_bytes 截成残词" % reason
+
+
+# ── I-2:工时卡副标题恒为「统计区间  ~ 」的死代码修复 ──
+
+def test_timesheet_card_subtitle_empty_when_no_range():
+    """start/end 缺失(前端未带上或后端拿到空串)时,宁可不显示这行副标题,也不拼出半截文案。"""
+    issues = [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]
+    card = LR.build_timesheet_card("张三", issues, "", "")
+    assert card["bodySubTitle"] == ""
+
+
+def test_timesheet_card_subtitle_present_when_range_given():
+    issues = [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]
+    card = LR.build_timesheet_card("张三", issues, "2026-07-01", "2026-07-07")
+    assert card["bodySubTitle"] == "统计区间 2026-07-01 ~ 2026-07-07"
+
+
+# ── I-1:build_summary_card 的 unit/head_title/title_fmt/label_fn 通用化(供工时汇总卡复用) ──
+
+def test_summary_card_default_params_unchanged():
+    """默认参数必须与修前逐字节一致 —— 项目路由调用点未改动传参,不能因为加参数改变行为。"""
+    rows = [{"name": "隋文宇", "total": 14, "reasons": [("回款延期", 6), ("成本超支", 5)]}]
+    card = LR.build_summary_card("张英哲", rows, "部门级汇总（+3）")
+    assert card["headTitle"] == "项目关注提醒"
+    assert card["bodyTitle"] == "你的团队有 14 个项目存在关注原因"
+    assert card["fields"][0]["value"].startswith("14 项：")
+
+
+def test_summary_card_timesheet_unit_and_title():
+    """工时汇总卡走「条」量纲 + 专属文案 + short_issue,不能出现「N 个项目」这种不适用的措辞。"""
+    rows = [{"name": "张三", "total": 3, "reasons": [("工时类型填报有误", 2), ("缺少工作概述", 1)]}]
+    card = LR.build_summary_card("耿磊磊", rows, "直接上级（+1）",
+                                 unit="条", head_title="工时填报提醒",
+                                 title_fmt="你的团队工时填报存在 %d 条问题",
+                                 label_fn=LR.short_issue)
+    assert card["headTitle"] == "工时填报提醒"
+    assert "条" in card["bodyTitle"] and "项目" not in card["bodyTitle"]
+    assert card["fields"][0]["value"].startswith("3 条：")
+    assert "工时类型有误" in card["fields"][0]["value"]     # 用了短标签,不是原始长标签

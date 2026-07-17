@@ -277,6 +277,67 @@ def test_plan_timesheet_employ_not_in_roster_unresolved():
     assert plan["unresolved"][0]["reason"] == "工号不在花名册"
 
 
+# ── I-1:timesheet 路由的 supervisorLevels 此前静默空转(只有 project 路由认这个字段) ──
+
+def test_plan_timesheet_supervisor_summary_rolls_up_by_direct_report():
+    """非 0 supervisorLevels 现在也要出汇总卡,按【直接下属】卷起来 —— 与 project 路由对称,
+    但聚合单位是「条」而不是「个项目」,措辞不能借用项目路由的文案。"""
+    items = [{"kind": "timesheet", "employId": "A006",
+              "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3}]},
+             {"kind": "timesheet", "employId": "A007",
+              "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 2}]}]
+    plan = LX.build_plan(items, _cfg(ts_levels=2), TREE, PMIS)
+    sup = {r["employId"]: r for r in plan["recipients"] if r["role"] == "supervisor"}
+    assert set(sup) == {"A005", "A002"}
+    card = sup["A005"]["card"]
+    assert card["headTitle"] == "工时填报提醒"
+    assert "条" in card["bodyTitle"] and "项目" not in card["bodyTitle"]
+    # 耿磊磊(A005)直接带 张三/李四 → 2 行
+    assert {f["key"] for f in card["fields"]} == {"张三", "李四"}
+    # 于岩(A002)直接只带耿磊磊(A005)→ 1 行,数字是整棵子树合计 5
+    assert [f["key"] for f in sup["A002"]["card"]["fields"]] == ["耿磊磊"]
+    assert sup["A002"]["card"]["fields"][0]["value"].startswith("5 条：")
+
+
+def test_plan_timesheet_levels_zero_no_supervisor_card():
+    """levels=0(默认值)时不出汇总卡 —— 与 project 路由 levels=0 的既有行为对称。"""
+    items = [{"kind": "timesheet", "employId": "A006",
+              "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
+    plan = LX.build_plan(items, _cfg(ts_levels=0), TREE, PMIS)
+    assert [r for r in plan["recipients"] if r["role"] == "supervisor"] == []
+
+
+def test_plan_timesheet_summary_uses_short_issue_label():
+    """长标签(「工时类型填报有误」24 字节)在汇总卡的 value 里也要走短标签,不能露出残词(联动 I-3)。"""
+    items = [{"kind": "timesheet", "employId": "A006",
+              "issues": [{"code": "TYPE_MISMATCH", "label": "工时类型填报有误", "count": 1}]}]
+    c = _cfg(ts_levels=1)
+    c["routes"][0]["issueCodes"] = ["TYPE_MISMATCH"]
+    plan = LX.build_plan(items, c, TREE, PMIS)
+    sup = [r for r in plan["recipients"] if r["role"] == "supervisor"][0]
+    value = sup["card"]["fields"][0]["value"]
+    assert "工时类型有误" in value
+    assert "…" not in value
+
+
+# ── I-2:工时卡副标题此前恒为「统计区间  ~ 」(items 里从没有 start/end 这两个键) ──
+
+def test_plan_timesheet_primary_card_subtitle_uses_item_range():
+    """区间由前端随 items 传入;build_plan 只透传,不自行计算。"""
+    items = [{"kind": "timesheet", "employId": "A006", "start": "2026-07-01", "end": "2026-07-07",
+              "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
+    plan = LX.build_plan(items, _cfg(), TREE, PMIS)
+    assert plan["recipients"][0]["card"]["bodySubTitle"] == "统计区间 2026-07-01 ~ 2026-07-07"
+
+
+def test_plan_timesheet_primary_card_subtitle_empty_without_range():
+    """items 不带 start/end 时,副标题必须是空串,绝不拼出「统计区间  ~ 」这种半截文案。"""
+    items = [{"kind": "timesheet", "employId": "A006",
+              "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
+    plan = LX.build_plan(items, _cfg(), TREE, PMIS)
+    assert plan["recipients"][0]["card"]["bodySubTitle"] == ""
+
+
 def test_plan_is_deterministic_same_input_same_output():
     """preview 与 send 走同一 build_plan;两次调用必须逐字段相等 —— 这是「所见即所发」的锚点。"""
     items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},

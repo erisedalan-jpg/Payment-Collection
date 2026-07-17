@@ -135,7 +135,7 @@ def send_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
 
 from lanxin_recipients import (           # noqa: E402  (置于此处以免与客户端段落交叉引用)
     build_project_card, build_summary_card, build_timesheet_card,
-    resolve_project_manager, supervisor_chain,
+    resolve_project_manager, short_issue, supervisor_chain,
 )
 
 _LEVEL_LABELS = {1: "直接上级（+1）", 2: "隔级上级（+2）", 3: "部门级（+3）",
@@ -162,6 +162,31 @@ def _descend_owner(tree: Dict[str, Any], sup_id: str, emp_id: str) -> Optional[s
             return cur
         cur = nxt
     return None
+
+
+def _sum_ts_counts(issues: List[Dict[str, Any]]) -> Dict[str, int]:
+    """工时 issues 列表([{'label','count',...}, ...]) → {label: 合计条数}(同 label 合并)。"""
+    out: Dict[str, int] = {}
+    for i in issues:
+        out[i["label"]] = out.get(i["label"], 0) + int(i["count"])
+    return out
+
+
+def _rollup(counts_by_emp: Dict[str, Dict[str, int]], levels: int,
+           tree: Dict[str, Any]) -> Dict[str, Dict[str, Dict[str, int]]]:
+    """{emp: {标签: 计数}} → {sup: {直接下属: {标签: 计数}}}(逐层卷上去)。
+    项目路由与工时路由共用此聚合 —— 两者都是「primary 工号 → {标签: 计数}」的形状,
+    只是标签含义不同(原因 vs 问题码),数值对聚合逻辑而言无差别。"""
+    agg: Dict[str, Dict[str, Dict[str, int]]] = {}
+    for emp, counts in counts_by_emp.items():
+        for sup in supervisor_chain(tree, emp, levels):
+            owner = _descend_owner(tree, sup, emp)
+            if not owner:
+                continue
+            slot = agg.setdefault(sup, {}).setdefault(owner, {})
+            for label, n in counts.items():
+                slot[label] = slot.get(label, 0) + n
+    return agg
 
 
 def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
@@ -230,25 +255,39 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 "card": build_project_card(by_id[emp]["name"], proj_by_emp[emp]),
             })
 
-    # ② 汇总卡:按【直接下属】聚合,数字是该下属整棵子树的合计
-    if r_proj:
-        levels = r_proj["recipients"]["supervisorLevels"]
-        # sup 工号 → 直接下属工号 → {原因: 计数}
-        agg: Dict[str, Dict[str, Dict[str, int]]] = {}
-        for emp, by_reason in proj_by_emp.items():
-            for sup in supervisor_chain(tree, emp, levels):
-                owner = _descend_owner(tree, sup, emp)
-                if not owner:
-                    continue
-                slot = agg.setdefault(sup, {}).setdefault(owner, {})
-                for reason, names in by_reason.items():
-                    slot[reason] = slot.get(reason, 0) + len(names)
+    # ② 汇总卡:按【直接下属】聚合,数字是该下属整棵子树的合计。
+    # 两条路由都支持:spec §4.1「任一 → supervisor」——之前只认 project,timesheet 的
+    # supervisorLevels 控件存了个不生效的值(I-1)。levels<=0 时 supervisor_chain 恒空,
+    # agg 自然为空、不出汇总卡,故此处两路由写法对称、无需分支判空。
+    if r_ts:
+        ts_levels = r_ts["recipients"]["supervisorLevels"]
+        ts_counts = {emp: _sum_ts_counts(issues) for emp, issues in ts_by_emp.items()}
+        agg = _rollup(ts_counts, ts_levels, tree)
         for sup in sorted(agg):
             rows = []
-            for owner, reasons in agg[sup].items():
+            for owner, counts in agg[sup].items():
                 rows.append({"name": by_id[owner]["name"],
-                             "total": sum(reasons.values()),
-                             "reasons": list(reasons.items())})
+                             "total": sum(counts.values()),
+                             "reasons": list(counts.items())})
+            label = _LEVEL_LABELS.get(_level_of(tree, sup, ts_by_emp), "上级汇总")
+            recipients.append({
+                "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
+                "card": build_summary_card(by_id[sup]["name"], rows, label,
+                                           unit="条", head_title="工时填报提醒",
+                                           title_fmt="你的团队工时填报存在 %d 条问题",
+                                           label_fn=short_issue),
+            })
+    if r_proj:
+        levels = r_proj["recipients"]["supervisorLevels"]
+        proj_counts = {emp: {reason: len(names) for reason, names in by_reason.items()}
+                       for emp, by_reason in proj_by_emp.items()}
+        agg = _rollup(proj_counts, levels, tree)
+        for sup in sorted(agg):
+            rows = []
+            for owner, counts in agg[sup].items():
+                rows.append({"name": by_id[owner]["name"],
+                             "total": sum(counts.values()),
+                             "reasons": list(counts.items())})
             label = _LEVEL_LABELS.get(_level_of(tree, sup, proj_by_emp), "上级汇总")
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
@@ -262,10 +301,11 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
 MAX_LEVELS_PROBE = 5
 
 
-def _level_of(tree: Dict[str, Any], sup_id: str, proj_by_emp: Dict[str, Any]) -> int:
-    """sup 相对于命中他的 primary 的最小级差(用于卡片副标题文案)。"""
+def _level_of(tree: Dict[str, Any], sup_id: str, by_emp: Dict[str, Any]) -> int:
+    """sup 相对于命中他的 primary 的最小级差(用于卡片副标题文案)。
+    by_emp 只用其 key(primary 工号集合)——project/timesheet 两路由共用,值形状无关。"""
     best = 99
-    for emp in proj_by_emp:
+    for emp in by_emp:
         ch = supervisor_chain(tree, emp, MAX_LEVELS_PROBE)
         if sup_id in ch:
             best = min(best, ch.index(sup_id) + 1)

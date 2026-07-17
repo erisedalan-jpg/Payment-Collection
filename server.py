@@ -2791,18 +2791,33 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True, "steps": steps})
 
     def handle_lanxin_preview(self):
-        """POST /api/lanxin/preview {items} - 超管专属。纯计算,不发任何网络请求。"""
+        """POST /api/lanxin/preview {items} - 超管专属。纯计算,不发任何网络请求。
+        build_plan 不打网络,故只需兜住花名册缺失/事项格式两类本地异常
+        (不会遇到 LanxinError —— 那只在 dispatch 里发生,见 handle_lanxin_send)。"""
         body = self._read_json_body()
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
             return
         cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
-        plan = lanxin.build_plan(body.get('items') or [], cfg,
-                                 self._lanxin_tree(), self._lanxin_pmis())
+        try:
+            plan = lanxin.build_plan(body.get('items') or [], cfg,
+                                     self._lanxin_tree(), self._lanxin_pmis())
+        except FileNotFoundError:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "未找到 input/组织架构.xlsx，无法解析收件人"))
+            return
+        except (KeyError, ValueError, TypeError) as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "事项数据格式有误：%s" % type(e).__name__))
+            return
         self._send_json(200, {"success": True, "plan": plan})
 
     def handle_lanxin_send(self):
-        """POST /api/lanxin/send {items} - 超管专属。与 preview 走同一个 build_plan —— 所见即所发。"""
+        """POST /api/lanxin/send {items} - 超管专属。与 preview 走同一个 build_plan —— 所见即所发。
+        do_POST 没有全局 except(V4.0.0 前无先例),凭证错/花名册缺失/畸形事项都会让异常直穿
+        socketserver、断开连接、前端只看到「Failed to fetch」——本函数兜住三类,转 400 结构化错误。
+        铁律:errMsg 是蓝信自己的文案,不含 appSecret/appToken(已核 _http/_unwrap 三个 except)；
+        其余异常只透出 type(e).__name__,不透出内部 repr。"""
         body = self._read_json_body()
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
@@ -2814,9 +2829,22 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not (cfg.get('credentials') or {}).get('apiGateway'):
             self._send_json(400, _error_payload(ERR_VALIDATION, "未配置开放平台网关地址"))
             return
-        plan = lanxin.build_plan(body.get('items') or [], cfg,
-                                 self._lanxin_tree(), self._lanxin_pmis())
-        result = lanxin.dispatch(plan, cfg)
+        try:
+            plan = lanxin.build_plan(body.get('items') or [], cfg,
+                                     self._lanxin_tree(), self._lanxin_pmis())
+            result = lanxin.dispatch(plan, cfg)
+        except lanxin.LanxinError as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "蓝信接口错误：%s (%s)" % (e.err_msg, e.err_code)))
+            return
+        except FileNotFoundError:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "未找到 input/组织架构.xlsx，无法解析收件人"))
+            return
+        except (KeyError, ValueError, TypeError) as e:
+            self._send_json(400, _error_payload(ERR_VALIDATION,
+                            "事项数据格式有误：%s" % type(e).__name__))
+            return
         self._audit_set(target='蓝信推送发送',
                         detail='成功 %d · 失败 %d · 未解析 %d'
                                % (result['sent'], len(result['failed']),

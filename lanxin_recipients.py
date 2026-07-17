@@ -44,6 +44,22 @@ def short_reason(reason: str) -> str:
     return REASON_SHORT_LABELS.get(reason, reason)
 
 
+# 工时问题标签同款处理:7 类里 5 类超 18 字节(其中 4 类真问题 + 1 类 HINT_ 提示,均可勾选)。
+# 与 REASON_SHORT_LABELS 同一条铁律:字节合规不等于可读,不能是砍掉词尾的残词。
+ISSUE_SHORT_LABELS = {
+    "缺少下一步工作计划": "缺下一步计划",              # 27 → 18 字节
+    "工时类型填报有误": "工时类型有误",                # 24 → 18 字节
+    "产品类别填写错误": "产品类别有误",                # 24 → 18 字节
+    "客户名称未填写": "缺客户名称",                    # 21 → 15 字节
+    "售前服务类产品类别不应为「其他」": "售前类别有误",  # 48 → 18 字节
+}
+
+
+def short_issue(label: str) -> str:
+    """工时卡 fields 的 key 显示名。超 18 字节的五类用短标签,其余原样。"""
+    return ISSUE_SHORT_LABELS.get(label, label)
+
+
 def fit_bytes(s: str, limit: int) -> str:
     """按 UTF-8 字节截断(中文 3 字节/字)。超出时末尾加 '…'(自身 3 字节)。
     绝不切半个字符 —— 逐字符累加,放不下就停。"""
@@ -141,13 +157,15 @@ def _card(head: str, title: str, subtitle: str, fields: List[Dict[str, str]],
 
 def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
                          start: str, end: str) -> Dict[str, Any]:
-    """工时卡 → 填报人本人。问题类型共 7 类,fields 恒 ≤10 对,永不撞线。"""
+    """工时卡 → 填报人本人。问题类型共 7 类,fields 恒 ≤10 对,永不撞线。
+    start/end 任一为空 → 不出「统计区间」这行副标题,绝不拼出半截文案(宁可不显示,不显示空区间)。"""
     total = sum(int(i["count"]) for i in issues)
     rows = sorted(issues, key=lambda i: -int(i["count"]))
-    fields = [_field(i["label"], "%d 条" % int(i["count"])) for i in rows]
+    fields = [_field(short_issue(i["label"]), "%d 条" % int(i["count"])) for i in rows]
+    subtitle = "统计区间 %s ~ %s" % (start, end) if start and end else ""
     return _card("工时填报提醒",
                  "你有 %d 条工时填报存在问题" % total,
-                 "统计区间 %s ~ %s" % (start, end),
+                 subtitle,
                  fields)
 
 
@@ -179,11 +197,15 @@ def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, 
                  "\n".join(lines))
 
 
-def build_summary_card(name: str, rows: List[Dict[str, Any]],
-                       level_label: str) -> Dict[str, Any]:
-    """汇总卡 → 上级。按【直接下属 × 原因】嵌套聚合:key=姓名, value='N 项：原因 n · 原因 n'。
+def build_summary_card(name: str, rows: List[Dict[str, Any]], level_label: str,
+                       unit: str = "项", head_title: str = "项目关注提醒",
+                       title_fmt: str = "你的团队有 %d 个项目存在关注原因",
+                       label_fn=short_reason) -> Dict[str, Any]:
+    """汇总卡 → 上级。按【直接下属 × 原因/问题码】嵌套聚合:key=姓名, value='N <unit>：标签 n · 标签 n'。
     数字是该下属整棵子树的合计(逐层卷上去)。只列有异常的直属。
-    主动不越 10 对 —— 蓝信超限行为未知,不去赌。"""
+    主动不越 10 对 —— 蓝信超限行为未知,不去赌。
+    unit/head_title/title_fmt/label_fn 让本函数同时服务项目路由(默认:项目/短原因)与
+    工时路由(条/短问题标签)—— 两者量纲不同,文案不能共用「N 个项目」。"""
     ordered = sorted(rows, key=lambda r: -int(r["total"]))
     shown = ordered[:MAX_FIELDS]
     rest = ordered[MAX_FIELDS:]
@@ -191,19 +213,19 @@ def build_summary_card(name: str, rows: List[Dict[str, Any]],
 
     fields: List[Dict[str, str]] = []
     for r in shown:
-        parts = ["%s %d" % (short_reason(c), n) for c, n in sorted(r["reasons"], key=lambda x: -x[1])]
-        value = "%d 项：%s" % (int(r["total"]), " · ".join(parts))
+        parts = ["%s %d" % (label_fn(c), n) for c, n in sorted(r["reasons"], key=lambda x: -x[1])]
+        value = "%d %s：%s" % (int(r["total"]), unit, " · ".join(parts))
         # value 超 192 字节时逐个丢掉最小的原因,末尾以「等」示意
         while len(value.encode("utf-8")) > LIMIT_FIELD_VALUE and len(parts) > 1:
             parts.pop()
-            value = "%d 项：%s 等" % (int(r["total"]), " · ".join(parts))
+            value = "%d %s：%s 等" % (int(r["total"]), unit, " · ".join(parts))
         fields.append(_field(r["name"], value))
 
     content = ""
     if rest:
-        content = "另有 %d 人共 %d 项未列出" % (len(rest), sum(int(r["total"]) for r in rest))
-    return _card("项目关注提醒",
-                 "你的团队有 %d 个项目存在关注原因" % total,
+        content = "另有 %d 人共 %d %s未列出" % (len(rest), sum(int(r["total"]) for r in rest), unit)
+    return _card(head_title,
+                 title_fmt % total,
                  level_label,
                  fields,
                  content)
