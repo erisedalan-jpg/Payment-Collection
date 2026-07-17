@@ -180,6 +180,38 @@ describe('DataView(两条来源重构)', () => {
     expect(t).toContain('数据历史')
     expect(t).toContain('清空数据')
   })
+
+  it('三个页签齐全,默认落「数据源」签', async () => {
+    const w = await mountView()
+    const labels = w.findAll('.el-tabs__item').map((n) => n.text())
+    expect(labels).toEqual(['数据源', '配置', '维护'])
+    // 三签内容全在 DOM(el-tab-pane 未设 lazy),故 text()/find() 恒命中 —— 必须用 isVisible() 断可见性
+    expect(w.find('#pane-sources').isVisible()).toBe(true)
+    expect(w.find('#pane-config').isVisible()).toBe(false)
+    expect(w.find('#pane-maint').isVisible()).toBe(false)
+  })
+
+  it('栅格不再用 auto-fit(改显式两栏)', async () => {
+    const w = await mountView()
+    expect(w.find('.dv-domain-grid').exists()).toBe(false)
+    expect(w.find('.dv-pane-grid').exists()).toBe(true)
+  })
+
+  it('倚天累积数据管理归入「维护」签,合规范围/规则归入「配置」签', async () => {
+    const auth = useAuthStore()
+    ;(auth as any).user = { account: 'admin', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const w = mount(DataView, { global: { plugins: [ElementPlus], stubs: {
+      'el-switch': true, YitianRulesCard: true, YitianScopeCard: true, YitianStoreCard: true, PortalConfigCard: true,
+    } } })
+    await flushPromises()
+    expect(w.find('#pane-maint').text()).toContain('倚天累积数据管理')
+    expect(w.find('#pane-config').text()).toContain('合规检查范围')
+    expect(w.find('#pane-config').text()).toContain('合规规则配置')
+    expect(w.find('#pane-config').text()).toContain('首页门户')
+    // 倚天源卡里不再有这三块
+    expect(w.find('#pane-sources').text()).not.toContain('累积数据管理')
+    expect(w.find('#pane-sources').text()).not.toContain('合规规则配置')
+  })
 })
 
 describe('DataView 本机取 cookie', () => {

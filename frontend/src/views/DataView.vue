@@ -26,6 +26,9 @@ const projectTags = useProjectTagsStore()
 const filter = useFilterStore()
 const auth = useAuthStore()
 
+// tab 不持久化:每次进入默认落「数据源」签(更新数据已常驻,签只在偶尔改配置/回滚时才切)
+const activeTab = ref('sources')
+
 const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 const lastPmis = computed(() => (data.data as any)?.dataQuality?.summary?.lastPmisUpdate || '-')
 
@@ -275,207 +278,234 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
       <div v-if="repRunning || repProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
     </div>
 
-    <!-- 按功能域拆分的功能卡 -->
-    <div class="dv-domain-grid">
-      <div class="dv-card">
-        <div class="dv-card-head">PMIS 域</div>
-        <div class="dv-row">
-          <button class="dv-btn primary" data-test="btn-fetch-pmis-cookie" @click="onFetchPmisCookie">获取本机 PMIS cookie 并推送</button>
-          <span class="dv-badge" :class="agentOnline ? 'ok' : 'warn'">本机代理{{ agentOnline ? '已连接' : '未运行' }}</span>
-        </div>
-        <div v-if="cookieMsg" class="dv-row dv-hint" :class="cookieErr ? 'err' : 'ok'">{{ cookieMsg }}</div>
-        <div class="dv-row">
-          <button class="dv-btn" data-test="btn-download" :disabled="dlRunning || repRunning" @click="onDownload">下载数据</button>
-          <span class="dv-hint">从 PMIS 抓取并覆盖 input/（只抓取不重算）</span>
-        </div>
-        <div v-if="dlRunning || dlProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
-
-        <div class="dv-sub-head">PMIS 九表（input/pmis/）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-fcell" data-test="pmis-row" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
-          </div>
-        </div>
-        <div class="dv-row dv-actions">
-          <input ref="pmisInput" type="file" accept=".xlsx" multiple class="dv-file" />
-          <button class="dv-btn" @click="onPmisUpload">上传 PMIS 文件</button>
-          <span v-if="pmisUploadMsg" class="dv-hint">{{ pmisUploadMsg }}</span>
-        </div>
-
-        <el-collapse class="dv-more">
-          <el-collapse-item name="pmis-cookie-manual" title="更多：手动粘贴 PMIS cookie（取备用）">
-            <div class="dv-row dv-cookie">
-              <span class="dv-label">手动 cookie</span>
-              <textarea v-model="pmisCookie" data-test="pmis-cookie" class="dv-cookie-box" rows="2"
-                placeholder="粘贴完整 PMIS cookie 串（高级兜底；正常用上方「获取本机 cookie」）"></textarea>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-
-      <div class="dv-card" data-test="files-card">
-        <div class="dv-card-head">项目域文件</div>
-        <div class="dv-sub-head">项目域文件（input/ 根）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-fcell" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
-          </div>
-        </div>
-        <div class="dv-row dv-actions">
-          <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-          <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
-          <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
-        </div>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">倚天工时域</div>
-        <div class="dv-sub-head">倚天工时域（input/yitian/）</div>
-        <div class="dv-fgrid">
-          <div v-for="name in YITIAN_FILE_NAMES" :key="name" class="dv-fcell" :title="name">
-            <span class="dv-fname2">{{ name }}</span>
-            <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
-          </div>
-        </div>
-        <div class="dv-row dv-actions">
-          <input ref="yitianInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
-          <button class="dv-btn" @click="onUploadYitian">上传倚天文件</button>
-          <button class="dv-btn" @click="onDownloadHolidayTemplate">下载 holidays.csv 模板</button>
-          <span v-if="yitianUploadMsg" class="dv-hint">{{ yitianUploadMsg }}</span>
-        </div>
-        <div class="dv-hint dv-fmt">
-          holidays.csv 格式（UTF-8，两列）：<code>日期,类型</code>；类型只有两种——
-          <code>休</code>=法定假/调休放假（即使落在周一~周五），<code>班</code>=调休上班（即使落在周末）。
-          未列出的日期按「周一~周五为工作日」处理。不提供该文件时全站按纯周一~周五近似，
-          含节假日的周期饱和度会偏低。
-        </div>
-
-        <div class="dv-row dv-actions">
-          <button class="dv-btn" data-test="btn-fetch-yitian-cookie" @click="onFetchYitianCookie">获取本机倚天 cookie 并存储</button>
-          <span class="dv-hint">当前 {{ yitianStatus.sessionPreview || '-' }} · 更新于 {{ yitianStatus.updatedAt || '-' }}</span>
-        </div>
-        <div v-if="yitianMsg" class="dv-row dv-hint" :class="yitianErr ? 'err' : 'ok'">{{ yitianMsg }}</div>
-
-        <el-collapse v-if="auth.isSuper" class="dv-more">
-          <el-collapse-item name="yitian-scope" title="合规检查范围（超管）">
-            <YitianScopeCard />
-          </el-collapse-item>
-          <el-collapse-item name="yitian-store" title="累积数据管理（超管）">
-            <YitianStoreCard />
-          </el-collapse-item>
-          <el-collapse-item v-if="auth.isSuper" name="yitian-rules" title="合规规则配置（超管）">
-            <YitianRulesCard />
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">项目标签</div>
-        <div class="dv-row dv-tags-mgr">
-          <span class="dv-label">标签库</span>
-          <span v-for="t in projectTags.tags" :key="t.name" class="dv-tag" :class="{ off: t.disabled }">
-            <input class="dv-tag-name" :value="t.name" @change="onRename(t.name, $event)" />
-            <el-switch :model-value="!t.disabled" size="small" @update:model-value="(v: boolean) => onDisable(t.name, !v)" />
-          </span>
-          <el-input v-model="newTag" size="small" placeholder="新标签" style="width: 120px" @keyup.enter="onAddTag" />
-          <button class="dv-btn" @click="onAddTag">添加</button>
-        </div>
-        <div class="dv-row">
-          <span class="dv-label">按标签排除</span>
-          <el-switch v-model="excludeOn" />
-          <el-select v-model="excludeTags" size="small" multiple collapse-tags clearable placeholder="选要排除的标签" style="width: 220px">
-            <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
-          </el-select>
-          <span class="dv-hint">开启后，挂有所选标签的项目从所有看板隐藏（替代旧纳管）</span>
-        </div>
-      </div>
-
-      <div class="dv-card">
-        <div class="dv-card-head">维护与历史</div>
-        <el-collapse class="dv-maint">
-          <el-collapse-item name="manual" title="人工数据导入 / 回滚">
-            <div data-test="manual-import-card">
-              <div class="dv-row">
-                <span class="dv-label">导入 xlsx</span>
-                <input ref="manImportInput" type="file" accept=".xlsx,.xls" class="dv-file" @change="onManImport" :disabled="manBusy" />
-                <span class="dv-hint">仅「项目标签」「跟进记录」sheet 整表替换；导入前自动快照</span>
-              </div>
-              <div v-if="manMsg" class="dv-row dv-hint ok">{{ manMsg }}</div>
-              <table v-if="manErrors.length" class="dv-err u-num">
-                <thead><tr><th>Sheet</th><th>行</th><th>列</th><th>错误</th></tr></thead>
-                <tbody>
-                  <tr v-for="(e, i) in manErrors" :key="i">
-                    <td>{{ e.sheet }}</td><td>{{ e.row }}</td><td>{{ e.col || '-' }}</td><td>{{ e.message }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-for="b in manBackups" :key="b.id" class="dv-row" data-test="man-backup-row">
-                <span class="dv-label u-num">{{ b.createdAt || b.id }}（标签{{ b.tagProjects ?? 0 }}/跟进{{ b.followupCount ?? 0 }}）</span>
-                <button class="dv-btn" :disabled="manBusy" @click="onManRollback(b.id)">回滚到此</button>
-              </div>
-            </div>
-          </el-collapse-item>
-
-          <el-collapse-item name="history" title="数据历史 / 回滚">
-            <div v-if="historyPre" class="dv-row">
-              <span class="dv-label">撤销</span>
-              <button class="dv-btn ghost" :disabled="historyBusy" @click="onUndoRollback">撤销上次回滚</button>
-              <span class="dv-hint">恢复到最近一次回滚前的状态</span>
-            </div>
-            <div v-if="!historyVersions.length" class="dv-row dv-hint">暂无历史版本，"更新数据"成功后会自动保存（保留最近 5 份）。</div>
-            <div v-for="v in historyVersions" :key="v.id" class="dv-row" data-test="history-row">
-              <span class="dv-label u-num">{{ v.createdAt || v.id }}</span>
-              <span class="dv-hint u-num">项目 {{ v.projectCount ?? '-' }} · 节点 {{ v.paymentNodeCount ?? '-' }} · {{ fmtMB(v.sizeBytes) }}</span>
-              <button class="dv-btn" :disabled="historyBusy" data-test="history-rollback" @click="onRollback(v.id)">回滚到此</button>
-            </div>
-            <div class="dv-row dv-hint" data-test="history-source-note">
-              源数据仅保留最新 1 份<template v-if="historySource?.refreshedAt">（来自 {{ historySource.refreshedAt }}{{ historySource.sizeBytes ? ' · ' + fmtMB(historySource.sizeBytes) : '' }}）</template>，回滚仅还原看板数据。
-            </div>
-            <div v-if="historyMsg" class="dv-row dv-hint ok">{{ historyMsg }}</div>
-          </el-collapse-item>
-
-          <el-collapse-item v-if="auth.isSuper" name="portal" title="首页门户 / 快捷入口">
-            <PortalConfigCard />
-          </el-collapse-item>
-
-          <el-collapse-item name="clear">
-            <template #title><span class="dv-danger-title">清空数据 ⚠</span></template>
+    <el-tabs v-model="activeTab" class="dv-tabs">
+      <!-- 注意:绝不给 el-tab-pane 设 lazy(EP 2.14.1 默认 false=全渲染+v-show 隐藏);
+           一旦设 lazy,现有 data-test 查询与冷加载行为同时改变。 -->
+      <el-tab-pane label="数据源" name="sources">
+        <div class="dv-pane-grid">
+          <div class="dv-card">
+            <div class="dv-card-head">PMIS 域</div>
             <div class="dv-row">
-              <button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button>
-              <span v-if="clearState" class="dv-hint ok">{{ clearState }}</span>
-              <span class="dv-hint">删除所有已获取数据与看板，不可撤销（两步确认）。</span>
+              <button class="dv-btn primary" data-test="btn-fetch-pmis-cookie" @click="onFetchPmisCookie">获取本机 PMIS cookie 并推送</button>
+              <span class="dv-badge" :class="agentOnline ? 'ok' : 'warn'">本机代理{{ agentOnline ? '已连接' : '未运行' }}</span>
             </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-    </div>
+            <div v-if="cookieMsg" class="dv-row dv-hint" :class="cookieErr ? 'err' : 'ok'">{{ cookieMsg }}</div>
+            <div class="dv-row">
+              <button class="dv-btn" data-test="btn-download" :disabled="dlRunning || repRunning" @click="onDownload">下载数据</button>
+              <span class="dv-hint">从 PMIS 抓取并覆盖 input/（只抓取不重算）</span>
+            </div>
+            <div v-if="dlRunning || dlProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
+
+            <div class="dv-sub-head">PMIS 九表（input/pmis/）</div>
+            <div class="dv-fgrid">
+              <div v-for="name in PMIS_FILE_NAMES" :key="name" class="dv-fcell" data-test="pmis-row" :title="name">
+                <span class="dv-fname2">{{ name }}</span>
+                <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+              </div>
+            </div>
+            <div class="dv-row dv-actions">
+              <input ref="pmisInput" type="file" accept=".xlsx" multiple class="dv-file" />
+              <button class="dv-btn" @click="onPmisUpload">上传 PMIS 文件</button>
+              <span v-if="pmisUploadMsg" class="dv-hint">{{ pmisUploadMsg }}</span>
+            </div>
+
+            <el-collapse class="dv-more">
+              <el-collapse-item name="pmis-cookie-manual" title="更多：手动粘贴 PMIS cookie（取备用）">
+                <div class="dv-row dv-cookie">
+                  <span class="dv-label">手动 cookie</span>
+                  <textarea v-model="pmisCookie" data-test="pmis-cookie" class="dv-cookie-box" rows="2"
+                    placeholder="粘贴完整 PMIS cookie 串（高级兜底；正常用上方「获取本机 cookie」）"></textarea>
+                </div>
+              </el-collapse-item>
+            </el-collapse>
+          </div>
+
+          <div class="dv-card" data-test="files-card">
+            <div class="dv-card-head">项目域文件</div>
+            <div class="dv-sub-head">项目域文件（input/ 根）</div>
+            <div class="dv-fgrid">
+              <div v-for="name in INPUT_DISPLAY_NAMES" :key="name" class="dv-fcell" :title="name">
+                <span class="dv-fname2">{{ name }}</span>
+                <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+              </div>
+            </div>
+            <div class="dv-row dv-actions">
+              <input ref="inputsInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
+              <button class="dv-btn" @click="onUploadInputs">上传项目域文件</button>
+              <span v-if="inputsUploadMsg" class="dv-hint">{{ inputsUploadMsg }}</span>
+            </div>
+          </div>
+
+          <div class="dv-card">
+            <div class="dv-card-head">倚天工时域</div>
+            <div class="dv-sub-head">倚天工时域（input/yitian/）</div>
+            <div class="dv-fgrid">
+              <div v-for="name in YITIAN_FILE_NAMES" :key="name" class="dv-fcell" :title="name">
+                <span class="dv-fname2">{{ name }}</span>
+                <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
+              </div>
+            </div>
+            <div class="dv-row dv-actions">
+              <input ref="yitianInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
+              <button class="dv-btn" @click="onUploadYitian">上传倚天文件</button>
+              <button class="dv-btn" @click="onDownloadHolidayTemplate">下载 holidays.csv 模板</button>
+              <span v-if="yitianUploadMsg" class="dv-hint">{{ yitianUploadMsg }}</span>
+            </div>
+            <div class="dv-hint dv-fmt">
+              holidays.csv 格式（UTF-8，两列）：<code>日期,类型</code>；类型只有两种——
+              <code>休</code>=法定假/调休放假（即使落在周一~周五），<code>班</code>=调休上班（即使落在周末）。
+              未列出的日期按「周一~周五为工作日」处理。不提供该文件时全站按纯周一~周五近似，
+              含节假日的周期饱和度会偏低。
+            </div>
+
+            <div class="dv-row dv-actions">
+              <button class="dv-btn" data-test="btn-fetch-yitian-cookie" @click="onFetchYitianCookie">获取本机倚天 cookie 并存储</button>
+              <span class="dv-hint">当前 {{ yitianStatus.sessionPreview || '-' }} · 更新于 {{ yitianStatus.updatedAt || '-' }}</span>
+            </div>
+            <div v-if="yitianMsg" class="dv-row dv-hint" :class="yitianErr ? 'err' : 'ok'">{{ yitianMsg }}</div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="配置" name="config">
+        <div class="dv-pane-grid">
+          <div class="dv-card">
+            <div class="dv-card-head">项目标签</div>
+            <div class="dv-row dv-tags-mgr">
+              <span class="dv-label">标签库</span>
+              <span v-for="t in projectTags.tags" :key="t.name" class="dv-tag" :class="{ off: t.disabled }">
+                <input class="dv-tag-name" :value="t.name" @change="onRename(t.name, $event)" />
+                <el-switch :model-value="!t.disabled" size="small" @update:model-value="(v: boolean) => onDisable(t.name, !v)" />
+              </span>
+              <el-input v-model="newTag" size="small" placeholder="新标签" style="width: 120px" @keyup.enter="onAddTag" />
+              <button class="dv-btn" @click="onAddTag">添加</button>
+            </div>
+            <div class="dv-row">
+              <span class="dv-label">按标签排除</span>
+              <el-switch v-model="excludeOn" />
+              <el-select v-model="excludeTags" size="small" multiple collapse-tags clearable placeholder="选要排除的标签" style="width: 220px">
+                <el-option v-for="t in projectTags.activeTags" :key="t.name" :value="t.name" :label="t.name" />
+              </el-select>
+              <span class="dv-hint">开启后，挂有所选标签的项目从所有看板隐藏（替代旧纳管）</span>
+            </div>
+          </div>
+
+          <div v-if="auth.isSuper" class="dv-card">
+            <div class="dv-card-head">倚天合规</div>
+            <el-collapse class="dv-more">
+              <el-collapse-item name="yitian-scope" title="合规检查范围（超管）">
+                <YitianScopeCard />
+              </el-collapse-item>
+              <el-collapse-item name="yitian-rules" title="合规规则配置（超管）">
+                <YitianRulesCard />
+              </el-collapse-item>
+            </el-collapse>
+          </div>
+
+          <div v-if="auth.isSuper" class="dv-card dv-span-all">
+            <div class="dv-card-head">首页门户</div>
+            <el-collapse class="dv-more">
+              <el-collapse-item name="portal" title="首页门户 / 快捷入口">
+                <PortalConfigCard />
+              </el-collapse-item>
+            </el-collapse>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="维护" name="maint">
+        <div class="dv-card">
+          <div class="dv-card-head">维护与历史</div>
+          <el-collapse class="dv-maint">
+            <el-collapse-item name="manual" title="人工数据导入 / 回滚">
+              <div data-test="manual-import-card">
+                <div class="dv-row">
+                  <span class="dv-label">导入 xlsx</span>
+                  <input ref="manImportInput" type="file" accept=".xlsx,.xls" class="dv-file" @change="onManImport" :disabled="manBusy" />
+                  <span class="dv-hint">仅「项目标签」「跟进记录」sheet 整表替换；导入前自动快照</span>
+                </div>
+                <div v-if="manMsg" class="dv-row dv-hint ok">{{ manMsg }}</div>
+                <table v-if="manErrors.length" class="dv-err u-num">
+                  <thead><tr><th>Sheet</th><th>行</th><th>列</th><th>错误</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(e, i) in manErrors" :key="i">
+                      <td>{{ e.sheet }}</td><td>{{ e.row }}</td><td>{{ e.col || '-' }}</td><td>{{ e.message }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-for="b in manBackups" :key="b.id" class="dv-row" data-test="man-backup-row">
+                  <span class="dv-label u-num">{{ b.createdAt || b.id }}（标签{{ b.tagProjects ?? 0 }}/跟进{{ b.followupCount ?? 0 }}）</span>
+                  <button class="dv-btn" :disabled="manBusy" @click="onManRollback(b.id)">回滚到此</button>
+                </div>
+              </div>
+            </el-collapse-item>
+
+            <el-collapse-item name="history" title="数据历史 / 回滚">
+              <div v-if="historyPre" class="dv-row">
+                <span class="dv-label">撤销</span>
+                <button class="dv-btn ghost" :disabled="historyBusy" @click="onUndoRollback">撤销上次回滚</button>
+                <span class="dv-hint">恢复到最近一次回滚前的状态</span>
+              </div>
+              <div v-if="!historyVersions.length" class="dv-row dv-hint">暂无历史版本，"更新数据"成功后会自动保存（保留最近 5 份）。</div>
+              <div v-for="v in historyVersions" :key="v.id" class="dv-row" data-test="history-row">
+                <span class="dv-label u-num">{{ v.createdAt || v.id }}</span>
+                <span class="dv-hint u-num">项目 {{ v.projectCount ?? '-' }} · 节点 {{ v.paymentNodeCount ?? '-' }} · {{ fmtMB(v.sizeBytes) }}</span>
+                <button class="dv-btn" :disabled="historyBusy" data-test="history-rollback" @click="onRollback(v.id)">回滚到此</button>
+              </div>
+              <div class="dv-row dv-hint" data-test="history-source-note">
+                源数据仅保留最新 1 份<template v-if="historySource?.refreshedAt">（来自 {{ historySource.refreshedAt }}{{ historySource.sizeBytes ? ' · ' + fmtMB(historySource.sizeBytes) : '' }}）</template>，回滚仅还原看板数据。
+              </div>
+              <div v-if="historyMsg" class="dv-row dv-hint ok">{{ historyMsg }}</div>
+            </el-collapse-item>
+
+            <el-collapse-item v-if="auth.isSuper" name="yitian-store" title="倚天累积数据管理（超管）">
+              <YitianStoreCard />
+            </el-collapse-item>
+
+            <el-collapse-item name="clear">
+              <template #title><span class="dv-danger-title">清空数据 ⚠</span></template>
+              <div class="dv-row">
+                <button class="dv-btn danger" :disabled="clearing" @click="onClear">清空数据</button>
+                <span v-if="clearState" class="dv-hint ok">{{ clearState }}</span>
+                <span class="dv-hint">删除所有已获取数据与看板，不可撤销（两步确认）。</span>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <style scoped>
+@import '@/styles/dataview.css';
+
 .data-view { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--gap-card); }
 .dv-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2); }
 .dv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
-.dv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1); }
-.dv-card-head { font-weight: 700; font-size: var(--fs-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--txt); }
-.dv-sub-head { font-size: var(--fs-1); font-weight: 700; color: var(--sub); padding: var(--sp-2) var(--sp-4) 0; }
-.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-2); flex-wrap: wrap; }
-.dv-actions { border-top: 1px solid var(--line); }
-.dv-label { width: 70px; flex-shrink: 0; color: var(--sub); font-weight: 600; font-size: var(--fs-1); }
-.dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); cursor: pointer; color: var(--txt); }
-.dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); transition: transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
-.dv-btn.ghost { color: var(--sub); }
-.dv-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
-.dv-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
-.dv-hint { font-size: var(--fs-1); color: var(--mut); }
-.dv-hint.ok { color: var(--ok-text); }
-.dv-file { font-size: var(--fs-1); }
-.dv-progress { padding: 0 var(--sp-4) var(--sp-3); }
-.dv-bar { height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
-.dv-bar-fill { height: 100%; background: var(--accent); transition: width var(--dur-2) var(--ease); }
-.dv-msg { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-2); }
+
+/* 主操作:更新看板,提为显眼主操作区(色调+更粗边框,不引入新色号) */
+.dv-primary {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+  box-shadow: var(--shadow-2);
+}
+.dv-primary .dv-card-head { color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
+
+/* 显式两栏:卡的位置由设计决定,不由浏览器宽度决定(旧 auto-fit 让 5 张高度差 4~5 倍的卡排出参差) */
+.dv-pane-grid {
+  display: grid;
+  gap: var(--gap-card);
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+}
+.dv-span-all { grid-column: 1 / -1; }
+@media (max-width: 768px) { .dv-pane-grid { grid-template-columns: 1fr; } }
+.dv-tabs :deep(.el-tabs__item) { font-size: var(--fs-2); font-weight: 700; }
+.dv-tabs :deep(.el-tabs__content) { padding-top: var(--gap-section); }
+
+/* 以下为单卡专用规则(非共享词汇,故未进 dataview.css);5 张卡本任务仍内联在本文件内,
+   删掉会破坏「页面观感须与 Task 2 之前完全一致」——Task 3-7 逐张抽卡时随卡搬到各自组件。 */
 .dv-tags-mgr { flex-wrap: wrap; gap: var(--sp-2); }
 .dv-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .dv-tag.off { opacity: .5; }
@@ -486,42 +516,7 @@ defineExpose({ onFetchPmisCookie, onFetchYitianCookie, checkAgent })
 .dv-cookie-box { flex: 1 1 320px; min-width: 220px; font-size: var(--fs-1); font-family: var(--font-sans);
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--txt);
   padding: var(--sp-2); resize: vertical; }
-.dv-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px var(--sp-4); padding: var(--sp-2) var(--sp-4); }
-.dv-fcell { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); padding: 3px 0; border-bottom: 1px dashed var(--line); min-width: 0; }
-.dv-fname2 { color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dv-ftime2 { color: var(--mut); font-size: var(--fs-1); flex-shrink: 0; }
-@media (max-width: 768px) { .dv-fgrid { grid-template-columns: 1fr; } }
 .dv-fmt { padding: var(--sp-1) var(--sp-4) var(--sp-2); line-height: var(--lh-base); }
 .dv-fmt code { background: var(--card2, var(--card)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0 4px; }
-.dv-badge { font-size: var(--fs-1); font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); }
-.dv-badge.ok { background: var(--ok-bg); color: var(--ok-text); }
-.dv-badge.warn { background: var(--warn-bg); color: var(--warn-text); }
-.dv-hint.err { color: var(--danger-text); }
-.dv-btn-lg { font-size: var(--fs-3); padding: var(--sp-2) var(--sp-5); }
-.dv-btn.primary:hover:not(:disabled) { transform: translateY(var(--lift)); box-shadow: var(--shadow-2); }
 .dv-danger-title { color: var(--danger-text); font-weight: 700; }
-.dv-more, .dv-maint { margin: 0; }
-.dv-more :deep(.el-collapse-item__header),
-.dv-maint :deep(.el-collapse-item__header) { font-size: var(--fs-2); font-weight: 700; color: var(--txt); padding-left: var(--sp-4); }
-.dv-more :deep(.el-collapse-item__content),
-.dv-maint :deep(.el-collapse-item__content) { padding-bottom: var(--sp-2); }
-.dv-maint { background: transparent; border: none; box-shadow: none; }
-.dv-more { border-top: 1px solid var(--line); margin-top: var(--sp-1); }
-
-/* 主操作:更新看板,提为显眼主操作区(色调+更粗边框,不引入新色号) */
-.dv-primary {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
-  background: color-mix(in srgb, var(--accent) 5%, var(--card));
-  box-shadow: var(--shadow-2);
-}
-.dv-primary .dv-card-head { color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
-
-/* 六大功能卡:①更新看板独占一行,②-⑥按功能域自适应换列 */
-.dv-domain-grid {
-  display: grid;
-  gap: var(--gap-card);
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-  align-items: start;
-}
-@media (max-width: 768px) { .dv-domain-grid { grid-template-columns: 1fr; } }
 </style>
