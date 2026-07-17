@@ -2472,14 +2472,16 @@ onMounted(load)
         <el-select v-model="r.recipients.supervisorLevels" size="small" style="width: 220px">
           <el-option v-for="o in LEVEL_OPTS" :key="o.v" :value="o.v" :label="o.t" />
         </el-select>
-        <el-select v-if="r.key === 'timesheet'" v-model="r.issueCodes" size="small"
-          multiple collapse-tags style="width: 200px" placeholder="参与推送的问题类型">
-          <el-option v-for="c in ALL_ISSUE_CODES" :key="c" :value="c" :label="issueLabel(c)" />
-        </el-select>
-        <el-select v-else v-model="r.reasons" size="small"
-          multiple collapse-tags style="width: 200px" placeholder="参与推送的关注原因">
-          <el-option v-for="c in ALL_REASONS" :key="c" :value="c" :label="c" />
-        </el-select>
+        <!-- 用 el-checkbox-group 而非 el-select multiple:EP 的 select 下拉是 teleport +
+             惰性挂载,不点开下拉选项根本不进 DOM,测试断言不到「未勾选项也在选项里」。
+             本仓已有先例:YitianScopeCard.vue / FollowupModals.vue。
+             附带好处:8 个选项平铺可见,超管不点开就知道有哪些可勾。 -->
+        <el-checkbox-group v-if="r.key === 'timesheet'" v-model="r.issueCodes" class="lx-opts">
+          <el-checkbox v-for="c in ALL_ISSUE_CODES" :key="c" :value="c" :label="c">{{ issueLabel(c) }}</el-checkbox>
+        </el-checkbox-group>
+        <el-checkbox-group v-else v-model="r.reasons" class="lx-opts">
+          <el-checkbox v-for="c in ALL_REASONS" :key="c" :value="c" :label="c">{{ c }}</el-checkbox>
+        </el-checkbox-group>
       </div>
 
       <div class="dv-row dv-actions">
