@@ -1927,9 +1927,10 @@ git commit -m "feat(lanxin): 4 个超管端点(config/selftest/preview/send)+审
 
 ---
 
-### Task 6: 前端口径层 `lib/lanxin/items.ts` + `lib/lanxinApi.ts`
+### Task 6: 前端口径层 `lib/lanxin/items.ts` + `lib/lanxinApi.ts` + 关注原因全集常量
 
 **Files:**
+- Modify: `frontend/src/lib/riskReasons.ts`（**仅追加**导出常量与穷尽护栏，不动 `riskReasons()` 逻辑）
 - Create: `frontend/src/lib/lanxin/items.ts`
 - Create: `frontend/src/lib/lanxin/items.test.ts`
 - Create: `frontend/src/lib/lanxinApi.ts`
@@ -1940,9 +1941,46 @@ git commit -m "feat(lanxin): 4 个超管端点(config/selftest/preview/send)+审
   - `issueRows(data: YitianData, start: string, end: string, l4s?: string[], excludedTypes?: string[]): IssueRow[]`，`IssueRow` 含 `empId` / `empName` / `codes: string[]`（from `@/lib/yitian/compliance`）
   - `ISSUE_LABELS: Record<string, string>`（from `@/lib/yitian/compliance`）
   - `api` from `@/api/client`
-- Produces: `PushItem` / `projectItems` / `timesheetItems`；`lanxinApi` 五个函数（见「跨任务契约」）
+- Produces: `ALL_RISK_CATEGORIES`（from `@/lib/riskReasons`，Task 7 消费）；`PushItem` / `projectItems` / `timesheetItems`；`lanxinApi` 五个函数（见「跨任务契约」）
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Step 1: 给 `riskReasons.ts` 追加全集常量与穷尽护栏**
+
+`RiskCategory` 是 TS 联合类型，**运行时枚举不出来**，而配置 UI 需要一份「全部 8 类」的选项源。
+若在组件里另抄一份，就会出现第三份副本（源头类型 / 后端白名单 / 组件），且**加第 9 类时下拉里静默缺项、无人报错**。
+故在类型旁边导出常量，并加**编译期穷尽护栏**：联合类型里有、数组里没的，`typecheck` 直接红。
+
+在 `frontend/src/lib/riskReasons.ts` 的 `TOTAL_OVERSPEND_CATS`（现第 18 行）**之后**追加：
+
+```ts
+/** 全部关注原因（8 类）。UI 选项源需要运行时可枚举的列表，而 RiskCategory 是类型、枚举不出来。
+ *  下方 _exhaustive 是编译期护栏：往 RiskCategory 加了新类却忘了加进本数组 → typecheck 报错。
+ *  注意：后端 lanxin_config.REASON_WHITELIST 是本列表的跨语言副本（Python 读不了 TS，无法消除），
+ *  两边必须一致；若不一致，后端 validate_config 会以 400 明确拒绝，不会静默。 */
+export const ALL_RISK_CATEGORIES = [
+  '回款延期', '里程碑滞后', '总成本超支大于5000', '总成本超支小于5000',
+  '交付成本超支', '风险未闭环', '数据异常', '未获取原项目预算',
+] as const satisfies readonly RiskCategory[]
+
+type _MissingCategory = Exclude<RiskCategory, typeof ALL_RISK_CATEGORIES[number]>
+const _exhaustive: _MissingCategory extends never ? true : never = true
+void _exhaustive
+```
+
+- [ ] **Step 2: 验证穷尽护栏真的会红（护栏本身也要验，否则它是假的）**
+
+```bash
+cd frontend
+# 临时给联合类型加一个不存在于数组里的成员,typecheck 必须报错
+sed -i "s/export type RiskCategory = '回款延期'/export type RiskCategory = '护栏探针' | '回款延期'/" src/lib/riskReasons.ts
+npm run typecheck; echo "EXIT=$?  (非 0 = 护栏生效)"
+git checkout src/lib/riskReasons.ts   # 还原探针
+```
+Expected: `EXIT` 非 0（报错指向 `_exhaustive`）。**若 EXIT=0，说明护栏没生效，必须修好再往下走** —— 一个不会报错的护栏比没有护栏更糟。
+还原后 `git diff --quiet src/lib/riskReasons.ts` 应为干净（探针不得残留），随后重新追加 Step 1 的常量。
+
+> 提示：上面 `sed` 会连同 Step 1 的追加一起被 `git checkout` 还原。正确顺序是：先做 Step 1 → 跑一次 `npm run typecheck` 确认绿 → 再把 Step 1 的改动 `git add` 暂存 → 然后做 Step 2 的探针 → 验完用 `git checkout` 还原到暂存态。
+
+- [ ] **Step 3: 写失败测试**
 
 创建 `frontend/src/lib/lanxin/items.test.ts`：
 
@@ -2022,14 +2060,26 @@ describe('timesheetItems', () => {
     expect(items.map((i) => (i as { employId: string }).employId)).toEqual(['A1', 'B2'])
   })
 })
+
+describe('ALL_RISK_CATEGORIES', () => {
+  it('是 8 类全集,且与后端 lanxin_config.REASON_WHITELIST 逐字一致', async () => {
+    const { ALL_RISK_CATEGORIES } = await import('@/lib/riskReasons')
+    // 后端 REASON_WHITELIST 的副本(Python 读不了 TS,只能靠这条测试锁住两边一致)。
+    // 改这里之前先改后端,反之亦然 —— 不一致时后端 validate_config 会 400,不会静默。
+    expect([...ALL_RISK_CATEGORIES]).toEqual([
+      '回款延期', '里程碑滞后', '总成本超支大于5000', '总成本超支小于5000',
+      '交付成本超支', '风险未闭环', '数据异常', '未获取原项目预算',
+    ])
+  })
+})
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [ ] **Step 4: 运行确认失败**
 
 Run: `cd frontend && npx vitest run src/lib/lanxin/items.test.ts`
 Expected: FAIL —— `Failed to resolve import "./items"`
 
-- [ ] **Step 3: 写 `items.ts`**
+- [ ] **Step 5: 写 `items.ts`**
 
 创建 `frontend/src/lib/lanxin/items.ts`：
 
@@ -2085,7 +2135,7 @@ export function timesheetItems(rows: IssueRow[], allowedCodes: string[]): PushIt
 }
 ```
 
-- [ ] **Step 4: 写 `lanxinApi.ts`**
+- [ ] **Step 6: 写 `lanxinApi.ts`**
 
 创建 `frontend/src/lib/lanxinApi.ts`：
 
@@ -2148,16 +2198,16 @@ export async function lanxinSend(items: PushItem[]) {
 
 > **实现者须核实**：`@/api/client` 的 `api.get` / `api.post` **确切签名与返回形状**（是否已解包 `data`）以本仓现有代码为准；若与上面不符，**改这里去适配，不要动 `api/client`**。
 
-- [ ] **Step 5: 运行确认通过 + typecheck**
+- [ ] **Step 7: 运行确认通过 + typecheck**
 
 Run: `cd frontend && npx vitest run src/lib/lanxin/items.test.ts && npm run typecheck`
-Expected: PASS（9 个用例）+ typecheck 无错
+Expected: PASS（10 个用例）+ typecheck 无错
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 8: 提交**
 
 ```bash
-git add frontend/src/lib/lanxin frontend/src/lib/lanxinApi.ts
-git commit -m "feat(lanxin): 前端口径层 items.ts(复用 riskReasons/compliance) + lanxinApi"
+git add frontend/src/lib/riskReasons.ts frontend/src/lib/lanxin frontend/src/lib/lanxinApi.ts
+git commit -m "feat(lanxin): 前端口径层 items.ts + lanxinApi + 关注原因全集常量(带编译期穷尽护栏)"
 ```
 
 ---
@@ -2171,8 +2221,10 @@ git commit -m "feat(lanxin): 前端口径层 items.ts(复用 riskReasons/complia
 - Create: `frontend/src/components/LanxinConfigCard.test.ts`
 
 **Interfaces:**
-- Consumes: `lanxinApi.{getLanxinConfig,saveLanxinConfig,lanxinSelftest}` / `LanxinConfig` / `LanxinRoute` / `ISSUE_LABELS`（from `@/lib/yitian/compliance`）
+- Consumes: `lanxinApi.{getLanxinConfig,saveLanxinConfig,lanxinSelftest}` / `LanxinConfig` / `LanxinRoute` / `ISSUE_LABELS`（from `@/lib/yitian/compliance`）/ **`ALL_RISK_CATEGORIES`（from `@/lib/riskReasons`，Task 6 新增）**
 - Produces: 无 props；`defineEmits<{ (e: 'open-push'): void }>()`（「预览并推送」按钮冒泡给 DataView 开抽屉）
+
+**依赖提示**：本任务在波次 D，Task 6（波次 C）已导出 `ALL_RISK_CATEGORIES`。**不要在本组件里另抄一份 8 类字符串** —— 那会成为第三份副本，且加第 9 类时下拉静默缺项。
 
 **样式**：`<style scoped>` 内 `@import '@/styles/dataview.css';`，只写本卡特有规则。**不要抄共享规则**。
 
@@ -2290,6 +2342,7 @@ Expected: FAIL —— `Failed to resolve import "./LanxinConfigCard.vue"`
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
+import { ALL_RISK_CATEGORIES } from '@/lib/riskReasons'
 import { getLanxinConfig, saveLanxinConfig, lanxinSelftest,
          type LanxinConfig } from '@/lib/lanxinApi'
 
@@ -2304,12 +2357,8 @@ const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
 // 全量选项源:必须是全集,不能拿 v-model 绑的子集当选项 —— 否则取消勾选后选项消失、再也勾不回来。
 const ALL_ISSUE_CODES = Object.keys(ISSUE_LABELS)
 const issueLabel = (c: string) => ISSUE_LABELS[c] ?? c
-// 与后端 lanxin_config.REASON_WHITELIST 必须逐字一致(后端据此校验取值合法性)。
-// 口径本身仍以前端 lib/riskReasons.ts 的 RiskCategory 为单一来源,这里只是选项清单。
-const ALL_REASONS = [
-  '回款延期', '里程碑滞后', '总成本超支大于5000', '总成本超支小于5000',
-  '交付成本超支', '风险未闭环', '数据异常', '未获取原项目预算',
-]
+// 关注原因全集从 riskReasons.ts 引入(那里带编译期穷尽护栏),不在此另抄一份。
+const ALL_REASONS = ALL_RISK_CATEGORIES
 
 // 汇总级别:0=不发;1..5 向上累积。上限 5 —— 预留 5 级架构(推广到整团队后仍够用)。
 const LEVEL_OPTS = [
@@ -2847,7 +2896,7 @@ git commit -m "chore(release): V4.0.0 蓝信推送集成"
 | §2 架构与职责边界 | Task 6（前端口径）+ Task 2/4（后端收件人）+ Task 5（端点） |
 | §2.2 preview/send 等价性 | Task 4（同一 `build_plan`）+ 确定性测试 + Task 5（两端点同调） |
 | §2.3 花名册读取不套 DEPT_L3、不动 read_org_roster | Task 2（docstring + 实现） |
-| §3 可配置收件链（0..5 累积、子集勾选、默认值） | Task 1（校验 + 默认）+ Task 7（UI） |
+| §3 可配置收件链（0..5 累积、子集勾选、默认值） | Task 1（校验 + 默认）+ Task 6（`ALL_RISK_CATEGORIES` 全集常量 + 穷尽护栏）+ Task 7（UI 引入该常量，不另抄副本） |
 | §4 三条链与护栏（1:N/环/断链/unresolved） | Task 2 + Task 4 |
 | §5 三类卡片与字节护栏 | Task 2 |
 | §6 四端点 + 脱敏 + 空串保留 + 审计 map | Task 1（脱敏/保留）+ Task 5（端点/审计） |
