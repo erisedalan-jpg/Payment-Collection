@@ -22,6 +22,9 @@ vi.mock('@/lib/cookieAgent', () => ({
 }))
 
 beforeEach(() => {
+  // 前一条用例可能 vi.spyOn(api, 'post')(见下方 cookie 相关用例);vitest 默认不还原 spy,
+  // 不清会让后续用例(如 M-3「先 POST cookie 再开 download」)静默断不到 cookie 请求。
+  vi.restoreAllMocks()
   setActivePinia(createPinia())
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (String(url).includes('/api/files/status')) {
@@ -62,7 +65,7 @@ describe('MainDomainSourceCard', () => {
     expect(rows.some((r) => r.text().includes('在建项目里程碑计划数据'))).toBe(true)
   })
 
-  it('repRunning 为真时禁用下载按钮(互斥不得丢失)', async () => {
+  it('repRunning 为真时禁用下载按钮', async () => {
     const w = mount(MainDomainSourceCard, { props: { repRunning: true }, global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(w.find('[data-test="btn-download"]').attributes('disabled')).toBeDefined()
@@ -100,7 +103,11 @@ describe('MainDomainSourceCard', () => {
     await w.find('[data-test="btn-download"]').trigger('click')
     await flushPromises()
     const calls = (fetch as any).mock.calls.map((c: any) => String(c[0]))
-    expect(calls.some((u: string) => u.includes('/api/pmis/download'))).toBe(true)
+    const cookieIdx = calls.findIndex((u: string) => u.includes('/api/pmis/cookie'))
+    const downloadIdx = calls.findIndex((u: string) => u.includes('/api/pmis/download'))
+    expect(cookieIdx).toBeGreaterThanOrEqual(0)
+    expect(downloadIdx).toBeGreaterThanOrEqual(0)
+    expect(cookieIdx).toBeLessThan(downloadIdx)
   })
 })
 
@@ -139,5 +146,27 @@ describe('MainDomainSourceCard 合并上传', () => {
     await w.find('[data-test="btn-upload-main"]').trigger('click')
     await flushPromises()
     expect((fetch as any).mock.calls.map((c: any) => String(c[0])).some((u: string) => u.includes('/api/pmis/upload'))).toBe(true)
+  })
+
+  it('HTTP 层部分失败(白名单内文件被服务端拒收)时提示行走 warn 且文案含失败数(I-1)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.includes('/api/files/status')) return { ok: true, json: async () => ({ files: {} }) } as any
+      if (u.includes('/api/pmis/upload') && u.includes(encodeURIComponent('项目风险数据.xlsx'))) {
+        return { ok: false, json: async () => ({}) } as any
+      }
+      return { ok: true, json: async () => ({}) } as any
+    }))
+    const w = await mountCard()
+    const input = w.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['x'], '项目中心.xlsx'), new File(['x'], '项目风险数据.xlsx')],
+    })
+    await w.find('[data-test="btn-upload-main"]').trigger('click')
+    await flushPromises()
+    const msgEl = w.find('[data-test="upload-main-msg"]')
+    expect(msgEl.text()).toContain('已上传 1 个 PMIS 九表')
+    expect(msgEl.text()).toContain('失败 1 个（服务端未接收,请重试）')
+    expect(msgEl.classes()).toContain('warn')
   })
 })

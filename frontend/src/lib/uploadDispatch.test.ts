@@ -80,4 +80,27 @@ describe('formatDispatchMessage', () => {
       '已跳过:工时.xlsx（属倚天工时域,请在「倚天工时域」卡上传）、x.txt（不在主域白名单）',
     )
   })
+
+  it('全部成功(okPmis/okInputs 等于分发数):不出现失败子句(I-1)', () => {
+    const r = { pmis: [f('项目中心.xlsx')], inputs: [f('budget_data.csv')], skipped: [] }
+    expect(formatDispatchMessage(r, 1, 1)).not.toContain('失败')
+  })
+
+  it('部分失败(okPmis 小于 r.pmis.length,即 HTTP 层失败):出现失败子句并报数(I-1)', () => {
+    const r = { pmis: [f('项目中心.xlsx'), f('项目风险数据.xlsx')], inputs: [], skipped: [] }
+    expect(formatDispatchMessage(r, 1, 0)).toBe(
+      '已上传 1 个 PMIS 九表 + 0 个项目域文件,请点[更新数据]生效;失败 1 个（服务端未接收,请重试）',
+    )
+  })
+
+  it('失败+跳过同时出现:失败子句在前、跳过子句在后(I-1)', () => {
+    const r = {
+      pmis: [f('项目中心.xlsx'), f('项目风险数据.xlsx')], inputs: [],
+      skipped: [{ name: 'x.txt', reason: 'unknown' as const }],
+    }
+    expect(formatDispatchMessage(r, 1, 0)).toBe(
+      '已上传 1 个 PMIS 九表 + 0 个项目域文件,请点[更新数据]生效;失败 1 个（服务端未接收,请重试）;' +
+      '已跳过:x.txt（不在主域白名单）',
+    )
+  })
 })
