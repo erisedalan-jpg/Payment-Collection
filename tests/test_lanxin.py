@@ -147,6 +147,30 @@ def test_no_permission_10005_not_retried(monkeypatch):
     assert len(fake.calls) == 1
 
 
+# ── M-1:errCode==0 但响应没有 appToken 时不能当成成功缓存(自检会显示"第①步通过"后无声中止) ──
+
+def test_get_app_token_empty_token_in_success_response_raises(monkeypatch):
+    """errCode==0 但 data 里没有 appToken(字段改名/网关裁剪/灰度返回空)—— 必须当失败处理,
+    不能返回空串让调用方的 `if token:` 悄悄短路。"""
+    fake = FakeHTTP([{"errCode": 0, "errMsg": "ok", "data": {"expiresIn": 7200}}])
+    monkeypatch.setattr(LX, "_http", fake)
+    with pytest.raises(LX.LanxinError) as e:
+        LX.get_app_token(CFG)
+    assert "appToken" in e.value.err_msg
+
+
+def test_get_app_token_empty_token_not_cached(monkeypatch):
+    """空 token 不能写缓存 —— 否则 2 小时内后续调用直接命中缓存返回空串,坏况被锁死。"""
+    fake = FakeHTTP([{"errCode": 0, "errMsg": "ok", "data": {"expiresIn": 7200}},
+                     {"errCode": 0, "errMsg": "ok", "data": {"appToken": "T1", "expiresIn": 7200}}])
+    monkeypatch.setattr(LX, "_http", fake)
+    with pytest.raises(LX.LanxinError):
+        LX.get_app_token(CFG)
+    # 第二次调用应重新打网络(未命中坏缓存),这次响应正常则应成功
+    assert LX.get_app_token(CFG) == "T1"
+    assert len(fake.calls) == 2
+
+
 def test_missing_gateway_raises_clear_error():
     cfg = {"credentials": {"apiGateway": "", "appId": "a", "appSecret": "b", "orgId": "1",
                            "idType": "employ_id"}}

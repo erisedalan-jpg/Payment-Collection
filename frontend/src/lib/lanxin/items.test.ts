@@ -95,14 +95,7 @@ describe('timesheetItems', () => {
   })
 })
 
-describe('ALL_RISK_CATEGORIES', () => {
-  it('是 8 类全集,且与后端 lanxin_config.REASON_WHITELIST 逐字一致', async () => {
-    const { ALL_RISK_CATEGORIES } = await import('@/lib/riskReasons')
-    // 后端 REASON_WHITELIST 的副本(Python 读不了 TS,只能靠这条测试锁住两边一致)。
-    // 改这里之前先改后端,反之亦然 —— 不一致时后端 validate_config 会 400,不会静默。
-    expect([...ALL_RISK_CATEGORIES]).toEqual([
-      '回款延期', '里程碑滞后', '总成本超支大于5000', '总成本超支小于5000',
-      '交付成本超支', '风险未闭环', '数据异常', '未获取原项目预算',
-    ])
-  })
-})
+// M-6:「与后端 REASON_WHITELIST 逐字一致」这条断言必须真的读后端源码比对(见
+// ./reasonWhitelistSync.test.ts),不能在 TS 侧把同一份字面量再抄一遍 —— 那样改后端不改
+// 这里照样绿,防不住跨语言两份副本漂移。该用例需要 node:fs,与本文件其余纯函数测试
+// 分文件放置(本文件走全局 jsdom 环境,sync 检查走 node 环境,避免共享 setupFiles 冲突)。
