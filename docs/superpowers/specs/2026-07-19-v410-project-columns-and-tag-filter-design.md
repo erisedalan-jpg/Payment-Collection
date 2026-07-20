@@ -1,7 +1,7 @@
-# V4.1.0 设计：/projects 三个日期列 + 标签筛选下沉 + temp 选列补齐
+# V4.0.1 设计：/projects 三个日期列 + 标签筛选下沉 + temp 选列补齐
 
 日期：2026-07-19
-版本：**V4.1.0**（Y 级：新增跨页字段与一处交互形态变更）
+版本：**V4.0.1**（Z 级：无新增页面/路由，仅列与页内筛选位置调整）
 基线：V4.0.0（已上线）
 
 ---
@@ -266,7 +266,7 @@ actualFinalAcceptDate: String(prog.实际终验时间 ?? '').slice(0, 10),
 
 ---
 
-## 9. 本版明确不做（留 V4.2.0）
+## 9. 本版明确不做（留 V4.1.0）
 
 用户原始需求的后两项，经确认拆版交付：
 
@@ -299,8 +299,8 @@ actualFinalAcceptDate: String(prog.实际终验时间 ?? '').slice(0, 10),
 - `frontend/src/views/ProjectsView.vue` — 三列 + FILTERABLE + 标签下沉
 - `frontend/src/views/TempFollowupView.vue` — 三列 + FILTERABLE
 - `frontend/src/views/ProjectDetailView.vue` — 原项目选项卡一行
-- `frontend/src/version.ts` — V4.1.0
+- `frontend/src/version.ts` — V4.0.1
 - 对应 `*.test.ts`
 
 **文档**
-- `PROGRESS.md`、`deploy/升级手册-V4.1.0.md`
+- `PROGRESS.md`、`deploy/升级手册-V4.0.1.md`
