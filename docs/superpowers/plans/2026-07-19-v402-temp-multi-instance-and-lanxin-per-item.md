@@ -1028,28 +1028,43 @@ useFollowupPage 被 5 个跟进页复用,只认 {archives,deleteArchive},
 
 ---
 
-### Task A4: temp 视图层——实例选项卡 + 持久化 key 迁移
+### Task A4: temp 视图层——抽实例面板子组件 + 选项卡 + 持久化 key 迁移
 
 **Files:**
+- Create: `frontend/src/components/TempInstancePanel.vue`
 - Modify: `frontend/src/views/TempFollowupView.vue`
 - Test: `frontend/src/views/TempFollowupView.test.ts`
 
 **Interfaces:**
-- Consumes（A3 产出）：store 的 `instances` / `activeId` / `setActive` / `createInstance` / `renameInstance` / `deleteInstance`，以及签名不变的 `scope` / `current` / `archives` / `saveScope` / `update` / `archive` / `deleteArchive`
+- Consumes（A3 产出）：store 的 `instances` / `activeId` / `activeInstance` / `setActive` / `createInstance` / `renameInstance` / `deleteInstance`，以及签名不变的 `scope` / `current` / `archives` / `saveScope` / `update` / `archive` / `deleteArchive`
 - Produces: 无
 
-**⚠ 本任务的核心风险不是 UI，是持久化 key。** 现状：
+**⚠ 为什么必须抽子组件（这一条决定整个任务的形状，先读懂再动手）**
 
-```ts
-const TABLE_ID = 'temp-followup'                              // :33
-const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ...)    // → colprefs:{account}:temp-followup
-const sort  = usePersistentSort(userScopedKey(TABLE_ID))      // → colsort:{account}:temp-followup
-cf.tableFilters(TABLE_ID)                                     // 内存态,无需迁移
-```
+多实例后表 key 必须带 instanceId，否则各实例的列配置互相覆盖。但
+`useColumnPrefs(viewKey: string, ...)` 与 `usePersistentSort(viewKey: string)` 都是
+**创建时用 viewKey 一次性初始化、之后闭包捕获**（`useColumnPrefs.ts:51-57`、
+`usePersistentSort.ts:6-12`）——它们**不响应 viewKey 变化**。而这两个 composable 现在是在
+`<script setup>` **顶层**调用的，给模板元素加 `:key` 只重建 DOM 子树、**不会重新执行 setup**，
+切换实例后 prefs 仍绑在旧 key 上。
 
-多实例后 `TABLE_ID` 必须带 instanceId，否则各实例的列配置互相覆盖。**但改 key 会让用户已有的选列与排序全部失效**——页面回落默认列，用户以为配置丢了。
+所以：把「表格区」整体抽成子组件 `TempInstancePanel.vue`，父组件用
+`<TempInstancePanel :key="temp.activeId" />` 驱动重建。key 变化 → 子组件销毁重建 →
+setup 重新执行 → 两个 composable 用新 key 初始化。
 
-**这是本仓第二次遇到同款陷阱**：V4.0.1 把 `tags` 加进 `/projects` 的 `DEFAULT_VISIBLE` 时，因为 `useColumnPrefs.loadKeys` 是**持久化优先**（有持久化就直接返回，`defaultVisible` 只在无持久化时兜底），老用户根本读不到新默认值，标签筛选入口凭空消失（终审 I-1）。
+**这个做法还顺带解决三件事**：分页、「当前/历史」模式、列筛选都随子组件重建自动归位，
+不需要在切换函数里手写 reset —— 手写 reset 容易漏，将来加新状态还得记着同步。
+
+**职责划分**：
+
+| 组件 | 负责 |
+|---|---|
+| `TempFollowupView.vue`（父） | store 加载、实例选项卡条、新建/重命名/删除弹窗、**一次性 key 迁移**、渲染 `<TempInstancePanel :key="activeId" />` |
+| `TempInstancePanel.vue`（子） | 列定义、`useColumnPrefs`、`usePersistentSort`、`useFollowupPage`、列筛选、表格、选列、范围设置入口、归档、导出 |
+
+子组件**不接 props**（直接从 store 读 `activeInstance`），父组件只用 `:key` 驱动重建
+—— 这样子组件内部对 store 的既有引用（`temp.scope` / `temp.current` / `temp.archives`）
+一个字都不用改。
 
 - [ ] **Step 1: 写失败测试**
 
@@ -1073,23 +1088,23 @@ describe('V4.0.2 多实例', () => {
     expect(wNormal.find('[data-test="temp-inst-new"]').exists()).toBe(false)
   })
 
-  it('切换实例时清空该表的列筛选 —— 否则用户看到空表却不知为何', async () => {
+  it('切换实例会重建面板 —— 这是列配置按实例隔离的前提', async () => {
     const w = await mountAs(true)
-    const cf = useCrossFilterStore()
-    const store = useTempFollowupStore()
-    cf.setColumnFilter(`temp-followup:${store.instances[0].id}`, 'orgL4', ['A组'])
+    const uidBefore = w.findComponent({ name: 'TempInstancePanel' }).vm.$.uid
     await w.findAll('[data-test="temp-inst-tab"]')[1].trigger('click')
-    expect(cf.hasFilters(`temp-followup:${store.instances[0].id}`)).toBe(false)
+    await nextTick()
+    const uidAfter = w.findComponent({ name: 'TempInstancePanel' }).vm.$.uid
+    expect(uidAfter).not.toBe(uidBefore)   // 组件实例确实换了,不是复用
   })
 
-  it('列配置按实例隔离:两个实例的 colprefs key 不同', async () => {
+  it('列配置按实例隔离:在 A 实例改列不写到 B 的 key', async () => {
     const w = await mountAs(true)
     const store = useTempFollowupStore()
     const a = store.instances[0].id
     const b = store.instances[1].id
     expect(a).not.toBe(b)
-    // 在实例 A 下改列 → 只写 A 的 key
-    ;(w.vm as any).prefs.toggle('setupDate')
+    const panel = w.findComponent({ name: 'TempInstancePanel' })
+    ;(panel.vm as any).prefs.toggle('setupDate')
     expect(localStorage.getItem(`colprefs:anon:temp-followup:${a}`)).toBeTruthy()
     expect(localStorage.getItem(`colprefs:anon:temp-followup:${b}`)).toBeNull()
   })
@@ -1103,12 +1118,13 @@ describe('V4.0.2 多实例', () => {
     const first = store.instances[0].id
     expect(JSON.parse(localStorage.getItem(`colprefs:anon:temp-followup:${first}`)!))
       .toEqual(['projectId', 'customer', 'setupDate'])
-    expect((w.vm as any).prefs.visibleKeys.value).toContain('setupDate')
+    const panel = w.findComponent({ name: 'TempInstancePanel' })
+    expect((panel.vm as any).prefs.visibleKeys.value).toContain('setupDate')
   })
 
   it('迁移只跑一次:标记位存在后不再覆盖用户新改的配置', async () => {
     localStorage.setItem('colprefs:anon:temp-followup', JSON.stringify(['projectId']))
-    const w1 = await mountAs(true)
+    await mountAs(true)
     const store = useTempFollowupStore()
     const first = store.instances[0].id
     // 用户之后自己改了列
@@ -1125,26 +1141,52 @@ describe('V4.0.2 多实例', () => {
 Run: `cd frontend && npx vitest run src/views/TempFollowupView.test.ts -t 'V4.0.2'`
 Expected: FAIL —— 找不到 `[data-test="temp-inst-tab"]`。
 
-- [ ] **Step 3: 把 TABLE_ID 改为按实例派生**
+- [ ] **Step 3: 抽出 `TempInstancePanel.vue`**
 
-`TempFollowupView.vue:33` 附近，把常量改为 computed，并让 `useColumnPrefs` / `usePersistentSort` 跟着实例走。**注意这两个 composable 接收的是字符串而非 ref**，所以实例切换时需要重新创建——用 `key` 强制重挂表格区是最简单可靠的做法：给表格容器加 `:key="tableId"`，Vue 会在实例切换时重建该子树，composable 随之用新 key 重新初始化。
+新建 `frontend/src/components/TempInstancePanel.vue`，把 `TempFollowupView.vue` 里
+**表格相关的整块**原样搬过来。
+
+搬走的脚本部分：`ALL_COLUMNS` / `ALL_KEYS` / `DEFAULT_VISIBLE` / `FILTERABLE` / `prefs` /
+`sort` / `fp` / `currentRows` / `inScopeIds` / `scopeInputs` / `contractTotal` / `onToggle` /
+`doArchive` / `doExport` / `onRow` 等所有与表格、选列、筛选、归档、导出、范围设置相关的逻辑。
+
+搬走的模板部分：工具栏、`ScopeBuilder`、`ColumnPicker`、`SegToggle`、`DataTable`、
+`ColumnFilter`、`FollowupModals` 整块。
+
+**唯一的实质改动**是表 key：
 
 ```ts
+defineOptions({ name: 'TempInstancePanel' })   // 测试用 findComponent({name}) 找它,必须有
+
+const temp = useTempFollowupStore()
 const TABLE_BASE = 'temp-followup'
-const tableId = computed(() => `${TABLE_BASE}:${temp.activeId}`)
+// 每个实例一套持久化。子组件由父组件 :key="activeId" 驱动重建,
+// 所以这里取一次即可 —— composable 不响应 viewKey 变化,靠重建换 key。
+const TABLE_ID = `${TABLE_BASE}:${temp.activeId}`
+
+const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
+const sort = usePersistentSort(userScopedKey(TABLE_ID))
 ```
 
-所有 `TABLE_ID` 的引用改为 `tableId.value`（脚本内）或 `tableId`（模板内）。
+其余所有 `TABLE_ID` 的引用**原样保留**（它现在是子组件内的常量）。
 
-- [ ] **Step 4: 实现一次性 key 迁移**
+组件末尾暴露给测试：
 
-在 `prefs` 初始化**之前**执行（迁移必须先于读取，否则读到的还是空）：
+```ts
+defineExpose({ ALL_COLUMNS, FILTERABLE, prefs, sort })
+```
+
+- [ ] **Step 4: 父组件实现一次性 key 迁移**
+
+在 `TempFollowupView.vue` 里（**迁移必须在子组件挂载之前完成**，否则子组件读到的还是空）：
 
 ```ts
 // V4.0.2 一次性迁移:多实例后表 key 从 'temp-followup' 变为 'temp-followup:{instanceId}',
 // 老用户已存的选列/排序会读不到而回落默认列 —— 用户会以为配置丢了。
 // 把旧 key 的值复制到【第一个实例】的新 key 下。标记位必须有,否则用户之后自己改的配置
 // 会在下次进页面时被旧值反复覆盖。getItem 也要包 try:浏览器禁用 storage 时访问该属性即抛。
+const TABLE_BASE = 'temp-followup'
+
 function migrateLegacyTableKeys(firstInstanceId: string) {
   if (!firstInstanceId) return
   const flag = userScopedKey('tablekeys-migrated:temp-followup:v402')
@@ -1163,63 +1205,57 @@ function migrateLegacyTableKeys(firstInstanceId: string) {
 }
 ```
 
-调用时机：`temp.load()` 完成、`instances` 就位之后，且在表格区渲染之前。实现上放在 `load()` 的 `.then` 里、或 `watch(() => temp.instances.length, ..., { once: true })` 中，取到 `temp.instances[0].id` 后调用。
+调用点：`temp.load()` 完成之后、且在渲染子组件之前。用一个 `ready` 标志控制子组件渲染时机：
+
+```ts
+const ready = ref(false)
+onMounted(async () => {
+  if (!temp.loaded) await temp.load()
+  migrateLegacyTableKeys(temp.instances[0]?.id ?? '')
+  try {
+    const last = localStorage.getItem(userScopedKey('temp-active'))
+    if (last) temp.setActive(last)      // 该 id 已不存在时 store 会自动回落到第一个
+  } catch { /* 忽略 */ }
+  ready.value = true
+})
+```
 
 **旧 key 不删除**——留着无害，回滚到 V4.0.1 时还能用。
 
-- [ ] **Step 5: 实现实例选项卡 UI**
+- [ ] **Step 5: 父组件实现实例选项卡与弹窗**
 
-模板中在页面标题下方、工具栏上方插入：
+模板整体结构：
 
 ```html
-<div class="tf-insts">
-  <button v-for="i in temp.instances" :key="i.id" data-test="temp-inst-tab"
-    class="tf-inst" :class="{ active: i.id === temp.activeId }" @click="switchInstance(i.id)">
-    {{ i.name }}
-  </button>
-  <button v-if="auth.isSuper" data-test="temp-inst-new" class="tf-inst tf-inst-new"
-    @click="newOpen = true">+ 新建</button>
-  <button v-if="auth.isSuper && temp.activeInstance" data-test="temp-inst-menu"
-    class="tf-inst tf-inst-menu" @click="menuOpen = true" title="重命名 / 删除">▾</button>
+<div class="temp-followup-view">
+  <h2 class="tf-title">临时重点跟进</h2>
+
+  <div class="tf-insts">
+    <button v-for="i in temp.instances" :key="i.id" data-test="temp-inst-tab"
+      class="tf-inst" :class="{ active: i.id === temp.activeId }" @click="switchInstance(i.id)">
+      {{ i.name }}
+    </button>
+    <button v-if="auth.isSuper" data-test="temp-inst-new" class="tf-inst tf-inst-new"
+      @click="newOpen = true">+ 新建</button>
+    <button v-if="auth.isSuper && temp.activeInstance" data-test="temp-inst-menu"
+      class="tf-inst tf-inst-menu" title="重命名 / 删除" @click="menuOpen = true">▾</button>
+  </div>
+
+  <TempInstancePanel v-if="ready && temp.activeId" :key="temp.activeId" />
 </div>
 ```
 
-样式（`<style scoped>` 内，只用设计令牌，不写散值）：
-
-```css
-.tf-insts { display: flex; gap: var(--sp-2); overflow-x: auto; margin-bottom: var(--sp-3); }
-.tf-inst {
-  flex: 0 0 auto; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line);
-  border-radius: var(--r-sm); background: var(--card); color: var(--sub);
-  font-size: var(--fs-2); cursor: pointer; transition: background var(--dur-1) var(--ease);
-}
-.tf-inst:hover { background: var(--hover-tint); }
-.tf-inst.active { background: var(--selected-tint); color: var(--txt); font-weight: 600; }
-```
-
-切换函数：
+切换函数（子组件重建会自动重置分页、模式与列筛选，这里只管切 store 与记忆）：
 
 ```ts
 function switchInstance(id: string) {
   if (id === temp.activeId) return
-  cf.clearAll(tableId.value)        // 先按【旧】实例的 key 清筛选,再切
   temp.setActive(id)
-  fp.mode.value = 'current'
-  fp.currentPage.value = 1
   try { localStorage.setItem(userScopedKey('temp-active'), id) } catch { /* 忽略 */ }
 }
 ```
 
-`load()` 之后恢复上次选中的实例（该 id 已不存在时 store 的 `_setInstances` 会自动回落到第一个）：
-
-```ts
-try {
-  const last = localStorage.getItem(userScopedKey('temp-active'))
-  if (last) temp.setActive(last)
-} catch { /* 忽略 */ }
-```
-
-**新建弹窗**（名称 + 范围来源），用仓库既有的 `el-dialog` 惯例：
+**新建弹窗**：
 
 ```html
 <el-dialog v-model="newOpen" title="新建跟进事项" width="420px">
@@ -1250,7 +1286,7 @@ async function doCreate() {
 }
 ```
 
-**删除确认**必须显示归档条数（破坏性操作）：
+**删除确认必须显示归档条数**（破坏性操作）：
 
 ```ts
 async function doDeleteInstance() {
@@ -1263,21 +1299,44 @@ async function doDeleteInstance() {
 }
 ```
 
+样式（只用设计令牌，不写散值）：
+
+```css
+.tf-insts { display: flex; gap: var(--sp-2); overflow-x: auto; margin-bottom: var(--sp-3); }
+.tf-inst {
+  flex: 0 0 auto; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line);
+  border-radius: var(--r-sm); background: var(--card); color: var(--sub);
+  font-size: var(--fs-2); cursor: pointer; transition: background var(--dur-1) var(--ease);
+}
+.tf-inst:hover { background: var(--hover-tint); }
+.tf-inst.active { background: var(--selected-tint); color: var(--txt); font-weight: 600; }
+```
+
 - [ ] **Step 6: 运行测试与 typecheck**
 
 Run: `cd frontend && npx vitest run src/views/TempFollowupView.test.ts && npm run typecheck`
 Expected: vitest PASS；typecheck **0 error**（A3 遗留的报错到此应全部消除）。
 
-- [ ] **Step 7: 提交**
+该测试文件的**既有用例必须全部继续通过**——抽子组件是纯搬运，行为不该有任何变化。
+若某条既有用例因为断言的元素搬进了子组件而失败，把断言改为在
+`w.findComponent({ name: 'TempInstancePanel' })` 上做，**不要削弱断言**。
+
+- [ ] **Step 7: 变异验证「按实例隔离」真的生效**
+
+这是本任务最容易假绿的地方：
+
+1. 临时把子组件里的 `TABLE_ID` 改回不带实例的 `TABLE_BASE`
+2. Run: `cd frontend && npx vitest run src/views/TempFollowupView.test.ts -t '列配置按实例隔离'`
+   Expected: **FAIL**
+3. 改回，确认 PASS
+
+若第 2 步没红，说明用例没真正验到隔离，修到会红为止。
+
+- [ ] **Step 8: 提交**
 
 ```bash
-git add frontend/src/views/TempFollowupView.vue frontend/src/views/TempFollowupView.test.ts
-git commit -m "feat(temp): 实例选项卡 + 持久化 key 一次性迁移
-
-表 key 从 temp-followup 改为 temp-followup:{instanceId},否则各实例列配置互相覆盖。
-改 key 会让老用户已存的选列/排序读不到而回落默认列(V4.0.1 终审 I-1 同款陷阱),
-故带一次性迁移把旧 key 值复制到第一个实例,标记位防重复覆盖。
-切换实例先按旧 key 清列筛选,再切。"
+git add frontend/src/components/TempInstancePanel.vue frontend/src/views/TempFollowupView.vue frontend/src/views/TempFollowupView.test.ts
+git commit -m "feat(temp): 抽实例面板子组件 + 选项卡 + 持久化 key 一次性迁移"
 ```
 
 ---
