@@ -18,6 +18,8 @@ export interface KeyProjectRow {
   nextPlan: string; nextPlanEditTime: string; nextPlanEditBy: string
   followDate: string; followBy: string
   setupDate: string | null
+  plannedFinalAcceptDate: string | null
+  actualFinalAcceptDate: string | null
 }
 
 /** 重点项目:级别 P1 或(TOP1000 大客户 且 合同>100万元)。合同已由 paymentPmis.contract 上游回退原项目(售前)。 */
@@ -42,7 +44,7 @@ export function buildProgressRowBase(
   rec: ProgressRecord,
 ): KeyProjectRow {
   const m = (pmis ?? {}) as Record<string, any>
-  const st = m.status ?? {}, risk = m.risk ?? {}, team = m.team ?? {}
+  const st = m.status ?? {}, risk = m.risk ?? {}, team = m.team ?? {}, prog = m.progress ?? {}
   const contract = p.paymentPmis?.contract
   return {
     projectId: p.projectId,
@@ -50,6 +52,9 @@ export function buildProgressRowBase(
     projectName: p.projectName || p.projectId,
     projectLevel: v(st.项目级别, '-'),
     setupDate: st.立项日期 ?? null,
+    // 直取后端 backfill_final_acceptance 回填的口径,前端不重算
+    plannedFinalAcceptDate: prog.终验时间 ?? null,
+    actualFinalAcceptDate: prog.实际终验时间 ?? null,
     projectManager: v(p.projectManager, '-'),
     ar: v(team.AR, '-'),
     sr: v(team.SR, '-'),

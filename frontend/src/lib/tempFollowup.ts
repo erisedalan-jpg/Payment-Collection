@@ -85,6 +85,7 @@ export function buildScopeInputs(
         paymentRatio: pr?.paymentRatio ?? null,
         openRisks: pr?.openRisks ?? 0,
         finalAcceptDate: String(prog.终验时间 ?? '').slice(0, 10),
+        actualFinalAcceptDate: String(prog.实际终验时间 ?? '').slice(0, 10),
         setupDate: String(pr?.setupDate ?? '').slice(0, 10),
       },
       nodes: (paymentNodes?.[p.projectId] ?? []).map((n: any) => ({
