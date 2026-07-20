@@ -3,7 +3,7 @@
 
 为什么要有这个文件:推送给谁、推哪些原因,是随组织习惯变的策略,不是代码常量。
 本模块把它提升为服务端配置,超管在 /data 可见可改,改完立即生效(本域不进数据管线)。
-appSecret 存于此,故 data/lanxin_config.json 必须 gitignore。
+appSecret / callbackAesKey / callbackSignToken 均存于此,故 data/lanxin_config.json 必须 gitignore。
 """
 from __future__ import annotations
 
@@ -37,14 +37,23 @@ MAX_SEND_INTERVAL_MS = 10000
 # 不是改这里的配置。详见 spec §10.1。
 _ID_TYPES = ("employ_id", "mobile", "mail", "login", "external_id")
 
+# 发送身份。account=应用号(回调事件 account_message);bot=智能机器人
+# (回调事件 bot_private_message / bot_group_message,须组织管理员额外开通机器人能力)。
+# 默认 account:机器人能力是第二道审批,可能批不下来,应用号是安全落点。
+SEND_AS_VALUES = ("account", "bot")
+
 
 def default_config() -> Dict[str, Any]:
     return {
         "enabled": False,
         "sendIntervalMs": 200,
+        "sendAs": "account",
         "credentials": {
             "appId": "", "appSecret": "", "orgId": "",
             "apiGateway": "", "idType": "employ_id",
+            # 回调密钥与回调签名令牌,取自开发者中心「回调事件」页 ——
+            # 与 AppId/AppSecret 是【另外两个】凭证,不要混。
+            "callbackAesKey": "", "callbackSignToken": "",
         },
         "routes": [
             {
@@ -158,7 +167,8 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
     if not isinstance(cred_in, dict):
         raise ValueError("credentials 必须是对象")
     cred: Dict[str, Any] = {}
-    for k in ("appId", "appSecret", "orgId", "apiGateway"):
+    for k in ("appId", "appSecret", "orgId", "apiGateway",
+              "callbackAesKey", "callbackSignToken"):
         v = cred_in.get(k, "")
         if not isinstance(v, str):
             raise ValueError("credentials.%s 必须是字符串" % k)
@@ -201,7 +211,11 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
     if seen != set(known):
         raise ValueError("routes 必须包含且仅包含:%s" % sorted(known))
 
-    return {"enabled": enabled, "sendIntervalMs": interval,
+    send_as = cfg.get("sendAs", "account")
+    if send_as not in SEND_AS_VALUES:
+        raise ValueError("sendAs 须为 %s 之一" % "/".join(SEND_AS_VALUES))
+
+    return {"enabled": enabled, "sendIntervalMs": interval, "sendAs": send_as,
             "credentials": cred, "routes": routes}
 
 
@@ -214,14 +228,21 @@ def load_config(path: str) -> Dict[str, Any]:
         return default_config()
 
 
+_SECRET_FIELDS = ("appSecret", "callbackAesKey", "callbackSignToken")
+
+
 def save_config(path: str, cfg: Any) -> Dict[str, Any]:
-    """校验后原子写。appSecret 为空串 = 沿用旧值(前端读到的是脱敏值,回传空串不应清空)。"""
+    """校验后原子写。三个密钥(appSecret/callbackAesKey/callbackSignToken)为空串
+    = 沿用旧值(前端读到的是脱敏值,回传空串不应清空)。"""
     clean = validate_config(cfg)
-    if not clean["credentials"]["appSecret"]:
+    if any(not clean["credentials"][f] for f in _SECRET_FIELDS):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 old = json.load(f)
-            clean["credentials"]["appSecret"] = (old.get("credentials") or {}).get("appSecret", "")
+            old_cred = old.get("credentials") or {}
+            for f in _SECRET_FIELDS:
+                if not clean["credentials"][f]:
+                    clean["credentials"][f] = old_cred.get(f, "")
         except (OSError, ValueError):
             pass
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -233,9 +254,13 @@ def save_config(path: str, cfg: Any) -> Dict[str, Any]:
 
 
 def public_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
-    """下发给前端的脱敏配置:appSecret 抹成空串,只透出 hasSecret 布尔。"""
+    """下发给前端的脱敏配置:三个密钥一律抹成空串,只透出 has* 布尔。
+    绝不回显明文 —— 前端拿不到,就不会被日志/截图/导出带出去。"""
     out = json.loads(json.dumps(cfg, ensure_ascii=False))
-    secret = (out.get("credentials") or {}).get("appSecret", "")
-    out["credentials"]["appSecret"] = ""
-    out["credentials"]["hasSecret"] = bool(secret)
+    cred = out.setdefault("credentials", {})
+    for field, flag in (("appSecret", "hasSecret"),
+                        ("callbackAesKey", "hasCallbackAesKey"),
+                        ("callbackSignToken", "hasCallbackSignToken")):
+        cred[flag] = bool(cred.get(field, ""))
+        cred[field] = ""
     return out

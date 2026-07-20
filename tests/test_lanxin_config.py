@@ -274,3 +274,57 @@ def test_item_bool_fields_validated(field):
     pj["items"][0][field] = "yes"
     with pytest.raises(ValueError):
         C.validate_config(cfg)
+
+
+# ---- V4.0.5 Task 3:回调凭证与发送身份 ----
+
+def test_default_config_has_callback_credentials_and_send_as():
+    cfg = LC.default_config()
+    assert cfg["credentials"]["callbackAesKey"] == ""
+    assert cfg["credentials"]["callbackSignToken"] == ""
+    # 默认走应用号:机器人能力要额外一道组织管理员审批,可能批不下来
+    assert cfg["sendAs"] == "account"
+
+
+def test_public_config_masks_callback_secrets(tmp_path):
+    cfg = LC.default_config()
+    cfg["credentials"]["callbackAesKey"] = "AAA"
+    cfg["credentials"]["callbackSignToken"] = "BBB"
+    pub = LC.public_config(cfg)
+    assert pub["credentials"]["callbackAesKey"] == ""
+    assert pub["credentials"]["callbackSignToken"] == ""
+    assert pub["credentials"]["hasCallbackAesKey"] is True
+    assert pub["credentials"]["hasCallbackSignToken"] is True
+
+
+def test_public_config_reports_missing_callback_secrets():
+    pub = LC.public_config(LC.default_config())
+    assert pub["credentials"]["hasCallbackAesKey"] is False
+    assert pub["credentials"]["hasCallbackSignToken"] is False
+
+
+def test_save_config_rejects_bad_send_as(tmp_path):
+    import pytest
+    cfg = LC.default_config()
+    cfg["sendAs"] = "robot"          # 合法值只有 account / bot
+    with pytest.raises(ValueError):
+        LC.save_config(str(tmp_path / "c.json"), cfg)
+
+
+def test_save_config_accepts_bot(tmp_path):
+    cfg = LC.default_config()
+    cfg["sendAs"] = "bot"
+    saved = LC.save_config(str(tmp_path / "c.json"), cfg)
+    assert saved["sendAs"] == "bot"
+
+
+def test_save_config_empty_callback_secret_keeps_old(tmp_path):
+    """与 appSecret 同规:传空串=不修改,避免脱敏读回后误清空。"""
+    p = str(tmp_path / "c.json")
+    cfg = LC.default_config()
+    cfg["credentials"]["callbackAesKey"] = "KEEPME"
+    LC.save_config(p, cfg)
+    cfg2 = LC.load_config(p)
+    cfg2["credentials"]["callbackAesKey"] = ""
+    saved = LC.save_config(p, cfg2)
+    assert saved["credentials"]["callbackAesKey"] == "KEEPME"
