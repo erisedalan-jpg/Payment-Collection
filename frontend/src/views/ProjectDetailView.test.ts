@@ -230,6 +230,22 @@ describe('ProjectDetailView', () => {
     expect(w.text()).not.toContain('原项目回款节点（不计入当前汇总）')
   })
 
+  it('原项目选项卡展示原项目立项日期(取原项目的 status.立项日期,不是本项目的)', async () => {
+    seed()
+    const ds = useDataStore()
+    // P-2 本身(售前项目)也有一份自己的 PMIS 立项日期，原项目 OLD-9 另有一份——两者都是合法日期，取错不会报错
+    ;(ds.data as any).projectPmis['P-2'] = { status: { 立项日期: '2026-01-01' } }
+    ;(ds.data as any).projectPmis['OLD-9'].status.立项日期 = '2024-03-15'
+    const w = await mountAt('/project/P-2')
+    await w.findAll('.pd-tab').find((b) => b.text() === '原项目')!.trigger('click')
+    const originTab = w.find('[data-test="pd-origin-info"]')
+    expect(originTab.exists()).toBe(true)
+    expect(originTab.text()).toContain('原项目立项日期')
+    expect(originTab.text()).toContain('2024-03-15')
+    // 反向断言:绝不能显示本项目(P-2)自己的立项日期——两者都是合法日期,写错不会报错,只能靠这条抓
+    expect(originTab.text()).not.toContain('2026-01-01')
+  })
+
   it('非售前项目不显示原项目 tab', async () => {
     seed()
     const w = await mountAt('/project/P-1')

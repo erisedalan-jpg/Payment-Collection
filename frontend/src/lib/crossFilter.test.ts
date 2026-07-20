@@ -63,8 +63,8 @@ describe('crossFilter — riskReasons 多值(按类别)', () => {
 
 describe('通用数组列筛选', () => {
   const rows = [{ code: ['A', 'B'] }, { code: ['A'] }, { code: [] }, { code: ['C'] }]
-  it('cfUniqueValues 摊平去重升序', () => {
-    expect(cfUniqueValues(rows, 'code').map((u) => u.display)).toEqual(['A', 'B', 'C'])
+  it('cfUniqueValues 摊平去重升序（含空数组 → 空值置顶，V4.0.1 起）', () => {
+    expect(cfUniqueValues(rows, 'code').map((u) => u.display)).toEqual(['空值', 'A', 'B', 'C'])
   })
   it('applyColumnFilters 元素成员匹配', () => {
     expect(applyColumnFilters(rows, { code: { value: ['A'] } })).toEqual([{ code: ['A', 'B'] }, { code: ['A'] }])
@@ -75,5 +75,50 @@ describe('通用数组列筛选', () => {
   it('不误伤标量列', () => {
     const s = [{ x: '1' }, { x: '2' }]
     expect(applyColumnFilters(s, { x: { value: ['1'] } })).toEqual([{ x: '1' }])
+  })
+})
+
+describe('V4.0.1 数组列的「空值」选项', () => {
+  const rows = [
+    { id: 'A', tags: ['重点', '国网'] },
+    { id: 'B', tags: [] },        // 空数组:无标签
+    { id: 'C' },                  // 字段缺失:同样视为无
+    { id: 'D', tags: ['重点'] },
+  ]
+
+  it('存在空数组时,选项首项是「空值」,其余按字母序', () => {
+    const opts = cfUniqueValues(rows, 'tags').map((o) => o.display)
+    expect(opts[0]).toBe('空值')
+    expect(opts).toEqual(['空值', '国网', '重点'])
+  })
+
+  it('全都有值时不产出「空值」选项', () => {
+    const opts = cfUniqueValues(
+      [{ id: 'A', tags: ['重点'] }, { id: 'D', tags: ['国网'] }], 'tags').map((o) => o.display)
+    expect(opts).toEqual(['国网', '重点'])
+  })
+
+  it('选「空值」能筛出空数组的行 —— 这是本任务的目的', () => {
+    const r = applyColumnFilters(rows, { tags: { value: ['空值'] } } as any)
+    expect(r.map((x: any) => x.id)).toEqual(['B', 'C'])
+  })
+
+  it('选具体标签时,空数组的行被排除(原有行为不得回归)', () => {
+    const r = applyColumnFilters(rows, { tags: { value: ['重点'] } } as any)
+    expect(r.map((x: any) => x.id)).toEqual(['A', 'D'])
+  })
+
+  it('「空值」与具体标签可同时选,取并集', () => {
+    const r = applyColumnFilters(rows, { tags: { value: ['空值', '国网'] } } as any)
+    expect(r.map((x: any) => x.id)).toEqual(['A', 'B', 'C'])
+  })
+
+  it('riskReasons 专用分支不受影响', () => {
+    const rr = [
+      { id: 'A', riskReasons: [{ category: '回款延期' }] },
+      { id: 'B', riskReasons: [] },
+    ]
+    const opts = cfUniqueValues(rr, 'riskReasons').map((o) => o.display)
+    expect(opts).toEqual(['回款延期'])   // 不加「空值」
   })
 })

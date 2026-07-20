@@ -327,6 +327,73 @@ describe('ProjectsView', () => {
   })
 })
 
+describe('V4.0.1 列与标签筛选', () => {
+  it('三个新日期列已登记且默认隐藏', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const cols = (w.vm as any).ALL_COLUMNS as { key: string; label: string }[]
+    const keys = cols.map((c) => c.key)
+    expect(keys).toContain('originSetupDate')
+    expect(keys).toContain('plannedFinalAcceptDate')
+    expect(keys).toContain('actualFinalAcceptDate')
+    expect(cols.find((c) => c.key === 'originSetupDate')!.label).toBe('原项目立项日期')
+    expect(cols.find((c) => c.key === 'plannedFinalAcceptDate')!.label).toBe('计划终验时间')
+    expect(cols.find((c) => c.key === 'actualFinalAcceptDate')!.label).toBe('实际终验时间')
+    // 默认不展示
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).not.toContain('originSetupDate')
+    expect(visible).not.toContain('plannedFinalAcceptDate')
+    expect(visible).not.toContain('actualFinalAcceptDate')
+  })
+
+  it('标签筛选已从工具栏移除', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.findComponent({ name: 'TagFilterSelect' }).exists()).toBe(false)
+  })
+
+  it('标签列默认可见且可筛 —— 否则下沉后筛选入口整个消失', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).toContain('tags')
+    expect((w.vm as any).FILTERABLE.has('tags')).toBe(true)
+  })
+
+  it('I-1 升级迁移:老用户持久化列表(无 tags)挂载后自动补入 tags，紧挨 riskReasons 之后', async () => {
+    seed()
+    localStorage.clear()
+    const prefKey = `colprefs:${userScopedKey('projects-active')}`
+    // 模拟老用户曾经动过选列，persisted 列表里没有 tags(升级前 tags 还不存在于 DEFAULT_VISIBLE)
+    localStorage.setItem(prefKey, JSON.stringify(['projectName', 'projectId', 'riskLevel', 'riskReasons', 'action']))
+    const w = mountView()
+    await flushPromises()
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).toContain('tags')
+    expect(visible.indexOf('tags')).toBe(visible.indexOf('riskReasons') + 1)
+    // 标记位已写入(账号前缀 anon)
+    expect(localStorage.getItem('anon:colprefs-migrated:projects:v401-tags')).toBeTruthy()
+    localStorage.clear()
+  })
+
+  it('I-1 迁移只执行一次:标记位已存在且用户已主动取消 tags 时，不会被重新加回', async () => {
+    seed()
+    localStorage.clear()
+    const prefKey = `colprefs:${userScopedKey('projects-active')}`
+    // 模拟:已迁移过一次，用户随后又主动把 tags 取消了
+    localStorage.setItem('anon:colprefs-migrated:projects:v401-tags', '1')
+    localStorage.setItem(prefKey, JSON.stringify(['projectName', 'projectId', 'riskLevel', 'riskReasons', 'action']))
+    const w = mountView()
+    await flushPromises()
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).not.toContain('tags')
+    localStorage.clear()
+  })
+})
+
 describe('ProjectsView 列排序', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

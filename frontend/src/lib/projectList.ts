@@ -2,7 +2,6 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
 import { riskReasons, TOTAL_OVERSPEND_CATS, type RiskReason } from './riskReasons'
 import { noOriginBudget } from './costAnalysis'
-import { tagMatch } from './tagFilter'
 
 // 项目清单行：projects[](P1 主域) join projectPmis[id] 的扁平展示模型
 export interface ProjectRow {
@@ -34,6 +33,9 @@ export interface ProjectRow {
   isAnomalous: boolean
   riskReasons: RiskReason[]
   setupDate: string | null
+  originSetupDate: string | null
+  plannedFinalAcceptDate: string | null
+  actualFinalAcceptDate: string | null
 }
 
 // 收窄后只保留特殊项筛选（列枚举筛选已迁至 crossFilter 表头）
@@ -42,7 +44,6 @@ export interface ProjectFilters {
   presale: string // '' | 'yes' | 'no'
   paused: string   // '' | 'yes'
   overspend: string // '' | 'yes'
-  tags: string[]
   riskCategory: string  // '' 或 '回款延期'|'里程碑滞后'|'总成本超支大于5000'|'总成本超支小于5000'|'交付成本超支'|'风险未闭环'|'数据异常'|'健康度低'
 }
 
@@ -76,6 +77,14 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       projectLevel: status.项目级别 || '-',
       projectType: status.项目类型 || '-',
       setupDate: status.立项日期 ?? null,
+      // 原项目立项日期:读的是【另一个项目】的 PMIS 记录。不要误用上面的局部变量 status
+      // ——那是本项目的,用它会让每个售前项目显示自己的立项日期,而且两者都是合法日期、不会报错。
+      originSetupDate: p.relatedClosedId
+        ? (((pmisMap[p.relatedClosedId] ?? {}) as Record<string, any>).status?.立项日期 ?? null)
+        : null,
+      // 终验两列直取后端已回填的口径(preprocess.backfill_final_acceptance),前端不重算
+      plannedFinalAcceptDate: prog.终验时间 ?? null,
+      actualFinalAcceptDate: prog.实际终验时间 ?? null,
       projectManager: p.projectManager || '-',
       orgL4: p.orgL4 || '-',
       stage: prog.项目阶段 || '-',
@@ -109,7 +118,6 @@ export function filterProjectRows(rows: ProjectRow[], f: ProjectFilters): Projec
     if (f.overspend === 'yes' && !r.overspend) return false
     if (f.presale === 'yes' && !r.isPresale) return false
     if (f.presale === 'no' && r.isPresale) return false
-    if (f.tags && f.tags.length && !tagMatch(r.tags ?? [], f.tags)) return false
     if (f.riskCategory) {
       if (f.riskCategory === '健康度低') {
         if (!['关注', '风险'].includes(r.health)) return false

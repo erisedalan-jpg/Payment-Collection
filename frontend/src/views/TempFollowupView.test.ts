@@ -107,4 +107,39 @@ describe('TempFollowupView', () => {
     expect(w.find('.el-pagination').exists()).toBe(true)
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
   })
+
+  describe('V4.0.1 三个日期列', () => {
+    it('立项日期/计划终验/实际终验已登记为可选列', async () => {
+      const w = await mountAs(true)
+      const cols = (w.vm as any).ALL_COLUMNS as { key: string; label: string }[]
+      const byKey = Object.fromEntries(cols.map((c) => [c.key, c]))
+      expect(byKey['setupDate']?.label).toBe('立项日期')
+      expect(byKey['plannedFinalAcceptDate']?.label).toBe('计划终验时间')
+      expect(byKey['actualFinalAcceptDate']?.label).toBe('实际终验时间')
+    })
+
+    it('三列默认隐藏(属额外可选列)', async () => {
+      const w = await mountAs(true)
+      const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+      expect(visible).not.toContain('setupDate')
+      expect(visible).not.toContain('plannedFinalAcceptDate')
+      expect(visible).not.toContain('actualFinalAcceptDate')
+    })
+
+    it('三列可筛', async () => {
+      const w = await mountAs(true)
+      const F = (w.vm as any).FILTERABLE as Set<string>
+      expect(F.has('setupDate')).toBe(true)
+      expect(F.has('plannedFinalAcceptDate')).toBe(true)
+      expect(F.has('actualFinalAcceptDate')).toBe(true)
+    })
+
+    it('三列都能排序(withSortable 自动赋予,不需手写)', async () => {
+      const w = await mountAs(true)
+      const cols = (w.vm as any).ALL_COLUMNS as { key: string; sortable?: boolean }[]
+      for (const k of ['setupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate']) {
+        expect(cols.find((c) => c.key === k)!.sortable).toBe(true)
+      }
+    })
+  })
 })

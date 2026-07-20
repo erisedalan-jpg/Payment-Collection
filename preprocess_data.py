@@ -84,11 +84,15 @@ def run_snapshot_pipeline(final_data, output_dir, today=None):
 
 
 def backfill_final_acceptance(project_pmis, project_milestones):
-    """把里程碑计划终验/服务完成日回填到 project_pmis[pid].progress.终验时间(就地修改)。"""
+    """把里程碑的终验/服务完成日回填到 project_pmis[pid].progress(就地修改):
+    终验时间=计划日(planDate)、实际终验时间=实际完成日(actualDate)。
+    两者共用 milestones 的 target 选择规则(售前看服务完成、其他看终验),口径不会漂移。"""
     for pid, pm in project_pmis.items():
         ptype = (pm.get("status") or {}).get("项目类型")
-        (pm.setdefault("progress", {}))["终验时间"] = milestones_mod.final_acceptance_date(
-            project_milestones.get(pid, []), ptype)
+        items = project_milestones.get(pid, [])
+        prog = pm.setdefault("progress", {})
+        prog["终验时间"] = milestones_mod.final_acceptance_date(items, ptype)
+        prog["实际终验时间"] = milestones_mod.final_acceptance_actual_date(items, ptype)
 
 
 def _collection_nodes_for(pid, rid, collection_stages):
