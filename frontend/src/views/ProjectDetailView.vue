@@ -267,6 +267,7 @@ const cm = computed(() => (page.value.closedPmis ?? {}) as Record<string, any>)
 const originInfo = computed(() => [
   { k: '原项目编号', v: page.value.closedId || '-' },
   { k: '原项目名称', v: cm.value.team?.项目名称 || '-' },
+  { k: '原项目立项日期', v: cm.value.status?.立项日期 || '-' },
   { k: '项目经理', v: cm.value.team?.项目经理 || '-' },
   { k: '最终客户', v: cm.value.customer?.最终客户 || '-' },
   { k: '合同总额(万)', v: fmtWan(cm.value.customer?.合同总额) },
@@ -415,7 +416,7 @@ const originInfo = computed(() => [
             <template v-else>
               <div class="pd-note">以下为已关闭原项目信息（标记「原项目」，不计入当前项目汇总）。</div>
               <div v-if="!page.closedPmis" class="pd-note">该原项目在 PMIS 已关闭项目表中无记录，仅能显示编号。</div>
-              <div class="pd-chips">
+              <div class="pd-chips" data-test="pd-origin-info">
                 <div v-for="it in originInfo" :key="it.k" class="pd-chip"><span class="pd-chip-k">{{ it.k }}</span><span class="pd-chip-v u-num">{{ it.v }}</span></div>
               </div>
               <template v-if="originMilestones.length">
