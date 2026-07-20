@@ -142,8 +142,9 @@ from lanxin_recipients import (           # noqa: E402  (置于此处以免与�
     resolve_project_manager, short_issue, supervisor_chain,
 )
 
-_LEVEL_LABELS = {1: "直接上级（+1）", 2: "隔级上级（+2）", 3: "部门级（+3）",
-                 4: "上级（+4）", 5: "上级（+5）"}
+# 汇总卡副标题:逐项配置后一张卡里的行可能来自不同级别,写「直接上级（+1）」会自相矛盾。
+# 顺带清掉 V4.0.0 终审记的 M-2(_level_of 取全局最小值、探测深度写死 5)。
+SUMMARY_SUBTITLE = "团队汇总"
 
 
 def _route(cfg: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
@@ -193,24 +194,76 @@ def _rollup(counts_by_emp: Dict[str, Dict[str, int]], levels: int,
     return agg
 
 
+def _merge_agg(dst: Dict[str, Dict[str, Dict[str, int]]],
+               src: Dict[str, Dict[str, Dict[str, int]]]) -> None:
+    """把一次 _rollup 的产出合并进累计结果(sup → owner → {标签: 计数} 三层就地相加)。
+
+    注:当前调用方 _rollup_by_levels 给每个标签只分一个 levels 组,故同一个 (sup, owner)
+    在不同组里携带的标签集合互斥,最内层的 `+` 实际恒等于赋值(终审 M-4 指出这一点)。
+    仍写成累加而非覆盖:一是「合并」语义本就该累加,写成赋值会让人误以为可以安全覆盖;
+    二是将来若改成一个标签可属多组(例如同时报本级与部门级),累加是唯一正确的行为,
+    而覆盖会静默丢数。"""
+    for sup, owners in src.items():
+        d = dst.setdefault(sup, {})
+        for owner, counts in owners.items():
+            c = d.setdefault(owner, {})
+            for label, n in counts.items():
+                c[label] = c.get(label, 0) + n
+
+
+def _rollup_by_levels(counts_by_emp: Dict[str, Dict[str, int]],
+                      label_levels: Dict[str, int],
+                      tree: Dict[str, Any]) -> Dict[str, Dict[str, Dict[str, int]]]:
+    """逐项配置版聚合:不同标签可能配不同的 supervisorLevels,按 levels 分组各卷一次再合并。
+    V4.0.1 及以前是「一次 _rollup 传单个 levels」,表达不了「回款延期报到 +1、数据异常报到 +3」。
+    _rollup 与 _descend_owner 本身不用改 —— 阻碍只在调用方式。"""
+    groups: Dict[int, List[str]] = {}
+    for label, lv in label_levels.items():
+        if lv > 0:
+            groups.setdefault(lv, []).append(label)
+    agg: Dict[str, Dict[str, Dict[str, int]]] = {}
+    for lv, labels in sorted(groups.items()):
+        allow = set(labels)
+        subset: Dict[str, Dict[str, int]] = {}
+        for emp, counts in counts_by_emp.items():
+            sub = {k: v for k, v in counts.items() if k in allow}
+            if sub:
+                subset[emp] = sub
+        if subset:
+            _merge_agg(agg, _rollup(subset, lv, tree))
+    return agg
+
+
+def _items_of(route: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """route → {code: item}。route 为 None(未配置/未启用)时返回空表。"""
+    if not route:
+        return {}
+    return {i["code"]: i for i in (route.get("items") or [])}
+
+
 def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                tree: Dict[str, Any], project_pmis: Dict[str, Any]) -> Dict[str, Any]:
     """事项 → 收件计划。纯计算,不发任何网络请求。
-    项目侧:projectId → 项目经理(姓名) → 工号(后端自行推导,不信任前端);工时侧:employId 直连。"""
+    项目侧:projectId → 项目经理(姓名) → 工号(后端自行推导,不信任前端);工时侧:employId 直连。
+    V4.0.2 起每一项(问题码/关注原因)各自配 enabled/primary/supervisorLevels。"""
     unresolved: List[Dict[str, Any]] = []
-    # primary 工号 → {原因: [项目名/条数]}
     proj_by_emp: Dict[str, Dict[str, List[str]]] = {}
     ts_by_emp: Dict[str, List[Dict[str, Any]]] = {}
     ts_range = {"start": "", "end": ""}
+    # 工时 counts 按【中文 label】聚合,而配置按【英文 code】——分桶时顺手建映射,
+    # 不去 import ISSUE_LABELS:本次数据没出现的 code 也不需要映射(counts 里没有它)。
+    ts_label_to_code: Dict[str, str] = {}
 
     r_proj = _route(cfg, "project")
     r_ts = _route(cfg, "timesheet")
+    proj_items = _items_of(r_proj)
+    ts_items = _items_of(r_ts)
 
     for it in items:
         kind = it.get("kind")
         if kind == "project" and r_proj:
-            allowed = set(r_proj.get("reasons") or [])
-            reasons = [x for x in (it.get("reasons") or []) if x in allowed]
+            reasons = [x for x in (it.get("reasons") or [])
+                       if (proj_items.get(x) or {}).get("enabled")]
             if not reasons:
                 continue
             pid = it.get("projectId")
@@ -228,8 +281,8 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
             for r in reasons:
                 bucket.setdefault(r, []).append(str(pm.get("projectName") or pid))
         elif kind == "timesheet" and r_ts:
-            allowed = set(r_ts.get("issueCodes") or [])
-            issues = [i for i in (it.get("issues") or []) if i.get("code") in allowed]
+            issues = [i for i in (it.get("issues") or [])
+                      if (ts_items.get(i.get("code")) or {}).get("enabled")]
             if not issues:
                 continue
             emp = str(it.get("employId") or "").strip().upper()
@@ -238,82 +291,73 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                                    "reason": "工号不在花名册"})
                 continue
             ts_by_emp.setdefault(emp, []).extend(issues)
+            for i in issues:
+                ts_label_to_code[i["label"]] = i["code"]
             ts_range["start"] = it.get("start") or ts_range["start"]
             ts_range["end"] = it.get("end") or ts_range["end"]
 
     recipients: List[Dict[str, Any]] = []
     by_id = tree["byId"]
 
-    # ① primary 卡
-    if r_ts and r_ts["recipients"]["primary"]:
+    # ① primary 卡:只放 primary=True 的项;过滤后为空则不出卡
+    if r_ts:
         for emp in sorted(ts_by_emp):
+            mine = [i for i in ts_by_emp[emp]
+                    if (ts_items.get(i.get("code")) or {}).get("primary")]
+            if not mine:
+                continue
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
-                "card": build_timesheet_card(by_id[emp]["name"], ts_by_emp[emp],
+                "card": build_timesheet_card(by_id[emp]["name"], mine,
                                              ts_range["start"], ts_range["end"]),
             })
-    if r_proj and r_proj["recipients"]["primary"]:
+    if r_proj:
         for emp in sorted(proj_by_emp):
+            mine = {r: names for r, names in proj_by_emp[emp].items()
+                    if (proj_items.get(r) or {}).get("primary")}
+            if not mine:
+                continue
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
-                "card": build_project_card(by_id[emp]["name"], proj_by_emp[emp]),
+                "card": build_project_card(by_id[emp]["name"], mine),
             })
 
-    # ② 汇总卡:按【直接下属】聚合,数字是该下属整棵子树的合计。
-    # 两条路由都支持:spec §4.1「任一 → supervisor」——之前只认 project,timesheet 的
-    # supervisorLevels 控件存了个不生效的值(I-1)。levels<=0 时 supervisor_chain 恒空,
-    # agg 自然为空、不出汇总卡,故此处两路由写法对称、无需分支判空。
+    # ② 汇总卡:按 levels 分组多次卷、再按 sup/owner/标签三层合并。
+    # 同一个 sup 被多项(可能不同级别)命中时只出【一张】卡 —— 「按人合并」在这里成立。
+    # 副标题固定中性文案:一张卡里的行可能来自不同级别,写「直接上级」会自相矛盾。
     if r_ts:
-        ts_levels = r_ts["recipients"]["supervisorLevels"]
         ts_counts = {emp: _sum_ts_counts(issues) for emp, issues in ts_by_emp.items()}
-        agg = _rollup(ts_counts, ts_levels, tree)
+        ts_levels = {label: (ts_items.get(code) or {}).get("supervisorLevels", 0)
+                     for label, code in ts_label_to_code.items()}
+        agg = _rollup_by_levels(ts_counts, ts_levels, tree)
         for sup in sorted(agg):
-            rows = []
-            for owner, counts in agg[sup].items():
-                rows.append({"name": by_id[owner]["name"],
-                             "total": sum(counts.values()),
-                             "reasons": list(counts.items())})
-            label = _LEVEL_LABELS.get(_level_of(tree, sup, ts_by_emp), "上级汇总")
+            rows = [{"name": by_id[owner]["name"], "total": sum(counts.values()),
+                     "reasons": list(counts.items())}
+                    for owner, counts in agg[sup].items()]
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
-                "card": build_summary_card(by_id[sup]["name"], rows, label,
+                "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE,
                                            unit="条", head_title="工时填报提醒",
                                            title_fmt="你的团队工时填报存在 %d 条问题",
                                            label_fn=short_issue),
             })
     if r_proj:
-        levels = r_proj["recipients"]["supervisorLevels"]
         proj_counts = {emp: {reason: len(names) for reason, names in by_reason.items()}
                        for emp, by_reason in proj_by_emp.items()}
-        agg = _rollup(proj_counts, levels, tree)
+        proj_levels = {code: (item or {}).get("supervisorLevels", 0)
+                       for code, item in proj_items.items()}
+        agg = _rollup_by_levels(proj_counts, proj_levels, tree)
         for sup in sorted(agg):
-            rows = []
-            for owner, counts in agg[sup].items():
-                rows.append({"name": by_id[owner]["name"],
-                             "total": sum(counts.values()),
-                             "reasons": list(counts.items())})
-            label = _LEVEL_LABELS.get(_level_of(tree, sup, proj_by_emp), "上级汇总")
+            rows = [{"name": by_id[owner]["name"], "total": sum(counts.values()),
+                     "reasons": list(counts.items())}
+                    for owner, counts in agg[sup].items()]
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
-                "card": build_summary_card(by_id[sup]["name"], rows, label),
+                "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE),
             })
 
     return {"recipients": recipients, "unresolved": unresolved,
             "totals": {"recipients": len(recipients), "unresolved": len(unresolved)}}
-
-
-MAX_LEVELS_PROBE = 5
-
-
-def _level_of(tree: Dict[str, Any], sup_id: str, by_emp: Dict[str, Any]) -> int:
-    """sup 相对于命中他的 primary 的最小级差(用于卡片副标题文案)。
-    by_emp 只用其 key(primary 工号集合)——project/timesheet 两路由共用,值形状无关。"""
-    best = 99
-    for emp in by_emp:
-        ch = supervisor_chain(tree, emp, MAX_LEVELS_PROBE)
-        if sup_id in ch:
-            best = min(best, ch.index(sup_id) + 1)
-    return best if best != 99 else 1
 
 
 def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:

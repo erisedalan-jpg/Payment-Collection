@@ -50,15 +50,14 @@ def default_config() -> Dict[str, Any]:
             {
                 "key": "timesheet", "label": "倚天工时问题", "enabled": True,
                 # 只含真问题;HINT_(合规提示)默认不勾,但仍在白名单里、页面可自行勾选
-                "issueCodes": list(DEFAULT_ISSUE_CODES),
                 # 默认不发汇总:工时问题是本人可自纠的,先不惊动上级
-                "recipients": {"primary": True, "supervisorLevels": 0},
+                "items": [_default_item(c, c in DEFAULT_ISSUE_CODES, True, 0)
+                          for c in ISSUE_LABELS],
             },
             {
                 "key": "project", "label": "项目关注原因", "enabled": True,
-                "reasons": list(REASON_WHITELIST),
                 # 默认到直接上级即止:+3 意味着一人收覆盖全部员工的卡,应由人显式开启
-                "recipients": {"primary": True, "supervisorLevels": 1},
+                "items": [_default_item(c, True, True, 1) for c in REASON_WHITELIST],
             },
         ],
     }
@@ -91,6 +90,53 @@ def _validate_subset(raw: Any, whitelist: List[str], field: str) -> List[str]:
         if x not in out:
             out.append(x)
     return out
+
+
+def _default_item(code: str, enabled: bool, primary: bool = True, levels: int = 0) -> Dict[str, Any]:
+    return {"code": code, "enabled": enabled, "primary": primary, "supervisorLevels": levels}
+
+
+def _validate_items(raw: Any, whitelist: List[str], field: str) -> List[Dict[str, Any]]:
+    """校验 items 并【按白名单顺序补齐】:白名单里没出现的 code 补 enabled=False。
+    补齐而不是报错,是为了将来新增问题码时旧配置仍能通过校验(V4.0.0 吃过
+    ISSUE_LABELS 从 7 项变 8 项的亏)。"""
+    if raw is None:
+        raw = []
+    if not isinstance(raw, list):
+        raise ValueError("%s 必须是数组" % field)
+    got: Dict[str, Dict[str, Any]] = {}
+    for it in raw:
+        if not isinstance(it, dict):
+            raise ValueError("%s 的元素必须是对象" % field)
+        code = it.get("code")
+        if code not in whitelist:
+            raise ValueError("%s 含非法 code:%s" % (field, code))
+        if code in got:
+            raise ValueError("%s 含重复 code:%s" % (field, code))
+        for b in ("enabled", "primary"):
+            v = it.get(b, True)
+            if not isinstance(v, bool):
+                raise ValueError("%s.%s 必须是布尔" % (field, b))
+        lv = it.get("supervisorLevels", 0)
+        if isinstance(lv, bool) or not isinstance(lv, int):
+            raise ValueError("%s.supervisorLevels 必须是整数" % field)
+        if not (0 <= lv <= MAX_SUPERVISOR_LEVELS):
+            raise ValueError("%s.supervisorLevels 须在 0..%d" % (field, MAX_SUPERVISOR_LEVELS))
+        got[code] = _default_item(code, bool(it.get("enabled", True)),
+                                  bool(it.get("primary", True)), lv)
+    return [got.get(c) or _default_item(c, False) for c in whitelist]
+
+
+def _migrate_route_items(r: Dict[str, Any], whitelist: List[str], legacy_field: str) -> Any:
+    """V4.0.1 及以前:一条路由一组 recipients + 一个 code 数组。
+    → 逐项 items,勾选项 enabled=True、其余 False,primary/levels 一律继承原 recipients。
+    这样迁移后行为与迁移前【逐字节等价】,管理员不动配置就没有任何变化。
+    判据是【缺 items 键】而非版本号比较。"""
+    if isinstance(r.get("items"), list):
+        return r["items"]
+    rec = _validate_recipients(r.get("recipients") or {})
+    on = set(_validate_subset(r.get(legacy_field, []), whitelist, legacy_field))
+    return [_default_item(c, c in on, rec["primary"], rec["supervisorLevels"]) for c in whitelist]
 
 
 def validate_config(cfg: Any) -> Dict[str, Any]:
@@ -142,18 +188,15 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
         if key in seen:
             raise ValueError("route.key 重复:%s" % key)
         seen.add(key)
+        whitelist = list(ISSUE_LABELS.keys()) if key == "timesheet" else list(REASON_WHITELIST)
+        legacy_field = "issueCodes" if key == "timesheet" else "reasons"
         item: Dict[str, Any] = {
             "key": key,
             "label": known[key]["label"],
             "enabled": bool(r.get("enabled", True)),
-            "recipients": _validate_recipients(r.get("recipients") or {}),
+            "items": _validate_items(_migrate_route_items(r, whitelist, legacy_field),
+                                     whitelist, "items"),
         }
-        if key == "timesheet":
-            item["issueCodes"] = _validate_subset(
-                r.get("issueCodes", []), list(ISSUE_LABELS.keys()), "issueCodes")
-        else:
-            item["reasons"] = _validate_subset(
-                r.get("reasons", []), REASON_WHITELIST, "reasons")
         routes.append(item)
     if seen != set(known):
         raise ValueError("routes 必须包含且仅包含:%s" % sorted(known))

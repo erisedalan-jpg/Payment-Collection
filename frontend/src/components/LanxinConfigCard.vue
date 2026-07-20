@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
-import { ALL_RISK_CATEGORIES } from '@/lib/riskReasons'
 import { getLanxinConfig, saveLanxinConfig, lanxinSelftest,
          type LanxinConfig } from '@/lib/lanxinApi'
 
@@ -14,11 +13,11 @@ const newSecret = ref('')
 const selftestEmp = ref('')
 const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
 
-// 全量选项源:必须是全集,不能拿 v-model 绑的子集当选项 —— 否则取消勾选后选项消失、再也勾不回来。
-const ALL_ISSUE_CODES = Object.keys(ISSUE_LABELS)
-const issueLabel = (c: string) => ISSUE_LABELS[c] ?? c
-// 关注原因全集从 riskReasons.ts 引入(那里带编译期穷尽护栏),不在此另抄一份。
-const ALL_REASONS = ALL_RISK_CATEGORIES
+/** code → 展示名。工时码查 ISSUE_LABELS(同表见 yitian_rules.py);项目关注原因的 code 本身就是中文,直接显示。
+ *  items 恒为完整白名单长度(后端 lanxin_config._validate_items 按白名单补齐),不必在前端再拼全集。 */
+function codeLabel(routeKey: string, code: string): string {
+  return routeKey === 'timesheet' ? (ISSUE_LABELS[code] ?? code) : code
+}
 
 // 汇总级别:0=不发;1..5 向上累积。上限 5 —— 预留 5 级架构(推广到整团队后仍够用)。
 const LEVEL_OPTS = [
@@ -96,21 +95,30 @@ onMounted(load)
       </div>
 
       <div class="dv-sub-head">推送路由</div>
-      <div v-for="r in cfg.routes" :key="r.key" class="dv-row lx-route">
-        <span class="dv-label">{{ r.label }}</span>
-        <el-switch v-model="r.enabled" />
-        <el-checkbox v-model="r.recipients.primary">
-          {{ r.key === 'timesheet' ? '发给填报人本人' : '发给项目经理' }}
-        </el-checkbox>
-        <el-select v-model="r.recipients.supervisorLevels" size="small" style="width: 220px">
-          <el-option v-for="o in LEVEL_OPTS" :key="o.v" :value="o.v" :label="o.t" />
-        </el-select>
-        <el-checkbox-group v-if="r.key === 'timesheet'" v-model="r.issueCodes" class="lx-opts">
-          <el-checkbox v-for="c in ALL_ISSUE_CODES" :key="c" :value="c" :label="c">{{ issueLabel(c) }}</el-checkbox>
-        </el-checkbox-group>
-        <el-checkbox-group v-else v-model="r.reasons" class="lx-opts">
-          <el-checkbox v-for="c in ALL_REASONS" :key="c" :value="c" :label="c">{{ c }}</el-checkbox>
-        </el-checkbox-group>
+      <div v-for="r in cfg.routes" :key="r.key" class="lx-route">
+        <div class="lx-route-head">
+          <span class="dv-label">{{ r.label }}</span>
+          <el-switch v-model="r.enabled" />
+        </div>
+        <table class="lx-items">
+          <thead>
+            <tr><th>{{ r.key === 'timesheet' ? '问题类型' : '关注原因' }}</th>
+                <th>启用</th><th>发本人</th><th>汇总级别</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="it in r.items" :key="it.code" data-test="lx-item-row">
+              <td class="lx-item-name">{{ codeLabel(r.key, it.code) }}</td>
+              <td><el-checkbox v-model="it.enabled" data-test="lx-item-enabled" /></td>
+              <td><el-checkbox v-model="it.primary" :disabled="!it.enabled" data-test="lx-item-primary" /></td>
+              <td>
+                <el-select v-model="it.supervisorLevels" size="small" style="width: 150px"
+                  :disabled="!it.enabled" data-test="lx-item-levels">
+                  <el-option v-for="o in LEVEL_OPTS" :key="o.v" :value="o.v" :label="o.t" />
+                </el-select>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="dv-row dv-actions">
@@ -138,9 +146,15 @@ onMounted(load)
 <style scoped>
 @import '@/styles/dataview.css';
 
-/* 本卡特有:路由行与自检步骤 */
-.lx-route { gap: var(--sp-2); align-items: flex-start; }
-.lx-opts { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); max-width: 420px; }
+/* 本卡特有:路由行(逐项表格)与自检步骤 */
+.lx-route { display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--line); }
+.lx-route-head { display: flex; align-items: center; gap: var(--sp-3); }
+.lx-items { width: 100%; border-collapse: collapse; margin-top: var(--sp-2); }
+.lx-items th, .lx-items td { padding: var(--sp-1) var(--sp-2); text-align: left; font-size: var(--fs-1); }
+.lx-items th { color: var(--mut); font-weight: 600; }
+.lx-items tbody tr:hover { background: var(--hover-tint); }
+.lx-item-name { color: var(--txt); }
 .lx-steps { flex-direction: column; align-items: stretch; gap: var(--sp-2); }
 .lx-step { display: flex; align-items: center; gap: var(--sp-2); }
 .lx-step-name { font-size: var(--fs-1); color: var(--txt); font-weight: 600; }
