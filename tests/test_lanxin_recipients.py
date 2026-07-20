@@ -207,7 +207,7 @@ def test_short_label_used_in_project_card_fields_but_not_bodycontent():
     """短标签只用于 fields 的 key;bodyContent 里仍须全名,信息不丢。"""
     card = LR.build_project_card("张三", {"总成本超支大于5000": ["P1"], "总成本超支小于5000": ["P2"]})
     keys = [f["key"] for f in card["fields"]]
-    assert "成本超支>5k" in keys and "成本超支<5k" in keys
+    assert "超支>5千" in keys and "超支<5千" in keys
     assert "总成本超支…" not in keys                    # 不再有截断撞车
     assert "总成本超支大于5000：P1" in card["bodyContent"]   # 全名仍在正文
     assert "总成本超支小于5000：P2" in card["bodyContent"]
@@ -218,14 +218,14 @@ def test_short_label_used_in_summary_card_value():
              "reasons": [("总成本超支大于5000", 1), ("总成本超支小于5000", 1)]}]
     card = LR.build_summary_card("组长", rows, "直接上级（+1）")
     v = card["fields"][0]["value"]
-    assert "成本超支>5k 1" in v and "成本超支<5k 1" in v
+    assert "超支>5千 1" in v and "超支<5千 1" in v
 
 def test_short_labels_are_not_mangled_words():
     """字节合规 ≠ 可读。「未获原项目预」是 18 字节但缺了「算」,是残词 ——
     光断言 <=18 字节抓不到这种,只有人眼或本测试能挡。
     规则:短标签若以中文结尾,不得是把某个词砍掉末字得来的(此处用白名单锁死具体取值)。"""
-    assert LR.REASON_SHORT_LABELS["总成本超支大于5000"] == "成本超支>5k"
-    assert LR.REASON_SHORT_LABELS["总成本超支小于5000"] == "成本超支<5k"
+    assert LR.REASON_SHORT_LABELS["总成本超支大于5000"] == "超支>5千"
+    assert LR.REASON_SHORT_LABELS["总成本超支小于5000"] == "超支<5千"
     assert LR.REASON_SHORT_LABELS["未获取原项目预算"] == "无原项目预算"
     # 残词回归护栏:曾经用过的「未获原项目预」不得复现
     assert "未获原项目预" not in LR.REASON_SHORT_LABELS.values()
@@ -272,7 +272,7 @@ def test_every_reason_fits_field_key_without_truncation():
     for reason in LC.REASON_WHITELIST:
         s = LR.short_reason(reason)
         assert len(s.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, "%s → %s 仍超限" % (reason, s)
-        assert LR._field(s, "1 个项目")["key"] == s, "%s 被 fit_bytes 截成残词" % reason
+        assert LR._field(s, "1 个项目")["key"] == s, "%s 被 fit_field 截成残词" % reason
 
 
 # ── I-2:工时卡副标题恒为「统计区间  ~ 」的死代码修复 ──
@@ -312,3 +312,83 @@ def test_summary_card_timesheet_unit_and_title():
     assert "条" in card["bodyTitle"] and "项目" not in card["bodyTitle"]
     assert card["fields"][0]["value"].startswith("3 条：")
     assert "工时类型有误" in card["fields"][0]["value"]     # 用了短标签,不是原始长标签
+
+
+# ── V4.0.3:fields 的双重限制(字符数 AND 字节数) ──────────────────────────
+#
+# openapi.lanxin.cn 的 message_body_type.md 对 fields 用的是【字数】而非字节:
+#   fields.key   长度不超过 6 个汉字
+#   fields.value 两行(接口限制 64 字)
+# 而 bodyTitle/bodySubTitle/bodyContent 明写 "200*3 / 400*3 / 1000*3 字节"。
+# 纯中文时两种算法等价(6*3=18),混合中英文时【不等价】——凭证未到位实测不了,
+# 故对 fields 取两者更严的一个,无论蓝信按哪种解读都不越限。
+
+def test_fit_field_char_limit_bites_before_byte_limit():
+    """混合中英文:字节没超但字符数超 → 必须按字符数截。"""
+    import lanxin_recipients as LR
+    s = "成本超支>5000元"          # 10 字符 / 4*3+1+4+3 = 20 字节
+    assert len(s) == 10 and len(s.encode("utf-8")) == 20
+    out = LR.fit_field(s, 6, 18)
+    assert len(out) <= 6
+    assert len(out.encode("utf-8")) <= 18
+
+
+def test_fit_field_byte_limit_bites_before_char_limit():
+    """纯中文:字符数没超但字节超 → 必须按字节截。"""
+    import lanxin_recipients as LR
+    s = "回款延期风险"              # 6 字符 / 18 字节
+    out = LR.fit_field(s, 6, 12)   # 故意把字节上限压到 12
+    assert len(out.encode("utf-8")) <= 12
+
+
+def test_fit_field_passthrough_when_both_ok():
+    import lanxin_recipients as LR
+    assert LR.fit_field("回款延期", 6, 18) == "回款延期"
+
+
+def test_all_reason_field_keys_fit_both_limits():
+    """★ 八类关注原因(经短标签映射后)必须同时满足 <=6 字符 且 <=18 字节,
+    且【不被截断】—— 截断产生的残词读不通,是 V4.0.0 踩过的坑。"""
+    import lanxin_config as C
+    import lanxin_recipients as LR
+    for reason in C.REASON_WHITELIST:
+        label = LR.short_reason(reason)
+        assert len(label) <= LR.LIMIT_FIELD_KEY_CHARS, "%s → %s 超 6 字符" % (reason, label)
+        assert len(label.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, "%s → %s 超 18 字节" % (reason, label)
+        assert LR.fit_field(label, LR.LIMIT_FIELD_KEY_CHARS, LR.LIMIT_FIELD_KEY) == label, \
+            "%s → %s 会被截断成残词" % (reason, label)
+
+
+def test_all_issue_field_keys_fit_both_limits():
+    """八类工时问题标签同上。"""
+    import yitian_rules as R
+    import lanxin_recipients as LR
+    for code, raw in R.ISSUE_LABELS.items():
+        label = LR.short_issue(raw)
+        assert len(label) <= LR.LIMIT_FIELD_KEY_CHARS, "%s → %s 超 6 字符" % (code, label)
+        assert len(label.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, "%s → %s 超 18 字节" % (code, label)
+        assert LR.fit_field(label, LR.LIMIT_FIELD_KEY_CHARS, LR.LIMIT_FIELD_KEY) == label, \
+            "%s → %s 会被截断成残词" % (code, label)
+
+
+def test_cost_overspend_labels_are_distinct_and_short():
+    """两个成本超支标签:必须互不相同(V4.0.0 目验逮到过截断后撞车)且 <=6 字符。"""
+    import lanxin_recipients as LR
+    a = LR.short_reason("总成本超支大于5000")
+    b = LR.short_reason("总成本超支小于5000")
+    assert a != b
+    for x in (a, b):
+        assert len(x) <= 6, "%s 有 %d 字符" % (x, len(x))
+
+
+def test_summary_card_value_respects_char_limit():
+    """汇总卡 value 是「N 项：标签 n · 标签 n」的混合文本,
+    64 字符比 192 字节严格得多 —— 丢弃循环必须按双重限制判。"""
+    import lanxin_recipients as LR
+    rows = [{"name": "张三", "total": 99,
+             "reasons": [("回款延期", 20), ("里程碑滞后", 19), ("交付成本超支", 18),
+                         ("风险未闭环", 17), ("数据异常", 15), ("无原项目预算", 10)]}]
+    card = LR.build_summary_card("李四", rows, "团队汇总")
+    v = card["fields"][0]["value"]
+    assert len(v) <= LR.LIMIT_FIELD_VALUE_CHARS, "value 有 %d 字符" % len(v)
+    assert len(v.encode("utf-8")) <= LR.LIMIT_FIELD_VALUE
