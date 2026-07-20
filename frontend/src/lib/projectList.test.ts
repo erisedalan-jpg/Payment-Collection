@@ -277,3 +277,51 @@ describe('paused/overspend 扩展(P4 风险焦点行)', () => {
     expect(r.overspend).toBe(true)
   })
 })
+
+describe('V4.0.1 三个日期字段', () => {
+  const pmisMap = {
+    'SS-1': { status: { 立项日期: '2026-01-01' },
+              progress: { 终验时间: '2026-08-01', 实际终验时间: '2026-08-20' } },
+    'OLD-9': { status: { 立项日期: '2024-03-15' } },
+    'N-1': { status: { 立项日期: '2025-05-05' },
+             progress: { 终验时间: '2026-07-01', 实际终验时间: null } },
+  } as any
+
+  it('售前项目的 originSetupDate 取原项目的立项日期', () => {
+    const rows = buildProjectRows(
+      [{ projectId: 'SS-1', isPresale: true, relatedClosedId: 'OLD-9' } as any], pmisMap)
+    expect(rows[0].originSetupDate).toBe('2024-03-15')
+    // 反向断言:绝不能等于本项目立项日期 —— 取错不会报错
+    expect(rows[0].originSetupDate).not.toBe('2026-01-01')
+    expect(rows[0].setupDate).toBe('2026-01-01')
+  })
+
+  it('无 relatedClosedId 的项目 originSetupDate 为 null', () => {
+    const rows = buildProjectRows([{ projectId: 'N-1' } as any], pmisMap)
+    expect(rows[0].originSetupDate).toBeNull()
+  })
+
+  it('relatedClosedId 指向不存在的项目时为 null,不抛错', () => {
+    const rows = buildProjectRows(
+      [{ projectId: 'SS-1', relatedClosedId: 'NOT-EXIST' } as any], pmisMap)
+    expect(rows[0].originSetupDate).toBeNull()
+  })
+
+  it('计划/实际终验时间直取 progress,不重算', () => {
+    const rows = buildProjectRows([{ projectId: 'SS-1' } as any], pmisMap)
+    expect(rows[0].plannedFinalAcceptDate).toBe('2026-08-01')
+    expect(rows[0].actualFinalAcceptDate).toBe('2026-08-20')
+  })
+
+  it('实际终验为 null 时字段为 null,不落成空串', () => {
+    const rows = buildProjectRows([{ projectId: 'N-1' } as any], pmisMap)
+    expect(rows[0].plannedFinalAcceptDate).toBe('2026-07-01')
+    expect(rows[0].actualFinalAcceptDate).toBeNull()
+  })
+
+  it('progress 整体缺失时两个终验字段均为 null', () => {
+    const rows = buildProjectRows([{ projectId: 'OLD-9' } as any], pmisMap)
+    expect(rows[0].plannedFinalAcceptDate).toBeNull()
+    expect(rows[0].actualFinalAcceptDate).toBeNull()
+  })
+})
