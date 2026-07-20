@@ -34,6 +34,9 @@ export interface ProjectRow {
   isAnomalous: boolean
   riskReasons: RiskReason[]
   setupDate: string | null
+  originSetupDate: string | null
+  plannedFinalAcceptDate: string | null
+  actualFinalAcceptDate: string | null
 }
 
 // 收窄后只保留特殊项筛选（列枚举筛选已迁至 crossFilter 表头）
@@ -76,6 +79,14 @@ export function buildProjectRows(projects: Project[], pmisMap: Record<string, Pr
       projectLevel: status.项目级别 || '-',
       projectType: status.项目类型 || '-',
       setupDate: status.立项日期 ?? null,
+      // 原项目立项日期:读的是【另一个项目】的 PMIS 记录。不要误用上面的局部变量 status
+      // ——那是本项目的,用它会让每个售前项目显示自己的立项日期,而且两者都是合法日期、不会报错。
+      originSetupDate: p.relatedClosedId
+        ? (((pmisMap[p.relatedClosedId] ?? {}) as Record<string, any>).status?.立项日期 ?? null)
+        : null,
+      // 终验两列直取后端已回填的口径(preprocess.backfill_final_acceptance),前端不重算
+      plannedFinalAcceptDate: prog.终验时间 ?? null,
+      actualFinalAcceptDate: prog.实际终验时间 ?? null,
       projectManager: p.projectManager || '-',
       orgL4: p.orgL4 || '-',
       stage: prog.项目阶段 || '-',
