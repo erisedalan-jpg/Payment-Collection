@@ -15,8 +15,9 @@ def _row(**kw):
     return base
 
 
-# 一份四段俱全的合格正文(避免各用例被必填项干扰)
-GOOD = "工作概述:巡检。工作进展:已完成部署。下一步工作计划:回访。"
+# 一份四段俱全的合格正文(避免各用例被必填项干扰)。
+# V4.0.4 起服务方式也在正文判定,故补进第四段 —— 此前注释写「四段」但只有三段。
+GOOD = "工作概述:巡检。工作进展:已完成部署。下一步工作计划:回访。服务方式:远程。"
 
 
 class TestCorrection:
@@ -43,18 +44,18 @@ class TestRequiredFields:
 
 
 class TestServiceMode:
-    def test_empty_column_after_effective_date_is_issue(self):
-        codes, _ = K.check_row(_row(content=GOOD, service_mode="", date="2026-06-01"))
-        assert "MISS_SERVICE_MODE" in codes
+    def test_column_no_longer_participates_in_judgement(self):
+        """V4.0.4:列填不填都不影响判定 —— 只看正文。"""
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"   # 三段齐全但无服务方式
+        for col in ("", "远程", "客户现场"):
+            codes, _ = K.check_row(_row(content=body, service_mode=col, date="2026-06-01"))
+            assert "MISS_SERVICE_MODE" in codes, "列=%r 时判定不应改变" % col
 
-    def test_empty_column_before_effective_date_exempt(self):
-        codes, _ = K.check_row(_row(content=GOOD, service_mode="", date="2026-04-17"))
+    def test_before_effective_date_exempt(self):
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"
+        codes, _ = K.check_row(_row(content=body, service_mode="", date="2026-04-17"))
         assert "MISS_SERVICE_MODE" not in codes
 
-    def test_filled_column_ok_even_if_text_lacks_the_word(self):
-        # 关键:正文里没有"服务方式"四个字,但列填了 → 合规(这是本次口径修正)
-        codes, _ = K.check_row(_row(content=GOOD, service_mode="客户现场", date="2026-06-01"))
-        assert "MISS_SERVICE_MODE" not in codes
 
 
 class TestTypeMismatch:
@@ -179,10 +180,19 @@ class TestOkOf:
 
 # —— 回归安全网:默认 cfg(由 yitian_rules 装配)喂 check_row 必须与旧硬编码行为一致 ——
 # 复用文件顶部的 _row 辅助;新用例统一走 K.check_row(row, "", cfg)。
-def test_all_three_sections_present_ok():
-    r = _row(content="工作概述:巡检。工作进展:完成。下一步计划:复盘。")
+def test_all_four_sections_present_ok():
+    """V4.0.4:「完全合规」从三段变四段 —— 服务方式也在正文判定了。"""
+    r = _row(content="工作概述:巡检。工作进展:完成。下一步计划:复盘。服务方式:远程。")
     codes, _ = K.check_row(r, "", RC.default_config())
     assert codes == []
+
+
+def test_three_sections_without_service_mode_reports_only_that():
+    """三段齐全但缺服务方式 → 只报 MISS_SERVICE_MODE,不牵连其他必填项。
+    这是 V4.0.4 口径变更后新增的一类问题(实测现网 15 条属于此类)。"""
+    r = _row(content="工作概述:巡检。工作进展:完成。下一步计划:复盘。")
+    codes, _ = K.check_row(r, "", RC.default_config())
+    assert codes == ["MISS_SERVICE_MODE"]
 
 
 def test_missing_summary_and_next():
@@ -255,3 +265,64 @@ def test_custom_summary_keyword():
 def test_cfg_none_uses_default():
     r = _row(content="工作进展x下一步x")
     assert "MISS_SUMMARY" in K.check_row(r)[0]
+
+
+class TestServiceModeByContent:
+    """V4.0.4:服务方式判定从「读列」改为「读正文关键词」,与必填三段一致。
+
+    背景(实测 2026-05-09 起的 502 条受检工时):
+      改口径【不是放宽也不是收紧,是换一批人被判问题】——
+      16 条「列空但正文写了」转为合规,15 条「列填了但正文没写」新增为问题,
+      两者几乎完全互补(填报人要么填列、要么写正文,基本二选一)。
+      那 15 条经逐条核对是【真的没在正文写】,正文都是规范三段式、列里填了「客户现场/远程」,
+      不存在「换了个说法」的情况 —— 故加关键词救不回来,这是口径变更的既定代价。
+    """
+
+    def test_content_with_keyword_is_ok_even_if_column_empty(self):
+        """★ 核心变更:正文写了就合规,不再管列。"""
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。服务方式：远程"
+        codes, _ = K.check_row(_row(content=body, service_mode="", date="2026-06-01"))
+        assert "MISS_SERVICE_MODE" not in codes
+
+    def test_content_without_keyword_is_issue_even_if_column_filled(self):
+        """★ 反向:列填了但正文没写 → 判问题(这正是那 15 条的处境)。"""
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"   # 无服务方式
+        codes, _ = K.check_row(_row(content=body, service_mode="客户现场", date="2026-06-01"))
+        assert "MISS_SERVICE_MODE" in codes
+
+    def test_before_effective_date_still_exempt(self):
+        """生效日仍生效:早于该日的历史工时不翻旧账。"""
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"
+        codes, _ = K.check_row(_row(content=body, service_mode="", date="2026-04-17"))
+        assert "MISS_SERVICE_MODE" not in codes
+
+    def test_disabled_check_skips(self):
+        import copy
+        import yitian_rules_config as RC
+        cfg = copy.deepcopy(RC.default_config())
+        cfg["checks"]["serviceMode"]["enabled"] = False
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"
+        codes, _ = K.check_row(_row(content=body, service_mode="", date="2026-06-01"), cfg=cfg)
+        assert "MISS_SERVICE_MODE" not in codes
+
+    def test_keywords_are_configurable(self):
+        """关键词由超管在 /data 配置,与必填三段同构。"""
+        import copy
+        import yitian_rules_config as RC
+        cfg = copy.deepcopy(RC.default_config())
+        cfg["checks"]["serviceMode"]["keywords"] = ["支持形式"]
+        base = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"
+        codes, _ = K.check_row(_row(content=base + " 支持形式：远程", date="2026-06-01"), cfg=cfg)
+        assert "MISS_SERVICE_MODE" not in codes
+        codes2, _ = K.check_row(_row(content=base + " 服务方式：远程", date="2026-06-01"), cfg=cfg)
+        assert "MISS_SERVICE_MODE" in codes2, "改了关键词后旧词不应再命中"
+
+    def test_empty_keywords_disables_the_check(self):
+        """关键词清空 = 该项不检查(与必填三段的 c['keywords'] 空值语义一致)。"""
+        import copy
+        import yitian_rules_config as RC
+        cfg = copy.deepcopy(RC.default_config())
+        cfg["checks"]["serviceMode"]["keywords"] = []
+        body = "工作概述:巡检。工作进展:完成。下一步工作计划:回访。"
+        codes, _ = K.check_row(_row(content=body, service_mode="", date="2026-06-01"), cfg=cfg)
+        assert "MISS_SERVICE_MODE" not in codes

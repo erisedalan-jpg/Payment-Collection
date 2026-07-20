@@ -3,6 +3,11 @@ import * as XLSX from 'xlsx'
 export const MULTI_SEP = '、'
 
 export interface CheckKw { enabled: boolean; keywords: string[] }
+
+/** 服务方式默认关键词。必须与后端 `yitian_rules.SERVICE_MODE_RE` 逐项一致
+ *  —— 有 rulesConfig.test.ts 里的跨语言同步测试真读 .py 源码比对,改一边会当场红。
+ *  用途:导入 V4.0.3 及以前的旧配置时补默认值(那时 serviceMode 还没有 keywords)。 */
+export const DEFAULT_SERVICE_MODE_KEYWORDS = ['服务方式', '服务形式', '支持方式', '支持形式']
 export interface YitianRulesConfig {
   version: number
   checkedTypes: string[]
@@ -10,7 +15,9 @@ export interface YitianRulesConfig {
     summary: CheckKw
     progress: CheckKw
     next: CheckKw
-    serviceMode: { enabled: boolean; effectiveDate: string }
+    // V4.0.4:服务方式改为按【正文关键词】判定(与必填三段一致),故多出 keywords;
+    // effectiveDate 保留 —— 早于该日的历史工时豁免,不翻旧账。
+    serviceMode: CheckKw & { effectiveDate: string }
     typeMismatch: { enabled: boolean; rules: Record<string, [string, string][]> }
     product: {
       enabled: boolean
@@ -51,8 +58,9 @@ export function configToWorkbook(cfg: YitianRulesConfig): XLSX.WorkBook {
     { 检查项: '概述', 关键词: joinMulti(cfg.checks.summary.keywords) },
     { 检查项: '进展', 关键词: joinMulti(cfg.checks.progress.keywords) },
     { 检查项: '下一步', 关键词: joinMulti(cfg.checks.next.keywords) },
+    { 检查项: '服务方式', 关键词: joinMulti(cfg.checks.serviceMode.keywords) },
   ]
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(req), '必填三段')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(req), '必填四段')
 
   const tm: Record<string, string>[] = []
   for (const [wt, pairs] of Object.entries(cfg.checks.typeMismatch.rules))
@@ -82,7 +90,10 @@ export function workbookToConfig(wb: XLSX.WorkBook): YitianRulesConfig {
   for (const r of baseRows) baseMap.set(String(r['项'] ?? '').trim(), String(r['值'] ?? ''))
   const enabledOf = (label: string): boolean => isYes(baseMap.get(label))
 
-  const reqRows = sheetRows(wb, '必填三段')
+  // V4.0.4 起该表叫「必填四段」(多了服务方式)。回退读旧名,
+  // 否则用户导入 V4.0.3 及以前导出的 Excel 会【静默丢掉全部必填关键词】。
+  const reqRows0 = sheetRows(wb, '必填四段')
+  const reqRows = reqRows0.length ? reqRows0 : sheetRows(wb, '必填三段')
   const reqKw = (label: string): string[] => {
     const hit = reqRows.find((r) => String(r['检查项'] ?? '').trim() === label)
     return splitMulti(hit?.['关键词'])
@@ -112,7 +123,11 @@ export function workbookToConfig(wb: XLSX.WorkBook): YitianRulesConfig {
       summary: { enabled: enabledOf('启用-缺概述'), keywords: reqKw('概述') },
       progress: { enabled: enabledOf('启用-缺进展'), keywords: reqKw('进展') },
       next: { enabled: enabledOf('启用-缺下一步'), keywords: reqKw('下一步') },
-      serviceMode: { enabled: enabledOf('启用-服务方式'), effectiveDate: String(baseMap.get('服务方式生效日') ?? '').trim() },
+      // 旧表没有「服务方式」这一行 → reqKw 返回空数组 → 补默认值,
+      // 不能留空:空关键词等于该项不检查,会让规则静默失效。
+      serviceMode: { enabled: enabledOf('启用-服务方式'),
+                     keywords: reqKw('服务方式').length ? reqKw('服务方式') : [...DEFAULT_SERVICE_MODE_KEYWORDS],
+                     effectiveDate: String(baseMap.get('服务方式生效日') ?? '').trim() },
       typeMismatch: { enabled: enabledOf('启用-类型一致性'), rules },
       product: { enabled: enabledOf('启用-产品类别'), lineKeywords, nameKeywords, exclusiveKws },
       customer: { enabled: enabledOf('启用-客户名称'), hintKeywords: splitMulti(baseMap.get('客户提示词')) },
@@ -138,13 +153,25 @@ const CHECK_KEYS = ['summary', 'progress', 'next', 'serviceMode',
 
 /** 最小结构校验:导入内容缺关键嵌套键会让编辑区模板在 render 阶段崩(onFile 的 try 兜不到),
  * 故在落 draft 前先卡住。语义合法性仍以后端 validate_config 为准(保存时兜底)。 */
+/** 把 V4.0.3 及以前的配置补齐到当前结构。只补【新增】的字段,不动既有值。
+ *  放在 assertRulesShape 之前调用 —— 否则旧配置会因缺 serviceMode.keywords 被判非法、
+ *  用户导入自己上个月导出的文件会直接失败。 */
+export function fillLegacyDefaults(cfg: unknown): unknown {
+  const c = cfg as Record<string, any>
+  const sm = c?.checks?.serviceMode
+  if (sm && typeof sm === 'object' && !Array.isArray(sm.keywords)) {
+    sm.keywords = [...DEFAULT_SERVICE_MODE_KEYWORDS]
+  }
+  return c
+}
+
 export function assertRulesShape(cfg: unknown): asserts cfg is YitianRulesConfig {
   const c = cfg as Record<string, any>
   const ck = c?.checks as Record<string, any> | undefined
   const ok = c && typeof c === 'object' && Array.isArray(c.checkedTypes) && ck && typeof ck === 'object'
     && CHECK_KEYS.every((k) => ck[k] && typeof ck[k] === 'object' && typeof ck[k].enabled === 'boolean')
     && Array.isArray(ck.summary.keywords) && Array.isArray(ck.progress.keywords) && Array.isArray(ck.next.keywords)
-    && typeof ck.serviceMode.effectiveDate === 'string'
+    && typeof ck.serviceMode.effectiveDate === 'string' && Array.isArray(ck.serviceMode.keywords)
     && ck.typeMismatch.rules && typeof ck.typeMismatch.rules === 'object'
     && Array.isArray(ck.product.lineKeywords) && Array.isArray(ck.product.nameKeywords) && Array.isArray(ck.product.exclusiveKws)
     && Array.isArray(ck.customer.hintKeywords) && Array.isArray(ck.presaleProductHint.skipWorkTypes)
@@ -154,7 +181,7 @@ export function assertRulesShape(cfg: unknown): asserts cfg is YitianRulesConfig
 export async function parseImportFile(file: File): Promise<YitianRulesConfig> {
   let cfg: YitianRulesConfig
   if (file.name.toLowerCase().endsWith('.json')) {
-    cfg = JSON.parse(await file.text()) as YitianRulesConfig
+    cfg = fillLegacyDefaults(JSON.parse(await file.text())) as YitianRulesConfig
   } else {
     const buf = await file.arrayBuffer()
     cfg = workbookToConfig(XLSX.read(buf, { type: 'array' }))

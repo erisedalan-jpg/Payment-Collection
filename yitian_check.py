@@ -113,11 +113,12 @@ def check_row(row: dict, peer: str = "", cfg: dict = None) -> Tuple[List[str], L
                 codes.append(code)
                 msgs.append(R.ISSUE_LABELS[code])
 
-    # 2) 服务方式:读列非空;早于生效日豁免(ISO 日期串字典序可直接比较)
+    # 2) 服务方式:V4.0.4 起与必填三段一致 —— 在【正文】里找关键词,不再读工时表的「服务方式」列。
+    #    早于生效日豁免(ISO 日期串字典序可直接比较),不翻旧账。
     sm = checks["serviceMode"]
-    if sm["enabled"]:
+    if sm["enabled"] and sm["keywords"]:
         if str(row.get("date") or "") >= sm["effectiveDate"]:
-            if not str(row.get("service_mode") or "").strip():
+            if not re.search(_keywords_re(sm["keywords"]), content, re.IGNORECASE):
                 codes.append("MISS_SERVICE_MODE")
                 msgs.append(R.ISSUE_LABELS["MISS_SERVICE_MODE"])
 
