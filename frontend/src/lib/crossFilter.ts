@@ -35,15 +35,19 @@ export function cfUniqueValues(rows: Record<string, any>[], colKey: string): Uni
     for (const r of rows) for (const rr of (r.riskReasons ?? [])) if (rr?.category) set.add(String(rr.category))
     return [...set].sort().map((display) => ({ display, raw: display }))
   }
-  // 通用数组列(如倚天「问题类型」string[]):元素级去重。放在 riskReasons 特例后;
-  // 主域可筛列无数组类型(数组列本被 FILTERABLE 排除),故此分支只对新引入的数组列生效,零回归。
+  // 通用数组列(如标签 string[]、倚天「问题类型」string[]):元素级去重。放在 riskReasons 特例后。
+  // 空数组/字段缺失 → 产出「空值」选项并置顶:标签筛选从工具栏下沉表头后,
+  // 原 TagFilterSelect 的「无标签」选项靠这里补回(实测 638 个项目中 580 个无标签)。
   if (rows.some((r) => Array.isArray(r[colKey]))) {
     const set = new Set<string>()
+    let hasEmpty = false
     for (const r of rows) {
       const v = r[colKey]
-      if (Array.isArray(v)) for (const item of v) set.add(String(item))
+      if (Array.isArray(v) && v.length) for (const item of v) set.add(String(item))
+      else hasEmpty = true
     }
-    return [...set].sort().map((display) => ({ display, raw: display }))
+    const vals = [...set].sort().map((display) => ({ display, raw: display }))
+    return hasEmpty ? [{ display: '空值', raw: '' }, ...vals] : vals
   }
   const uvMap: Record<string, unknown> = {}
   for (const r of rows) {
@@ -73,6 +77,11 @@ export function applyColumnFilters(
       }
       const cv0 = row[ck]
       if (Array.isArray(cv0)) {
+        if (!cv0.length) {
+          // 空数组只被「空值」命中(与非数组列的空值语义一致)
+          if (!sel.includes('空值')) return false
+          continue
+        }
         const strs = cv0.map((x) => String(x))
         if (!sel.some((s) => strs.includes(s))) return false
         continue
