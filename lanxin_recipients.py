@@ -32,6 +32,11 @@ MAX_FIELDS = 10
 
 SIGNATURE = "项目管理平台"
 
+# 卡片底部引导语。仅在【回调凭证已配置】时附加 —— 回调没配就写「请直接回复」,
+# 是让人对着收不到的地方说话。两种发送身份都能收回复(应用号走 account_message,
+# 机器人走 bot_private_message),故不按身份区分。
+REPLY_HINT = "如有说明，请直接回复本消息"
+
 # 卡片 fields 的 key 上限 18 字节(蓝信硬限)。八类关注原因里这三类超限,
 # 其中「总成本超支大于/小于5000」截断后【完全相同】(都成「总成本超支…」),收件人分不清 —— 目验才发现。
 # 故卡内用短标签。注意:这【不改口径】,riskReasons 的 RiskCategory 一个字不动,
@@ -188,20 +193,24 @@ def _card(head: str, title: str, subtitle: str, fields: List[Dict[str, str]],
 
 
 def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
-                         start: str, end: str) -> Dict[str, Any]:
+                         start: str, end: str, reply_hint: bool = False) -> Dict[str, Any]:
     """工时卡 → 填报人本人。问题类型共 7 类,fields 恒 ≤10 对,永不撞线。
-    start/end 任一为空 → 不出「统计区间」这行副标题,绝不拼出半截文案(宁可不显示,不显示空区间)。"""
+    start/end 任一为空 → 不出「统计区间」这行副标题,绝不拼出半截文案(宁可不显示,不显示空区间)。
+    reply_hint=True 时在 bodyContent 追加回复引导语(仅回调凭证已配置时由调用方传 True)。"""
     total = sum(int(i["count"]) for i in issues)
     rows = sorted(issues, key=lambda i: -int(i["count"]))
     fields = [_field(short_issue(i["label"]), "%d 条" % int(i["count"])) for i in rows]
     subtitle = "统计区间 %s ~ %s" % (start, end) if start and end else ""
+    content = REPLY_HINT if reply_hint else ""
     return _card("工时填报提醒",
                  "你有 %d 条工时填报存在问题" % total,
                  subtitle,
-                 fields)
+                 fields,
+                 content)
 
 
-def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, Any]:
+def build_project_card(name: str, by_reason: Dict[str, List[str]],
+                       reply_hint: bool = False) -> Dict[str, Any]:
     """项目卡 → 项目经理本人。
     fields 按【原因】排(共 8 类,恒 ≤10 对) —— 不能按项目名排:实测单人最多背 49 个项目。
     具体项目名进 bodyContent(3000 字节/八行),超出显式写「另有 N 个未列出」。
@@ -217,10 +226,14 @@ def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, 
     used = 0
     shown: set = set()      # 已经写进 bodyContent 某一行的项目名
     dropped: set = set()    # 因超预算被丢弃那一行涉及的项目名
+    # 预留「另有…」的 60 字节;引导语是循环后追加的,也必须先扣掉,
+    # 否则最坏情形会被 _card 的 fit_bytes 截成半截指令(引导语是操作指引,
+    # 截半了比不显示更糟 —— 用户不知道该做什么)。
+    reserve = 60 + (len(REPLY_HINT.encode("utf-8")) + 1 if reply_hint else 0)
     for reason, names in rows:
         line = "%s：%s" % (reason, "、".join(names))
         n = len(line.encode("utf-8")) + 1
-        if used + n > LIMIT_BODY_CONTENT - 60:      # 预留「另有…」的位置
+        if used + n > LIMIT_BODY_CONTENT - reserve:
             dropped.update(names)
             continue
         lines.append(line)
@@ -229,6 +242,8 @@ def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, 
     omitted = dropped - shown      # 只统计【完全没出现在正文里】的项目
     if omitted:
         lines.append("另有 %d 个项目未列出" % len(omitted))
+    if reply_hint:
+        lines.append(REPLY_HINT)
     return _card("项目关注提醒",
                  "你名下 %d 个项目存在关注原因" % distinct,
                  "",
@@ -239,7 +254,7 @@ def build_project_card(name: str, by_reason: Dict[str, List[str]]) -> Dict[str, 
 def build_summary_card(name: str, rows: List[Dict[str, Any]], level_label: str,
                        unit: str = "项", head_title: str = "项目关注提醒",
                        title_fmt: str = "你的团队有 %d 个项目存在关注原因",
-                       label_fn=short_reason) -> Dict[str, Any]:
+                       label_fn=short_reason, reply_hint: bool = False) -> Dict[str, Any]:
     """汇总卡 → 上级。按【直接下属 × 原因/问题码】嵌套聚合:key=姓名, value='N <unit>：标签 n · 标签 n'。
     数字是该下属整棵子树的合计(逐层卷上去)。只列有异常的直属。
     主动不越 10 对 —— 蓝信超限行为未知,不去赌。
@@ -264,6 +279,8 @@ def build_summary_card(name: str, rows: List[Dict[str, Any]], level_label: str,
     content = ""
     if rest:
         content = "另有 %d 人共 %d %s未列出" % (len(rest), sum(int(r["total"]) for r in rest), unit)
+    if reply_hint:
+        content = (content + "\n" + REPLY_HINT) if content else REPLY_HINT
     return _card(head_title,
                  title_fmt % total,
                  level_label,
