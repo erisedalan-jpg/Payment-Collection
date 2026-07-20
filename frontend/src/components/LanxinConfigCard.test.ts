@@ -5,6 +5,7 @@ import ElementPlus from 'element-plus'
 import LanxinConfigCard from './LanxinConfigCard.vue'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 import { ALL_RISK_CATEGORIES } from '@/lib/riskReasons'
+import { getLanxinConfig } from '@/lib/lanxinApi'
 
 // items 恒为完整白名单长度(后端 lanxin_config._validate_items 按白名单补齐)。
 // 只把 MISS_SUMMARY / 回款延期 设为已启用,其余 code 保持 enabled:false ——
@@ -130,5 +131,20 @@ describe('V4.0.2 逐项配置', () => {
     const payload = vi.mocked(saveLanxinConfig).mock.calls[0][0]
     expect(Array.isArray(payload.routes[0].items)).toBe(true)
     expect(payload.routes[0].items[0]).toHaveProperty('supervisorLevels')
+  })
+
+  // M-1(终审):items 恒为完整白名单是【后端契约】(_validate_items 会按白名单补齐,
+  // 有 test_items_missing_codes_are_filled_as_disabled 锁)。这里锁的是契约被破坏时的
+  // 降级行为 —— 少渲染几行是可接受的,但绝不能崩、也不能把已收到的项吞掉。
+  it('后端若返回不完整 items,UI 不崩且如实渲染收到的项', async () => {
+    const partial = JSON.parse(JSON.stringify(CFG))
+    partial.routes[0].items = [
+      { code: 'MISS_SUMMARY', enabled: true, primary: true, supervisorLevels: 0 },
+    ]
+    vi.mocked(getLanxinConfig).mockResolvedValueOnce(partial)
+    const w = await mountCard()
+    // 工时路由只剩 1 行、项目路由仍 8 行 —— 如实渲染收到的,不崩也不吞
+    expect(w.findAll('[data-test="lx-item-row"]').length).toBe(1 + ALL_RISK_CATEGORIES.length)
+    expect(w.html()).toContain('缺少工作概述')
   })
 })

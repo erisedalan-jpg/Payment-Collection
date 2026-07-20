@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import TempFollowupView from './TempFollowupView.vue'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { tempFollowupApi } from '@/lib/tempFollowupApi'
 
 // V4.0.2:store 现在要的是多实例形状 {instances: [...]}(不再是单实例 {scope,current,archives})。
 // 固定 id('inst-t1'/'inst-t2')便于测试断言按实例隔离的持久化 key。
@@ -226,6 +227,50 @@ describe('TempFollowupView', () => {
       await mountAs(true)
       expect(JSON.parse(localStorage.getItem(`colprefs:admin:temp-followup:${first}`)!))
         .toEqual(['projectName', 'orgL4'])
+    })
+
+    // M-5:上面那条"迁移只跑一次"用例实际锁住的是 migrateLegacyTableKeys 里
+    // `localStorage.getItem(newKey) === null` 这道 null 守卫 —— 新 key 只要非 null 就不会被
+    // 覆盖,与标记位(done)是否存在无关(变异验证实测:把 `if (done) return` 注释掉,那条用例
+    // 仍然全绿)。标记位真正守的是另一条路径:新 key 被清空(变回 null)后,不能让旧 key 的值
+    // "复活"进新 key —— 必须把新 key 设成 null 才能让 null 守卫失效,从而暴露标记位是否生效。
+    it('标记位锁住迁移只跑一次:新 key 被清空后,旧值不会因重新挂载而复活', async () => {
+      localStorage.setItem('colprefs:admin:temp-followup', JSON.stringify(['projectId']))
+      await mountAs(true)                     // 首次挂载:触发迁移,写下标记位
+      const store = useTempFollowupStore()
+      const first = store.instances[0].id
+      expect(localStorage.getItem(`colprefs:admin:temp-followup:${first}`)).not.toBeNull()
+
+      // 模拟用户后续清空了这份列配置(如"重置为默认"),新 key 变回 null;
+      // 旧 key(colprefs:admin:temp-followup)仍保留原值,未被清空。
+      localStorage.removeItem(`colprefs:admin:temp-followup:${first}`)
+
+      await mountAs(true)                     // 再次挂载:标记位仍在 → 不该重新迁移
+      expect(localStorage.getItem(`colprefs:admin:temp-followup:${first}`)).toBeNull()
+    })
+
+    // M-6:doCreate/doRename/doDeleteInstance 此前没有 catch —— api.post 在 {success:false}
+    // 时抛 ApiRequestError,全局无兜底处理器。最确定会撞上的是"只剩一个实例时点删除"(后端
+    // 必然 400「至少保留一个跟进事项」):不加 catch 的话确认弹窗点完之后什么都没发生、
+    // 管理弹窗也不关、控制台一条 unhandled rejection——用户只会以为页面卡了。
+    // 直接 spy 真实 ElMessageBox.confirm/ElMessage.error(而不是整体 mock element-plus 模块),
+    // 避免影响本文件其它依赖真实 ElementPlus 插件渲染 el-dialog/el-table 的用例。
+    it('删除跟进事项失败(如仅剩一个实例的 400)时提示错误,不静默', async () => {
+      const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as any)
+      const errSpy = vi.spyOn(ElMessage, 'error').mockImplementation(() => ({}) as any)
+      ;(tempFollowupApi.deleteInstance as any).mockRejectedValueOnce(
+        new Error('至少保留一个跟进事项'))
+      const w = await mountAs(true)
+      await w.find('[data-test="temp-inst-menu"]').trigger('click')
+      await flushPromises()
+      const delBtn = w.findAll('button').find((b) => b.text() === '删除')
+      expect(delBtn).toBeTruthy()
+      await delBtn!.trigger('click')
+      await flushPromises()
+      expect(confirmSpy).toHaveBeenCalled()
+      expect(errSpy).toHaveBeenCalled()        // 核心断言:失败必须有提示,不能静默
+      confirmSpy.mockRestore()
+      errSpy.mockRestore()
     })
   })
 })

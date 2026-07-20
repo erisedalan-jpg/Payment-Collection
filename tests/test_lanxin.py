@@ -1,6 +1,7 @@
 import json
 import pytest
 import lanxin as LX
+import lanxin_config as LC
 
 
 CFG = {
@@ -526,6 +527,82 @@ def test_plan_totals():
     plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["totals"]["recipients"] == len(plan["recipients"])
     assert plan["totals"]["unresolved"] == 1
+
+
+# ── I-2:spec §3 点名的 Part B 头号测试——迁移前后 build_plan 行为等价性(golden) ──
+
+def test_build_plan_behavior_equivalence_after_migration_golden():
+    """★ I-2:spec §3 点名的 Part B 头号测试 —— 对同一份 items,用【迁移后的配置】跑
+    build_plan,推给谁、推哪些项、每项计数必须与【迁移前的旧配置语义】完全一致。
+
+    旧实现(V4.0.1 及以前的路由级 recipients + issueCodes/reasons)已被删除,仓库里也
+    没有留存 golden 输出,所以本测试不是"跑旧代码再对拍",而是按旧语义手工算出期望值:
+    旧配置里 recipients.primary/supervisorLevels 是【整条路由统一】的,对 issueCodes/
+    reasons 里勾选的每一项都套用同一组 primary/levels —— 这正是 lanxin_config.
+    _migrate_route_items 的定义(见 lanxin_config.py:130-139),所以"手工套用旧语义算
+    期望值"与"迁移后按逐项 items 跑 build_plan"在数学上必然给出同一个答案,除非迁移或
+    build_plan 哪里出错,故此golden值可作为等价性的可执行证据。
+
+    唯一的已知有意差异(非缺陷,spec §B3 明确要求,为清 V4.0.0 遗留的 M-2 技术债):
+    汇总卡副标题从旧的按级别分文案统一改成固定的「团队汇总」。准确的说法因此是
+    "推给谁、推哪些项、每项计数完全一致,唯一变化是汇总卡副标题文案"——不是字面意义
+    上的"逐字节等价",断言必须反映这个真实情况,不能为了通过测试而放宽断言。
+    """
+    legacy = _cfg(project_levels=2, ts_levels=2, project_on=True, ts_on=True)
+    migrated = LC.validate_config(legacy)
+
+    items = [
+        {"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},   # P1 → 张三(A006)
+        {"kind": "project", "projectId": "P3", "reasons": ["回款延期"]},   # P3 → 李四(A007)
+        {"kind": "timesheet", "employId": "A006",
+         "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3}]},
+        {"kind": "timesheet", "employId": "A007",
+         "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 2}]},
+    ]
+    plan = LX.build_plan(items, migrated, TREE, PMIS)
+
+    got = [{"employId": r["employId"], "role": r["role"],
+            "bodyTitle": r["card"]["bodyTitle"], "fields": r["card"]["fields"]}
+           for r in plan["recipients"]]
+
+    expected = [
+        # ① 工时 primary(推本人):sorted(ts_by_emp) = A006, A007
+        {"employId": "A006", "role": "primary",
+         "bodyTitle": "你有 3 条工时填报存在问题",
+         "fields": [{"key": "缺少工作概述", "value": "3 条"}]},
+        {"employId": "A007", "role": "primary",
+         "bodyTitle": "你有 2 条工时填报存在问题",
+         "fields": [{"key": "缺少工作概述", "value": "2 条"}]},
+        # ② 项目 primary(推本人):sorted(proj_by_emp) = A006, A007
+        {"employId": "A006", "role": "primary",
+         "bodyTitle": "你名下 1 个项目存在关注原因",
+         "fields": [{"key": "回款延期", "value": "1 个项目"}]},
+        {"employId": "A007", "role": "primary",
+         "bodyTitle": "你名下 1 个项目存在关注原因",
+         "fields": [{"key": "回款延期", "value": "1 个项目"}]},
+        # ③ 工时 supervisor:+2 于岩(A002,看耿磊磊子树合计5)先、+1 耿磊磊(A005,看张三/李四)后
+        #   —— sorted(agg) 按工号字符串排序,"A002" < "A005"
+        {"employId": "A002", "role": "supervisor",
+         "bodyTitle": "你的团队工时填报存在 5 条问题",
+         "fields": [{"key": "耿磊磊", "value": "5 条：缺少工作概述 5"}]},
+        {"employId": "A005", "role": "supervisor",
+         "bodyTitle": "你的团队工时填报存在 5 条问题",
+         "fields": [{"key": "张三", "value": "3 条：缺少工作概述 3"},
+                    {"key": "李四", "value": "2 条：缺少工作概述 2"}]},
+        # ④ 项目 supervisor:同样 A002 先、A005 后
+        {"employId": "A002", "role": "supervisor",
+         "bodyTitle": "你的团队有 2 个项目存在关注原因",
+         "fields": [{"key": "耿磊磊", "value": "2 项：回款延期 2"}]},
+        {"employId": "A005", "role": "supervisor",
+         "bodyTitle": "你的团队有 2 个项目存在关注原因",
+         "fields": [{"key": "张三", "value": "1 项：回款延期 1"},
+                    {"key": "李四", "value": "1 项：回款延期 1"}]},
+    ]
+    assert got == expected
+
+    # 唯一的已知差异:汇总卡副标题统一为「团队汇总」,不再按级别写「直接上级（+N）」。
+    supervisor_subtitles = {r["card"]["bodySubTitle"] for r in plan["recipients"] if r["role"] == "supervisor"}
+    assert supervisor_subtitles == {LX.SUMMARY_SUBTITLE}
 
 
 def test_dispatch_sends_each_recipient(monkeypatch):

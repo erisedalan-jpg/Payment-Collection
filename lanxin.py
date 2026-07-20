@@ -196,7 +196,13 @@ def _rollup(counts_by_emp: Dict[str, Dict[str, int]], levels: int,
 
 def _merge_agg(dst: Dict[str, Dict[str, Dict[str, int]]],
                src: Dict[str, Dict[str, Dict[str, int]]]) -> None:
-    """把一次 _rollup 的产出合并进累计结果(sup → owner → {标签: 计数} 三层就地相加)。"""
+    """把一次 _rollup 的产出合并进累计结果(sup → owner → {标签: 计数} 三层就地相加)。
+
+    注:当前调用方 _rollup_by_levels 给每个标签只分一个 levels 组,故同一个 (sup, owner)
+    在不同组里携带的标签集合互斥,最内层的 `+` 实际恒等于赋值(终审 M-4 指出这一点)。
+    仍写成累加而非覆盖:一是「合并」语义本就该累加,写成赋值会让人误以为可以安全覆盖;
+    二是将来若改成一个标签可属多组(例如同时报本级与部门级),累加是唯一正确的行为,
+    而覆盖会静默丢数。"""
     for sup, owners in src.items():
         d = dst.setdefault(sup, {})
         for owner, counts in owners.items():

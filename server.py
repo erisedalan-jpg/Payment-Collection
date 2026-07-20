@@ -520,28 +520,43 @@ def _load_temp_followup():
     每次调用都会为默认实例新分配一个 uuid;若不落盘,同一份"从未写过盘"的 store 被读两次
     (例如先 GET 拿 id 再 POST 用该 id)就会各自生成不同 id,前一次读到的 id 到下一次写入时
     就变成"不存在"——首次使用即触发本任务要求必须 400 的那条防线,但触发方却是合法请求。
-    不抛。"""
+
+    落盘只在两种【确知安全】的情况下发生:①文件本就不存在(全新安装,写默认 store 无损);
+    ②文件存在且成功解析出一个 dict、只是缺 instances 键(旧结构迁移,写入迁移结果无损)。
+    只要文件存在但没能读出可用 dict(损坏 JSON、瞬时 OSError、编码异常等)——一律不落盘,
+    只把内存里的默认值返回给本次请求用,磁盘上那份文件原封不动地留给人工排查/恢复
+    (V4.0.1 及以前就是这个语义;V4.0.2 引入落盘时未区分这两种情况,曾导致读失败原子
+    覆盖现网数据,见 C-1)。不抛。"""
     with _temp_lock:
-        store = None
-        if os.path.exists(TEMP_FOLLOWUP_FILE):
+        file_exists = os.path.exists(TEMP_FOLLOWUP_FILE)
+        parsed_dict = None
+        if file_exists:
             try:
                 with open(TEMP_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
                     loaded = json.load(f)
                 if isinstance(loaded, dict):
-                    store = loaded
-            except Exception:
-                store = None
-        needs_persist = not (isinstance(store, dict) and isinstance(store.get('instances'), list)
-                             and store['instances'])
-        if store is None:
+                    parsed_dict = loaded
+            except (OSError, ValueError) as e:
+                logger.error("读取临时跟进数据失败,本次按内存默认值处理、不写盘: %s", e)
+                parsed_dict = None
+
+        if not file_exists:
             store = _temp.new_store()
+            safe_to_persist = True
+        elif parsed_dict is not None:
+            store = _temp.migrate(parsed_dict)
+            needs_migration = not (isinstance(parsed_dict.get('instances'), list)
+                                   and parsed_dict['instances'])
+            safe_to_persist = needs_migration
         else:
-            store = _temp.migrate(store)
+            store = _temp.new_store()
+            safe_to_persist = False
+
         for inst in store.get('instances') or []:
             inst['scope'] = _temp.normalize_scope(inst.get('scope'))
             inst.setdefault('current', {})
             inst.setdefault('archives', [])
-        if needs_persist:
+        if safe_to_persist:
             _save_temp_followup(store)
         return store
 
@@ -1822,7 +1837,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return s.get('instances', [])
 
         ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
-        if holder.get('detail'):
+        if ok and holder.get('detail'):
             self._audit_set(detail=holder['detail'])
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,

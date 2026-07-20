@@ -251,6 +251,27 @@ def test_temp_followup_scope_summarized(tmp_path, monkeypatch):
         srv.shutdown(); srv.server_close()
 
 
+def test_temp_followup_delete_rejected_keeps_neutral_detail(tmp_path, monkeypatch):
+    """M-3:只剩一个实例时删除必被 400 拒绝,审计 detail 不能留下"删除跟进事项「X」
+    (含 N 条归档)"这种暗示已成功的富化文案 —— 那件事根本没发生。"""
+    srv, port = _start(tmp_path, monkeypatch)
+    _patch_business_files(monkeypatch, tmp_path)
+    try:
+        conn, cookie = _login(port)
+        conn.request('GET', '/api/temp-followup', headers={'Cookie': cookie})
+        data = json.loads(conn.getresponse().read())
+        iid = data['instances'][0]['id']
+        resp = _post(conn, cookie, '/api/temp-followup/instances/delete', {'instanceId': iid})
+        assert resp.status == 400
+        resp.read()
+        _wait_for(lambda: audit.read({'event': ['temp_followup.instance_delete']}, 1, 50)['rows'])
+        row = audit.read({'event': ['temp_followup.instance_delete']}, 1, 50)['rows'][0]
+        assert row['success'] is False
+        assert '含' not in (row['detail'] or '') and '条归档' not in (row['detail'] or '')
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
 def test_opportunity_create_and_update_enriched(tmp_path, monkeypatch):
     srv, port = _start(tmp_path, monkeypatch)
     _patch_business_files(monkeypatch, tmp_path)
