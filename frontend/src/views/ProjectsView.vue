@@ -14,7 +14,6 @@ import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
-import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupModal from '@/components/FollowupModal.vue'
 import Modal from '@/components/Modal.vue'
@@ -41,7 +40,7 @@ const rows = computed(() =>
   buildProjectRows((data.data?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.effectiveAssignments))
 
 // 工具栏特殊筛选(非列枚举)
-const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' })
+const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', riskCategory: '' })
 // 先表头列枚举(crossFilter) → 再特殊项
 const filtered = computed(() => filterProjectRows(applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as ProjectRow[], sp))
 
@@ -51,6 +50,12 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'contractAmount', label: '合同金额(万)', width: 110, sortable: true,
     formatter: (v) => (v == null ? '-' : (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
   { key: 'setupDate', label: '立项日期', width: 110, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'originSetupDate', label: '原项目立项日期', width: 130, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'plannedFinalAcceptDate', label: '计划终验时间', width: 120, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'actualFinalAcceptDate', label: '实际终验时间', width: 120, sortable: true,
     formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
   { key: 'projectManager', label: '项目经理', width: 96, sortable: true },
   { key: 'orgL4', label: 'L4组', width: 110, sortable: true },
@@ -72,8 +77,10 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'action', label: '操作', width: 80, fixed: 'right' },
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
-const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
-const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate'])
+// tags 进默认可见:ColumnFilter 挂在表头,列隐藏则筛选入口一并消失。
+// 标签筛选原本是工具栏常驻的,若下沉后仍默认隐藏,升级后的观感就是「标签筛选没了」。
+const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'tags', 'action']
+const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate', 'originSetupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate', 'tags'])
 
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
@@ -142,7 +149,7 @@ async function doExport() {
   exOpen.value = false
 }
 
-defineExpose({ ALL_COLUMNS })
+defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
 </script>
 
 <template>
@@ -155,7 +162,6 @@ defineExpose({ ALL_COLUMNS })
         <el-option value="yes" label="售前整合" />
         <el-option value="no" label="非售前" />
       </el-select>
-      <TagFilterSelect v-model="sp.tags" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button class="pv-export-btn" @click="exOpen = true">导出</button>
