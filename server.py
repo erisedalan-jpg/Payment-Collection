@@ -358,7 +358,11 @@ _lanxin_inbox_lock = threading.RLock()
 # 但足以挡住「免登录端点被灌爆磁盘」。
 LANXIN_CALLBACK_MAX_BYTES = 1024 * 1024
 # 验签未通过的请求只记数与时间,【绝不落 body】—— 否则免登录端点等于任人写盘。
-_lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": ""}
+# lastReason 区分本次拒绝是 'signature'(验签失败,通常是签名令牌填错)还是
+# 'stale'(新鲜度检查失败,通常是时间戳格式/两端时钟对不上)—— 两者原因完全不同,
+# 共用同一个计数器会让超管排查时误把"格式假设错了"当成"密钥填错了"去查(见
+# lanxin_timestamp_fresh 的假设声明 + PROGRESS.md 债务条目)。
+_lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": "", "lastReason": ""}
 
 # 存证文件的滚动归档(I-2)。参照 audit.py 的既有做法:活动文件超上限就整份挪进
 # 归档目录、只保留最近若干份。不做滚动的话这个纯 append 的 jsonl 只增不减 ——
@@ -397,7 +401,13 @@ def lanxin_risk_key(project_id, risk_code):
 def lanxin_timestamp_fresh(timestamp, now_epoch, skew=LANXIN_CALLBACK_MAX_SKEW_SEC):
     """回调 timestamp 是否落在 ±skew 秒窗口内。纯函数。
 
-    蓝信文档的 timestamp 为 epoch 秒;13 位一律按毫秒解释(容错,两种口径都认)。
+    按 epoch 秒解读;13 位一律按毫秒解释(容错,两种口径都认)。
+    【这是假设,不是文档规定】——`docs/2026-07-20-蓝信回调接口调研.md` 从未记载过这个
+    字段的单位与格式,首次联调时必须核实(见 PROGRESS.md 债务条目)。若蓝信实际发送
+    ISO8601、带小数的毫秒等任何非纯数字形态,下面的 isdigit 判断会为假,导致每一条
+    回调都被拒绝、入站半环全死;排查时看 `_lanxin_rejected['lastReason']` 是否为
+    'stale',以及日志里打出的 timestamp 原值长什么样(handle_lanxin_callback 里那行
+    warning——只打 timestamp,不打签名/密钥/报文体)。
     无法解析成整数 → False:缺参/垃圾参必然验不过,不给它放行。
     """
     raw = str(timestamp or '').strip()
@@ -3033,9 +3043,19 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             os.path.join(BASE_DIR, 'input', config.ORG_FILE))
 
     def _lanxin_pmis(self):
-        """projectPmis 用于 projectId → 项目经理。读整份 analysis_data 即可(已有缓存路径)。"""
+        """projectPmis 用于 projectId → 项目经理 及风险记录。读整份 analysis_data 即可(已有缓存路径)。"""
         data = _load_analysis_cached()
         return (data or {}).get('projectPmis') or {}
+
+    def _lanxin_valid_project_ids(self):
+        """归入前的项目存在性校验须对齐 /risk /progress /temp /payment_key 四页
+        【实际渲染的范围】——四页组件(RiskFollowupView/TempInstancePanel/
+        PaymentKeyFollowupView/KeyProjectsView)全部从 analysis_data.projects 数组取数据,
+        不是 projectPmis。projectPmis 条目数明显更多(现网 1260 vs projects 638),
+        622 个 id 只存在于 projectPmis——用它校验会让这类 id 打通归入,写进一个任何
+        页面都不会读的跟进 key(Minor-1,已记 PROGRESS.md 债务)。"""
+        data = _load_analysis_cached() or {}
+        return {str(p.get('projectId')) for p in (data.get('projects') or []) if p.get('projectId')}
 
     def handle_lanxin_config_get(self):
         """GET /api/lanxin/config - 凭证/路由配置 + 回调验签被拒计数。超管专属。
@@ -3218,6 +3238,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _lanxin_rejected['count'] += 1
             _lanxin_rejected['lastAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             _lanxin_rejected['lastFrom'] = audit.client_ip(self.headers, self.client_address)
+            _lanxin_rejected['lastReason'] = 'signature'
             self._send_json(200, {"errCode": -2, "errMsg": "签名校验失败"})
             return
 
@@ -3226,6 +3247,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _lanxin_rejected['count'] += 1
             _lanxin_rejected['lastAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             _lanxin_rejected['lastFrom'] = audit.client_ip(self.headers, self.client_address)
+            _lanxin_rejected['lastReason'] = 'stale'
+            # 排查者拿不到报文体也拿不到签名(铁律),这行日志是判断"蓝信到底发的
+            # 什么格式"的唯一线索——只打 timestamp 原值,绝不打签名/密钥/报文体。
+            logger.warning("蓝信回调时间戳未通过新鲜度检查(疑似重放,或时间戳格式不符假设): "
+                           "timestamp=%r", timestamp)
             self._send_json(200, {"errCode": -2, "errMsg": "时间戳超出有效窗口(疑似重放)"})
             return
 
@@ -3318,20 +3344,29 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
 
-        # M-2:projectId 必须真实存在。前端 el-select 只给现有项目,但那是【前端】——
-        # 直接打 API 可以传任意字符串,在跟进 store 里造出永远无人读取的幽灵 key。
-        pmis = self._lanxin_pmis()
-        proj = pmis.get(project_id)
-        if proj is None:
+        # M-2 + Minor-1:projectId 必须真实存在。前端 el-select 只给现有项目,但那是
+        # 【前端】——直接打 API 可以传任意字符串,在跟进 store 里造出永远无人读取的幽灵
+        # key。"存在"须对齐四页实际读取的 projects 数组,而不是范围明显更宽的
+        # projectPmis(见 _lanxin_valid_project_ids)。riskRecords 字段只在 projectPmis
+        # 上,存在性校验通过后仍要另取 projectPmis 记录供 needsRiskCode 分支使用。
+        if project_id not in self._lanxin_valid_project_ids():
             self._send_json(400, _error_payload(ERR_VALIDATION, "项目 %s 不存在" % project_id))
             return
+        proj = self._lanxin_pmis().get(project_id) or {}
         if _LANXIN_HANDLE_TARGETS[domain].get('needsRiskCode'):
-            codes = [str((rr or {}).get('风险编码') or '').strip()
-                     for rr in (proj.get('riskRecords') or [])]
+            records = proj.get('riskRecords') or []
+            codes = [str((rr or {}).get('风险编码') or '').strip() for rr in records]
             codes = [c for c in codes if c]
             if not codes:
-                self._send_json(400, _error_payload(
-                    ERR_VALIDATION, "项目 %s 无风险记录,无法归入风险跟进" % project_id))
+                if records:
+                    # Minor-2:记录存在但全部未填风险编码,与"真无风险记录"是两种不同
+                    # 情况——/risk 页(buildRiskRows)对这类项目仍会渲染出行,统一说
+                    # "无风险记录"会让人以为看错了页面。
+                    msg = ("项目 %s 的风险记录均未填风险编码,无法归入风险跟进(风险编码为空)"
+                          % project_id)
+                else:
+                    msg = "项目 %s 无风险记录,无法归入风险跟进" % project_id
+                self._send_json(400, _error_payload(ERR_VALIDATION, msg))
                 return
             if not risk_code:
                 self._send_json(400, _error_payload(
@@ -3388,8 +3423,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 "跟进内容已写入,但收件箱状态标记失败。请勿重复点击归入(会重复追加),"
                 "刷新后若仍显示「未归入」请联系管理员核对。"))
             return
-        self._audit_set(target='蓝信回复 %s' % item_id,
-                        detail='归入%s · 项目 %s' % (_LANXIN_HANDLE_TARGETS[domain]['label'], project_id))
+        # Minor-3:riskCode 补进审计详情——handledInfo 里已有,detail 里此前没有,
+        # 审计流水查不出回复落到了该项目的哪一条风险记录上。
+        detail = '归入%s · 项目 %s' % (_LANXIN_HANDLE_TARGETS[domain]['label'], project_id)
+        if risk_code:
+            detail += ' · 风险 %s' % risk_code
+        self._audit_set(target='蓝信回复 %s' % item_id, detail=detail)
         self._send_json(200, {"success": True, "handledInfo": info})
 
     def handle_lanxin_inbox_delete(self):

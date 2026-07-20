@@ -61,6 +61,15 @@ const riskOptions = computed(() =>
 const riskEmpty = computed(() =>
   needsRiskCode(handleForm.value.domain) && !!handleForm.value.projectId && !riskOptions.value.length)
 
+/** riskOptions 已经把没有风险编码的记录过滤掉了(见 riskChoices)，riskEmpty 因此分不清
+ *  「项目真的一条风险记录都没有」和「记录都在，只是全部没填风险编码」——后一种情况
+ *  /risk 页(riskRows.ts)明明会渲染出行，统一提示「无风险记录」会让人以为看错了页面。 */
+const riskCodeless = computed(() => {
+  if (!riskEmpty.value || !handleForm.value.projectId) return false
+  const raw = pmisMap.value[handleForm.value.projectId]?.riskRecords ?? []
+  return raw.length > 0
+})
+
 /** 换项目/换域后旧的风险编码必然失效（它属于上一个项目），一律清掉重选。 */
 function onScopeChange() {
   handleForm.value.riskCode = ''
@@ -86,7 +95,12 @@ async function confirmHandle() {
   if (!handleForm.value.projectId) { ElMessage.warning('请先选择项目'); return }
   if (needsInstance(domain) && !handleForm.value.instanceId) { ElMessage.warning('临时跟进须再选一个实例'); return }
   if (needsRiskCode(domain)) {
-    if (riskEmpty.value) { ElMessage.warning('该项目无风险记录，无法归入风险跟进'); return }
+    if (riskEmpty.value) {
+      ElMessage.warning(riskCodeless.value
+        ? '该项目风险记录均未填风险编码，无法归入风险跟进（风险编码为空）'
+        : '该项目无风险记录，无法归入风险跟进')
+      return
+    }
     if (!handleForm.value.riskCode) { ElMessage.warning('风险跟进须再选一条风险记录'); return }
   }
   busy.value = true
@@ -127,7 +141,7 @@ onMounted(() => { if (!data.data) data.load(); load() })
 // 测试需要绕过 el-select 的真实 popper 交互,直接摆状态调用这两个方法(参照
 // YitianRulesCard.test.ts 对 draft/onSave/applyImport 的既有做法)。
 defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
-               riskOptions, riskEmpty, onScopeChange, openHandle, confirmHandle })
+               riskOptions, riskEmpty, riskCodeless, onScopeChange, openHandle, confirmHandle })
 </script>
 
 <template>
@@ -225,7 +239,9 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
             <el-option v-for="r in riskOptions" :key="r.code" :label="r.label" :value="r.code" />
           </el-select>
           <span v-else class="dv-hint warn" data-test="li-risk-empty">
-            该项目无风险记录，无法归入风险跟进。请改选其它项目或其它目标域。
+            {{ riskCodeless
+                ? '该项目风险记录均未填风险编码，无法归入风险跟进（风险编码为空）。请改选其它项目或其它目标域。'
+                : '该项目无风险记录，无法归入风险跟进。请改选其它项目或其它目标域。' }}
           </span>
         </div>
 

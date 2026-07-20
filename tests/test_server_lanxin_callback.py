@@ -181,7 +181,7 @@ def lanxin_srv(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "inbox.json"))
     # 计数器是模块级可变字典,用例之间会串 —— 每次归零,并在退出时还原。
     before = dict(server._lanxin_rejected)
-    server._lanxin_rejected.update({"count": 0, "lastAt": "", "lastFrom": ""})
+    server._lanxin_rejected.update({"count": 0, "lastAt": "", "lastFrom": "", "lastReason": ""})
 
     cfg = lanxin_config.default_config()
     cfg["credentials"]["callbackSignToken"] = "tok-abc"
@@ -278,6 +278,11 @@ _RISK_PMIS = {
         ],
     },
     "P0002": {"projectName": "无风险项目", "riskRecords": []},
+    # Minor-2:风险记录【存在】但全部未填风险编码 —— 与 P0002 的"真无风险记录"是两种
+    # 不同情况,/risk 页(buildRiskRows)对这类项目仍会渲染出行。
+    "P0003": {"projectName": "风险编码缺失项目", "riskRecords": [
+        {"风险编码": "", "风险名称": "未编码风险", "风险等级": "高", "风险状态": "未关闭"},
+    ]},
 }
 
 
@@ -398,16 +403,46 @@ def test_replayed_signature_is_rejected_and_writes_nothing(lanxin_srv):
     assert server._lanxin_rejected["count"] == before + 1  # ③ 计数器能让超管看见
 
 
+def test_rejected_last_reason_distinguishes_signature_from_stale(lanxin_srv):
+    """Important-2:验签失败与新鲜度失败此前共用同一个 _lanxin_rejected 计数器,
+    没有原因字段——超管只看到拒绝计数在涨,分不清该查 signToken 还是查时间戳格式/
+    两端时钟。lastReason 必须能区分这两种情况,文案上一个指向"签名填错了",
+    一个指向"时间戳/时钟对不上"。
+    """
+    body = json.dumps({"dataEncrypt": _FAKE_CIPHER})
+
+    status, payload = _post_callback(lanxin_srv, body, signature="deadbeef")
+    assert payload["errCode"] == -2
+    assert server._lanxin_rejected["lastReason"] == "signature"
+
+    stale = str(int(time.time()) - 86400)
+    sig = _sign("tok-abc", stale, "n1", _FAKE_CIPHER)     # 签名本身完全正确
+    status, payload = _post_callback(lanxin_srv, body, timestamp=stale, signature=sig)
+    assert payload["errCode"] == -2
+    assert server._lanxin_rejected["lastReason"] == "stale"
+
+
 def test_freshness_check_runs_after_signature_not_before(lanxin_srv):
     """承重墙①不能被新鲜度检查破坏:验签仍须【先于】一切。
 
-    时间戳新鲜但签名错 → 必须报验签失败(-2)且不落盘;若把新鲜度提到验签之前,
-    未验签的请求就有了一条能改变服务端行为的路径。
+    时间戳新鲜但签名错 → 必须报验签失败(-2)且不落盘。但这个输入在【两种顺序下
+    结果完全相同】(都返回 -2、都不落盘)——抓不到顺序被调换,把新鲜度检查整段挪到
+    验签之前,这条断言一条都不会红。
+
+    唯一能区分顺序的输入是【时间戳过期 且 签名错】:正确顺序(验签先行)下,走不到
+    新鲜度检查,必须报的是【签名】错误;若新鲜度被错误地提到验签之前,过期的时间戳
+    会先被拦下,报出的会变成「时间戳超出有效窗口」——下面这条断言就是靠这一点分辨。
     """
     body = json.dumps({"dataEncrypt": _FAKE_CIPHER})
     status, payload = _post_callback(lanxin_srv, body, signature="deadbeef")
 
     assert payload["errCode"] == -2
+    assert not os.path.exists(server.LANXIN_RAW_FILE)
+
+    stale = str(int(time.time()) - 86400)
+    status, payload = _post_callback(lanxin_srv, body, timestamp=stale, signature="deadbeef")
+    assert status == 200
+    assert "签名" in payload["errMsg"]     # 顺序若反,这里会变成「时间戳超出有效窗口」
     assert not os.path.exists(server.LANXIN_RAW_FILE)
 
 
@@ -499,7 +534,15 @@ def handle_srv(tmp_path, monkeypatch):
 
     monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "inbox.json"))
     monkeypatch.setattr(server, "RISK_FOLLOWUP_FILE", str(tmp_path / "risk_followup.json"))
-    monkeypatch.setattr(server, "_load_analysis_cached", lambda: {"projectPmis": _RISK_PMIS})
+    # Minor-1:项目存在性校验改打 projects 数组(见 _lanxin_valid_project_ids),
+    # 不再是 projectPmis —— 这里补上 projects,否则本组既有用例全部会先被"项目不存在"
+    # 挡在门外。默认让 projects 与 _RISK_PMIS 的 key 集合一致;
+    # test_handle_rejects_project_only_in_pmis_not_in_projects 会再单独覆写这个 mock,
+    # 构造"只在 projectPmis、不在 projects"的场景来验证这条校验本身。
+    monkeypatch.setattr(server, "_load_analysis_cached", lambda: {
+        "projectPmis": _RISK_PMIS,
+        "projects": [{"projectId": pid} for pid in _RISK_PMIS],
+    })
 
     store = lanxin_inbox.new_store()
     for iid, status, text in (("ok1", "parsed", "收到,已在处理"),
@@ -577,11 +620,55 @@ def test_handle_risk_on_project_without_risk_records_is_rejected(handle_srv):
     assert "无风险记录" in json.dumps(payload, ensure_ascii=False)
 
 
+def test_handle_risk_on_project_with_codeless_risk_records_gets_distinct_message(handle_srv):
+    """Minor-2:风险记录【存在】但全部未填风险编码,与 P0002 的"真无风险记录"必须是
+    两种不同文案 —— /risk 页(buildRiskRows)对 P0003 这类项目仍会渲染出行,统一说
+    "无风险记录"会让人以为看错了页面。"""
+    status, payload = handle_srv(itemId="ok1", domain="risk",
+                                 projectId="P0003", riskCode="R-1")
+    assert status == 400
+    msg = json.dumps(payload, ensure_ascii=False)
+    assert "风险编码为空" in msg
+    assert "P0003 无风险记录" not in msg
+
+
 def test_handle_rejects_unknown_project(handle_srv):
     """M-2:projectId 必须真实存在。前端 el-select 只给现有项目,但直接打 API
     可以传任意字符串,在跟进 store 里造出永远无人读取的幽灵 key。"""
     status, _ = handle_srv(itemId="ok1", domain="progress", projectId="不存在的项目号")
     assert status == 400
+
+
+def test_handle_rejects_project_only_in_pmis_not_in_projects(handle_srv, monkeypatch):
+    """Minor-1:后端过去拿 projectPmis 判存在性,但 /risk /progress /temp /payment_key
+    四页全部从 projects 数组渲染。现网 projectPmis 1260 条、projects 638 条,622 个 id
+    只存在于 projectPmis —— 旧校验会让这类 id 打通归入,写进一个任何页面都不会读的
+    跟进 key。这里构造一个只在 projectPmis、不在 projects 里的 id,验证它仍被拒绝。
+    """
+    monkeypatch.setattr(server, "_load_analysis_cached", lambda: {
+        "projectPmis": {**_RISK_PMIS, "PMIS-ONLY": {"projectName": "仅存在于PMIS的项目",
+                                                     "riskRecords": []}},
+        "projects": [{"projectId": pid} for pid in _RISK_PMIS],   # 不含 PMIS-ONLY
+    })
+    status, payload = handle_srv(itemId="ok1", domain="progress", projectId="PMIS-ONLY")
+    assert status == 400
+    assert "不存在" in json.dumps(payload, ensure_ascii=False)
+
+
+def test_handle_audit_detail_includes_risk_code(handle_srv, monkeypatch):
+    """Minor-3:归入成功的审计详情必须带 riskCode——handledInfo 里已有,detail 里此前
+    没有,审计流水查不出回复落到了该项目的哪一条风险记录上。"""
+    captured = {}
+    orig_audit_set = server.CustomHandler._audit_set
+
+    def _spy(self, **kwargs):
+        captured.update(kwargs)
+        return orig_audit_set(self, **kwargs)
+
+    monkeypatch.setattr(server.CustomHandler, "_audit_set", _spy)
+    status, payload = handle_srv(itemId="ok1", domain="risk", projectId="P0001", riskCode="R-7")
+    assert status == 200, payload
+    assert "R-7" in (captured.get("detail") or "")
 
 
 def test_handle_rejects_unparsed_item(handle_srv):

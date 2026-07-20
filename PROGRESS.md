@@ -335,6 +335,8 @@
 - [ ] **L-28（V3.1.0 概算工具）** `/budget` 的**项目级别 / 客户级别 / 签约类型 / 是否含第三方外采 / 项目所在地**五个字段**不参与任何计算**（原工具即如此，纯审批标签，仅随报价存档与导出）。日后若要让它们影响系数（如渠道签约上浮、一线城市另计），需**先明确业务口径**再动 `lib/budget/calc.ts` —— 别看到字段闲着就顺手接进公式。
 - [ ] **L-29（测试卫生，全仓）** **全量 pytest 会往真实 `data/audit_log.jsonl` 追加测试审计记录** —— 全仓只有 4 个测试文件隔离了 `audit.AUDIT_LOG_FILE`（monkeypatch 到 tmp_path），其余「起真服务 + 发写请求」的测试都没隔离，跑一次 `verify.sh` 就会在生产审计日志里留下一批测试痕迹（污染审计、也让审计条数不可信）。建议**统一隔离**：加一个 autouse 的 conftest fixture 把 `AUDIT_LOG_FILE` 指向 tmp_path，而不是逐文件补。
 - [ ] **L-30（.gitignore 遗漏）** `.gitignore` 漏列 `data/payment_key_followup.json` / `data/risk_followup.json` —— 两个本地跟进数据文件（同类的 `followup_records.json`/`project_tags.json` 等都已忽略），当前靠"没人 `git add data/`"侥幸没被提交。补上。
+- [ ] **L-31（V4.0.5 蓝信回调，复审 refix2 记录）** nonce 重放缓存未做，当前依赖 **±5 分钟时间戳窗口 + 存证滚动归档两道叠加**兜底重放风险（`lanxin_timestamp_fresh` + `_lanxin_rotate_raw`）。这条窗口本身建立在一个未经证实的假设上——蓝信文档从未记载回调 `timestamp` 字段的单位与格式，`lanxin_timestamp_fresh` 按 epoch 秒解读纯属假设，首次联调必须核实。**这笔债与上面的窗口耦合**：若日后因为发现时间戳格式判断有误而放宽、简化或摘掉这道窗口，"没有 nonce 重放缓存"这个问题会跟着无声重新打开——两者必须一起处理，不能只改一头。已加 `_lanxin_rejected.lastReason`('signature'/'stale') 与只打 timestamp 原值(不含签名/密钥/报文体)的告警日志,便于首次联调时快速定位蓝信实际发送的格式。
+- [ ] **L-32（测试卫生，verify.sh 闸门）** `tests/test_server_download.py::test_super_download_missing_script_reports` 是既有竞态 flake（2026-07-20 复审实测 3 次全量：2 红 1 绿），非本版引入。它会让 `verify.sh` 这个合并闸门随机变红，侵蚀"全绿才算 done"的规矩。建议改为轮询到 SSE 终态帧再断言，而不是发完请求立即读一次响应体。
 
 ### 🔴 严重（小改动、高收益，建议优先）
 - [x] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。（A2 完成：ThreadingHTTPServer + create_server）
