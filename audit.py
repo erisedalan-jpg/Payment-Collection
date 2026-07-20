@@ -90,6 +90,10 @@ _ACTION_MAP = {
     ('POST', '/api/lanxin/config'): ('lanxin.config', '蓝信推送配置'),
     ('POST', '/api/lanxin/selftest'): ('lanxin.selftest', '蓝信连通性自检'),
     ('POST', '/api/lanxin/send'): ('lanxin.send', '蓝信推送发送'),
+    ('POST', '/api/lanxin/inbox/handle'): ('lanxin.inbox_handle', '归入蓝信回复'),
+    ('POST', '/api/lanxin/inbox/delete'): ('lanxin.inbox_delete', '删除蓝信回复'),
+    # 注:/api/lanxin/callback 【不入表】—— 它是免登录端点,没有账号可记,
+    # 且蓝信会重推,记进审计只会把噪声灌满。拒签计数走 _lanxin_rejected。
 }
 
 
