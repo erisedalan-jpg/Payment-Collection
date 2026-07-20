@@ -15,7 +15,11 @@ const newCallbackSignToken = ref('')
 // 验签被拒次数——回调端点免登录，验签失败时只记数不落报文体(见 lanxin_callback 设计)。
 // 这是超管判断「回调签名令牌是否填对」的唯一线索。数据源是 GET /api/lanxin/config 的
 // 顶层 rejected 字段(Task 6 提供);该任务落地前接口不含此字段,load() 里按 0 兜底。
-const rejected = ref<{ count: number; lastAt: string }>({ count: 0, lastAt: '' })
+// lastReason(Important-2)区分最近一次是验签失败还是时间戳新鲜度失败——两者共用
+// 同一个 count，不分原因超管只看到计数在涨，会去查 signToken/aesKey/nginx，
+// 而真正的原因可能是时间戳格式或两端时钟对不上。
+const rejected = ref<{ count: number; lastAt: string; lastReason?: string }>(
+  { count: 0, lastAt: '', lastReason: '' })
 const selftestEmp = ref('')
 const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
 
@@ -51,7 +55,7 @@ async function load() {
     // 缺这个字段是预期状态,不能让整卡因此报错或渲染异常。
     const res = await getLanxinConfigFull()
     cfg.value = res.config
-    rejected.value = res.rejected ?? { count: 0, lastAt: '' }
+    rejected.value = res.rejected ?? { count: 0, lastAt: '', lastReason: '' }
   } catch { /* 未登录/缺接口静默 */ }
 }
 
@@ -160,8 +164,11 @@ defineExpose({ rejected })
       </div>
       <div v-if="rejected.count > 0" class="dv-row" data-test="lx-rejected">
         <span class="dv-label">已拒绝</span>
-        <span class="dv-hint warn">
-          {{ rejected.count }} 次验签失败 · 最近 {{ rejected.lastAt }} —— 通常意味着回调签名令牌填错了
+        <span class="dv-hint warn" data-test="lx-rejected-reason">
+          {{ rejected.count }} 次回调被拒 · 最近 {{ rejected.lastAt }} ——
+          {{ rejected.lastReason === 'stale'
+              ? '最近一次因时间戳超出有效窗口，多半是时间戳格式或两端时钟对不上，而非签名填错'
+              : '最近一次是验签失败，通常意味着回调签名令牌填错了' }}
         </span>
       </div>
 

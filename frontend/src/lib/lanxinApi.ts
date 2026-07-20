@@ -48,11 +48,15 @@ export interface LanxinSendResult {
 }
 
 /** 回调验签被拒次数——数据源是 GET /api/lanxin/config 顶层的 rejected 字段(Task 6 提供)。
- *  Task 6 落地前接口不含该字段,故 getLanxinRejectedStats() 允许解出 undefined,调用方按 0 兜底。 */
+ *  Task 6 落地前接口不含该字段,故 getLanxinRejectedStats() 允许解出 undefined,调用方按 0 兜底。
+ *  lastReason(Important-2)区分最近一次拒绝是 'signature'(验签失败,通常是签名令牌填错)
+ *  还是 'stale'(时间戳新鲜度检查失败,通常是时间戳格式/两端时钟对不上)——两者共用同一个
+ *  count,不分原因的话超管只看到计数在涨,分不清该查哪一样。 */
 export interface LanxinRejectedStats {
   count: number
   lastAt: string
   lastFrom?: string
+  lastReason?: 'signature' | 'stale' | ''
 }
 
 /** 完整响应:config + rejected(验签失败计数,Task 6 提供)。一次请求拿两样,

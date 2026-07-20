@@ -54,6 +54,7 @@ beforeEach(() => {
     projects: [
       { projectId: 'P001', projectName: '项目一' },
       { projectId: 'P002', projectName: '无风险项目' },
+      { projectId: 'P003', projectName: '风险编码缺失项目' },
     ],
     // 风险跟进按「项目号::风险编码」复合键存储，归入抽屉的二级下拉从这里取记录。
     projectPmis: {
@@ -62,6 +63,11 @@ beforeEach(() => {
         { 风险编码: 'R-8', 风险名称: '预算超支', 风险等级: '中', 风险状态: '未关闭' },
       ] },
       P002: { riskRecords: [] },
+      // Minor-2:风险记录【存在】但全部没填风险编码——与 P002 的「真无风险记录」
+      // 是两种不同情况，/risk 页(riskRows.ts)对这类项目仍会渲染出行。
+      P003: { riskRecords: [
+        { 风险编码: '', 风险名称: '未编码风险', 风险等级: '高', 风险状态: '未关闭' },
+      ] },
     },
   }
   vi.mocked(getLanxinInbox).mockReset()
@@ -185,6 +191,7 @@ describe('LanxinInboxCard', () => {
     handleForm: { domain: string; projectId: string; instanceId: string; riskCode: string }
     riskOptions: { code: string; label: string }[]
     riskEmpty: boolean
+    riskCodeless: boolean
     confirmHandle: () => Promise<void>
   }
 
@@ -216,8 +223,28 @@ describe('LanxinInboxCard', () => {
     vm.handleForm.projectId = 'P002'   // 无风险记录
     await flushPromises()
     expect(vm.riskEmpty).toBe(true)
+    expect(vm.riskCodeless).toBe(false)
     expect(vm.riskOptions).toEqual([])
     expect(wrapper.text()).toContain('该项目无风险记录')
+    await vm.confirmHandle()
+    await flushPromises()
+    expect(handleLanxinInboxItem).not.toHaveBeenCalled()
+  })
+
+  // Minor-2：P003 的风险记录【存在】但全部没填风险编码，riskOptions 会把它们过滤成
+  // 空数组——不加区分的话，riskEmpty 分不出这是「真无风险记录」还是「记录都在只是没编码」，
+  // 而 /risk 页(riskRows.ts)对这类项目仍会渲染出行，统一提示「无风险记录」会误导人。
+  it('风险记录全部未编码时提示与「真无风险记录」不同，且同样不允许归入', async () => {
+    const wrapper = await openRiskDrawer()
+    const vm = wrapper.vm as unknown as RiskVm
+    vm.handleForm.domain = 'risk'
+    vm.handleForm.projectId = 'P003'   // 风险记录存在但全部无编码
+    await flushPromises()
+    expect(vm.riskEmpty).toBe(true)
+    expect(vm.riskCodeless).toBe(true)
+    expect(vm.riskOptions).toEqual([])
+    expect(wrapper.text()).toContain('风险编码为空')
+    expect(wrapper.text()).not.toContain('该项目无风险记录，无法归入风险跟进。')
     await vm.confirmHandle()
     await flushPromises()
     expect(handleLanxinInboxItem).not.toHaveBeenCalled()
