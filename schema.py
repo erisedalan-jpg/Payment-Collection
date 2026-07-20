@@ -39,6 +39,7 @@ class PmisProgress(_Base):
     里程碑进度状态: Optional[str] = None
     项目阶段: Optional[str] = None
     终验时间: Optional[str] = None
+    实际终验时间: Optional[str] = None
 
 
 class PmisRisk(_Base):
