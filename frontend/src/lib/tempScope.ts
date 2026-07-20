@@ -60,7 +60,10 @@ export const FIELD_CATALOG: FieldDef[] = [
   { group: 'project', key: 'costRatio', label: '预算消耗比', kind: 'number' },
   { group: 'project', key: 'paymentRatio', label: '回款完成率', kind: 'number' },
   { group: 'project', key: 'openRisks', label: '未关闭风险数', kind: 'number' },
-  { group: 'project', key: 'finalAcceptDate', label: '终验时间', kind: 'date' },
+  // key 严禁改名:data/temp_followup.json 里已存的范围条件按此 key 序列化,
+  // 改名会让用户已配好的范围静默失效(条件仍显示、但永远匹配不到、无报错)。
+  { group: 'project', key: 'finalAcceptDate', label: '计划终验时间', kind: 'date' },
+  { group: 'project', key: 'actualFinalAcceptDate', label: '实际终验时间', kind: 'date' },
   { group: 'project', key: 'setupDate', label: '立项日期', kind: 'date' },
   // —— paymentNode 组(存在性) ——
   { group: 'paymentNode', key: 'stage', label: '回款阶段', kind: 'enum' },

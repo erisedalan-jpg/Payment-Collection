@@ -104,3 +104,28 @@ describe('buildProgressRowBase setupDate', () => {
     expect(buildProgressRowBase(proj(), pmis(), {}).setupDate).toBeNull()
   })
 })
+
+describe('V4.0.1 终验两字段', () => {
+  it('buildProgressRowBase 带出计划/实际终验时间', () => {
+    const row = buildProgressRowBase(
+      { projectId: 'P1' } as any,
+      { progress: { 终验时间: '2026-07-01', 实际终验时间: '2026-07-15' } } as any,
+      {} as any)
+    expect(row.plannedFinalAcceptDate).toBe('2026-07-01')
+    expect(row.actualFinalAcceptDate).toBe('2026-07-15')
+  })
+
+  it('实际未发生时为 null,不落成空串', () => {
+    const row = buildProgressRowBase(
+      { projectId: 'P1' } as any,
+      { progress: { 终验时间: '2026-07-01', 实际终验时间: null } } as any,
+      {} as any)
+    expect(row.actualFinalAcceptDate).toBeNull()
+  })
+
+  it('pmis 整体缺失时两字段均为 null,不抛错', () => {
+    const row = buildProgressRowBase({ projectId: 'P1' } as any, undefined, {} as any)
+    expect(row.plannedFinalAcceptDate).toBeNull()
+    expect(row.actualFinalAcceptDate).toBeNull()
+  })
+})

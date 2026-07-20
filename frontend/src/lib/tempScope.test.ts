@@ -106,3 +106,29 @@ describe('projectMatches', () => {
     expect(projectMatches(inp({ proj: { orgL4: 'X' } }), f)).toBe(false)
   })
 })
+
+describe('V4.0.1 终验字段目录', () => {
+  it('finalAcceptDate 这个 key 必须原样存在 —— 改名会让已存盘的范围条件静默失效', () => {
+    // data/temp_followup.json 里用户已保存的条件按此 key 序列化。
+    // 改 key 后条件仍会显示在界面上,但 evalCond 永远匹配不到,且没有任何报错。
+    const f = FIELD_CATALOG.find((x) => x.group === 'project' && x.key === 'finalAcceptDate')
+    expect(f).toBeDefined()
+    expect(f!.label).toBe('计划终验时间')
+    expect(f!.kind).toBe('date')
+  })
+
+  it('新增实际终验时间字段', () => {
+    const f = FIELD_CATALOG.find((x) => x.group === 'project' && x.key === 'actualFinalAcceptDate')
+    expect(f).toBeDefined()
+    expect(f!.label).toBe('实际终验时间')
+    expect(f!.kind).toBe('date')
+  })
+
+  it('实际终验时间可按区间筛选', () => {
+    const f = { combinator: 'AND', groups: [{ combinator: 'AND', conditions: [
+      { group: 'project', field: 'actualFinalAcceptDate', op: 'between',
+        min: '2026-01-01', max: '2026-12-31' }] }] } as any
+    expect(projectMatches(inp({ proj: { actualFinalAcceptDate: '2026-06-30' } }), f)).toBe(true)
+    expect(projectMatches(inp({ proj: { actualFinalAcceptDate: '2027-01-01' } }), f)).toBe(false)
+  })
+})
