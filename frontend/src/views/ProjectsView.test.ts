@@ -362,6 +362,36 @@ describe('V4.0.1 列与标签筛选', () => {
     expect(visible).toContain('tags')
     expect((w.vm as any).FILTERABLE.has('tags')).toBe(true)
   })
+
+  it('I-1 升级迁移:老用户持久化列表(无 tags)挂载后自动补入 tags，紧挨 riskReasons 之后', async () => {
+    seed()
+    localStorage.clear()
+    const prefKey = `colprefs:${userScopedKey('projects-active')}`
+    // 模拟老用户曾经动过选列，persisted 列表里没有 tags(升级前 tags 还不存在于 DEFAULT_VISIBLE)
+    localStorage.setItem(prefKey, JSON.stringify(['projectName', 'projectId', 'riskLevel', 'riskReasons', 'action']))
+    const w = mountView()
+    await flushPromises()
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).toContain('tags')
+    expect(visible.indexOf('tags')).toBe(visible.indexOf('riskReasons') + 1)
+    // 标记位已写入(账号前缀 anon)
+    expect(localStorage.getItem('anon:colprefs-migrated:projects:v401-tags')).toBeTruthy()
+    localStorage.clear()
+  })
+
+  it('I-1 迁移只执行一次:标记位已存在且用户已主动取消 tags 时，不会被重新加回', async () => {
+    seed()
+    localStorage.clear()
+    const prefKey = `colprefs:${userScopedKey('projects-active')}`
+    // 模拟:已迁移过一次，用户随后又主动把 tags 取消了
+    localStorage.setItem('anon:colprefs-migrated:projects:v401-tags', '1')
+    localStorage.setItem(prefKey, JSON.stringify(['projectName', 'projectId', 'riskLevel', 'riskReasons', 'action']))
+    const w = mountView()
+    await flushPromises()
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).not.toContain('tags')
+    localStorage.clear()
+  })
 })
 
 describe('ProjectsView 列排序', () => {
