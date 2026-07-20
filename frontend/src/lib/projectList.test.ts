@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, paymentStatusOf, type ProjectFilters } from './projectList'
-import { NO_TAG_VALUE } from '@/lib/tagFilter'
 
 const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
@@ -123,8 +122,8 @@ describe('buildProjectRows', () => {
   })
 })
 
-// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags/riskCategory）
-const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' }
+// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/riskCategory；tags 已下沉表头 ColumnFilter,不再是本层职责）
+const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', riskCategory: '' }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -144,50 +143,6 @@ describe('filterProjectRows', () => {
   it("搜索 '-' 不命中占位字段(客户缺失为 '-')", () => {
     const only = buildProjectRows([proj({ projectId: 'X9', projectName: '纯中文名' })], {})
     expect(filterProjectRows(only, { ...F0, search: '-' })).toHaveLength(0)
-  })
-})
-
-describe('标签筛选', () => {
-  it('按标签多选过滤(并集 OR)', () => {
-    const rows = [
-      { projectId: 'A', tags: ['BH项目'] },
-      { projectId: 'B', tags: ['框架合同'] },
-      { projectId: 'C', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: ['BH项目', '框架合同'] }).map((r) => r.projectId)).toEqual(['A', 'B'])
-    expect(filterProjectRows(rows, { ...F0, tags: [] }).length).toBe(3)
-  })
-
-  it('无标签(NO_TAG_VALUE) 只留无标签行', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: [NO_TAG_VALUE] }).map((r) => r.projectId)).toEqual(['B'])
-  })
-
-  it('选标签 → OR 命中', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: ['x'] }).map((r) => r.projectId)).toEqual(['A'])
-  })
-
-  it('混选 无标签+标签 → 并集', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: [NO_TAG_VALUE, 'x'] }).map((r) => r.projectId)).toEqual(['A', 'B'])
-  })
-
-  it('tags 空数组 → 不过滤，返回全部', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: [] }).map((r) => r.projectId)).toEqual(['A', 'B'])
   })
 })
 

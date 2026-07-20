@@ -327,6 +327,43 @@ describe('ProjectsView', () => {
   })
 })
 
+describe('V4.0.1 列与标签筛选', () => {
+  it('三个新日期列已登记且默认隐藏', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const cols = (w.vm as any).ALL_COLUMNS as { key: string; label: string }[]
+    const keys = cols.map((c) => c.key)
+    expect(keys).toContain('originSetupDate')
+    expect(keys).toContain('plannedFinalAcceptDate')
+    expect(keys).toContain('actualFinalAcceptDate')
+    expect(cols.find((c) => c.key === 'originSetupDate')!.label).toBe('原项目立项日期')
+    expect(cols.find((c) => c.key === 'plannedFinalAcceptDate')!.label).toBe('计划终验时间')
+    expect(cols.find((c) => c.key === 'actualFinalAcceptDate')!.label).toBe('实际终验时间')
+    // 默认不展示
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).not.toContain('originSetupDate')
+    expect(visible).not.toContain('plannedFinalAcceptDate')
+    expect(visible).not.toContain('actualFinalAcceptDate')
+  })
+
+  it('标签筛选已从工具栏移除', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.findComponent({ name: 'TagFilterSelect' }).exists()).toBe(false)
+  })
+
+  it('标签列默认可见且可筛 —— 否则下沉后筛选入口整个消失', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const visible = (w.vm as any).prefs.visibleKeys.value as string[]
+    expect(visible).toContain('tags')
+    expect((w.vm as any).FILTERABLE.has('tags')).toBe(true)
+  })
+})
+
 describe('ProjectsView 列排序', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
