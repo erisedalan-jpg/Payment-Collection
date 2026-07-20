@@ -12,10 +12,10 @@ def test_default_config_shape():
     assert {r["key"] for r in d["routes"]} == {"timesheet", "project"}
     ts = next(r for r in d["routes"] if r["key"] == "timesheet")
     pj = next(r for r in d["routes"] if r["key"] == "project")
-    # 默认值:工时不发汇总;项目发到直接上级
-    assert ts["recipients"]["supervisorLevels"] == 0
-    assert pj["recipients"]["supervisorLevels"] == 1
-    assert len(pj["reasons"]) == 8
+    # 默认值:工时不发汇总;项目发到直接上级 —— 收件人规则已下沉到每一项(items)
+    assert all(i["supervisorLevels"] == 0 for i in ts["items"])
+    assert all(i["supervisorLevels"] == 1 for i in pj["items"])
+    assert len(pj["items"]) == 8
 
 
 def test_validate_accepts_default():
@@ -25,37 +25,46 @@ def test_validate_accepts_default():
 @pytest.mark.parametrize("lv", [0, 1, 2, 3, 4, 5])
 def test_supervisor_levels_0_to_5_ok(lv):
     c = LC.default_config()
-    c["routes"][1]["recipients"]["supervisorLevels"] = lv
-    assert LC.validate_config(c)["routes"][1]["recipients"]["supervisorLevels"] == lv
+    c["routes"][1]["items"][0]["supervisorLevels"] = lv
+    assert LC.validate_config(c)["routes"][1]["items"][0]["supervisorLevels"] == lv
 
 
 @pytest.mark.parametrize("lv", [-1, 6, 99, "1", None])
 def test_supervisor_levels_out_of_range_rejected(lv):
     c = LC.default_config()
-    c["routes"][1]["recipients"]["supervisorLevels"] = lv
+    c["routes"][1]["items"][0]["supervisorLevels"] = lv
     with pytest.raises(ValueError):
         LC.validate_config(c)
 
 
 def test_unknown_issue_code_rejected():
     c = LC.default_config()
-    c["routes"][0]["issueCodes"] = ["MISS_SUMMARY", "NOT_A_CODE"]
+    c["routes"][0]["items"] = [
+        {"code": "MISS_SUMMARY", "enabled": True, "primary": True, "supervisorLevels": 0},
+        {"code": "NOT_A_CODE", "enabled": True, "primary": True, "supervisorLevels": 0},
+    ]
     with pytest.raises(ValueError):
         LC.validate_config(c)
 
 
 def test_unknown_reason_rejected():
     c = LC.default_config()
-    c["routes"][1]["reasons"] = ["回款延期", "不存在的原因"]
+    c["routes"][1]["items"] = [
+        {"code": "回款延期", "enabled": True, "primary": True, "supervisorLevels": 1},
+        {"code": "不存在的原因", "enabled": True, "primary": True, "supervisorLevels": 1},
+    ]
     with pytest.raises(ValueError):
         LC.validate_config(c)
 
 
 def test_empty_subset_is_legal():
-    """空子集 = 该路由不推任何原因,是合法配置(等同停用),不应报错。"""
+    """空 items = 该路由所有项都不推,是合法配置(等同停用),不应报错;
+    自动按白名单补齐为全 disabled(而非报错或留空)。"""
     c = LC.default_config()
-    c["routes"][1]["reasons"] = []
-    assert LC.validate_config(c)["routes"][1]["reasons"] == []
+    c["routes"][1]["items"] = []
+    out = LC.validate_config(c)["routes"][1]["items"]
+    assert len(out) == 8
+    assert all(i["enabled"] is False for i in out)
 
 
 def test_non_https_gateway_rejected():
@@ -132,14 +141,136 @@ def test_default_issue_codes_exclude_hint():
     发「你有问题」,且数量上还压过真问题。故默认不勾。"""
     from yitian_rules import ISSUE_LABELS
     ts = next(r for r in LC.default_config()["routes"] if r["key"] == "timesheet")
-    assert all(not c.startswith("HINT_") for c in ts["issueCodes"])
-    assert set(ts["issueCodes"]) == {k for k in ISSUE_LABELS if not k.startswith("HINT_")}
-    assert "HINT_PRESALE_PRODUCT" not in ts["issueCodes"]
+    enabled_codes = {i["code"] for i in ts["items"] if i["enabled"]}
+    assert all(not c.startswith("HINT_") for c in enabled_codes)
+    assert enabled_codes == {k for k in ISSUE_LABELS if not k.startswith("HINT_")}
+    assert _item(ts, "HINT_PRESALE_PRODUCT")["enabled"] is False
 
 
 def test_hint_code_still_selectable():
     """默认不勾 ≠ 不可勾:超管想推提示,页面上勾了必须能存下来。"""
     c = LC.default_config()
-    c["routes"][0]["issueCodes"] = ["MISS_SUMMARY", "HINT_PRESALE_PRODUCT"]
+    ts = c["routes"][0]
+    for it in ts["items"]:
+        if it["code"] == "HINT_PRESALE_PRODUCT":
+            it["enabled"] = True
     saved = LC.validate_config(c)
-    assert "HINT_PRESALE_PRODUCT" in saved["routes"][0]["issueCodes"]
+    ts_out = next(r for r in saved["routes"] if r["key"] == "timesheet")
+    assert _item(ts_out, "HINT_PRESALE_PRODUCT")["enabled"] is True
+
+
+def _codes(route):
+    return [i["code"] for i in route["items"]]
+
+
+def _item(route, code):
+    return next(i for i in route["items"] if i["code"] == code)
+
+
+def test_default_config_routes_use_items():
+    import lanxin_config as C
+    d = C.default_config()
+    ts = next(r for r in d["routes"] if r["key"] == "timesheet")
+    pj = next(r for r in d["routes"] if r["key"] == "project")
+    assert "recipients" not in ts and "issueCodes" not in ts
+    assert "recipients" not in pj and "reasons" not in pj
+    assert _codes(ts) == list(C.ISSUE_LABELS.keys())     # 恒为完整白名单
+    assert _codes(pj) == C.REASON_WHITELIST
+    # 默认:HINT_ 前缀不勾(V4.0.0 实测该单码 96 条 > 全部真问题 63 条)
+    assert _item(ts, "HINT_PRESALE_PRODUCT")["enabled"] is False
+    assert _item(ts, "MISS_SUMMARY")["enabled"] is True
+    # 默认收件人策略沿用 V4.0.0:工时不发汇总、项目发到直接上级
+    assert _item(ts, "MISS_SUMMARY")["supervisorLevels"] == 0
+    assert _item(pj, "回款延期")["supervisorLevels"] == 1
+    assert _item(pj, "回款延期")["primary"] is True
+
+
+def test_migrate_legacy_routes_preserves_behavior():
+    """★ 迁移后行为必须与迁移前逐字节等价 —— 管理员不动配置就不该有任何行为变化。
+    旧 issueCodes 里出现的 → enabled;其余 → 不启用;primary/levels 一律继承原 recipients。"""
+    import lanxin_config as C
+    legacy = C.default_config()
+    legacy["routes"] = [
+        {"key": "timesheet", "label": "倚天工时问题", "enabled": True,
+         "issueCodes": ["MISS_SUMMARY", "TYPE_MISMATCH"],
+         "recipients": {"primary": True, "supervisorLevels": 2}},
+        {"key": "project", "label": "项目关注原因", "enabled": True,
+         "reasons": ["回款延期", "数据异常"],
+         "recipients": {"primary": False, "supervisorLevels": 3}},
+    ]
+    out = C.validate_config(legacy)
+    ts = next(r for r in out["routes"] if r["key"] == "timesheet")
+    pj = next(r for r in out["routes"] if r["key"] == "project")
+    assert _item(ts, "MISS_SUMMARY")["enabled"] is True
+    assert _item(ts, "TYPE_MISMATCH")["enabled"] is True
+    assert _item(ts, "MISS_PROGRESS")["enabled"] is False        # 旧配置没勾
+    # 继承原路由的 recipients —— 这是「行为等价」的关键
+    for c in ("MISS_SUMMARY", "TYPE_MISMATCH", "MISS_PROGRESS"):
+        assert _item(ts, c)["primary"] is True
+        assert _item(ts, c)["supervisorLevels"] == 2
+    assert _item(pj, "回款延期")["enabled"] is True
+    assert _item(pj, "风险未闭环")["enabled"] is False
+    for c in C.REASON_WHITELIST:
+        assert _item(pj, c)["primary"] is False
+        assert _item(pj, c)["supervisorLevels"] == 3
+
+
+def test_migrate_is_idempotent():
+    import lanxin_config as C
+    once = C.validate_config(C.default_config())
+    twice = C.validate_config(once)
+    assert twice == once
+
+
+def test_items_missing_codes_are_filled_as_disabled():
+    """白名单里没出现在 items 的 code 自动补 enabled=False。
+    将来新增问题码不会让旧配置校验失败(V4.0.0 吃过 ISSUE_LABELS 从 7 变 8 的亏)。"""
+    import lanxin_config as C
+    cfg = C.default_config()
+    ts = next(r for r in cfg["routes"] if r["key"] == "timesheet")
+    ts["items"] = [{"code": "MISS_SUMMARY", "enabled": True, "primary": True, "supervisorLevels": 1}]
+    out = C.validate_config(cfg)
+    ots = next(r for r in out["routes"] if r["key"] == "timesheet")
+    assert _codes(ots) == list(C.ISSUE_LABELS.keys())
+    assert _item(ots, "MISS_SUMMARY")["supervisorLevels"] == 1
+    assert _item(ots, "MISS_PROGRESS")["enabled"] is False
+
+
+def test_unknown_item_code_rejected():
+    import lanxin_config as C
+    cfg = C.default_config()
+    ts = next(r for r in cfg["routes"] if r["key"] == "timesheet")
+    ts["items"] = [{"code": "NOT_A_CODE", "enabled": True, "primary": True, "supervisorLevels": 0}]
+    with pytest.raises(ValueError):
+        C.validate_config(cfg)
+
+
+def test_duplicate_item_code_rejected():
+    import lanxin_config as C
+    cfg = C.default_config()
+    ts = next(r for r in cfg["routes"] if r["key"] == "timesheet")
+    ts["items"] = [{"code": "MISS_SUMMARY", "enabled": True, "primary": True, "supervisorLevels": 0},
+                   {"code": "MISS_SUMMARY", "enabled": False, "primary": True, "supervisorLevels": 0}]
+    with pytest.raises(ValueError):
+        C.validate_config(cfg)
+
+
+@pytest.mark.parametrize("bad", [-1, 6, 99, "1", None, True])
+def test_item_supervisor_levels_validated(bad):
+    """True 必须被拒 —— isinstance(True, int) 为真,不显式排除就会漏过去。"""
+    import lanxin_config as C
+    cfg = C.default_config()
+    pj = next(r for r in cfg["routes"] if r["key"] == "project")
+    pj["items"][0]["supervisorLevels"] = bad
+    with pytest.raises(ValueError):
+        C.validate_config(cfg)
+
+
+@pytest.mark.parametrize("field", ["enabled", "primary"])
+def test_item_bool_fields_validated(field):
+    import lanxin_config as C
+    cfg = C.default_config()
+    pj = next(r for r in cfg["routes"] if r["key"] == "project")
+    pj["items"][0][field] = "yes"
+    with pytest.raises(ValueError):
+        C.validate_config(cfg)
