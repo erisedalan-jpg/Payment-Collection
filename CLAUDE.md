@@ -150,8 +150,7 @@ python -m pytest -q
 
 ## 8. 已知重大技术债（详见 PROGRESS.md backlog）
 
-- `server.py` 用单线程 `HTTPServer`，同步/更新 SSE 期间会阻塞全站（含"停止"）。
-- 服务绑定 `("", 8080)` = 所有网卡，无认证。
+- 长任务（`/api/reprocess` 等 SSE）期间，跨域互斥锁采用「抢不到立即 400、绝不排队」策略；调用方需自行重试。
 - `data/analysis_data.json` 全量 fetch（~2MB），前端一次性加载；vite 构建产物单 chunk >500KB（未做代码分割）。
 - `/insight` 项目分析"回款完成率"口径（节点已收/PMIS合同）与主域口径（流水/合同）不同源，待归并统一。
 - `collection_stages.csv` 导出端覆盖风险：导出脚本若漏在建项目则其回款节点静默缺失（无校验告警）——建议加"在建项目收款阶段覆盖率"治理告警。

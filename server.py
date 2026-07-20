@@ -347,7 +347,7 @@ BUDGET_ESTIMATES_FILE = os.path.join(BASE_DIR, 'data', 'budget_estimates.json')
 # ── 蓝信推送 /lanxin:凭证/路由配置(超管可配) ──
 LANXIN_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'lanxin_config.json')
 # M-4:send 是不可撤销的对外动作,双击或两个超管同时点会重复触达全员。非阻塞 acquire——
-# 抢不到锁立即 400,绝不排队等待(服务是单线程 HTTPServer,排队会把整站堵死)。
+# 抢不到锁立即 400,绝不排队等待(排队会把请求线程耗在锁上,拖垮并发)。
 _lanxin_send_lock = threading.Lock()
 
 # ── 蓝信回调入站(V4.0.5):收件箱库 + 原始报文存证 ──
@@ -3058,7 +3058,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         铁律:errMsg 是蓝信自己的文案,不含 appSecret/appToken(已核 _http/_unwrap 三个 except)；
         其余异常只透出 type(e).__name__,不透出内部 repr。
         M-4:加服务端并发锁 —— 推送不可撤销,双击或两个超管同时点会导致重复触达全员。
-        非阻塞 acquire,抢不到直接 400,不排队(单线程排队 = 把全站堵死)。"""
+        非阻塞 acquire,抢不到直接 400,不排队(排队 = 请求线程被锁拖住)。"""
         body = self._read_json_body()
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
