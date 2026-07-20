@@ -15,6 +15,7 @@ import YitianRulesCard from '@/components/YitianRulesCard.vue'
 import MaintenanceCard from '@/components/MaintenanceCard.vue'
 import LanxinConfigCard from '@/components/LanxinConfigCard.vue'
 import LanxinPushDrawer from '@/components/LanxinPushDrawer.vue'
+import LanxinInboxCard from '@/components/LanxinInboxCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -130,6 +131,12 @@ defineExpose({
             </el-collapse>
           </div>
         </div>
+      </el-tab-pane>
+
+      <!-- GET /api/lanxin/inbox 等三个接口后端超管专属(_SUPER_ONLY_PATHS),整签按 LanxinConfigCard
+           同规格用 auth.isSuper 收起 —— 否则普通管理员打开 /data 就会看到一个恒 403 的空签。 -->
+      <el-tab-pane v-if="auth.isSuper" label="蓝信回复" name="lanxinInbox">
+        <LanxinInboxCard />
       </el-tab-pane>
 
       <el-tab-pane label="维护" name="maint">
