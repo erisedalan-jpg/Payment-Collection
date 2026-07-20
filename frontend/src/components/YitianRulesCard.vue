@@ -93,6 +93,9 @@ defineExpose({ draft, onSave, onReset, applyImport, addTo, removeAt })
       </div>
       <div class="yr-row"><el-switch v-model="draft.checks.serviceMode.enabled" /><span class="yr-lbl">服务方式检查</span>
         <span class="yr-lbl">生效日</span><el-date-picker v-model="draft.checks.serviceMode.effectiveDate" type="date" value-format="YYYY-MM-DD" size="small" />
+        <span class="yr-lbl">关键词</span>
+        <el-tag v-for="(t,i) in draft.checks.serviceMode.keywords" :key="t" closable @close="removeAt(draft.checks.serviceMode.keywords,i)">{{ t }}</el-tag>
+        <el-input class="yr-add" size="small" placeholder="加关键词回车" @keyup.enter="(e:any)=>{addTo(draft!.checks.serviceMode.keywords,e.target.value);e.target.value=''}" />
       </div>
       <div class="yr-row"><el-switch v-model="draft.checks.customer.enabled" /><span class="yr-lbl">客户名称检查 · 提示词</span>
         <el-tag v-for="(t,i) in draft.checks.customer.hintKeywords" :key="t" closable @close="removeAt(draft.checks.customer.hintKeywords,i)">{{ t }}</el-tag>
