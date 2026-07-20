@@ -1,5 +1,6 @@
 import { api } from '@/api/client'
 import type { PushItem } from '@/lib/lanxin/items'
+import type { LanxinInboxItem } from '@/lib/lanxinInbox'
 
 export interface LanxinRouteItem {
   code: string
@@ -77,4 +78,31 @@ export async function lanxinPreview(items: PushItem[]): Promise<LanxinPlan> {
 export async function lanxinSend(items: PushItem[]) {
   return await api.post<{ plan: LanxinPlan; result: LanxinSendResult }>(
     '/api/lanxin/send', { items })
+}
+
+// —— 收件箱（Task 6/8）：员工在蓝信里的回复回流本系统 ——
+export interface LanxinInboxResp {
+  success: boolean
+  items: LanxinInboxItem[]
+  rejected: LanxinRejectedStats
+  received: number
+}
+export interface LanxinInboxHandleResp {
+  success: boolean
+  handledInfo: Record<string, unknown>
+}
+
+export async function getLanxinInbox(): Promise<LanxinInboxResp> {
+  return await api.get<LanxinInboxResp>('/api/lanxin/inbox')
+}
+/** instanceId 只有 domain==='temp' 时才有意义(见 needsInstance)，其余域传 undefined 即可——
+ *  JSON.stringify 会把值为 undefined 的键整个丢掉，后端读不到等同于没传。 */
+export async function handleLanxinInboxItem(
+  itemId: string, domain: string, projectId: string, instanceId?: string,
+): Promise<LanxinInboxHandleResp> {
+  return await api.post<LanxinInboxHandleResp>('/api/lanxin/inbox/handle',
+    { itemId, domain, projectId, instanceId })
+}
+export async function deleteLanxinInboxItem(itemId: string): Promise<{ success: boolean }> {
+  return await api.post<{ success: boolean }>('/api/lanxin/inbox/delete', { itemId })
 }
