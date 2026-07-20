@@ -235,14 +235,15 @@ def save_config(path: str, cfg: Any) -> Dict[str, Any]:
     """校验后原子写。三个密钥(appSecret/callbackAesKey/callbackSignToken)为空串
     = 沿用旧值(前端读到的是脱敏值,回传空串不应清空)。"""
     clean = validate_config(cfg)
-    if any(not clean["credentials"][f] for f in _SECRET_FIELDS):
+    # M-1:循环变量名不得与文件句柄同名(原先两处都叫 f,功能虽对但极易读错)。
+    if any(not clean["credentials"][name] for name in _SECRET_FIELDS):
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                old = json.load(f)
+            with open(path, "r", encoding="utf-8") as fh:
+                old = json.load(fh)
             old_cred = old.get("credentials") or {}
-            for f in _SECRET_FIELDS:
-                if not clean["credentials"][f]:
-                    clean["credentials"][f] = old_cred.get(f, "")
+            for name in _SECRET_FIELDS:
+                if not clean["credentials"][name]:
+                    clean["credentials"][name] = old_cred.get(name, "")
         except (OSError, ValueError):
             pass
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)

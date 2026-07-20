@@ -823,3 +823,73 @@ def test_reply_hint_never_truncated_at_byte_limit():
     content = card["bodyContent"]
     assert len(content.encode("utf-8")) <= LR.LIMIT_BODY_CONTENT
     assert LR.REPLY_HINT in content        # 完整,不是半截
+
+
+# ── I-1 回归:reply_hint 必须由 build_plan 真正接线到四种卡片 ──────────────────
+#
+# 为什么这一组【必须打 build_plan 的产物】而不是打 builder:
+# 上面 Task 4 的两条测试直接调 LR.build_*_card(..., reply_hint=True) 并手动传 True,
+# 于是 build_plan 一次都没传过 reply_hint(生产调用方 0 处)也照样全绿 ——
+# 定义 8 处、测试 8 处、生产 0 处,员工收到的卡片底部从来没有过引导语,
+# 没人知道这张卡能回,收件箱恒空,而链路本身完全正常、查不出任何毛病。
+
+def _cfg_with_callback(cfg, aes="A" * 43, token="tok-abc"):
+    """给配置填上回调双凭证。空串 = 未配置。"""
+    cfg["credentials"]["callbackAesKey"] = aes
+    cfg["credentials"]["callbackSignToken"] = token
+    return cfg
+
+
+def _plan_cards_json(plan):
+    return json.dumps([r["card"] for r in plan["recipients"]], ensure_ascii=False)
+
+
+def _all_four_card_kinds_cfg():
+    """一次同时产出四种卡片:工时 primary / 项目 primary / 工时汇总 / 项目汇总。
+    supervisorLevels=1 让 A006(张三)卷到 A005(耿磊磊)。"""
+    return _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 1)},
+                      pj_items={"回款延期": (True, True, 1)})
+
+
+_FOUR_KIND_ITEMS = [
+    {"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
+    {"kind": "timesheet", "employId": "A006",
+     "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]},
+]
+
+
+def test_build_plan_adds_reply_hint_when_callback_credentials_configured():
+    """I-1 核心:凭证配齐 → build_plan 产出的【每一张】卡片都带引导语。"""
+    cfg = _cfg_with_callback(_all_four_card_kinds_cfg())
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+
+    assert len(plan["recipients"]) == 4, "夹具应同时覆盖四种卡片"
+    for r in plan["recipients"]:
+        card_json = json.dumps(r["card"], ensure_ascii=False)
+        assert LR.REPLY_HINT in card_json, \
+            "%s/%s 的卡片缺少回复引导语" % (r["routeKey"], r["role"])
+
+
+def test_build_plan_omits_reply_hint_when_callback_not_configured():
+    """未配凭证 → 一张都不许带:引导用户回复一个收不到的地方,比不提示更糟。"""
+    cfg = _all_four_card_kinds_cfg()          # default_config 里两个回调凭证均为空串
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+
+    assert len(plan["recipients"]) == 4
+    assert LR.REPLY_HINT not in _plan_cards_json(plan)
+
+
+def test_build_plan_omits_reply_hint_when_only_one_credential_configured():
+    """只配一个 = 验签或解密必然失败,回复照样石沉大海 —— 仍不许提示。"""
+    for aes, token in (("A" * 43, ""), ("", "tok-abc")):
+        cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes=aes, token=token)
+        plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+        assert LR.REPLY_HINT not in _plan_cards_json(plan), \
+            "aes=%r token=%r 时不应出现引导语" % (aes, token)
+
+
+def test_build_plan_treats_whitespace_credentials_as_unconfigured():
+    """全空白的凭证等同于没配 —— 它过不了验签,只会让回复石沉大海。"""
+    cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes="   ", token="  ")
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+    assert LR.REPLY_HINT not in _plan_cards_json(plan)

@@ -360,15 +360,53 @@ LANXIN_CALLBACK_MAX_BYTES = 1024 * 1024
 # 验签未通过的请求只记数与时间,【绝不落 body】—— 否则免登录端点等于任人写盘。
 _lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": ""}
 
+# 存证文件的滚动归档(I-2)。参照 audit.py 的既有做法:活动文件超上限就整份挪进
+# 归档目录、只保留最近若干份。不做滚动的话这个纯 append 的 jsonl 只增不减 ——
+# 拿到一份合法签名的报文就能无限重放(去重只保护 items,存证在去重之前),
+# 收件箱毫无变化、验签计数也不涨,直到磁盘写满让全平台原子写失败。
+LANXIN_RAW_ARCHIVE_DIR = os.path.join(BASE_DIR, 'data', 'lanxin_raw_archive')
+LANXIN_RAW_MAX_BYTES = 8 * 1024 * 1024
+LANXIN_RAW_ARCHIVE_KEEP = 5
+# 时间戳新鲜度窗口(秒)。签名本身不含有效期,不校验新鲜度 = 一份合法报文永久可重放。
+# ±5 分钟:蓝信最长重试间隔远小于此,同时容得下两端的时钟漂移。
+LANXIN_CALLBACK_MAX_SKEW_SEC = 300
+
 # 归入目标域。四域的首个进展字段【已核实,不得臆测】:
 #   risk / payment_key → followAction     temp / progress → weekProgress
 # progress 域是唯一例外:它不走 followup_store,store 逻辑内联在本文件。
+#
+# needsRiskCode:risk 域的 store 【不按 projectId 索引】,而按复合键
+# "{projectId}::{风险编码}"(见 frontend/src/lib/riskRows.ts 的读取端,它没有任何
+# 回退到裸 projectId 的分支)。四域里只有它是复合键 —— 写错就是静默数据丢失:
+# 条目被标 handled、canHandle 转 false,员工的回复再也捞不回来且全程零报错。
 _LANXIN_HANDLE_TARGETS = {
-    'risk':        {'field': 'followAction', 'label': '风险跟进'},
+    'risk':        {'field': 'followAction', 'label': '风险跟进', 'needsRiskCode': True},
     'payment_key': {'field': 'followAction', 'label': '回款重点跟进'},
     'temp':        {'field': 'weekProgress', 'label': '临时重点跟进'},
     'progress':    {'field': 'weekProgress', 'label': '重点项目进展'},
 }
+
+
+def lanxin_risk_key(project_id, risk_code):
+    """risk 跟进 store 的复合主键。【格式必须与 frontend/src/lib/riskRows.ts 逐字一致】,
+    那边是 `${p.projectId}::${riskCode}` 且【没有】回退到裸 projectId 的分支。
+    tests/test_server_lanxin_callback.py 有一条契约测试直接读那个 .ts 文件防止两端漂移。"""
+    return '%s::%s' % (project_id, risk_code)
+
+
+def lanxin_timestamp_fresh(timestamp, now_epoch, skew=LANXIN_CALLBACK_MAX_SKEW_SEC):
+    """回调 timestamp 是否落在 ±skew 秒窗口内。纯函数。
+
+    蓝信文档的 timestamp 为 epoch 秒;13 位一律按毫秒解释(容错,两种口径都认)。
+    无法解析成整数 → False:缺参/垃圾参必然验不过,不给它放行。
+    """
+    raw = str(timestamp or '').strip()
+    if not raw.lstrip('-').isdigit():
+        return False
+    val = int(raw)
+    if abs(val) >= 10 ** 11:            # 13 位毫秒
+        val //= 1000
+    return abs(val - now_epoch) <= skew
 
 
 def _load_lanxin_inbox():
@@ -387,6 +425,39 @@ def _load_lanxin_inbox():
 
 def _save_lanxin_inbox(store):
     _atomic_write_json(LANXIN_INBOX_FILE, store)
+
+
+def _lanxin_rotate_raw():
+    """存证文件超上限就整份挪进归档目录,只留最近 LANXIN_RAW_ARCHIVE_KEEP 份(I-2)。
+
+    与 audit.py 同构:惰性触发(写之前查一次大小),归档用 os.replace 原子挪走,
+    绝不逐行重写 —— 存证是「原样留证」,不能在滚动过程中改动任何一个字节。
+    失败【只记日志不上抛】:滚动是维护动作,它坏了不该让一次合法回调返回失败
+    (承重墙②:唯一返回非 0 的分支是存证落盘本身失败)。
+    """
+    try:
+        if not os.path.exists(LANXIN_RAW_FILE):
+            return
+        if os.path.getsize(LANXIN_RAW_FILE) < LANXIN_RAW_MAX_BYTES:
+            return
+        os.makedirs(LANXIN_RAW_ARCHIVE_DIR, exist_ok=True)
+        stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        dest = os.path.join(LANXIN_RAW_ARCHIVE_DIR, 'lanxin-callback-raw-%s.jsonl' % stamp)
+        n = 1
+        while os.path.exists(dest):          # 同秒内滚动两次也不覆盖
+            dest = os.path.join(LANXIN_RAW_ARCHIVE_DIR,
+                                'lanxin-callback-raw-%s-%d.jsonl' % (stamp, n))
+            n += 1
+        os.replace(LANXIN_RAW_FILE, dest)
+        old = sorted(f for f in os.listdir(LANXIN_RAW_ARCHIVE_DIR)
+                     if f.startswith('lanxin-callback-raw-') and f.endswith('.jsonl'))
+        for name in old[:-LANXIN_RAW_ARCHIVE_KEEP] if LANXIN_RAW_ARCHIVE_KEEP > 0 else old:
+            try:
+                os.remove(os.path.join(LANXIN_RAW_ARCHIVE_DIR, name))
+            except OSError:
+                pass
+    except OSError as e:
+        logger.error("蓝信存证滚动归档失败(不影响本次存证): %s", e)
 
 
 def _lanxin_append_reply(existing, name, received_at, text):
@@ -3106,7 +3177,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         """POST /api/lanxin/callback —— 蓝信订阅事件推送入口。【免登录】。
 
         闸门顺序即设计,不可调换:
-          ① 大小上限 → ② 验签 → ③ 存证 → ④ 解密 → ⑤ 解析 → ⑥ 去重 → ⑦ 落库
+          ① 大小上限 → ② 验签 → ②b 新鲜度 → ③ 存证 → ④ 解密 → ⑤ 解析 → ⑥ 去重 → ⑦ 落库
+
+        ②b 为什么夹在验签与存证之间:签名里不含有效期,只验签的话,一份合法报文
+        可被无限重放 —— 每次都在存证后才走到去重,于是收件箱毫无变化、验签计数也
+        不涨(签名是对的),没有任何告警,直到磁盘写满。新鲜度必须【先于存证】拦掉,
+        同时【后于验签】,否则等于给未验签的请求开了一条能改变服务端行为的路径。
 
         为什么验签必须先于存证:这是全站唯一的免登录写入口。先无条件落盘,
         同网段任何人都能 POST 垃圾把磁盘灌满。
@@ -3145,11 +3221,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(200, {"errCode": -2, "errMsg": "签名校验失败"})
             return
 
+        # ②b 新鲜度。签名合法但过期 = 重放,按验签失败同等处理:不落盘、只记数。
+        if not lanxin_timestamp_fresh(timestamp, time.time()):
+            _lanxin_rejected['count'] += 1
+            _lanxin_rejected['lastAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            _lanxin_rejected['lastFrom'] = audit.client_ip(self.headers, self.client_address)
+            self._send_json(200, {"errCode": -2, "errMsg": "时间戳超出有效窗口(疑似重放)"})
+            return
+
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # ③ 存证。这是唯一允许让蓝信重推的失败点。
         try:
             os.makedirs(os.path.dirname(LANXIN_RAW_FILE) or '.', exist_ok=True)
+            _lanxin_rotate_raw()
             with open(LANXIN_RAW_FILE, 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"receivedAt": now, "timestamp": timestamp,
                                     "nonce": nonce, "signature": signature,
@@ -3207,8 +3292,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                               "received": len(store.get('items') or [])})
 
     def handle_lanxin_inbox_handle(self):
-        """POST /api/lanxin/inbox/handle {itemId, domain, projectId, instanceId?}
-        —— 把一条回复【追加】进目标跟进域。超管专属。"""
+        """POST /api/lanxin/inbox/handle {itemId, domain, projectId, riskCode?, instanceId?}
+        —— 把一条回复【追加】进目标跟进域。超管专属。
+
+        riskCode 只在 domain=='risk' 时必填:该域 store 按复合键索引(见 lanxin_risk_key)。
+        复合键由【后端】拼,不收前端直接传的 riskKey —— 那样前端可以传一个与 projectId
+        对不上的键,在跟进 store 里造出永远读不到的幽灵记录。
+        """
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
@@ -3217,6 +3307,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         domain = str(data.get('domain') or '').strip()
         project_id = str(data.get('projectId') or '').strip()
         instance_id = str(data.get('instanceId') or '').strip()
+        risk_code = str(data.get('riskCode') or '').strip()
         if not item_id or not project_id or domain not in _LANXIN_HANDLE_TARGETS:
             self._send_json(400, _error_payload(
                 ERR_VALIDATION, "itemId/projectId 必填,domain 须为 %s 之一"
@@ -3227,6 +3318,30 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
 
+        # M-2:projectId 必须真实存在。前端 el-select 只给现有项目,但那是【前端】——
+        # 直接打 API 可以传任意字符串,在跟进 store 里造出永远无人读取的幽灵 key。
+        pmis = self._lanxin_pmis()
+        proj = pmis.get(project_id)
+        if proj is None:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "项目 %s 不存在" % project_id))
+            return
+        if _LANXIN_HANDLE_TARGETS[domain].get('needsRiskCode'):
+            codes = [str((rr or {}).get('风险编码') or '').strip()
+                     for rr in (proj.get('riskRecords') or [])]
+            codes = [c for c in codes if c]
+            if not codes:
+                self._send_json(400, _error_payload(
+                    ERR_VALIDATION, "项目 %s 无风险记录,无法归入风险跟进" % project_id))
+                return
+            if not risk_code:
+                self._send_json(400, _error_payload(
+                    ERR_VALIDATION, "归入风险跟进须指定 riskCode(风险编码)"))
+                return
+            if risk_code not in codes:
+                self._send_json(400, _error_payload(
+                    ERR_VALIDATION, "风险编码 %s 不属于项目 %s" % (risk_code, project_id)))
+                return
+
         with _lanxin_inbox_lock:
             store = _load_lanxin_inbox()
             item = next((x for x in store.get('items') or [] if x.get('id') == item_id), None)
@@ -3236,11 +3351,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if item.get('handled'):
             self._send_json(400, _error_payload(ERR_VALIDATION, "该条已归入,不可重复归入"))
             return
+        # M-2:未解析的条目 text 恒为空串,归入等于往业务数据里写一条空回复。
+        # 前端 canHandle 已挡,但前端守卫【不等于】后端可以没有。
+        if item.get('status') != 'parsed':
+            self._send_json(400, _error_payload(
+                ERR_VALIDATION, "该条未解析,不可归入业务数据"))
+            return
 
         field = _LANXIN_HANDLE_TARGETS[domain]['field']
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ok, res = self._lanxin_write_followup(
-            domain, field, project_id, instance_id,
+            domain, field, project_id, instance_id, risk_code,
             item.get('name'), item.get('receivedAt'), item.get('text'), account, now)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
@@ -3250,10 +3371,23 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
         info = {"domain": domain, "label": _LANXIN_HANDLE_TARGETS[domain]['label'],
                 "projectId": project_id, "instanceId": instance_id or None,
-                "at": now, "by": account}
-        self._followup_txn(_lanxin_inbox_lock, _load_lanxin_inbox,
-                           lambda s: lanxin_inbox.mark_handled(s, item_id, info),
-                           _save_lanxin_inbox)
+                "riskCode": risk_code or None, "at": now, "by": account}
+        # M-3:标记失败【必须告知】。跟进内容此刻已写入,而条目仍显示「未归入」——
+        # 超管再点一次就会把同一条回复重复追加进跟进字段,且没有任何提示。
+        marked, mark_res = self._followup_txn(
+            _lanxin_inbox_lock, _load_lanxin_inbox,
+            lambda s: lanxin_inbox.mark_handled(s, item_id, info),
+            _save_lanxin_inbox)
+        if not marked or mark_res is False:
+            logger.error("蓝信归入已写入跟进,但标记 handled 失败: item=%s res=%r", item_id, mark_res)
+            self._audit_set(target='蓝信回复 %s' % item_id,
+                            detail='归入%s · 项目 %s · 标记失败'
+                                   % (_LANXIN_HANDLE_TARGETS[domain]['label'], project_id))
+            self._send_json(500, _error_payload(
+                ERR_INTERNAL,
+                "跟进内容已写入,但收件箱状态标记失败。请勿重复点击归入(会重复追加),"
+                "刷新后若仍显示「未归入」请联系管理员核对。"))
+            return
         self._audit_set(target='蓝信回复 %s' % item_id,
                         detail='归入%s · 项目 %s' % (_LANXIN_HANDLE_TARGETS[domain]['label'], project_id))
         self._send_json(200, {"success": True, "handledInfo": info})
@@ -3286,21 +3420,28 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._audit_set(target='蓝信回复 %s' % item_id, detail='删除收件箱条目')
         self._send_json(200, {"success": True})
 
-    def _lanxin_write_followup(self, domain, field, project_id, instance_id,
+    def _lanxin_write_followup(self, domain, field, project_id, instance_id, risk_code,
                                name, received_at, text, account, now):
         """把回复追加进目标域。返回 (ok, result) —— 与 _followup_txn 同构。
 
         progress 域【不走 followup_store】,其 store 逻辑内联在本文件,
         故必须单开分支,不可假定四域同构。
+
+        risk 域的 store key 【不是 projectId】而是 "{projectId}::{风险编码}" 复合键
+        (四域里唯一一个,见 lanxin_risk_key)。写成裸 projectId 不会报任何错,
+        但前端 riskRows.ts 永远读不到,而条目已被标 handled —— 回复静默蒸发。
         """
+        # 每个域各自的 store 主键。只有 risk 与 projectId 不同。
+        key = lanxin_risk_key(project_id, risk_code) if domain == 'risk' else project_id
+
         def _appended(container):
             """从容器(store 或 temp 的 instance)取现有内容并追加。"""
-            old = (container.get('current', {}).get(project_id) or {}).get(field, '')
+            old = (container.get('current', {}).get(key) or {}).get(field, '')
             return _lanxin_append_reply(old, name, received_at, text)
 
         if domain == 'risk':
             def _m(store):
-                return _riskfu.apply_update(store, project_id, field,
+                return _riskfu.apply_update(store, key, field,
                                             _appended(store), account, now)
             return self._followup_txn(_risk_lock, _load_risk_followup, _m, _save_risk_followup)
 
@@ -3320,12 +3461,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                                           _appended(inst), account, now)
             return self._followup_txn(_temp_lock, _load_temp_followup, _m, _save_temp_followup)
 
-        # progress
+        # progress(key 即 project_id,与其余非 risk 域一致)
         def _m(store):
-            old = (store.get('current', {}).get(project_id) or {}).get(field, '')
-            return _progress_apply_update(
-                store, project_id, field,
-                _lanxin_append_reply(old, name, received_at, text), account, now)
+            return _progress_apply_update(store, project_id, field,
+                                          _appended(store), account, now)
         return self._followup_txn(_progress_lock, _load_progress, _m, _save_progress)
 
     def _rebuild_yitian_data(self, store, rules_cfg=None):

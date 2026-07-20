@@ -3,9 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
-import type { Project } from '@/types/analysis'
+import type { Project, ProjectPmis } from '@/types/analysis'
 import { getLanxinInbox, handleLanxinInboxItem, deleteLanxinInboxItem } from '@/lib/lanxinApi'
-import { HANDLE_DOMAINS, needsInstance, canHandle,
+import { HANDLE_DOMAINS, needsInstance, needsRiskCode, riskChoices, canHandle,
          type HandleDomain, type LanxinInboxItem } from '@/lib/lanxinInbox'
 
 const data = useDataStore()
@@ -17,6 +17,7 @@ const received = ref(0)
 const busy = ref(false)
 
 const projects = computed(() => (data.data?.projects ?? []) as Project[])
+const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 
 async function load() {
   busy.value = true
@@ -48,14 +49,27 @@ function projectLabel(pid: string): string {
 // —— 归入抽屉 ——
 const handleOpen = ref(false)
 const handleItem = ref<LanxinInboxItem | null>(null)
-const handleForm = ref<{ domain: HandleDomain | ''; instanceId: string; projectId: string }>({
-  domain: '', instanceId: '', projectId: '',
+const handleForm = ref<{ domain: HandleDomain | ''; instanceId: string; projectId: string; riskCode: string }>({
+  domain: '', instanceId: '', projectId: '', riskCode: '',
 })
+
+/** 当前所选项目的风险记录。域切到 risk、或改选项目时都要跟着重算。 */
+const riskOptions = computed(() =>
+  handleForm.value.projectId ? riskChoices(pmisMap.value, handleForm.value.projectId) : [])
+
+/** 选了 risk 域但该项目一条风险记录都没有 —— 必须显式告知，不能给个空下拉让人干瞪眼。 */
+const riskEmpty = computed(() =>
+  needsRiskCode(handleForm.value.domain) && !!handleForm.value.projectId && !riskOptions.value.length)
+
+/** 换项目/换域后旧的风险编码必然失效（它属于上一个项目），一律清掉重选。 */
+function onScopeChange() {
+  handleForm.value.riskCode = ''
+}
 
 async function openHandle(item: LanxinInboxItem) {
   if (!canHandle(item)) return
   handleItem.value = item
-  handleForm.value = { domain: '', instanceId: '', projectId: item.candidateProjects[0] ?? '' }
+  handleForm.value = { domain: '', instanceId: '', projectId: item.candidateProjects[0] ?? '', riskCode: '' }
   handleOpen.value = true
   // 提前把临时跟进实例列表拉起来:域下拉切到 temp 时不必再等一轮网络往返才看到实例选项。
   // 复用既有 store,不是本组件自己再起一份请求逻辑(V4.0.2 多实例化后实例列表的唯一来源)。
@@ -71,10 +85,15 @@ async function confirmHandle() {
   if (!domain) { ElMessage.warning('请先选择归入目标域'); return }
   if (!handleForm.value.projectId) { ElMessage.warning('请先选择项目'); return }
   if (needsInstance(domain) && !handleForm.value.instanceId) { ElMessage.warning('临时跟进须再选一个实例'); return }
+  if (needsRiskCode(domain)) {
+    if (riskEmpty.value) { ElMessage.warning('该项目无风险记录，无法归入风险跟进'); return }
+    if (!handleForm.value.riskCode) { ElMessage.warning('风险跟进须再选一条风险记录'); return }
+  }
   busy.value = true
   try {
     await handleLanxinInboxItem(item.id, domain, handleForm.value.projectId,
-      needsInstance(domain) ? handleForm.value.instanceId : undefined)
+      needsInstance(domain) ? handleForm.value.instanceId : undefined,
+      needsRiskCode(domain) ? handleForm.value.riskCode : undefined)
     ElMessage.success('已归入')
     handleOpen.value = false
     await load()
@@ -107,7 +126,8 @@ onMounted(() => { if (!data.data) data.load(); load() })
 
 // 测试需要绕过 el-select 的真实 popper 交互,直接摆状态调用这两个方法(参照
 // YitianRulesCard.test.ts 对 draft/onSave/applyImport 的既有做法)。
-defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm, openHandle, confirmHandle })
+defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
+               riskOptions, riskEmpty, onScopeChange, openHandle, confirmHandle })
 </script>
 
 <template>
@@ -149,6 +169,7 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm, op
         <template #default="{ row }: { row: LanxinInboxItem }">
           <span v-if="row.handled">
             {{ row.handledInfo?.label }} · {{ row.handledInfo?.projectId }}
+            <template v-if="row.handledInfo?.riskCode">· {{ row.handledInfo.riskCode }}</template>
           </span>
           <span v-else class="dv-hint">未归入</span>
         </template>
@@ -171,7 +192,7 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm, op
         <div class="dv-row">
           <span class="dv-label">归入目标域</span>
           <el-select v-model="handleForm.domain" data-test="li-domain-select"
-            placeholder="选择归入目标域" style="width: 220px">
+            placeholder="选择归入目标域" style="width: 220px" @change="onScopeChange">
             <el-option v-for="d in HANDLE_DOMAINS" :key="d.value" :label="d.label" :value="d.value" />
           </el-select>
         </div>
@@ -185,7 +206,7 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm, op
         <div class="dv-row">
           <span class="dv-label">项目</span>
           <el-select v-model="handleForm.projectId" data-test="li-project-select"
-            filterable placeholder="选择项目" style="width: 280px">
+            filterable placeholder="选择项目" style="width: 280px" @change="onScopeChange">
             <el-option-group v-if="handleItem.candidateProjects.length" label="推测候选(可改)">
               <el-option v-for="pid in handleItem.candidateProjects" :key="`c-${pid}`"
                 :value="pid" :label="projectLabel(pid)" />
@@ -196,6 +217,18 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm, op
             </el-option-group>
           </el-select>
         </div>
+        <!-- 风险跟进按「项目号::风险编码」复合键存储（四域里唯一），故须再选一条风险记录 -->
+        <div v-if="needsRiskCode(handleForm.domain)" class="dv-row">
+          <span class="dv-label">风险记录</span>
+          <el-select v-if="!riskEmpty" v-model="handleForm.riskCode" data-test="li-risk-select"
+            filterable placeholder="选择风险记录" style="width: 280px">
+            <el-option v-for="r in riskOptions" :key="r.code" :label="r.label" :value="r.code" />
+          </el-select>
+          <span v-else class="dv-hint warn" data-test="li-risk-empty">
+            该项目无风险记录，无法归入风险跟进。请改选其它项目或其它目标域。
+          </span>
+        </div>
+
         <div class="dv-row dv-hint">
           候选项目按「最近推给此人的蓝信卡片涉及哪些项目」推测得出，仅供参考，可改选任意项目。
         </div>
