@@ -179,10 +179,25 @@ def load_milestones(pmis_dir: str, keep_ids: Set[str]
     return merged, stat_a, stat_c
 
 
-def final_acceptance_date(items: List[Dict[str, Any]], project_type: Any) -> Optional[str]:
-    """按项目类型取里程碑计划日:售前服务类→服务完成.planDate,否则→终验.planDate。缺/空→None。"""
-    target = "服务完成" if str(project_type or "").strip() == config.PRESALE_PROJECT_TYPE else "终验"
+def _final_acceptance_target(project_type: Any) -> str:
+    """计划/实际两个取数口径共用的里程碑选择规则:售前服务类看「服务完成」,其他看「终验」。
+    抽出来是为了让两个函数不可能漂移 —— 改规则只有这一处。"""
+    return "服务完成" if str(project_type or "").strip() == config.PRESALE_PROJECT_TYPE else "终验"
+
+
+def _final_acceptance_field(items: List[Dict[str, Any]], project_type: Any, field: str) -> Optional[str]:
+    target = _final_acceptance_target(project_type)
     for it in items or []:
         if it.get("name") == target:
-            return it.get("planDate") or None
+            return it.get(field) or None
     return None
+
+
+def final_acceptance_date(items: List[Dict[str, Any]], project_type: Any) -> Optional[str]:
+    """按项目类型取里程碑计划日:售前服务类→服务完成.planDate,否则→终验.planDate。缺/空→None。"""
+    return _final_acceptance_field(items, project_type, "planDate")
+
+
+def final_acceptance_actual_date(items: List[Dict[str, Any]], project_type: Any) -> Optional[str]:
+    """同 final_acceptance_date,但取实际完成日 actualDate。计划已排而实际未发生→None(不回退 planDate)。"""
+    return _final_acceptance_field(items, project_type, "actualDate")

@@ -117,3 +117,29 @@ def test_final_acceptance_date():
     assert M.final_acceptance_date([{"name": "初验", "planDate": "2026-06-01"}], "实施项目") is None
     assert M.final_acceptance_date([{"name": "终验", "planDate": ""}], "实施项目") is None
     assert M.final_acceptance_date([], "售前服务类") is None
+
+
+def test_final_acceptance_actual_date():
+    import milestones as M
+    items = [{"name": "终验", "planDate": "2026-07-01", "actualDate": "2026-07-15"},
+             {"name": "服务完成", "planDate": "2026-08-01", "actualDate": "2026-08-20"}]
+    assert M.final_acceptance_actual_date(items, "实施项目") == "2026-07-15"      # 非售前→终验
+    assert M.final_acceptance_actual_date(items, "售前服务类") == "2026-08-20"    # 售前→服务完成
+    # 计划已排、实际未发生:必须 None,不能回退成 planDate
+    assert M.final_acceptance_actual_date(
+        [{"name": "终验", "planDate": "2026-07-01", "actualDate": ""}], "实施项目") is None
+    assert M.final_acceptance_actual_date(
+        [{"name": "初验", "actualDate": "2026-06-01"}], "实施项目") is None
+    assert M.final_acceptance_actual_date([], "售前服务类") is None
+
+
+def test_final_acceptance_pair_shares_target_rule():
+    """计划与实际必须用同一套 target 选择规则 —— 两函数对同一项目必须命中同一个里程碑。"""
+    import milestones as M
+    items = [{"name": "终验", "planDate": "2026-07-01", "actualDate": "2026-07-15"},
+             {"name": "服务完成", "planDate": "2026-08-01", "actualDate": "2026-08-20"}]
+    for ptype in ("实施项目", "售前服务类"):
+        plan = M.final_acceptance_date(items, ptype)
+        actual = M.final_acceptance_actual_date(items, ptype)
+        hit = next(i for i in items if i["planDate"] == plan)
+        assert hit["actualDate"] == actual

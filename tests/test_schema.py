@@ -243,3 +243,12 @@ def test_closed_projects_default_empty():
 def test_project_has_sign_unit_field():
     import schema
     assert "signUnit" in schema.Project.model_fields
+
+
+def test_pmis_progress_has_actual_final_acceptance():
+    import schema
+    assert {"终验时间", "实际终验时间"} <= set(schema.PmisProgress.model_fields)
+    p = schema.PmisProgress(**{"终验时间": "2026-07-01", "实际终验时间": "2026-07-15"})
+    assert p.实际终验时间 == "2026-07-15"
+    # 缺省必须是 None,不是空串 —— 前端按 null 判空显 '-'
+    assert schema.PmisProgress().实际终验时间 is None

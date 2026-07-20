@@ -47,6 +47,41 @@ def test_backfill_final_acceptance():
     assert project_pmis["C"]["progress"]["终验时间"] is None  # 无里程碑 + 自动建 progress 键
 
 
+def test_backfill_final_acceptance_fills_both_fields():
+    import preprocess_data as P
+    project_pmis = {
+        "P1": {"status": {"项目类型": "实施项目"}},
+        "P2": {"status": {"项目类型": "售前服务类"}},
+        "P3": {"status": {"项目类型": "实施项目"}},
+    }
+    project_milestones = {
+        "P1": [{"name": "终验", "planDate": "2026-07-01", "actualDate": "2026-07-15"}],
+        "P2": [{"name": "服务完成", "planDate": "2026-08-01", "actualDate": "2026-08-20"}],
+        # P3:计划已排,实际未发生
+        "P3": [{"name": "终验", "planDate": "2026-09-01", "actualDate": ""}],
+    }
+    P.backfill_final_acceptance(project_pmis, project_milestones)
+    assert project_pmis["P1"]["progress"]["终验时间"] == "2026-07-01"
+    assert project_pmis["P1"]["progress"]["实际终验时间"] == "2026-07-15"
+    assert project_pmis["P2"]["progress"]["终验时间"] == "2026-08-01"
+    assert project_pmis["P2"]["progress"]["实际终验时间"] == "2026-08-20"
+    # 实际未发生 → None,键必须存在(前端按 undefined/None 显 '-',缺键会让 schema 与前端类型不一致)
+    assert project_pmis["P3"]["progress"]["终验时间"] == "2026-09-01"
+    assert project_pmis["P3"]["progress"]["实际终验时间"] is None
+    assert "实际终验时间" in project_pmis["P3"]["progress"]
+
+
+def test_backfill_final_acceptance_keeps_existing_progress_keys():
+    """回填是就地 setdefault + 赋值,不能把 progress 里既有的键冲掉。"""
+    import preprocess_data as P
+    project_pmis = {"P1": {"status": {"项目类型": "实施项目"},
+                           "progress": {"完工进展": 0.8, "项目阶段": "实施"}}}
+    P.backfill_final_acceptance(project_pmis, {"P1": [{"name": "终验", "actualDate": "2026-07-15"}]})
+    assert project_pmis["P1"]["progress"]["完工进展"] == 0.8
+    assert project_pmis["P1"]["progress"]["项目阶段"] == "实施"
+    assert project_pmis["P1"]["progress"]["实际终验时间"] == "2026-07-15"
+
+
 def test_derive_sign_unit_tag_seed():
     from preprocess_data import derive_sign_unit_tag_seed
     rows = [
