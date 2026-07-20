@@ -104,10 +104,15 @@ def id_mapping(cfg: Dict[str, Any], token: str, emp_id: str) -> str:
     return data.get("staffId") or ""
 
 
-def send_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
-                 msg_data: Dict[str, Any]) -> Dict[str, Any]:
-    """POST /v1/messages/create。msgType 由 msg_data 的唯一键推断(text/appCard/...)。
-    56008 限流 → 退避重试;10005 无权限 → 立即失败(重试无用)。"""
+ACCOUNT_MESSAGE_PATH = "/v1/messages/create"        # 应用号:回调事件 account_message
+BOT_MESSAGE_PATH = "/v1/bot/messages/create"        # 智能机器人:回调 bot_private_message
+
+
+def _send(cfg: Dict[str, Any], token: str, staff_ids: List[str],
+          msg_data: Dict[str, Any], path: str) -> Dict[str, Any]:
+    """两种发送身份的共用实现。msgType 由 msg_data 的唯一键推断(text/appCard/...)。
+    56008 限流 → 退避重试;其余错误(如 10005 无权限)立即失败,重试无用。
+    两个接口的请求体、收件上限、错误码完全一致,唯一差异是 path。"""
     if len(staff_ids) > MAX_RECIPIENTS:
         raise ValueError("userIdList 最多 %d 个,当前 %d" % (MAX_RECIPIENTS, len(staff_ids)))
     keys = list(msg_data.keys())
@@ -115,8 +120,8 @@ def send_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
         raise ValueError("msgData 必须且只能含一个消息体键")
     body = json.dumps({"userIdList": list(staff_ids), "msgType": keys[0], "msgData": msg_data},
                       ensure_ascii=False).encode("utf-8")
-    url = "%s/v1/messages/create?%s" % (_gateway(cfg),
-                                        urllib.parse.urlencode({"app_token": token}))
+    url = "%s%s?%s" % (_gateway(cfg), path,
+                       urllib.parse.urlencode({"app_token": token}))
     headers = {"Content-Type": "application/json"}
 
     last: Optional[LanxinError] = None
@@ -130,6 +135,18 @@ def send_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
             if attempt < len(RETRY_BACKOFF):
                 time.sleep(RETRY_BACKOFF[attempt])
     raise last            # type: ignore[misc]
+
+
+def send_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
+                 msg_data: Dict[str, Any]) -> Dict[str, Any]:
+    """以【应用号】身份发送。"""
+    return _send(cfg, token, staff_ids, msg_data, ACCOUNT_MESSAGE_PATH)
+
+
+def send_bot_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
+                     msg_data: Dict[str, Any]) -> Dict[str, Any]:
+    """以【智能机器人】身份发送。须组织管理员已开通机器人能力。"""
+    return _send(cfg, token, staff_ids, msg_data, BOT_MESSAGE_PATH)
 
 
 # ── 编排:build_plan(纯计算) / dispatch(真发) ─────────────────────────────
@@ -248,6 +265,10 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     V4.0.2 起每一项(问题码/关注原因)各自配 enabled/primary/supervisorLevels。"""
     unresolved: List[Dict[str, Any]] = []
     proj_by_emp: Dict[str, Dict[str, List[str]]] = {}
+    # 与 proj_by_emp 并行的独立桶:proj_by_emp 存【项目名称】(卡片文案用,不可动);
+    # 本桶只存【项目号】,供归入功能拿去当跟进域的 key(Task 6)。projectName 聚合过程
+    # 会丢项目号(bucket.append 只存了名字),故必须另开一桶,不能从 proj_by_emp 反推。
+    proj_ids_by_emp: Dict[str, List[str]] = {}
     ts_by_emp: Dict[str, List[Dict[str, Any]]] = {}
     ts_range = {"start": "", "end": ""}
     # 工时 counts 按【中文 label】聚合,而配置按【英文 code】——分桶时顺手建映射,
@@ -280,6 +301,9 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
             bucket = proj_by_emp.setdefault(emp, {})
             for r in reasons:
                 bucket.setdefault(r, []).append(str(pm.get("projectName") or pid))
+            ids = proj_ids_by_emp.setdefault(emp, [])
+            if pid and pid not in ids:
+                ids.append(pid)
         elif kind == "timesheet" and r_ts:
             issues = [i for i in (it.get("issues") or [])
                       if (ts_items.get(i.get("code")) or {}).get("enabled")]
@@ -308,6 +332,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 continue
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
+                "routeKey": "timesheet", "projectIds": [],
                 "card": build_timesheet_card(by_id[emp]["name"], mine,
                                              ts_range["start"], ts_range["end"]),
             })
@@ -319,6 +344,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 continue
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
+                "routeKey": "project", "projectIds": list(proj_ids_by_emp.get(emp) or []),
                 "card": build_project_card(by_id[emp]["name"], mine),
             })
 
@@ -336,6 +362,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                     for owner, counts in agg[sup].items()]
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
+                "routeKey": "timesheet", "projectIds": [],
                 "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE,
                                            unit="条", head_title="工时填报提醒",
                                            title_fmt="你的团队工时填报存在 %d 条问题",
@@ -351,8 +378,17 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
             rows = [{"name": by_id[owner]["name"], "total": sum(counts.values()),
                      "reasons": list(counts.items())}
                     for owner, counts in agg[sup].items()]
+            # 该 sup 名下所有 owner 的项目号并集,按首次出现顺序去重(owner 顺序 → owner 内顺序)。
+            sup_ids: List[str] = []
+            seen_ids: set = set()
+            for owner in agg[sup]:
+                for pid2 in proj_ids_by_emp.get(owner) or []:
+                    if pid2 not in seen_ids:
+                        seen_ids.add(pid2)
+                        sup_ids.append(pid2)
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
+                "routeKey": "project", "projectIds": sup_ids,
                 "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE),
             })
 
@@ -361,10 +397,15 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
 
 
 def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
-    """按 plan 真发。串行 + 间隔(单线程 HTTPServer,且限流阈值未知);
-    单人失败不中断整批,如实计入 failed。"""
+    """按 plan 真发。串行 + 间隔(控速,限流阈值未知);
+    单人失败不中断整批,如实计入 failed。
+    发送身份由 cfg["sendAs"] 决定("bot" → 智能机器人,其余(含未配置)→ 应用号默认)。
+    sentLog 只记成功项 —— 它是回调侧反查 staffId↔employId 身份的唯一依据,
+    记入失败项会让人被错误地当成"推送过"去反查身份和推荐归入项目。"""
     token = get_app_token(cfg)
     interval = int(cfg.get("sendIntervalMs") or 0) / 1000.0
+    sender = send_bot_message if cfg.get("sendAs") == "bot" else send_message
+    sent_log: List[Dict[str, Any]] = []
     staff_cache: Dict[str, str] = {}
     sent = 0
     failed: List[Dict[str, Any]] = []
@@ -379,12 +420,20 @@ def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
                 if not sid:
                     raise LanxinError(-1, "未换到 staffId")
                 staff_cache[emp] = sid
-            data = send_message(cfg, token, [sid], {"appCard": r["card"]})
+            data = sender(cfg, token, [sid], {"appCard": r["card"]})
             if data.get("invalidStaff"):
                 raise LanxinError(-1, "蓝信侧认为该人员ID无效")
             sent += 1
             if data.get("msgId"):
                 msg_ids.append(data["msgId"])
+            sent_log.append({
+                "staffId": sid,
+                "employId": emp,
+                "name": r["name"],
+                "routeKey": r.get("routeKey") or "",
+                "projectIds": list(r.get("projectIds") or []),
+                "msgId": data.get("msgId") or "",
+            })
         except LanxinError as e:
             failed.append({"employId": emp, "name": r["name"],
                            "errCode": e.err_code, "errMsg": e.err_msg})
@@ -394,4 +443,4 @@ def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
         if interval:
             time.sleep(interval)
 
-    return {"sent": sent, "failed": failed, "msgIds": msg_ids}
+    return {"sent": sent, "failed": failed, "msgIds": msg_ids, "sentLog": sent_log}
