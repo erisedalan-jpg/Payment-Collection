@@ -117,6 +117,34 @@ def test_load_temp_corrupt_returns_default(tmp_path, monkeypatch):
     assert s["instances"][0]["scope"]["groups"] == []
 
 
+def test_load_temp_read_failure_does_not_overwrite_file(tmp_path, monkeypatch):
+    """C-1 护栏:文件存在且合法(现网真实归档数据),但一次读取抛异常(瞬时 OSError/
+    编码问题等)时,绝不能把磁盘上那份好文件原子覆盖成空 store —— 这是本次修复的
+    核心断言。V4.0.1 及以前的语义是"读失败只降级本次返回值,文件安然无恙"。"""
+    f = tmp_path / "temp_followup.json"
+    good = {
+        "version": 2,
+        "instances": [
+            {"id": "inst-real1", "name": "现网跟进", "scope": {"combinator": "AND", "groups": []},
+             "current": {"P1": {"weekProgress": "真实进展"}},
+             "archives": [{"archiveTime": "2026-07-01 00:00:00", "rows": [{"projectId": "P1"}]}]},
+        ],
+    }
+    f.write_text(json.dumps(good, ensure_ascii=False), encoding="utf-8")
+    original_bytes = f.read_bytes()
+    monkeypatch.setattr(server, "TEMP_FOLLOWUP_FILE", str(f))
+
+    def _boom(*a, **k):
+        raise OSError("simulated transient read failure")
+    monkeypatch.setattr(server.json, "load", _boom)
+
+    s = server._load_temp_followup()
+    # 本次请求拿到的是内存里的默认值(不是磁盘上那份真实数据,因为读取失败了)
+    assert s["instances"][0]["id"] != "inst-real1"
+    # 核心断言:磁盘文件必须原封不动,一字节都不能变
+    assert f.read_bytes() == original_bytes
+
+
 def test_save_load_roundtrip(tmp_path, monkeypatch):
     f = tmp_path / "temp_followup.json"
     monkeypatch.setattr(server, "TEMP_FOLLOWUP_FILE", str(f))

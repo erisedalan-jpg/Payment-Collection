@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
@@ -60,11 +60,20 @@ function switchInstance(id: string) {
 const newOpen = ref(false)
 const newName = ref('')
 const newFrom = ref('')
+// M-6:三个弹窗操作此前没有 catch —— api.post 在 {success:false} 时抛 ApiRequestError
+// (api/client.ts),全局没有兜底处理器。最确定会撞上的是"只剩一个实例时点删除":后端必然
+// 400「至少保留一个跟进事项」,不加 catch 的话确认弹窗点完之后什么都没发生、管理弹窗也不
+// 关、控制台一条 unhandled rejection——用户只会以为页面卡了。统一按仓库既有惯例
+// (AdminView.vue 的 submitForm/onDelete)用 ElMessage.error 兜底。
 async function doCreate() {
-  await temp.createInstance(newName.value.trim(), newFrom.value || undefined)
-  newOpen.value = false
-  newName.value = ''
-  newFrom.value = ''
+  try {
+    await temp.createInstance(newName.value.trim(), newFrom.value || undefined)
+    newOpen.value = false
+    newName.value = ''
+    newFrom.value = ''
+  } catch (e) {
+    ElMessage.error((e as Error).message || '新建失败')
+  }
 }
 
 // 重命名 / 删除跟进事项(超管)
@@ -73,17 +82,29 @@ const renameName = ref('')
 watch(menuOpen, (v) => { if (v) renameName.value = temp.activeInstance?.name ?? '' })
 async function doRename() {
   if (!temp.activeInstance) return
-  await temp.renameInstance(temp.activeInstance.id, renameName.value.trim())
-  menuOpen.value = false
+  try {
+    await temp.renameInstance(temp.activeInstance.id, renameName.value.trim())
+    menuOpen.value = false
+  } catch (e) {
+    ElMessage.error((e as Error).message || '重命名失败')
+  }
 }
 async function doDeleteInstance() {
   const inst = temp.activeInstance
   if (!inst) return
-  await ElMessageBox.confirm(
-    `将删除跟进事项「${inst.name}」，同时删除其 ${inst.archives.length} 条归档。此操作不可撤销。`,
-    '删除跟进事项', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
-  await temp.deleteInstance(inst.id)
-  menuOpen.value = false
+  try {
+    await ElMessageBox.confirm(
+      `将删除跟进事项「${inst.name}」，同时删除其 ${inst.archives.length} 条归档。此操作不可撤销。`,
+      '删除跟进事项', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return   // 用户取消,不提示错误
+  }
+  try {
+    await temp.deleteInstance(inst.id)
+    menuOpen.value = false
+  } catch (e) {
+    ElMessage.error((e as Error).message || '删除失败')
+  }
 }
 </script>
 

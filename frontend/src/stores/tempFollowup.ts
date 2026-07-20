@@ -36,23 +36,32 @@ export const useTempFollowupStore = defineStore('tempFollowup', () => {
   function setActive(id: string) {
     if (instances.value.some((i) => i.id === id)) activeId.value = id
   }
+  // 四个 action 都遵循同一条规则:请求发起前把 activeId 存进局部常量 id,await 之后
+  // 一律按 id 去 instances.value 里查实例再回填 —— 绝不能在 await 之后再读
+  // activeInstance.value,因为用户可能在请求在途时已经切换了选项卡(I-1)。
   async function saveScope(next: ScopeFilter) {
-    const r = await tempFollowupApi.saveScope(activeId.value, next)
-    if (activeInstance.value) activeInstance.value.scope = r.scope ?? next
+    const id = activeId.value
+    const r = await tempFollowupApi.saveScope(id, next)
+    const inst = instances.value.find((i) => i.id === id)
+    if (inst) inst.scope = r.scope ?? next
   }
   async function update(projectId: string, field: 'weekProgress' | 'nextPlan', content: string) {
-    const r = await tempFollowupApi.update(activeId.value, projectId, field, content)
-    const inst = activeInstance.value
+    const id = activeId.value
+    const r = await tempFollowupApi.update(id, projectId, field, content)
+    const inst = instances.value.find((i) => i.id === id)
     if (inst) inst.current = { ...inst.current, [projectId]: { ...inst.current[projectId], ...r.record } }
   }
   async function archive(rows: Record<string, unknown>[]) {
-    const r = await tempFollowupApi.archive(activeId.value, rows)
-    const inst = activeInstance.value
+    const id = activeId.value
+    const r = await tempFollowupApi.archive(id, rows)
+    const inst = instances.value.find((i) => i.id === id)
     if (inst) { inst.archives = r.archives ?? []; inst.current = {} }
   }
   async function deleteArchive(idx: number) {
-    const r = await tempFollowupApi.deleteArchive(activeId.value, idx)
-    if (activeInstance.value) activeInstance.value.archives = r.archives ?? []
+    const id = activeId.value
+    const r = await tempFollowupApi.deleteArchive(id, idx)
+    const inst = instances.value.find((i) => i.id === id)
+    if (inst) inst.archives = r.archives ?? []
   }
   async function createInstance(name: string, copyFrom?: string) {
     const r = await tempFollowupApi.createInstance(name, copyFrom)
