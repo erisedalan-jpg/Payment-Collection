@@ -18,9 +18,15 @@ export interface LanxinRoute {
 export interface LanxinConfig {
   enabled: boolean
   sendIntervalMs: number
+  /** 发送身份：应用号(account) | 智能机器人(bot)，默认 account。 */
+  sendAs: 'account' | 'bot'
   credentials: {
     appId: string; appSecret: string; orgId: string
     apiGateway: string; idType: string; hasSecret?: boolean
+    // 回调双凭证(开发者中心「回调事件」页申请)。callbackAesKey/callbackSignToken 经
+    // public_config 脱敏后恒为空串，has* 布尔才是「是否已配置」的唯一依据。
+    callbackAesKey: string; callbackSignToken: string
+    hasCallbackAesKey?: boolean; hasCallbackSignToken?: boolean
   }
   routes: LanxinRoute[]
 }
@@ -40,8 +46,23 @@ export interface LanxinSendResult {
   msgIds: string[]
 }
 
+/** 回调验签被拒次数——数据源是 GET /api/lanxin/config 顶层的 rejected 字段(Task 6 提供)。
+ *  Task 6 落地前接口不含该字段,故 getLanxinRejectedStats() 允许解出 undefined,调用方按 0 兜底。 */
+export interface LanxinRejectedStats {
+  count: number
+  lastAt: string
+  lastFrom?: string
+}
+
+/** 完整响应:config + rejected(验签失败计数,Task 6 提供)。一次请求拿两样,
+ *  给需要 rejected 的调用方(目前只有 LanxinConfigCard.vue)用。 */
+export async function getLanxinConfigFull(): Promise<{ config: LanxinConfig; rejected?: LanxinRejectedStats }> {
+  return await api.get<{ config: LanxinConfig; rejected?: LanxinRejectedStats }>('/api/lanxin/config')
+}
+/** 只要 config 的薄包装—— LanxinPushDrawer.vue 等既有调用方签名与返回类型不变,
+ *  不必因为新增 rejected 而跟着改。 */
 export async function getLanxinConfig(): Promise<LanxinConfig> {
-  return (await api.get<{ config: LanxinConfig }>('/api/lanxin/config')).config
+  return (await getLanxinConfigFull()).config
 }
 export async function saveLanxinConfig(cfg: LanxinConfig): Promise<LanxinConfig> {
   return (await api.post<{ config: LanxinConfig }>('/api/lanxin/config', { config: cfg })).config
