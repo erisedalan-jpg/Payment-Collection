@@ -188,16 +188,28 @@ TREE = {
         "A005": {"name": "耿磊磊", "supId": "A002", "l4": "小金融服务组", "l31": "服务二部"},
         "A006": {"name": "张三", "supId": "A005", "l4": "小金融服务组", "l31": "服务二部"},
         "A007": {"name": "李四", "supId": "A005", "l4": "小金融服务组", "l31": "服务二部"},
+        # A010 挂在 A002(于岩)下、与 A005(耿磊磊)是不同分支 —— 专供「不同项配不同级别,
+        # 各自卷到各自的上级」用例:需要两条【互不重叠】的上级链,才能验证互不污染。
+        "A010": {"name": "赵六", "supId": "A002", "l4": "小金融服务组", "l31": "服务二部"},
     },
     "byName": {"张英哲": ["A001"], "于岩": ["A002"], "耿磊磊": ["A005"],
-               "张三": ["A006"], "李四": ["A007"]},
+               "张三": ["A006"], "李四": ["A007"], "赵六": ["A010"]},
 }
 PMIS = {
     "P1": {"team": {"项目经理": "张三"}},
     "P2": {"team": {"项目经理": "张三"}},
     "P3": {"team": {"项目经理": "李四"}},
     "P9": {"team": {"项目经理": "查无此人"}},
+    "P10": {"team": {"项目经理": "赵六"}},
 }
+
+# B2 新增用例用的别名:_TREE/_PMIS 复用既有夹具;_EMP 任取一个在册工号;
+# _SUP1/_SUP2 分别是 A006(张三)的 +1 上级、A010(赵六)的 +2 上级 —— 两条链不重叠。
+_TREE = TREE
+_PMIS = PMIS
+_EMP = "A006"
+_SUP1 = "A005"
+_SUP2 = "A001"
 
 
 def _cfg(project_levels=1, ts_levels=0, project_on=True, ts_on=True):
@@ -213,10 +225,29 @@ def _cfg(project_levels=1, ts_levels=0, project_on=True, ts_on=True):
     return c
 
 
+def _cfg_items(ts_items=None, pj_items=None, ts_on=True, pj_on=True):
+    """新结构配置工厂。ts_items/pj_items: {code: (enabled, primary, levels)}，未列出的 code 补 (False, True, 0)。"""
+    import lanxin_config as C
+    c = C.default_config()
+    def _mk(whitelist, spec):
+        spec = spec or {}
+        return [{"code": k, "enabled": spec.get(k, (False, True, 0))[0],
+                 "primary": spec.get(k, (False, True, 0))[1],
+                 "supervisorLevels": spec.get(k, (False, True, 0))[2]} for k in whitelist]
+    c["routes"] = [
+        {"key": "timesheet", "label": "倚天工时问题", "enabled": ts_on,
+         "items": _mk(list(C.ISSUE_LABELS.keys()), ts_items)},
+        {"key": "project", "label": "项目关注原因", "enabled": pj_on,
+         "items": _mk(C.REASON_WHITELIST, pj_items)},
+    ]
+    return c
+
+
 def test_plan_primary_manager_gets_own_card():
     items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
              {"kind": "project", "projectId": "P2", "reasons": ["里程碑滞后"]}]
-    plan = LX.build_plan(items, _cfg(project_levels=0), TREE, PMIS)
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 0), "里程碑滞后": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     prim = [r for r in plan["recipients"] if r["role"] == "primary"]
     assert len(prim) == 1
     assert prim[0]["employId"] == "A006"
@@ -227,7 +258,8 @@ def test_plan_supervisor_summary_rolls_up_by_direct_report():
     """+2:耿磊磊(直接上级)与于岩(隔级)各一张;于岩那张按【直接下属】列 = 只有耿磊磊一行。"""
     items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
              {"kind": "project", "projectId": "P3", "reasons": ["回款延期"]}]
-    plan = LX.build_plan(items, _cfg(project_levels=2), TREE, PMIS)
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 2)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     sup = {r["employId"]: r for r in plan["recipients"] if r["role"] == "supervisor"}
     assert set(sup) == {"A005", "A002"}
     # 耿磊磊直接带 张三/李四 → 2 行
@@ -239,50 +271,55 @@ def test_plan_supervisor_summary_rolls_up_by_direct_report():
 
 def test_plan_levels_zero_no_supervisor():
     items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}]
-    plan = LX.build_plan(items, _cfg(project_levels=0), TREE, PMIS)
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert [r for r in plan["recipients"] if r["role"] == "supervisor"] == []
 
 
 def test_plan_primary_false_only_supervisor():
-    c = _cfg(project_levels=1)
-    c["routes"][1]["recipients"]["primary"] = False
+    cfg = _cfg_items(pj_items={"回款延期": (True, False, 1)})
     plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
-                         c, TREE, PMIS)
+                         cfg, TREE, PMIS)
     assert [r["role"] for r in plan["recipients"]] == ["supervisor"]
 
 
 def test_plan_route_disabled_drops_items():
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1)}, pj_on=False)
     plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
-                         _cfg(project_on=False), TREE, PMIS)
+                         cfg, TREE, PMIS)
     assert plan["recipients"] == []
 
 
 def test_plan_filters_reasons_not_in_config():
     """配置里取消勾选的原因不参与推送。"""
     items = [{"kind": "project", "projectId": "P1", "reasons": ["数据异常"]}]
-    plan = LX.build_plan(items, _cfg(project_levels=0), TREE, PMIS)
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 0)})      # 数据异常未列出 → enabled=False
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["recipients"] == []
 
 
 def test_plan_unresolved_manager_not_in_roster():
     """实测 managerNotInOrg 有 6 个项目会走到这里 —— 必须显式列出,不静默丢。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1)})
     plan = LX.build_plan([{"kind": "project", "projectId": "P9", "reasons": ["回款延期"]}],
-                         _cfg(), TREE, PMIS)
+                         cfg, TREE, PMIS)
     assert plan["recipients"] == []
     assert plan["unresolved"] == [{"kind": "project", "id": "P9",
                                    "name": "查无此人", "reason": "经理不在花名册"}]
 
 
 def test_plan_unresolved_unknown_project_id():
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1)})
     plan = LX.build_plan([{"kind": "project", "projectId": "NOPE", "reasons": ["回款延期"]}],
-                         _cfg(), TREE, PMIS)
+                         cfg, TREE, PMIS)
     assert plan["unresolved"][0]["reason"] == "项目不存在"
 
 
 def test_plan_timesheet_primary():
     items = [{"kind": "timesheet", "employId": "A006",
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3}]}]
-    plan = LX.build_plan(items, _cfg(), TREE, PMIS)
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert len(plan["recipients"]) == 1
     assert plan["recipients"][0]["card"]["headTitle"] == "工时填报提醒"
 
@@ -290,15 +327,121 @@ def test_plan_timesheet_primary():
 def test_plan_timesheet_filters_issue_codes():
     items = [{"kind": "timesheet", "employId": "A006",
               "issues": [{"code": "TYPE_MISMATCH", "label": "工时类型填报有误", "count": 1}]}]
-    plan = LX.build_plan(items, _cfg(), TREE, PMIS)      # 配置只勾了 MISS_SUMMARY
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})      # 配置只勾了 MISS_SUMMARY
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["recipients"] == []
 
 
 def test_plan_timesheet_employ_not_in_roster_unresolved():
     items = [{"kind": "timesheet", "employId": "ZZZ",
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
-    plan = LX.build_plan(items, _cfg(), TREE, PMIS)
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["unresolved"][0]["reason"] == "工号不在花名册"
+
+
+# ── B2:build_plan 按项聚合(逐项 enabled/primary/supervisorLevels) ──────────
+
+
+def test_plan_item_disabled_is_dropped():
+    """未启用的项不产出任何卡。"""
+    cfg = _cfg_items(pj_items={"回款延期": (False, True, 1)})
+    plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
+                        cfg, _TREE, _PMIS)
+    assert plan["recipients"] == []
+
+
+def test_plan_item_primary_false_still_rolls_up():
+    """primary=False 的项不进本人卡,但仍进汇总 —— 两者是独立开关。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, False, 1)})
+    plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
+                        cfg, _TREE, _PMIS)
+    roles = [r["role"] for r in plan["recipients"]]
+    assert "primary" not in roles
+    assert "supervisor" in roles
+
+
+def test_plan_primary_card_only_contains_primary_items():
+    """同一人名下,只有 primary=True 的原因进本人卡。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 0), "数据异常": (True, False, 0)})
+    plan = LX.build_plan(
+        [{"kind": "project", "projectId": "P1", "reasons": ["回款延期", "数据异常"]}],
+        cfg, _TREE, _PMIS)
+    card = next(r["card"] for r in plan["recipients"] if r["role"] == "primary")
+    keys = [f["key"] for f in card["fields"]]
+    assert "回款延期" in keys
+    assert "数据异常" not in keys
+
+
+def test_plan_mixed_levels_route_to_different_supervisors():
+    """★ 本任务的核心用例:不同项配不同级别,各自卷到各自的上级。
+
+    与任务书字面版本的差异(已记录):任务书原例把两个原因都挂在【同一个】项目/经理
+    (P1→张三)名下。但 _rollup 对同一来源员工的上级链是【级联】的 —— levels=2 会把
+    +1 和 +2 两级都收进 agg(既有测试 test_plan_supervisor_summary_rolls_up_by_direct_report
+    已验证此级联行为,B2 明确保留、不改 _rollup)。于是「数据异常」配 levels=2 时,张三的
+    +1 上级(耿磊磊)会被级联进 agg,与「回款延期」(levels=1)撞在同一张卡上,不可能做到
+    「+1 只看回款延期」。要让两个不同级别真正各自路由到互不重叠的上级,两个原因必须来自
+    【上级链不重叠】的两个不同员工 —— 故改用 P1(张三→耿磊磊,+1)与 P10(赵六→于岩→
+    张英哲,+2)两个项目,分别只挂一个原因。断言意图不变:level=1 的项目不出现在只该看
+    level=1 那条链的卡上,level=2 的项目也一样。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1), "数据异常": (True, True, 2)})
+    plan = LX.build_plan(
+        [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
+         {"kind": "project", "projectId": "P10", "reasons": ["数据异常"]}],
+        cfg, _TREE, _PMIS)
+    sups = {r["employId"]: r["card"] for r in plan["recipients"] if r["role"] == "supervisor"}
+    # +1 级上级只看到「回款延期」;+2 级上级只看到「数据异常」
+    lvl1_card = sups[_SUP1]
+    lvl2_card = sups[_SUP2]
+    assert "回款延期" in lvl1_card["fields"][0]["value"]
+    assert "数据异常" not in lvl1_card["fields"][0]["value"]
+    assert "数据异常" in lvl2_card["fields"][0]["value"]
+    assert "回款延期" not in lvl2_card["fields"][0]["value"]
+
+
+def test_plan_same_supervisor_hit_by_two_levels_gets_one_merged_card():
+    """★ 「按人合并」在这里成立:同一上级因两项(不同级别)命中,只收【一张】卡、卡内两行内容。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1), "数据异常": (True, True, 1)})
+    plan = LX.build_plan(
+        [{"kind": "project", "projectId": "P1", "reasons": ["回款延期", "数据异常"]}],
+        cfg, _TREE, _PMIS)
+    sup_recs = [r for r in plan["recipients"] if r["role"] == "supervisor" and r["employId"] == _SUP1]
+    assert len(sup_recs) == 1
+    v = sup_recs[0]["card"]["fields"][0]["value"]
+    assert "回款延期" in v and "数据异常" in v
+
+
+def test_plan_levels_zero_item_no_summary():
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 0)})
+    plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
+                        cfg, _TREE, _PMIS)
+    assert all(r["role"] != "supervisor" for r in plan["recipients"])
+
+
+def test_plan_timesheet_item_levels_use_code_not_label():
+    """★ 工时侧 counts 按【中文 label】聚合、配置按【英文 code】—— 映射错会静默不发汇总。"""
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 1)})
+    plan = LX.build_plan(
+        [{"kind": "timesheet", "employId": _EMP, "start": "", "end": "",
+          "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3}]}],
+        cfg, _TREE, _PMIS)
+    assert any(r["role"] == "supervisor" for r in plan["recipients"])
+
+
+def test_summary_card_subtitle_is_neutral():
+    """副标题固定「团队汇总」:合并卡里的行可能来自不同级别,写「直接上级」会自相矛盾。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1)})
+    plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
+                        cfg, _TREE, _PMIS)
+    card = next(r["card"] for r in plan["recipients"] if r["role"] == "supervisor")
+    assert card["bodySubTitle"] == "团队汇总"
+
+
+def test_level_helpers_removed():
+    """_level_of / _LEVEL_LABELS 已随中性文案一并删除(顺带清 V4.0.0 的 M-2 技术债)。"""
+    assert not hasattr(LX, "_level_of")
+    assert not hasattr(LX, "_LEVEL_LABELS")
 
 
 # ── I-1:timesheet 路由的 supervisorLevels 此前静默空转(只有 project 路由认这个字段) ──
@@ -310,7 +453,8 @@ def test_plan_timesheet_supervisor_summary_rolls_up_by_direct_report():
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3}]},
              {"kind": "timesheet", "employId": "A007",
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 2}]}]
-    plan = LX.build_plan(items, _cfg(ts_levels=2), TREE, PMIS)
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 2)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     sup = {r["employId"]: r for r in plan["recipients"] if r["role"] == "supervisor"}
     assert set(sup) == {"A005", "A002"}
     card = sup["A005"]["card"]
@@ -327,7 +471,8 @@ def test_plan_timesheet_levels_zero_no_supervisor_card():
     """levels=0(默认值)时不出汇总卡 —— 与 project 路由 levels=0 的既有行为对称。"""
     items = [{"kind": "timesheet", "employId": "A006",
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
-    plan = LX.build_plan(items, _cfg(ts_levels=0), TREE, PMIS)
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert [r for r in plan["recipients"] if r["role"] == "supervisor"] == []
 
 
@@ -335,9 +480,8 @@ def test_plan_timesheet_summary_uses_short_issue_label():
     """长标签(「工时类型填报有误」24 字节)在汇总卡的 value 里也要走短标签,不能露出残词(联动 I-3)。"""
     items = [{"kind": "timesheet", "employId": "A006",
               "issues": [{"code": "TYPE_MISMATCH", "label": "工时类型填报有误", "count": 1}]}]
-    c = _cfg(ts_levels=1)
-    c["routes"][0]["issueCodes"] = ["TYPE_MISMATCH"]
-    plan = LX.build_plan(items, c, TREE, PMIS)
+    cfg = _cfg_items(ts_items={"TYPE_MISMATCH": (True, True, 1)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     sup = [r for r in plan["recipients"] if r["role"] == "supervisor"][0]
     value = sup["card"]["fields"][0]["value"]
     assert "工时类型有误" in value
@@ -350,7 +494,8 @@ def test_plan_timesheet_primary_card_subtitle_uses_item_range():
     """区间由前端随 items 传入;build_plan 只透传,不自行计算。"""
     items = [{"kind": "timesheet", "employId": "A006", "start": "2026-07-01", "end": "2026-07-07",
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
-    plan = LX.build_plan(items, _cfg(), TREE, PMIS)
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["recipients"][0]["card"]["bodySubTitle"] == "统计区间 2026-07-01 ~ 2026-07-07"
 
 
@@ -358,7 +503,8 @@ def test_plan_timesheet_primary_card_subtitle_empty_without_range():
     """items 不带 start/end 时,副标题必须是空串,绝不拼出「统计区间  ~ 」这种半截文案。"""
     items = [{"kind": "timesheet", "employId": "A006",
               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
-    plan = LX.build_plan(items, _cfg(), TREE, PMIS)
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["recipients"][0]["card"]["bodySubTitle"] == ""
 
 
@@ -366,8 +512,9 @@ def test_plan_is_deterministic_same_input_same_output():
     """preview 与 send 走同一 build_plan;两次调用必须逐字段相等 —— 这是「所见即所发」的锚点。"""
     items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
              {"kind": "project", "projectId": "P3", "reasons": ["里程碑滞后"]}]
-    a = LX.build_plan(items, _cfg(project_levels=2), TREE, PMIS)
-    b = LX.build_plan(items, _cfg(project_levels=2), TREE, PMIS)
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 2), "里程碑滞后": (True, True, 2)})
+    a = LX.build_plan(items, cfg, TREE, PMIS)
+    b = LX.build_plan(items, cfg, TREE, PMIS)
     assert json.dumps(a, ensure_ascii=False, sort_keys=True) == \
            json.dumps(b, ensure_ascii=False, sort_keys=True)
 
@@ -375,7 +522,8 @@ def test_plan_is_deterministic_same_input_same_output():
 def test_plan_totals():
     items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
              {"kind": "project", "projectId": "P9", "reasons": ["回款延期"]}]
-    plan = LX.build_plan(items, _cfg(project_levels=1), TREE, PMIS)
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 1)})
+    plan = LX.build_plan(items, cfg, TREE, PMIS)
     assert plan["totals"]["recipients"] == len(plan["recipients"])
     assert plan["totals"]["unresolved"] == 1
 
