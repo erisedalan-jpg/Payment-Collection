@@ -100,3 +100,20 @@ describe('buildScopeInputs 立项日期', () => {
     expect(projectMatches(inputs[0], scope('2025-01-01', '2025-12-31'))).toBe(false)
   })
 })
+
+describe('V4.0.1 buildScopeInputs 实际终验时间', () => {
+  it('proj.actualFinalAcceptDate 取自 progress.实际终验时间并截到 10 位', () => {
+    const inputs = buildScopeInputs(
+      [{ projectId: 'P1' } as any],
+      { P1: { progress: { 终验时间: '2026-07-01', 实际终验时间: '2026-07-15 00:00:00' } } } as any,
+      {}, {})
+    expect(inputs[0].proj.actualFinalAcceptDate).toBe('2026-07-15')
+    expect(inputs[0].proj.finalAcceptDate).toBe('2026-07-01')
+  })
+
+  it('实际终验缺失时为空串(与既有 finalAcceptDate 的空值表示一致)', () => {
+    const inputs = buildScopeInputs(
+      [{ projectId: 'P1' } as any], { P1: { progress: {} } } as any, {}, {})
+    expect(inputs[0].proj.actualFinalAcceptDate).toBe('')
+  })
+})

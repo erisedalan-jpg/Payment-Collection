@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, paymentStatusOf, type ProjectFilters } from './projectList'
-import { NO_TAG_VALUE } from '@/lib/tagFilter'
 
 const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
@@ -123,8 +122,8 @@ describe('buildProjectRows', () => {
   })
 })
 
-// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/tags/riskCategory）
-const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' }
+// Step 1: ProjectFilters 收窄后的基准对象（只含 search/presale/paused/overspend/riskCategory；tags 已下沉表头 ColumnFilter,不再是本层职责）
+const F0: ProjectFilters = { search: '', presale: '', paused: '', overspend: '', riskCategory: '' }
 
 describe('filterProjectRows', () => {
   const rows = buildProjectRows(
@@ -144,50 +143,6 @@ describe('filterProjectRows', () => {
   it("搜索 '-' 不命中占位字段(客户缺失为 '-')", () => {
     const only = buildProjectRows([proj({ projectId: 'X9', projectName: '纯中文名' })], {})
     expect(filterProjectRows(only, { ...F0, search: '-' })).toHaveLength(0)
-  })
-})
-
-describe('标签筛选', () => {
-  it('按标签多选过滤(并集 OR)', () => {
-    const rows = [
-      { projectId: 'A', tags: ['BH项目'] },
-      { projectId: 'B', tags: ['框架合同'] },
-      { projectId: 'C', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: ['BH项目', '框架合同'] }).map((r) => r.projectId)).toEqual(['A', 'B'])
-    expect(filterProjectRows(rows, { ...F0, tags: [] }).length).toBe(3)
-  })
-
-  it('无标签(NO_TAG_VALUE) 只留无标签行', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: [NO_TAG_VALUE] }).map((r) => r.projectId)).toEqual(['B'])
-  })
-
-  it('选标签 → OR 命中', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: ['x'] }).map((r) => r.projectId)).toEqual(['A'])
-  })
-
-  it('混选 无标签+标签 → 并集', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: [NO_TAG_VALUE, 'x'] }).map((r) => r.projectId)).toEqual(['A', 'B'])
-  })
-
-  it('tags 空数组 → 不过滤，返回全部', () => {
-    const rows = [
-      { projectId: 'A', tags: ['x'] },
-      { projectId: 'B', tags: [] },
-    ] as any
-    expect(filterProjectRows(rows, { ...F0, tags: [] }).map((r) => r.projectId)).toEqual(['A', 'B'])
   })
 })
 
@@ -275,5 +230,53 @@ describe('paused/overspend 扩展(P4 风险焦点行)', () => {
     expect(pmGuard['QABJ-SS-1'].cost).not.toHaveProperty('超支')
     const [r] = buildProjectRows([proj()], pmGuard as any)
     expect(r.overspend).toBe(true)
+  })
+})
+
+describe('V4.0.1 三个日期字段', () => {
+  const pmisMap = {
+    'SS-1': { status: { 立项日期: '2026-01-01' },
+              progress: { 终验时间: '2026-08-01', 实际终验时间: '2026-08-20' } },
+    'OLD-9': { status: { 立项日期: '2024-03-15' } },
+    'N-1': { status: { 立项日期: '2025-05-05' },
+             progress: { 终验时间: '2026-07-01', 实际终验时间: null } },
+  } as any
+
+  it('售前项目的 originSetupDate 取原项目的立项日期', () => {
+    const rows = buildProjectRows(
+      [{ projectId: 'SS-1', isPresale: true, relatedClosedId: 'OLD-9' } as any], pmisMap)
+    expect(rows[0].originSetupDate).toBe('2024-03-15')
+    // 反向断言:绝不能等于本项目立项日期 —— 取错不会报错
+    expect(rows[0].originSetupDate).not.toBe('2026-01-01')
+    expect(rows[0].setupDate).toBe('2026-01-01')
+  })
+
+  it('无 relatedClosedId 的项目 originSetupDate 为 null', () => {
+    const rows = buildProjectRows([{ projectId: 'N-1' } as any], pmisMap)
+    expect(rows[0].originSetupDate).toBeNull()
+  })
+
+  it('relatedClosedId 指向不存在的项目时为 null,不抛错', () => {
+    const rows = buildProjectRows(
+      [{ projectId: 'SS-1', relatedClosedId: 'NOT-EXIST' } as any], pmisMap)
+    expect(rows[0].originSetupDate).toBeNull()
+  })
+
+  it('计划/实际终验时间直取 progress,不重算', () => {
+    const rows = buildProjectRows([{ projectId: 'SS-1' } as any], pmisMap)
+    expect(rows[0].plannedFinalAcceptDate).toBe('2026-08-01')
+    expect(rows[0].actualFinalAcceptDate).toBe('2026-08-20')
+  })
+
+  it('实际终验为 null 时字段为 null,不落成空串', () => {
+    const rows = buildProjectRows([{ projectId: 'N-1' } as any], pmisMap)
+    expect(rows[0].plannedFinalAcceptDate).toBe('2026-07-01')
+    expect(rows[0].actualFinalAcceptDate).toBeNull()
+  })
+
+  it('progress 整体缺失时两个终验字段均为 null', () => {
+    const rows = buildProjectRows([{ projectId: 'OLD-9' } as any], pmisMap)
+    expect(rows[0].plannedFinalAcceptDate).toBeNull()
+    expect(rows[0].actualFinalAcceptDate).toBeNull()
   })
 })

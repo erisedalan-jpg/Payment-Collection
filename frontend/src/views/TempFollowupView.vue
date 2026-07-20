@@ -90,13 +90,20 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'top1000', label: 'TOP1000', width: 90 },
   { key: 'quadrant', label: '象限', width: 140 },
   { key: 'milestoneStatus', label: '里程碑状态', width: 120 },
+  { key: 'setupDate', label: '立项日期', width: 110,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'plannedFinalAcceptDate', label: '计划终验时间', width: 120,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'actualFinalAcceptDate', label: '实际终验时间', width: 120,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
 ])
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 // 默认可见 = key 页那 14 列(额外列默认隐藏)
 const DEFAULT_VISIBLE = ['projectId', 'customer', 'projectName', 'projectLevel', 'projectManager', 'ar', 'sr',
   'orgL4', 'contractWan', 'riskLevel', 'weekProgress', 'nextPlan', 'followDate', 'followBy']
 const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate',
-  'stage', 'projectType', 'projectStatus', 'health', 'paymentStatus', 'top1000', 'quadrant', 'milestoneStatus'])
+  'stage', 'projectType', 'projectStatus', 'health', 'paymentStatus', 'top1000', 'quadrant', 'milestoneStatus',
+  'setupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate'])
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
@@ -151,6 +158,7 @@ defineExpose({
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
   inScopeIds, scopeInputs,
+  ALL_COLUMNS, FILTERABLE, prefs,
 })
 </script>
 

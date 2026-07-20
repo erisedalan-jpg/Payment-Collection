@@ -14,7 +14,6 @@ import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
-import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupModal from '@/components/FollowupModal.vue'
 import Modal from '@/components/Modal.vue'
@@ -41,7 +40,7 @@ const rows = computed(() =>
   buildProjectRows((data.data?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.effectiveAssignments))
 
 // 工具栏特殊筛选(非列枚举)
-const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', tags: [], riskCategory: '' })
+const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', riskCategory: '' })
 // 先表头列枚举(crossFilter) → 再特殊项
 const filtered = computed(() => filterProjectRows(applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as ProjectRow[], sp))
 
@@ -51,6 +50,12 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'contractAmount', label: '合同金额(万)', width: 110, sortable: true,
     formatter: (v) => (v == null ? '-' : (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
   { key: 'setupDate', label: '立项日期', width: 110, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'originSetupDate', label: '原项目立项日期', width: 130, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'plannedFinalAcceptDate', label: '计划终验时间', width: 120, sortable: true,
+    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
+  { key: 'actualFinalAcceptDate', label: '实际终验时间', width: 120, sortable: true,
     formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
   { key: 'projectManager', label: '项目经理', width: 96, sortable: true },
   { key: 'orgL4', label: 'L4组', width: 110, sortable: true },
@@ -72,10 +77,48 @@ const ALL_COLUMNS: DataColumn[] = [
   { key: 'action', label: '操作', width: 80, fixed: 'right' },
 ]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
-const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'action']
-const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate'])
+// tags 进默认可见:ColumnFilter 挂在表头,列隐藏则筛选入口一并消失。
+// 标签筛选原本是工具栏常驻的,若下沉后仍默认隐藏,升级后的观感就是「标签筛选没了」。
+const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'tags', 'action']
+const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate', 'originSetupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate', 'tags'])
 
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
+
+// V4.0.1 一次性迁移:本版把 tags 加进 DEFAULT_VISIBLE 且删掉了工具栏 TagFilterSelect，
+// 标签筛选入口下沉到列头 ColumnFilter。但凡是曾经动过选列的老用户，persisted 列表里没有
+// tags(defaultVisible 只在"无持久化"时兜底)，升级后标签筛选入口会彻底消失。
+// 用独立标记位一次性补回 tags；标记位必须存在，否则用户升级后主动再取消 tags，
+// 下次进页面又会被强行加回——那是更糟的 bug。只补 tags 这一列，不动用户其余列顺序/可见性。
+const TAGS_MIGRATION_KEY = userScopedKey('colprefs-migrated:projects:v401-tags')
+// storage 不可用时视为「已迁移」跳过:那种环境下 useColumnPrefs 也读不到持久化、
+// 直接落 DEFAULT_VISIBLE(本就含 tags),无需补列。getItem 必须包 try —— 浏览器完全禁用
+// storage 时访问该属性即抛 SecurityError,裸调用会让整个 /projects 挂载失败。
+let tagsMigrated = true
+try {
+  tagsMigrated = !!localStorage.getItem(TAGS_MIGRATION_KEY)
+} catch {
+  /* storage 不可用 → 跳过迁移 */
+}
+if (!tagsMigrated) {
+  try {
+    localStorage.setItem(TAGS_MIGRATION_KEY, '1')
+  } catch {
+    /* 忽略写入失败(隐私模式/配额) */
+  }
+  if (!prefs.visibleKeys.value.includes('tags')) {
+    prefs.toggle('tags') // 先追加到末尾(会持久化)，再挪到 riskReasons 之后
+    const arr = prefs.visibleKeys.value
+    const riskIdx = arr.indexOf('riskReasons')
+    const actionIdx = arr.indexOf('action')
+    const targetIdx = riskIdx >= 0 ? riskIdx + 1 : (actionIdx >= 0 ? actionIdx : arr.length - 1)
+    let tagsIdx = arr.indexOf('tags')
+    while (tagsIdx > targetIdx) {
+      prefs.moveUp('tags')
+      tagsIdx = prefs.visibleKeys.value.indexOf('tags')
+    }
+  }
+}
+
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
@@ -142,7 +185,7 @@ async function doExport() {
   exOpen.value = false
 }
 
-defineExpose({ ALL_COLUMNS })
+defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
 </script>
 
 <template>
@@ -155,7 +198,6 @@ defineExpose({ ALL_COLUMNS })
         <el-option value="yes" label="售前整合" />
         <el-option value="no" label="非售前" />
       </el-select>
-      <TagFilterSelect v-model="sp.tags" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button class="pv-export-btn" @click="exOpen = true">导出</button>
