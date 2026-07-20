@@ -212,6 +212,8 @@ _SUPER_ONLY_PATHS = frozenset({
     # delete/import 维持超管专属(破坏性/整表替换)。
     '/api/opportunities/delete', '/api/opportunities/import',
     '/api/temp-followup/scope', '/api/temp-followup/archive', '/api/temp-followup/archive/delete',
+    '/api/temp-followup/instances/create', '/api/temp-followup/instances/rename',
+    '/api/temp-followup/instances/delete',
     '/api/opportunity-followup/scope', '/api/opportunity-followup/archive', '/api/opportunity-followup/archive/delete',
     '/api/risk-followup/scope', '/api/risk-followup/archive', '/api/risk-followup/archive/delete',
     '/api/payment-key-followup/scope', '/api/payment-key-followup/archive', '/api/payment-key-followup/archive/delete',
@@ -513,20 +515,35 @@ _temp_lock = threading.RLock()
 
 
 def _load_temp_followup():
-    """加载临时跟进 store;缺文件/损坏 → 默认(new_store)。不抛。"""
-    if os.path.exists(TEMP_FOLLOWUP_FILE):
-        try:
-            with open(TEMP_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
-                store = json.load(f)
-            if isinstance(store, dict):
-                store.setdefault('version', 1)
-                store['scope'] = _temp.normalize_scope(store.get('scope'))
-                store.setdefault('current', {})
-                store.setdefault('archives', [])
-                return store
-        except Exception:
-            pass
-    return _temp.new_store()
+    """加载临时跟进 store;缺文件/损坏 → 默认。读取时自动迁移单实例结构(V4.0.1 及以前)。
+    首次生成默认 store 或首次迁移旧结构后【立即落盘】——`temp_followup.new_store`/`migrate`
+    每次调用都会为默认实例新分配一个 uuid;若不落盘,同一份"从未写过盘"的 store 被读两次
+    (例如先 GET 拿 id 再 POST 用该 id)就会各自生成不同 id,前一次读到的 id 到下一次写入时
+    就变成"不存在"——首次使用即触发本任务要求必须 400 的那条防线,但触发方却是合法请求。
+    不抛。"""
+    with _temp_lock:
+        store = None
+        if os.path.exists(TEMP_FOLLOWUP_FILE):
+            try:
+                with open(TEMP_FOLLOWUP_FILE, 'r', encoding='utf-8') as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    store = loaded
+            except Exception:
+                store = None
+        needs_persist = not (isinstance(store, dict) and isinstance(store.get('instances'), list)
+                             and store['instances'])
+        if store is None:
+            store = _temp.new_store()
+        else:
+            store = _temp.migrate(store)
+        for inst in store.get('instances') or []:
+            inst['scope'] = _temp.normalize_scope(inst.get('scope'))
+            inst.setdefault('current', {})
+            inst.setdefault('archives', [])
+        if needs_persist:
+            _save_temp_followup(store)
+        return store
 
 
 def _save_temp_followup(store):
@@ -930,6 +947,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_temp_followup_archive()
         elif parsed.path == '/api/temp-followup/archive/delete':
             self.handle_temp_followup_archive_delete()
+        elif parsed.path == '/api/temp-followup/instances/create':
+            self.handle_temp_followup_instance_create()
+        elif parsed.path == '/api/temp-followup/instances/rename':
+            self.handle_temp_followup_instance_rename()
+        elif parsed.path == '/api/temp-followup/instances/delete':
+            self.handle_temp_followup_instance_delete()
         elif parsed.path == '/api/opportunity-followup/scope':
             self.handle_opportunity_followup_scope()
         elif parsed.path == '/api/opportunity-followup/update':
@@ -1619,20 +1642,20 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._json_response({"success": True, "archives": holder.get("archives", [])})
 
     def handle_temp_followup_get(self):
-        """GET /api/temp-followup — {scope, current, archives}。任意登录用户(普通管理员需 scope 在前端算命中集)。"""
+        """GET /api/temp-followup — {instances:[{id,name,scope,current,archives}]}。任意登录用户
+        (普通管理员需 scope 在前端算命中集)。V4.0.2 起多实例:不再有顶层 scope/current/archives。"""
         account, rec = self._session_account_rec()
         if not rec:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         try:
             store = _load_temp_followup()
-            self._json_response({"success": True, "scope": store.get("scope"),
-                                 "current": store.get("current", {}), "archives": store.get("archives", [])})
+            self._json_response({"success": True, "instances": store.get("instances", [])})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"读取临时跟进失败: {e}"))
 
     def handle_temp_followup_scope(self):
-        """POST /api/temp-followup/scope {combinator, groups} — 保存范围条件。超管专属(_authz_gate 拦)。"""
+        """POST /api/temp-followup/scope {instanceId, combinator, groups} — 保存指定实例的范围条件。超管专属(_authz_gate 拦)。"""
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
@@ -1640,8 +1663,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._audit_set(detail=audit.summarize_scope(data))
 
         def _apply(s):
-            s['scope'] = _temp.normalize_scope(data)
-            return s['scope']
+            inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
+            if inst is None:
+                raise ValueError("instanceId 不存在")
+            inst['scope'] = _temp.normalize_scope(data)
+            return inst['scope']
 
         ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
         if not ok:
@@ -1650,7 +1676,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._json_response({"success": True, "scope": res})
 
     def handle_temp_followup_update(self):
-        """POST /api/temp-followup/update {projectId, field, content} — 编辑单格进展。任意登录用户。"""
+        """POST /api/temp-followup/update {instanceId, projectId, field, content} — 编辑单格进展。任意登录用户。"""
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
@@ -1666,17 +1692,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        ok, res = self._followup_txn(
-            _temp_lock, _load_temp_followup,
-            lambda s: _temp.apply_update(s, pid, field, str(data.get('content') or ''), account, now),
-            _save_temp_followup)
+
+        def _apply(s):
+            inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
+            if inst is None:
+                raise ValueError("instanceId 不存在")
+            return _temp.apply_update(inst, pid, field, str(data.get('content') or ''), account, now)
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "保存进展失败")); return
         self._json_response({"success": True, "record": res})
 
     def handle_temp_followup_archive(self):
-        """POST /api/temp-followup/archive {rows} — 冻结当前为快照并清空 current。超管专属。"""
+        """POST /api/temp-followup/archive {instanceId, rows} — 冻结指定实例的当前进展为快照并清空 current。超管专属。"""
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
@@ -1689,8 +1719,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         def _apply(s):
-            _temp.apply_archive(s, rows, now)
-            return s.get("archives", [])
+            inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
+            if inst is None:
+                raise ValueError("instanceId 不存在")
+            _temp.apply_archive(inst, rows, now)
+            return inst.get("archives", [])
 
         ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
         if not ok:
@@ -1699,7 +1732,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._json_response({"success": True, "archives": res})
 
     def handle_temp_followup_archive_delete(self):
-        """POST /api/temp-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
+        """POST /api/temp-followup/archive/delete {instanceId, archiveIdx} — 删指定实例的指定历史快照。超管专属。"""
         data = self._read_json_body()
         if data is None:
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
@@ -1710,8 +1743,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         holder = {}
 
         def _apply(s):
-            deleted = _temp.apply_archive_delete(s, idx)
-            holder['archives'] = s.get("archives", [])
+            inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
+            if inst is None:
+                raise ValueError("instanceId 不存在")
+            deleted = _temp.apply_archive_delete(inst, idx)
+            holder['archives'] = inst.get("archives", [])
             return deleted
 
         ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
@@ -1721,6 +1757,78 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if res is False:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
         self._json_response({"success": True, "archives": holder.get("archives", [])})
+
+    # ── 临时跟进 实例管理(V4.0.2 多实例):新建/重命名/删除。均超管专属 ──
+
+    def handle_temp_followup_instance_create(self):
+        """POST /api/temp-followup/instances/create {name, copyFrom?} — 新建跟进事项。超管专属。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        self._audit_set(target=str(data.get('name') or ''), detail='新建跟进事项')
+        holder = {}
+
+        def _apply(s):
+            inst = _temp.create_instance(s, data.get('name'), data.get('copyFrom') or None)
+            holder['instance'] = inst
+            return s.get('instances', [])
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL,
+                                           res or "新建失败")); return
+        self._json_response({"success": True, "instance": holder.get('instance'), "instances": res})
+
+    def handle_temp_followup_instance_rename(self):
+        """POST /api/temp-followup/instances/rename {instanceId, name} — 重命名。超管专属。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        self._audit_set(target=str(data.get('instanceId') or ''),
+                        detail='重命名为「%s」' % str(data.get('name') or ''))
+
+        def _apply(s):
+            if not _temp.rename_instance(s, str(data.get('instanceId') or ''), data.get('name')):
+                raise ValueError("instanceId 不存在")
+            return s.get('instances', [])
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL,
+                                           res or "重命名失败")); return
+        self._json_response({"success": True, "instances": res})
+
+    def handle_temp_followup_instance_delete(self):
+        """POST /api/temp-followup/instances/delete {instanceId} — 删除跟进事项(连同其归档)。超管专属。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        # 先设一个兜底 detail:事务失败早退时也要留下审计痕迹。
+        # (_audit_set 只是设实例属性,在写审计记录时才读 —— 见 server.py:3028,
+        #  所以事务【之后】再覆盖成富化文案是有效的。)
+        self._audit_set(target=str(data.get('instanceId') or ''), detail='删除跟进事项')
+        holder = {}
+
+        def _apply(s):
+            inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
+            if inst is None:
+                raise ValueError("instanceId 不存在")
+            # 破坏性操作:审计里带上实例名与归档条数,事后能看清删掉了什么
+            holder['detail'] = '删除跟进事项「%s」(含 %d 条归档)' % (
+                inst.get('name', ''), len(inst.get('archives') or []))
+            _temp.delete_instance(s, inst['id'])
+            return s.get('instances', [])
+
+        ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
+        if holder.get('detail'):
+            self._audit_set(detail=holder['detail'])
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL,
+                                           res or "删除失败")); return
+        self._json_response({"success": True, "instances": res})
 
     def handle_opportunity_followup_get(self):
         """GET /api/opportunity-followup — {scope, current, archives}。任意登录用户。"""
