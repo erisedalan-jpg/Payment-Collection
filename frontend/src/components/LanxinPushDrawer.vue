@@ -34,14 +34,16 @@ function buildItems(cfg: LanxinConfig): PushItem[] {
   const out: PushItem[] = []
   const rProj = cfg.routes.find((r) => r.key === 'project')
   if (rProj?.enabled && data.data) {
+    const allow = (rProj.items ?? []).filter((i) => i.enabled).map((i) => i.code)
     out.push(...projectItems(data.data.projects ?? [],
                              (data.data.projectPmis ?? {}) as never,
-                             rProj.reasons ?? []))
+                             allow))
   }
   const rTs = cfg.routes.find((r) => r.key === 'timesheet')
   if (rTs?.enabled && yitian.data) {
+    const allow = (rTs.items ?? []).filter((i) => i.enabled).map((i) => i.code)
     const rows = issueRows(yitian.data, '', '', [], yitianSettings.settings.excludedTypes ?? [])
-    out.push(...timesheetItems(rows, rTs.issueCodes ?? [],
+    out.push(...timesheetItems(rows, allow,
                                yitian.data.meta.periodStart ?? '', yitian.data.meta.periodEnd ?? ''))
   }
   return out

@@ -1,13 +1,18 @@
 import { api } from '@/api/client'
 import type { PushItem } from '@/lib/lanxin/items'
 
+export interface LanxinRouteItem {
+  code: string
+  enabled: boolean
+  primary: boolean
+  supervisorLevels: number
+}
+
 export interface LanxinRoute {
   key: string
   label: string
   enabled: boolean
-  issueCodes?: string[]
-  reasons?: string[]
-  recipients: { primary: boolean; supervisorLevels: number }
+  items: LanxinRouteItem[]
 }
 
 export interface LanxinConfig {

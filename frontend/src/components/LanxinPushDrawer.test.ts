@@ -36,6 +36,22 @@ const YITIAN_DATA = {
   issues: [{ i: 0, codes: ['MISS_SUMMARY'], msgs: ['缺少工作概述'], snippet: '' }],
 } as unknown as YitianData
 
+// V4.0.2 fixture:同一员工两条工时行,分别带一个 enabled 码(MISS_SUMMARY)与一个
+// disabled 码(TYPE_MISMATCH,见上方 getLanxinConfig mock)—— 用于验证 buildItems
+// 真的按 items.filter(enabled) 派生白名单,而不是把两个码都发出去。
+const YITIAN_DATA_MULTI_CODE = {
+  ...YITIAN_DATA,
+  entries: [
+    ...(YITIAN_DATA as unknown as { entries: unknown[] }).entries,
+    { d: '2026-07-02', e: 'A1', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null,
+      sm: null, bg: null, wo: '', top: false, ok: 2, iss: ['TYPE_MISMATCH'] },
+  ],
+  issues: [
+    { i: 0, codes: ['MISS_SUMMARY'], msgs: ['缺少工作概述'], snippet: '' },
+    { i: 1, codes: ['TYPE_MISMATCH'], msgs: ['工时类型填报有误'], snippet: '' },
+  ],
+} as unknown as YitianData
+
 // vi.hoisted:mock 工厂里要用的 spy 必须在 vi.mock 提升之前先声明,否则 TDZ 报错。
 const { getYitianDataMock, lanxinPreviewMock } = vi.hoisted(() => ({
   getYitianDataMock: vi.fn(),
@@ -48,16 +64,24 @@ vi.mock('@/lib/yitianApi', () => ({
   saveYitianSettings: vi.fn(async (s: unknown) => s),
 }))
 
+// items 恒为完整白名单长度;此处只把 MISS_SUMMARY / 回款延期 设为 enabled,
+// 其余 code 一律 enabled:false —— 用于验证 buildItems 只按 enabled 派生白名单。
 vi.mock('@/lib/lanxinApi', () => ({
   getLanxinConfig: vi.fn(async () => ({
     enabled: true, sendIntervalMs: 200,
     credentials: { appId: 'a', appSecret: '', orgId: '1',
                    apiGateway: 'https://x.example.com', idType: 'employ_id', hasSecret: true },
     routes: [
-      { key: 'timesheet', label: '倚天工时问题', enabled: true, issueCodes: ['MISS_SUMMARY'],
-        recipients: { primary: true, supervisorLevels: 0 } },
-      { key: 'project', label: '项目关注原因', enabled: true, reasons: ['回款延期'],
-        recipients: { primary: true, supervisorLevels: 1 } },
+      { key: 'timesheet', label: '倚天工时问题', enabled: true,
+        items: [
+          { code: 'MISS_SUMMARY', enabled: true, primary: true, supervisorLevels: 0 },
+          { code: 'TYPE_MISMATCH', enabled: false, primary: true, supervisorLevels: 0 },
+        ] },
+      { key: 'project', label: '项目关注原因', enabled: true,
+        items: [
+          { code: '回款延期', enabled: true, primary: true, supervisorLevels: 1 },
+          { code: '里程碑滞后', enabled: false, primary: true, supervisorLevels: 1 },
+        ] },
     ],
   })),
   // C-1:不再把 lanxinPreview 整个 mock 成罐头数据就完事 —— 用 vi.hoisted 的 spy 接住入参,
@@ -148,5 +172,22 @@ describe('LanxinPushDrawer', () => {
     const sentItems = lanxinPreviewMock.mock.calls[0][0] as PushItem[]
     expect(sentItems.some((i) => i.kind === 'timesheet')).toBe(false)
     warnSpy.mockRestore()
+  })
+})
+
+describe('V4.0.2 逐项配置', () => {
+  it('buildItems 只取 enabled 的项', async () => {
+    // 配置里工时仅 MISS_SUMMARY 启用、TYPE_MISMATCH 未启用 → 即便数据里两码都有问题行,
+    // 发给后端预览的 items 也只应含 MISS_SUMMARY。
+    getYitianDataMock.mockReset()
+    getYitianDataMock.mockResolvedValue(YITIAN_DATA_MULTI_CODE)
+    await mountDrawer()
+    const sent = lanxinPreviewMock.mock.calls[0][0] as PushItem[]
+    const ts = sent.filter((x) => x.kind === 'timesheet')
+    expect(ts.length).toBeGreaterThan(0)
+    for (const it of ts) {
+      if (it.kind !== 'timesheet') continue
+      for (const i of it.issues) expect(i.code).toBe('MISS_SUMMARY')
+    }
   })
 })
