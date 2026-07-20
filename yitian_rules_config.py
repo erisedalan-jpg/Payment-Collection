@@ -34,7 +34,8 @@ def default_config() -> Dict[str, Any]:
             "summary": {"enabled": True, "keywords": _re_to_keywords(R.SUMMARY_RE)},
             "progress": {"enabled": True, "keywords": _re_to_keywords(R.PROGRESS_RE)},
             "next": {"enabled": True, "keywords": _re_to_keywords(R.NEXT_RE)},
-            "serviceMode": {"enabled": True, "effectiveDate": R.SERVICE_MODE_EFFECTIVE_DATE},
+            "serviceMode": {"enabled": True, "keywords": _re_to_keywords(R.SERVICE_MODE_RE),
+                            "effectiveDate": R.SERVICE_MODE_EFFECTIVE_DATE},
             "typeMismatch": {"enabled": True, "rules": {
                 wt: [list(pair) for pair in pairs] for wt, pairs in R.TYPE_MISMATCH_RULES.items()}},
             "product": {"enabled": True,
@@ -106,8 +107,11 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
         date = sm.get("effectiveDate", d["checks"]["serviceMode"]["effectiveDate"])
         if not (isinstance(date, str) and _DATE_RE.match(date)):
             raise ValueError("serviceMode.effectiveDate 须为 YYYY-MM-DD")
-        d["checks"]["serviceMode"] = {"enabled": _bool(sm.get("enabled", True), "serviceMode.enabled"),
-                                      "effectiveDate": date}
+        d["checks"]["serviceMode"] = {
+            "enabled": _bool(sm.get("enabled", True), "serviceMode.enabled"),
+            "keywords": _norm_str_list(sm.get("keywords", d["checks"]["serviceMode"]["keywords"]),
+                                       "serviceMode.keywords"),
+            "effectiveDate": date}
 
     tm = _seg(checks_in, "typeMismatch")
     if tm:
