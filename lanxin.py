@@ -262,7 +262,12 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                tree: Dict[str, Any], project_pmis: Dict[str, Any]) -> Dict[str, Any]:
     """事项 → 收件计划。纯计算,不发任何网络请求。
     项目侧:projectId → 项目经理(姓名) → 工号(后端自行推导,不信任前端);工时侧:employId 直连。
-    V4.0.2 起每一项(问题码/关注原因)各自配 enabled/primary/supervisorLevels。"""
+    V4.0.2 起每一项(问题码/关注原因)各自配 enabled/primary/supervisorLevels。
+
+    V4.0.5:回调双凭证都配齐时,四种卡片一律附回复引导语 REPLY_HINT。
+    这是入站半环唯一的「告知」环节 —— 不接线的话卡片上没有任何提示,
+    没人知道这张卡能回,于是没人回、收件箱恒空,而链路本身完全正常,
+    排查者会去查验签、查 nginx、查蓝信后台,什么都查不出来。"""
     unresolved: List[Dict[str, Any]] = []
     proj_by_emp: Dict[str, Dict[str, List[str]]] = {}
     # 与 proj_by_emp 并行的独立桶:proj_by_emp 存【项目名称】(卡片文案用,不可动);
@@ -279,6 +284,12 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     r_ts = _route(cfg, "timesheet")
     proj_items = _items_of(r_proj)
     ts_items = _items_of(r_ts)
+
+    # 回复引导语的开关:两个回调凭证【都】非空才算入站链路可用。
+    # 只配一个 = 验签或解密必然失败,此时引导用户回复只会让回复石沉大海。
+    _cred = cfg.get("credentials") or {}
+    reply_hint = bool(str(_cred.get("callbackAesKey") or "").strip()) and \
+        bool(str(_cred.get("callbackSignToken") or "").strip())
 
     for it in items:
         kind = it.get("kind")
@@ -334,7 +345,8 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
                 "routeKey": "timesheet", "projectIds": [],
                 "card": build_timesheet_card(by_id[emp]["name"], mine,
-                                             ts_range["start"], ts_range["end"]),
+                                             ts_range["start"], ts_range["end"],
+                                             reply_hint=reply_hint),
             })
     if r_proj:
         for emp in sorted(proj_by_emp):
@@ -345,7 +357,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
                 "routeKey": "project", "projectIds": list(proj_ids_by_emp.get(emp) or []),
-                "card": build_project_card(by_id[emp]["name"], mine),
+                "card": build_project_card(by_id[emp]["name"], mine, reply_hint=reply_hint),
             })
 
     # ② 汇总卡:按 levels 分组多次卷、再按 sup/owner/标签三层合并。
@@ -366,7 +378,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE,
                                            unit="条", head_title="工时填报提醒",
                                            title_fmt="你的团队工时填报存在 %d 条问题",
-                                           label_fn=short_issue),
+                                           label_fn=short_issue, reply_hint=reply_hint),
             })
     if r_proj:
         proj_counts = {emp: {reason: len(names) for reason, names in by_reason.items()}
@@ -389,7 +401,8 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
                 "routeKey": "project", "projectIds": sup_ids,
-                "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE),
+                "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE,
+                                           reply_hint=reply_hint),
             })
 
     return {"recipients": recipients, "unresolved": unresolved,

@@ -112,7 +112,10 @@ def decrypt(aes_key: str, data_encrypt: str) -> str:
     密钥推导按蓝信文档:base64_decode(aesKey + "=") 得 32 字节,IV 取其前 16 字节。
     """
     try:
-        key = base64.b64decode((aes_key or "") + "=")
+        # M-5:validate=True 与下方解密文时保持一致。默认(False)会静默丢弃非
+        # base64 字符,含杂字符的密钥会被吞成另一个「看似合法」的密钥,
+        # 于是解密在很远的 PKCS7 处才失败,报错完全指不到真正的原因。
+        key = base64.b64decode((aes_key or "") + "=", validate=True)
     except (binascii.Error, ValueError) as e:
         raise ValueError("aesKey 不是合法 base64: %s" % e)
     if len(key) not in (16, 24, 32):

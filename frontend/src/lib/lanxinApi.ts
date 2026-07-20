@@ -95,13 +95,18 @@ export interface LanxinInboxHandleResp {
 export async function getLanxinInbox(): Promise<LanxinInboxResp> {
   return await api.get<LanxinInboxResp>('/api/lanxin/inbox')
 }
-/** instanceId 只有 domain==='temp' 时才有意义(见 needsInstance)，其余域传 undefined 即可——
- *  JSON.stringify 会把值为 undefined 的键整个丢掉，后端读不到等同于没传。 */
+/** instanceId 只有 domain==='temp' 时才有意义(见 needsInstance)，riskCode 只有
+ *  domain==='risk' 时才有意义(见 needsRiskCode)，其余域传 undefined 即可——
+ *  JSON.stringify 会把值为 undefined 的键整个丢掉，后端读不到等同于没传。
+ *
+ *  传的是 riskCode 而【不是】拼好的 riskKey：复合键由后端用 projectId 拼
+ *  (server.lanxin_risk_key)，前端拼好再传的话可以送进一个与 projectId 对不上的键。 */
 export async function handleLanxinInboxItem(
-  itemId: string, domain: string, projectId: string, instanceId?: string,
+  itemId: string, domain: string, projectId: string,
+  instanceId?: string, riskCode?: string,
 ): Promise<LanxinInboxHandleResp> {
   return await api.post<LanxinInboxHandleResp>('/api/lanxin/inbox/handle',
-    { itemId, domain, projectId, instanceId })
+    { itemId, domain, projectId, instanceId, riskCode })
 }
 export async function deleteLanxinInboxItem(itemId: string): Promise<{ success: boolean }> {
   return await api.post<{ success: boolean }>('/api/lanxin/inbox/delete', { itemId })
