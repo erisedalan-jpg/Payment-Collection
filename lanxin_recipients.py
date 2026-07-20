@@ -19,8 +19,14 @@ MAX_LEVELS = 5
 LIMIT_BODY_TITLE = 600
 LIMIT_BODY_SUBTITLE = 1200
 LIMIT_BODY_CONTENT = 3000
+# fields 的上限在两版文档里表述不同,故取两者更严的一个(见 fit_field):
+#   developer.lanxin.cn(V4.0.0 依据):18 / 192 【字节】
+#   openapi.lanxin.cn (V4.0.3 复核):6 个汉字 / 64 字 【字数】
+# 纯中文时等价(6*3=18、64*3=192),混合中英文时不等价 —— 凭证未到位无法实测,不去赌。
 LIMIT_FIELD_KEY = 18
+LIMIT_FIELD_KEY_CHARS = 6
 LIMIT_FIELD_VALUE = 192
+LIMIT_FIELD_VALUE_CHARS = 64
 LIMIT_SIGNATURE = 96
 MAX_FIELDS = 10
 
@@ -31,8 +37,8 @@ SIGNATURE = "项目管理平台"
 # 故卡内用短标签。注意:这【不改口径】,riskReasons 的 RiskCategory 一个字不动,
 # 仅组卡时把长名映射成短名显示;bodyContent 里仍用全名列项目,信息不丢。
 REASON_SHORT_LABELS = {
-    "总成本超支大于5000": "成本超支>5k",     # 25 → 15 字节
-    "总成本超支小于5000": "成本超支<5k",     # 25 → 15 字节
+    "总成本超支大于5000": "超支>5千",        # 5 字符 / 11 字节
+    "总成本超支小于5000": "超支<5千",        # 5 字符 / 11 字节
     # 「未获原项目预算」是 21 字节仍超限;砍成「未获原项目预」虽合规却是缺「算」的残词。
     # 同为 18 字节但通顺的写法:「无原项目预算」。
     "未获取原项目预算": "无原项目预算",      # 24 → 18 字节
@@ -75,6 +81,31 @@ def fit_bytes(s: str, limit: int) -> str:
     for ch in s:
         n = len(ch.encode("utf-8"))
         if used + n > budget:
+            break
+        out.append(ch)
+        used += n
+    return "".join(out) + ell
+
+
+def fit_field(s: str, max_chars: int, max_bytes: int) -> str:
+    """fields 专用截断:字符数与字节数【同时】满足,取更严的那个。
+
+    bodyTitle/bodySubTitle/bodyContent 明写字节上限,用 fit_bytes 即可;
+    唯独 fields 两版文档一个说字节、一个说字数,含英文/数字的标签在两种解读下
+    结果不同(例:「成本超支>5k」7 字符但只有 15 字节)。两边都不越即可,
+    代价仅是混合文本略严一点。"""
+    if len(s) <= max_chars and len(s.encode("utf-8")) <= max_bytes:
+        return s
+    ell = "…"
+    char_budget = max_chars - len(ell)
+    byte_budget = max_bytes - len(ell.encode("utf-8"))
+    if char_budget <= 0 or byte_budget <= 0:
+        return ""
+    out = []
+    used = 0
+    for ch in s:
+        n = len(ch.encode("utf-8"))
+        if len(out) + 1 > char_budget or used + n > byte_budget:
             break
         out.append(ch)
         used += n
@@ -138,7 +169,8 @@ def resolve_project_manager(tree: Dict[str, Any],
 
 
 def _field(key: str, value: str) -> Dict[str, str]:
-    return {"key": fit_bytes(key, LIMIT_FIELD_KEY), "value": fit_bytes(value, LIMIT_FIELD_VALUE)}
+    return {"key": fit_field(key, LIMIT_FIELD_KEY_CHARS, LIMIT_FIELD_KEY),
+            "value": fit_field(value, LIMIT_FIELD_VALUE_CHARS, LIMIT_FIELD_VALUE)}
 
 
 def _card(head: str, title: str, subtitle: str, fields: List[Dict[str, str]],
@@ -223,7 +255,8 @@ def build_summary_card(name: str, rows: List[Dict[str, Any]], level_label: str,
         parts = ["%s %d" % (label_fn(c), n) for c, n in sorted(r["reasons"], key=lambda x: -x[1])]
         value = "%d %s：%s" % (int(r["total"]), unit, " · ".join(parts))
         # value 超 192 字节时逐个丢掉最小的原因,末尾以「等」示意
-        while len(value.encode("utf-8")) > LIMIT_FIELD_VALUE and len(parts) > 1:
+        while (len(value) > LIMIT_FIELD_VALUE_CHARS
+               or len(value.encode("utf-8")) > LIMIT_FIELD_VALUE) and len(parts) > 1:
             parts.pop()
             value = "%d %s：%s 等" % (int(r["total"]), unit, " · ".join(parts))
         fields.append(_field(r["name"], value))
