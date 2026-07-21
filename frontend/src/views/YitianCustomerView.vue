@@ -10,6 +10,7 @@ import { useYitianViewStore } from '@/stores/yitianView'
 import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from '@/lib/yitian/customer'
 import { NO_L4 } from '@/lib/yitian/metrics'
 import { buildDrillQuery } from '@/lib/yitian/drill'
+import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -27,6 +28,9 @@ function onL4BarClick(p: any) {
 }
 function onTop1000Row(row: any) {
   if (row?.l4) goAnalyticsL4(row.l4)
+}
+function goDetailL4(row: { l4: string }) {
+  if (row?.l4) router.push({ path: '/yitian/detail', query: buildDetailDrill({ l4: row.l4 }) })
 }
 
 const ready = computed(() => !!store.data)
@@ -85,6 +89,7 @@ const topCols: DataColumn[] = [
   { key: 'topHoursText', label: 'TOP1000 工时', width: 130, num: true, sortable: true },
   { key: 'pctText', label: 'TOP1000 占比', width: 130, num: true, sortable: true },
   { key: 'topCustomers', label: 'TOP1000 客户数', width: 140, num: true, sortable: true },
+  { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },
 ]
 
 function topSummaryMethod({ columns }: { columns: { property: string }[] }): string[] {
@@ -152,7 +157,7 @@ const topCustList = computed(() =>
 const topCustChartOption = computed(() => topCustOption(topCustList.value))
 const topCustHeight = computed(() => `${Math.max(240, topCustList.value.length * 28 + 96)}px`)
 
-defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick, onTop1000Row })
+defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick, onTop1000Row, goDetailL4 })
 </script>
 
 <template>
@@ -169,7 +174,11 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
         <div v-if="!topRowsRaw.length" class="yt-empty">无数据</div>
         <ChartBox v-else :option="top1000ChartOption" :height="top1000Height" @datapoint-click="onL4BarClick" />
         <DataTable :columns="topCols" :rows="topRows" :show-count="false" clickable
-          :show-summary="true" :summary-method="topSummaryMethod" @row-click="onTop1000Row" />
+          :show-summary="true" :summary-method="topSummaryMethod" @row-click="onTop1000Row">
+          <template #cell-detailAction="{ row }">
+            <el-link type="primary" :underline="false" @click.stop="goDetailL4(row)">明细</el-link>
+          </template>
+        </DataTable>
       </section>
 
       <section class="yt-card">
