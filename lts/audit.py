@@ -51,6 +51,13 @@ _ACTION_MAP = {
     ('POST', '/api/tags'): ('tags.save', '保存标签'),
     ('POST', '/api/portal/config'): ('portal.save', '保存门户配置'),
     ('POST', '/api/portal/upload'): ('portal.upload', '上传门户文件'),
+    # 蓝信推送(超管)。/api/lanxin/callback 【不入表】—— 免登录端点无账号可记,
+    # 且蓝信会重推,记进审计只会灌满噪声;拒签计数走 server 的 _lanxin_rejected。
+    ('POST', '/api/lanxin/config'): ('lanxin.config', '蓝信推送配置'),
+    ('POST', '/api/lanxin/selftest'): ('lanxin.selftest', '蓝信连通性自检'),
+    ('POST', '/api/lanxin/send'): ('lanxin.send', '蓝信推送发送'),
+    ('POST', '/api/lanxin/inbox/handle'): ('lanxin.inbox_handle', '标记蓝信回复已处理'),
+    ('POST', '/api/lanxin/inbox/delete'): ('lanxin.inbox_delete', '删除蓝信回复'),
 }
 
 
