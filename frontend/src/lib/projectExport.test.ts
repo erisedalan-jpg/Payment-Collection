@@ -46,3 +46,40 @@ describe('buildExportSheets 合同金额单位', () => {
     expect(row['合同金额(万)']).toBe('')
   })
 })
+
+describe('buildExportSheets 按可见列导出(listColumns)', () => {
+  const base = { projects: [], assignments: {}, followup: [], paymentNodes: {}, milestones: {} }
+
+  it('按 listColumns 导出:排除操作列、riskReasons 取 category、formatter 生效', () => {
+    const sheets = buildExportSheets(['list'], {
+      ...base,
+      rows: [{
+        projectId: 'P1', projectName: '甲', contractAmount: 1180000,
+        health: '关注', riskReasons: [{ category: '回款延期' }, { category: '里程碑滞后' }],
+        tags: ['BH项目'],
+      }],
+      listColumns: [
+        { key: 'projectName', label: '项目名称' },
+        { key: 'contractAmount', label: '合同金额(万)', formatter: (v: any) => (v == null ? '-' : String(v / 10000)) },
+        { key: 'health', label: '健康度' },
+        { key: 'riskReasons', label: '关注原因' },
+        { key: 'action', label: '操作' }, // 应被排除
+      ],
+    } as any)
+    const row = sheets[0].rows[0]
+    expect(Object.keys(row)).toEqual(['项目名称', '合同金额(万)', '健康度', '关注原因']) // 无「操作」列
+    expect(row['项目名称']).toBe('甲')
+    expect(row['合同金额(万)']).toBe('118') // 列 formatter 生效
+    expect(row['健康度']).toBe('关注') // 字符串直取
+    expect(row['关注原因']).toBe('回款延期、里程碑滞后') // 数组取 category 拼接
+  })
+
+  it('不传 listColumns 回退固定列(向后兼容,仍含标签列)', () => {
+    const row = buildExportSheets(['list'], {
+      ...base,
+      rows: [{ projectId: 'P1', projectName: '甲', tags: ['BH项目'] }],
+    } as any)[0].rows[0]
+    expect(row['项目编号']).toBe('P1')
+    expect(row['标签']).toBe('BH项目')
+  })
+})

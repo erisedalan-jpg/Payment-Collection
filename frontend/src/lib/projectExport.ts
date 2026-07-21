@@ -2,6 +2,14 @@ import type { Project, PaymentNodePmis, MilestoneItem } from '@/types/analysis'
 
 export type ExportScope = 'list' | 'tags' | 'followup' | 'nodes' | 'milestones'
 
+/** 「项目清单」sheet 的导出列。由 /projects 当前可见列(visibleColumns)派生，实现「导出=页面所见列」。
+ *  formatter 直接复用列定义里的展示 formatter，做到导出文本与页面一致。 */
+export interface ExportListCol {
+  key: string
+  label: string
+  formatter?: (v: any, r: Record<string, any>) => string
+}
+
 export interface ExportCtx {
   rows: Record<string, any>[]            // /projects 当前筛选后的 ProjectRow[]（决定项目集）
   projects: Project[]
@@ -9,6 +17,8 @@ export interface ExportCtx {
   followup: Record<string, any>[]        // 全量跟进记录
   paymentNodes: Record<string, PaymentNodePmis[]>
   milestones: Record<string, MilestoneItem[]>
+  // 传入则「项目清单」按当前可见列导出(排除操作列);不传回退固定 LIST_COLS(向后兼容)。
+  listColumns?: ExportListCol[]
 }
 
 const LIST_COLS: [string, string][] = [
@@ -30,19 +40,38 @@ export function buildExportSheets(
   const out: { name: string; rows: Record<string, unknown>[] }[] = []
 
   if (scope.includes('list')) {
-    out.push({
-      name: '项目清单',
-      rows: ctx.rows.map((r) => {
-        const o: Record<string, unknown> = {}
-        for (const [k, label] of LIST_COLS) {
-          const raw = r[k]
-          if (k === 'contractAmount') o[label] = typeof raw === 'number' ? raw / 10000 : (raw ?? '')
-          else o[label] = raw ?? ''
-        }
-        o['标签'] = (r.tags ?? []).join('、')
-        return o
-      }),
-    })
+    if (ctx.listColumns && ctx.listColumns.length) {
+      // 按当前可见列导出:排除操作列(无数据),值优先走列自带 formatter(与页面一致),
+      // riskReasons 是数组对象、取 category 拼接,其余原样。
+      const cols = ctx.listColumns.filter((c) => c.key !== 'action')
+      out.push({
+        name: '项目清单',
+        rows: ctx.rows.map((r) => {
+          const o: Record<string, unknown> = {}
+          for (const c of cols) {
+            const raw = (r as Record<string, any>)[c.key]
+            if (c.formatter) o[c.label] = c.formatter(raw, r)
+            else if (c.key === 'riskReasons') o[c.label] = Array.isArray(raw) ? raw.map((x: any) => x?.category ?? '').filter(Boolean).join('、') : ''
+            else o[c.label] = raw ?? ''
+          }
+          return o
+        }),
+      })
+    } else {
+      out.push({
+        name: '项目清单',
+        rows: ctx.rows.map((r) => {
+          const o: Record<string, unknown> = {}
+          for (const [k, label] of LIST_COLS) {
+            const raw = r[k]
+            if (k === 'contractAmount') o[label] = typeof raw === 'number' ? raw / 10000 : (raw ?? '')
+            else o[label] = raw ?? ''
+          }
+          o['标签'] = (r.tags ?? []).join('、')
+          return o
+        }),
+      })
+    }
   }
 
   if (scope.includes('tags')) {
