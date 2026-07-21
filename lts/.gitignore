@@ -1,0 +1,5 @@
+# 蓝信:含 appSecret/回调双密钥 + 员工回复正文 + 回调存证,绝不入库
+data/lanxin_config.json
+data/lanxin_inbox.json
+data/lanxin_callback_raw.jsonl
+data/lanxin_raw_archive/
