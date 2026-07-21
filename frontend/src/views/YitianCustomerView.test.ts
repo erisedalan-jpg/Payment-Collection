@@ -20,6 +20,7 @@ function makeRouter(): Router {
     routes: [
       { path: '/yitian/customer', component: YitianCustomerView },
       { path: '/yitian/analytics', component: { template: '<div/>' } },
+      { path: '/yitian/detail', component: { template: '<div/>' } },
     ],
   })
 }
@@ -177,5 +178,12 @@ describe('YitianCustomerView · 下钻(跨页)', () => {
     await w.findComponent(DataTable).vm.$emit('row-click', {})
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/yitian/customer')
+  })
+
+  it('TOP1000 表「明细」入口跳 /yitian/detail 带 dL4', async () => {
+    const { w } = await mountAndCharts()
+    const push = vi.spyOn(router, 'push')
+    ;(w.vm as any).goDetailL4({ l4: '银行服务组' })
+    expect(push).toHaveBeenCalledWith({ path: '/yitian/detail', query: { dL4: '银行服务组' } })
   })
 })
