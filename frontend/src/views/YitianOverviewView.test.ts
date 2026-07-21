@@ -24,6 +24,7 @@ function newRouter(): Router {
       { path: '/', component: YitianOverviewView },
       { path: '/yitian/analytics', component: StubPage },
       { path: '/yitian/compliance', component: StubPage },
+      { path: '/yitian/detail', component: StubPage },
     ],
   })
 }
@@ -212,6 +213,14 @@ describe('YitianOverviewView', () => {
     const w = mountView()
     await flushPromises()
     expect(w.find('.dt-clickable-row').exists()).toBe(true)
+  })
+
+  it('组织表「明细」入口跳 /yitian/detail 带 dL4', async () => {
+    const w = mountView()
+    await flushPromises()
+    const push = vi.spyOn(router, 'push')
+    ;(w.vm as any).goDetailL4({ name: '银行服务组' })
+    expect(push).toHaveBeenCalledWith({ path: '/yitian/detail', query: { dL4: '银行服务组' } })
   })
 })
 
