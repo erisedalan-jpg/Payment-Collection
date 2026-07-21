@@ -180,6 +180,8 @@ async function doExport() {
     followup: fu as any,
     paymentNodes: (data.data?.paymentNodes ?? {}) as any,
     milestones: (data.data?.projectMilestones ?? {}) as any,
+    // 「项目清单」sheet 按当前可见列导出(所见即所导),复用列 formatter 保持与页面文本一致。
+    listColumns: visibleColumns.value.map((c) => ({ key: c.key, label: c.label, formatter: c.formatter })),
   })
   exportSheets(`项目数据导出_${filtered.value.length}项.xlsx`, sheets)
   exOpen.value = false
