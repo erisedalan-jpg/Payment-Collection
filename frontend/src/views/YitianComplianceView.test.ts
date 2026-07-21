@@ -54,6 +54,7 @@ describe('YitianComplianceView', () => {
       routes: [
         { path: '/', component: { template: '<div />' } },
         { path: '/yitian/compliance', component: YitianComplianceView },
+        { path: '/yitian/detail', component: { template: '<div/>' } },
       ],
     })
   })
@@ -155,5 +156,15 @@ describe('YitianComplianceView', () => {
     await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ keep: '1' })
     w.unmount()
+  })
+
+  it('问题表「明细」入口跳 /yitian/detail 带 dEmp+dOnly', async () => {
+    await router.push('/')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    const push = vi.spyOn(router, 'push')
+    ;(w.vm as any).goDetailIssue({ empId: 'A1' })
+    expect(push).toHaveBeenCalledWith({ path: '/yitian/detail', query: { dEmp: 'A1', dOnly: '1' } })
   })
 })
