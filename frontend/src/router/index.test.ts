@@ -13,7 +13,7 @@ describe('router', () => {
   })
 
   it('resolves all top-level pages', () => {
-    for (const path of ['/', '/payment', '/insight/board', '/payment/projects', '/payment/nodes', '/insight/calendar', '/insight/milestone', '/insight/costdetail', '/data', '/about', '/projects', '/activity', '/insight']) {
+    for (const path of ['/', '/payment', '/insight/board', '/payment/projects', '/payment/nodes', '/insight/calendar', '/insight/milestone', '/insight/costdetail', '/data', '/about', '/projects', '/activity', '/insight', '/yitian/detail']) {
       expect(router.resolve(path).matched.length).toBeGreaterThan(0)
     }
   })
@@ -151,5 +151,9 @@ describe('router', () => {
     expect(r.name).toBe('payment-key')
     expect((r.matched[0].components?.default as any).__name).toBe('PaymentKeyFollowupView')
     expect(r.matched[0].meta.pageKey).toBe('payment-key')
+  })
+
+  it('/yitian/detail 解析到 YitianDetailView', () => {
+    expect((router.resolve('/yitian/detail').matched[0].components?.default as any).__name).toBe('YitianDetailView')
   })
 })

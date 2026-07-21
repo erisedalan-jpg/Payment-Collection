@@ -3,7 +3,7 @@ export type PageKey =
   | 'insight' | 'insight-milestone' | 'insight-costdetail' | 'insight-risk' | 'insight-board' | 'insight-calendar' | 'opportunities-board'
   | 'payment' | 'payment-projects' | 'payment-nodes'
   | 'projects-key' | 'opportunities-progress' | 'temp-followup' | 'opportunity-followup' | 'risk-followup' | 'payment-key'
-  | 'yitian' | 'yitian-compliance' | 'yitian-analytics' | 'yitian-trend' | 'yitian-customer'
+  | 'yitian' | 'yitian-detail' | 'yitian-compliance' | 'yitian-analytics' | 'yitian-trend' | 'yitian-customer'
   | 'data' | 'governance' | 'budget' | 'about'
 
 /** allowedPages 含 '*' 或该 key → 可访问(isSuper 由调用方先判)。 */
