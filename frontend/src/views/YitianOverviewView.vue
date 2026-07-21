@@ -11,6 +11,7 @@ import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { kpi, typeHours, orgSummary, selectEntries, orgL4SummaryRow, NO_L4 } from '@/lib/yitian/metrics'
 import { buildDrillQuery } from '@/lib/yitian/drill'
+import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 
 const store = useYitianStore()
 const view = useYitianViewStore()
@@ -35,6 +36,9 @@ function onKpiClick(i: number) {
 }
 function goCompliance() {
   router.push('/yitian/compliance')
+}
+function goDetailL4(row: { name: string }) {
+  if (row?.name) router.push({ path: '/yitian/detail', query: buildDetailDrill({ l4: row.name }) })
 }
 
 onMounted(() => { store.load(); settings.load() })
@@ -93,6 +97,7 @@ const orgCols: DataColumn[] = [
   { key: 'hoursText', label: '实际工时', width: 110, num: true, sortable: true },
   { key: 'baseText', label: '基础工时', width: 110, num: true },
   { key: 'satText', label: '饱和度', width: 110, num: true, sortable: true },
+  { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },
 ]
 
 // 只展示 L4 层,并剔除「未分配L4」(花名册里 L4 为空的部门负责人)。
@@ -144,7 +149,7 @@ function orgSummaryMethod({ columns }: { columns: { property: string }[] }): str
   return columns.map((c) => disp[c.property] ?? '')
 }
 
-defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount, complianceRingColor, metrics, onOrgBarClick, onOrgRow, onKpiClick, goCompliance })
+defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOption, complianceRatio, complianceIssueCount, complianceRingColor, metrics, onOrgBarClick, onOrgRow, onKpiClick, goCompliance, goDetailL4 })
 </script>
 
 <template>
@@ -175,7 +180,11 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
           <ChartBox :option="orgBarChartOption" :height="orgBarHeight" @datapoint-click="onOrgBarClick" />
           <h3 class="yt-h yt-h--sub">分层汇总</h3>
           <DataTable :columns="orgCols" :rows="orgRows" :show-count="false" clickable
-            :show-summary="true" :summary-method="orgSummaryMethod" @row-click="onOrgRow" />
+            :show-summary="true" :summary-method="orgSummaryMethod" @row-click="onOrgRow">
+            <template #cell-detailAction="{ row }">
+              <el-link type="primary" :underline="false" @click.stop="goDetailL4(row)">明细</el-link>
+            </template>
+          </DataTable>
         </section>
       </div>
     </template>
