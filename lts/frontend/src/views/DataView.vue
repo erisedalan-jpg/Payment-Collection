@@ -16,12 +16,18 @@ import { readWorkbook, parseManualSheets } from '@/lib/manualImport'
 import { manualApi, type ManualError, type ManualBackup } from '@/lib/manualApi'
 import DataStatusBar from '@/components/DataStatusBar.vue'
 import PortalConfigCard from '@/components/PortalConfigCard.vue'
+import LanxinConfigCard from '@/components/LanxinConfigCard.vue'
+import LanxinPushDrawer from '@/components/LanxinPushDrawer.vue'
+import LanxinInboxCard from '@/components/LanxinInboxCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
 const projectTags = useProjectTagsStore()
 const filter = useFilterStore()
 const auth = useAuthStore()
+
+// —— 蓝信推送(超管专属) ——
+const lanxinOpen = ref(false)
 
 const lastUpdate = computed(() => (data.data?.meta as any)?.lastUpdate || '-')
 const lastPmis = computed(() => (data.data as any)?.dataQuality?.summary?.lastPmisUpdate || '-')
@@ -356,7 +362,17 @@ defineExpose({ onFetchPmisCookie, checkAgent })
           </el-collapse-item>
         </el-collapse>
       </div>
+
+      <!-- 蓝信推送(超管专属):配置+收件箱,与 PortalConfigCard 同属超管闸,后端已在 _SUPER_ONLY_PATHS 收紧 -->
+      <div v-if="auth.isSuper" class="dv-card dv-span-all">
+        <LanxinConfigCard @open-push="lanxinOpen = true" />
+      </div>
+      <div v-if="auth.isSuper" class="dv-card dv-span-all">
+        <LanxinInboxCard />
+      </div>
     </div>
+
+    <LanxinPushDrawer v-model="lanxinOpen" />
   </div>
 </template>
 
@@ -430,4 +446,6 @@ defineExpose({ onFetchPmisCookie, checkAgent })
   align-items: start;
 }
 @media (max-width: 768px) { .dv-domain-grid { grid-template-columns: 1fr; } }
+/* 蓝信配置/收件箱卡内容较宽(表格/表单),跨域网格全宽占一行 */
+.dv-span-all { grid-column: 1 / -1; }
 </style>

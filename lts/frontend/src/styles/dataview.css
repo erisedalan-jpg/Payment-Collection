@@ -1,0 +1,45 @@
+/* /data 数据管理页共享样式词汇。由 DataView 与 4 张卡在 <style scoped> 内 @import 复用。
+   @import 在 scoped 变换之前解析,故这里的规则(含 :deep)会拿到各消费方自己的 scope 属性。 */
+.dv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1); }
+.dv-card-head { font-weight: 700; font-size: var(--fs-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--txt); }
+.dv-sub-head { font-size: var(--fs-1); font-weight: 700; color: var(--sub); padding: var(--sp-2) var(--sp-4) 0; }
+.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-2); flex-wrap: wrap; }
+.dv-actions { border-top: 1px solid var(--line); }
+.dv-label { width: 70px; flex-shrink: 0; color: var(--sub); font-weight: 600; font-size: var(--fs-1); }
+
+.dv-btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-2); cursor: pointer; color: var(--txt); }
+.dv-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); transition: transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
+.dv-btn.primary:hover:not(:disabled) { transform: translateY(var(--lift)); box-shadow: var(--shadow-2); }
+.dv-btn.ghost { color: var(--sub); }
+.dv-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.dv-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.dv-btn-lg { font-size: var(--fs-3); padding: var(--sp-2) var(--sp-5); }
+
+.dv-hint { font-size: var(--fs-1); color: var(--mut); }
+.dv-hint.ok { color: var(--ok-text); }
+.dv-hint.err { color: var(--danger-text); }
+.dv-hint.warn { color: var(--warn-text); }
+.dv-file { font-size: var(--fs-1); }
+
+.dv-progress { padding: 0 var(--sp-4) var(--sp-3); }
+.dv-bar { height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.dv-bar-fill { height: 100%; background: var(--accent); transition: width var(--dur-2) var(--ease); }
+.dv-msg { font-size: var(--fs-1); color: var(--mut); margin-top: var(--sp-2); }
+
+.dv-badge { font-size: var(--fs-1); font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); }
+.dv-badge.ok { background: var(--ok-bg); color: var(--ok-text); }
+.dv-badge.warn { background: var(--warn-bg); color: var(--warn-text); }
+
+.dv-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px var(--sp-4); padding: var(--sp-2) var(--sp-4); }
+.dv-fcell { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); padding: 3px 0; border-bottom: 1px dashed var(--line); min-width: 0; }
+.dv-fname2 { color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-ftime2 { color: var(--mut); font-size: var(--fs-1); flex-shrink: 0; }
+@media (max-width: 768px) { .dv-fgrid { grid-template-columns: 1fr; } }
+
+.dv-more, .dv-maint { margin: 0; }
+.dv-more { border-top: 1px solid var(--line); margin-top: var(--sp-1); }
+.dv-maint { background: transparent; border: none; box-shadow: none; }
+.dv-more :deep(.el-collapse-item__header),
+.dv-maint :deep(.el-collapse-item__header) { font-size: var(--fs-2); font-weight: 700; color: var(--txt); padding-left: var(--sp-4); }
+.dv-more :deep(.el-collapse-item__content),
+.dv-maint :deep(.el-collapse-item__content) { padding-bottom: var(--sp-2); }
