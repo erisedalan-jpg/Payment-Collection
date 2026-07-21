@@ -48,6 +48,7 @@ export const PAYMENT_LINKS: NavLink[] = [
 // 倚天工时域(V3.0.0):离线导入工时.xlsx → 合规检查 / 工时统计 / 趋势 / 客户支持
 export const YITIAN_LINKS: NavLink[] = [
   { label: '倚天工时总览', to: '/yitian', key: 'yitian' },
+  { label: '工时明细', to: '/yitian/detail', key: 'yitian-detail' },
   { label: '工时合规检查', to: '/yitian/compliance', key: 'yitian-compliance' },
   { label: '工时统计分析', to: '/yitian/analytics', key: 'yitian-analytics' },
   { label: '工时趋势分析', to: '/yitian/trend', key: 'yitian-trend' },

@@ -31,6 +31,7 @@ import OpportunityFollowupView from '@/views/OpportunityFollowupView.vue'
 import OpportunitiesBoardView from '@/views/OpportunitiesBoardView.vue'
 import PaymentKeyFollowupView from '@/views/PaymentKeyFollowupView.vue'
 import YitianOverviewView from '@/views/YitianOverviewView.vue'
+import YitianDetailView from '@/views/YitianDetailView.vue'
 import YitianComplianceView from '@/views/YitianComplianceView.vue'
 import YitianAnalyticsView from '@/views/YitianAnalyticsView.vue'
 import YitianTrendView from '@/views/YitianTrendView.vue'
@@ -107,6 +108,7 @@ export const router = createRouter({
     { path: '/payment', name: 'payment', component: DashboardView, meta: { title: '回款总览', pageKey: 'payment' } },
     // 倚天工时域(V3.0.0):hideFilter —— 本域用自己的 YitianToolbar,不吃全站 FilterBar
     { path: '/yitian', name: 'yitian', component: YitianOverviewView, meta: { title: '倚天工时总览', hideFilter: true, pageKey: 'yitian' } },
+    { path: '/yitian/detail', name: 'yitian-detail', component: YitianDetailView, meta: { title: '工时明细', hideFilter: true, pageKey: 'yitian-detail' } },
     { path: '/yitian/compliance', name: 'yitian-compliance', component: YitianComplianceView, meta: { title: '工时合规检查', hideFilter: true, pageKey: 'yitian-compliance' } },
     { path: '/yitian/analytics', name: 'yitian-analytics', component: YitianAnalyticsView, meta: { title: '工时统计分析', hideFilter: true, pageKey: 'yitian-analytics' } },
     { path: '/yitian/trend', name: 'yitian-trend', component: YitianTrendView, meta: { title: '工时趋势分析', hideFilter: true, pageKey: 'yitian-trend' } },
