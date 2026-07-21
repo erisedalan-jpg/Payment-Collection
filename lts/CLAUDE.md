@@ -12,7 +12,7 @@
 - 访问地址：`http://localhost:8080`
 - 交流语言：**简体中文**
 
-**功能范围**：项目总览首页（含首页门户快捷入口）· 在建项目 / 已关闭项目 / 项目详情 · 项目动态 · 项目分析（多维分析 + 里程碑管理 + 成本分析 + 风险看板 + 回款多维分析 + 回款日历）· 回款（总览 / 项目 / 节点）· 数据治理 · 账号管理 · 数据管理 · 关于。
+**功能范围**：项目总览首页（含首页门户快捷入口）· 在建项目 / 已关闭项目 / 项目详情 · 项目动态 · 项目分析（多维分析 + 里程碑管理 + 成本分析 + 风险看板 + 回款多维分析 + 回款日历）· 回款（总览 / 项目 / 节点）· 数据治理 · 账号管理 · 数据管理 · 关于 · 蓝信推送（超管）。
 
 ## 2. 架构地图（按数据流）
 
@@ -45,6 +45,7 @@
 | `portal.py` | 首页门户/快捷入口(Launchpad)：配置校验 + 可见性过滤 + 文件名消毒 + 下载头 |
 | `auth.py` / `audit.py` / `data_scope.py` | 账号鉴权(PBKDF2+会话) / 操作审计(绝不记密码token) / 按 allowedL4 切 `analysis_data`(L4 数据隔离) |
 | `config.py` / `pmis_config.py` | 集中配置常量(消除硬编码) / PMIS 下载 cookie 读写 |
+| `lanxin*.py`(6 模块) | 蓝信双向域(脉络③,不进管线):出站推送【仅项目关注原因,无倚天工时】+ 入站回调收件箱【仅收,无归入】。config(凭证+项目路由+回调双密钥,超管可配,脱敏下发) · recipients(卡片) · crypto(零依赖 AES+SHA1 验签) · callback(报文解析) · inbox(收件箱+发送台账)。凭证入站从未联调 |
 | `frontend/` | Vue3 前端：`router/`(路由) `views/`(页面) `components/` `lib/`(纯计算口径) `stores/`(Pinia) `charts/` `styles/theme.css`(设计令牌单一落地) |
 | `data/*.json` | 管线产物 `analysis_data.json`；配置/存档类 `followup_records`·`project_tags`·`portal_links`·`accounts`·`events`·`audit_log.jsonl`(部分含敏感数据,已 gitignore) |
 | `input/` | 数据源输入：`input/pmis/`(PMIS 9 表 xlsx)、`input/`(收款阶段/回款流水/预算 CSV + 组织架构/A/TOP1000 xlsx)；经页面上传或本地放置，点「更新数据」生效 |
@@ -79,6 +80,20 @@ python server.py --stop     # 停止运行中的服务
 - **回款数据核心源 = `input/collection_stages.csv`**（PMIS 收款阶段台账导出，已入「数据更新」流程）。
 - **异常项目（`orgL4` 空）排除出回款统计**（`lib/anomaly.isAnomalous`）：回款看板硬排除、治理页告警、项目清单标「数据异常」。
 - **日期区间口径**：FilterBar 起止日期，计划侧按节点 planDate∈区间、已回款按流水到账日∈区间；「全部」区间≡全时口径。
+
+### 蓝信约定（LTS-1.1.0，从 master 移植并剥离倚天/归入）
+
+- **四条承重设计**（沿用 master，一条不破）：
+  1. **验签必须先于存证**：`/api/lanxin/callback` 是全站唯一免登录写入口，安全边界是 SHA1 验签而非会话；验签未过只记数（`_lanxin_rejected`），绝不落 body，否则同网段任何人可灌满磁盘。
+  2. **解析失败仍返回 `errCode 0`**：存证一旦落盘即视为「成功」（唯一返回非 0 的分支是存证落盘失败）——重推毫无意义，看不懂的报文落 `status:"unparsed"` 进收件箱，不静默丢弃。
+  3. **三密钥脱敏**：`appSecret`/`callbackAesKey`/`callbackSignToken` 绝不进日志/审计/异常消息/前端下发，`public_config` 一律抹空只透 `has*` 布尔。
+  4. **免登录仅回调、且靠验签而非会话**：`_AUTH_EXEMPT` 只放行 `/api/lanxin/callback`，其余 7 个蓝信端点都在 `_SUPER_ONLY_PATHS`。
+- **与 master 的差异**（LTS 精简边界）：
+  - **无倚天工时推送**：只有「项目关注原因」一条路由，无 `timesheet` 路由/工时卡/工时短标签（LTS 无倚天工时域）。
+  - **无归入**：LTS 无跟进域，员工回复不归入任何跟进记录；`html.escape`/`_lanxin_append_reply`/`_LANXIN_HANDLE_TARGETS`/`lanxin_risk_key` 均不移植。
+  - **`inbox/handle` 降级为「仅标记已处理」**：只置 `handled` 供超管人工分诊，不写业务数据；收件箱不附 `candidateProjects` 归因候选。
+- **已知债 L-31**（随 master 一并继承）：nonce 重放缓存未做，依赖「时间戳窗口 + 存证轮转」两道叠加；若为解决「未联调环境时钟偏差」而放宽/摘掉窗口检查，会无声重开此债。
+- `data/lanxin_config.json`（含 AppSecret+回调双密钥）、`data/lanxin_inbox.json`（存员工回复正文）、`data/lanxin_callback_raw.jsonl`（回调存证）必须 gitignore，绝不入库。
 
 ## 5. ⚠️ 最易踩坑：打包模式 vs 开发模式
 
