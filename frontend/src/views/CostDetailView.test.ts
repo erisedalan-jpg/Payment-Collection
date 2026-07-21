@@ -79,12 +79,13 @@ describe('CostDetailView 明细表', () => {
     expect((detail.props('rows') as any[]).length).toBe(20)
   })
 
-  it('明细表不用 sticky-header(避免动态 max-height 在长页面塌缩成 ~1 行,与上方 L4 汇总表一致)', () => {
+  it('明细表用 sticky-header + 固定 max-height(表内滚动一次展示多行,如/projects;固定值绕过在长页面底部按位置动态测高塌缩成~1行)', () => {
     seed()
     const w = mount(CostDetailView, opts)
     const tables = w.findAllComponents({ name: 'DataTable' })
     const detail = tables[tables.length - 1]
-    expect(detail.props('stickyHeader')).toBeFalsy()
+    expect(detail.props('stickyHeader')).toBe(true)
+    expect(detail.props('maxHeightPx')).toBe(640)
   })
 
   it('明细列:删 L3/L3-1、含交付部门剩余/交付外包剩余、金额列去 ¥(纯数字)', () => {
