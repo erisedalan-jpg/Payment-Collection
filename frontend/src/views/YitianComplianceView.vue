@@ -18,6 +18,7 @@ import { parseDrillQuery } from '@/lib/yitian/drill'
 import { STATUS_LIGHT, STATUS_DARK, STRUCT_LIGHT, STRUCT_DARK } from '@/charts/echartsTheme'
 import { useSettingsStore } from '@/stores/settings'
 import { exportRows } from '@/lib/exportXlsx'
+import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 
 const TABLE_ID = 'yitian-compliance'
 const store = useYitianStore()
@@ -94,6 +95,9 @@ function onHeatmapClick(p: any) {
   if (!d) return
   const l4 = heatmap.value.l4s[d[0]]; const code = heatmap.value.codes[d[1]]?.label
   drillTable([{ col: 'l4', val: l4 }, { col: 'issueTypes', val: code }])
+}
+function goDetailIssue(row: { empId: string }) {
+  if (row?.empId) router.push({ path: '/yitian/detail', query: buildDetailDrill({ emp: row.empId, only: true }) })
 }
 
 // 健康带:合规率环 + 三项计数卡(均取自 issueRows 派生,与问题明细同源,不会对不上)。
@@ -180,6 +184,7 @@ const cols: DataColumn[] = [
   { key: 'okText', label: '状态', width: 80, sortable: true },
   { key: 'issueText', label: '问题', width: 320, wrap: true },
   { key: 'snippet', label: '工作成果摘要', width: 360, wrap: true },
+  { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },
 ]
 
 function onExport() {
@@ -193,7 +198,7 @@ function onExport() {
   )
 }
 
-defineExpose({ filtered, paged, codeDist, codeBarChartOption, complianceRatio, complianceRingColor })
+defineExpose({ filtered, paged, codeDist, codeBarChartOption, complianceRatio, complianceRingColor, goDetailIssue })
 </script>
 
 <template>
@@ -242,6 +247,9 @@ defineExpose({ filtered, paged, codeDist, codeBarChartOption, complianceRatio, c
         <DataTable :columns="cols" :rows="paged" sticky-header :max-height-px="560">
           <template v-for="col in cols" :key="col.key" #[`header-${col.key}`]="{ col: c }">
             <span class="yt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="allDetailRows" /><ColumnFilter v-else-if="c.key === 'issueText'" :table-id="TABLE_ID" col-key="issueTypes" :source-rows="allDetailRows" /></span>
+          </template>
+          <template #cell-detailAction="{ row }">
+            <el-link type="primary" :underline="false" @click.stop="goDetailIssue(row)">明细</el-link>
           </template>
         </DataTable>
         <div class="yt-pager">
