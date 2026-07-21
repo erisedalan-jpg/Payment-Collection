@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -8,7 +9,7 @@ import ColumnPicker from '@/components/ColumnPicker.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useCrossFilterStore } from '@/stores/crossFilter'
-import { applyColumnFilters } from '@/lib/crossFilter'
+import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
@@ -18,6 +19,7 @@ import {
   buildDetailRows, filterDetailRows, detailSummary, buildDetailSheetRows,
   ALL_COLUMNS, ALL_KEYS, DEFAULT_VISIBLE, FILTERABLE,
 } from '@/lib/yitian/detail'
+import { parseDetailDrill } from '@/lib/yitian/detailDrill'
 
 const TABLE_ID = 'yitian-detail'
 const store = useYitianStore()
@@ -53,6 +55,35 @@ function onExport() {
   if (!filtered.value.length) { ElMessage.warning('无可导出数据'); return }
   exportSheets('工时明细.xlsx', [{ name: '工时明细', rows: buildDetailSheetRows(filtered.value, visibleColumns.value) }])
 }
+
+const route = useRoute()
+const router = useRouter()
+
+// 下钻落地:复刻 analytics/compliance 范式——ready 门控 + flush:'post' + nextTick 一次性 watcher,
+// 避免 YitianToolbar 的 view.hydrate() 用 localStorage 历史区间覆盖掉刚设的下钻日期(见 analytics 注释)。
+let drillApplied = false
+function applyDrillLanding() {
+  if (drillApplied) return
+  const q = route.query
+  if (!Object.keys(q).length) { drillApplied = true; return }
+  drillApplied = true
+  const d = parseDetailDrill(q)
+  const setters: [string, string][] = []
+  if (d.l4) setters.push(['l4', d.l4])
+  if (d.emp) setters.push(['empId', d.emp]) // 隐藏键:按工号精确,避同名
+  if (setters.length) {
+    cf.clearAll(TABLE_ID)
+    for (const [col, val] of setters) {
+      cf.setColumnFilter(TABLE_ID, col, [val], cfUniqueValues(rows.value, col).length)
+    }
+  }
+  if (d.start && d.end) { view.start = d.start; view.end = d.end }
+  if (d.only) onlyIssues.value = true
+  const rest: Record<string, any> = { ...route.query }
+  delete rest.dL4; delete rest.dEmp; delete rest.dStart; delete rest.dEnd; delete rest.dOnly
+  router.replace({ query: rest })
+}
+watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, flush: 'post' })
 
 onMounted(() => { store.load() })
 
