@@ -91,8 +91,8 @@ describe('AppSidebar', () => {
     expect(text).not.toContain('回款进度')    // /payment/plan 已删
     expect(text).not.toContain('风险项目')    // /payment/risk 已删
     expect(text).not.toContain('回款台账')    // /ledger 已删
-    // 七个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+倚天工时(5)+工具(4,V3.1.0加概算工具)+系统管理(1) = 30
-    expect(wrapper.findAll('.nav-sub').length).toBe(30)
+    // 七个分区子项统一二级呈现(.nav-sub):项目(5)+项目分析(7)+重点跟进(5)+回款(3)+倚天工时(6,V4.1.0加工时明细)+工具(4,V3.1.0加概算工具)+系统管理(1) = 31
+    expect(wrapper.findAll('.nav-sub').length).toBe(31)
   })
 
   it('toggle button flips uiStore collapsed', async () => {
