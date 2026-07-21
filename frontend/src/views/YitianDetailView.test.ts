@@ -96,4 +96,26 @@ describe('YitianDetailView', () => {
     await flushPromises()
     expect(w.find('.yd-view').exists()).toBe(true)
   })
+
+  it('下钻落地:dL4+dOnly → 设 cf.l4 + onlyIssues,并清下钻键(保留其它)', async () => {
+    await router.push('/yitian/detail?dL4=浙江服务组&dOnly=1&keep=1')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect((w.vm as any).onlyIssues).toBe(true)
+    // 浙江服务组只有 A2(李四) 的一条 ok=1 行,dOnly=1 也保留它
+    expect((w.vm as any).filtered.map((r: any) => r.empName)).toEqual(['李四'])
+    expect(router.currentRoute.value.query).toEqual({ keep: '1' })
+    w.unmount()
+  })
+
+  it('下钻落地:dEmp 按工号精确筛(避同名)', async () => {
+    await router.push('/yitian/detail?dEmp=A1')
+    await router.isReady()
+    const w = mountView()
+    await flushPromises()
+    expect((w.vm as any).filtered.every((r: any) => r.empId === 'A1')).toBe(true)
+    expect((w.vm as any).filtered.length).toBe(2)
+    w.unmount()
+  })
 })
