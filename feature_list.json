@@ -1,45 +1,548 @@
 {
   "project": "项目管理平台",
-  "version": "V1.15.0",
-  "updated": "2026-06-19",
-  "note": "harness 状态层的机器可读功能清单；status: done | in_progress | todo。前端为 frontend/ Vue3+Vite+TS；数据源以 PMIS 导出(input/pmis 9表)+CSV(收款阶段/流水/预算)为核心。回款达成率/完成率口径=Σ流水净额÷Σ合同总额。详细版本史/技术债见 PROGRESS.md。",
+  "version": "V4.0.5",
+  "updated": "2026-07-20",
+  "note": "harness 状态层的机器可读功能清单；status: done | in_progress | todo。V4.0.5 从代码全量重建(此前停在 V1.15.0)——路由/pageKey/授权取自 frontend/src/router 与 nav.ts，各页 items 由子代理逐个读实际 .vue 核实，横切项(鉴权/权限门禁/L4隔离/全局筛选/蓝信双向/服务生命周期)由控制者读后端核实。group 对应侧栏七组(项目/项目分析/重点跟进/回款/倚天工时/工具/系统管理) + 横切/系统。前端 Vue3+Vite+TS+Pinia+ElementPlus+ECharts；后端纯 Python 标准库 server.py。回款达成率/完成率口径=Σ流水净额÷Σ合同总额。5 跟进页(重点项目进展/重点商机/临时/风险/回款重点)共用后端 followup_store 引擎。详细版本史/技术债/口径见 PROGRESS.md 与 CLAUDE.md。",
   "features": [
-    { "id": "F-overview", "name": "项目总览", "page": "/", "status": "done",
-      "items": ["在管/进行中/暂停/高风险/超支 KPI", "回款达成率(已回流水÷合同)", "健康度四维异常", "回款重点带(年度/本月/7天/延期Top)", "项目动态右栏"] },
-    { "id": "F-projects", "name": "在建项目", "page": "/projects", "status": "done",
-      "items": ["项目清单", "表头列枚举筛选", "选列菜单(localStorage 持久化)", "横向滚动+固定列", "标签列与多选筛选", "数据异常(orgL4空)标记", "按范围导出 xlsx", "行内跟进"] },
-    { "id": "F-closed-projects", "name": "已关闭项目", "page": "/projects/closed", "status": "done",
-      "items": ["已关闭项目清单", "选列/表头筛选/横滚", "精简详情 /closed-project/:id"] },
-    { "id": "F-activity", "name": "项目动态", "page": "/activity", "status": "done",
-      "items": ["周期对比卡(阶段/延期/回款/风险/超支/达成率)", "事件时间线"] },
-    { "id": "F-insight", "name": "项目分析", "page": "/insight", "status": "done",
-      "items": ["多维透视/排名/交叉", "下钻", "注:回款完成率为节点已收÷PMIS合同(与主域口径不同源,技术债)"] },
-    { "id": "F-project-detail", "name": "项目详情", "page": "/project/:id", "status": "done",
-      "items": ["头部徽章+团队块(9字段)", "六指标条", "回款tab(收款阶段)", "回款数据tab(流水,售前回退原项目)", "进度里程碑tab", "风险tab", "预算核算tab", "原项目tab(售前)", "标签编辑", "跟进记录CRUD"] },
-    { "id": "F-payment-overview", "name": "回款总览", "page": "/payment", "status": "done",
-      "items": ["6 指标卡", "按L4回款数据表(11列可排序)", "待回款趋势(整数万+横滑)", "服务组达成排名(全部L4)"] },
-    { "id": "F-payment-board", "name": "多维看板", "page": "/payment/board", "status": "done",
-      "items": ["排名/交叉/透视三模式", "5维(L4部门/项目级别/行业/项目阶段/标签)", "5指标(项目数/合同总额/计划回款/完成率/延期节点)", "标签多值炸开分组", "DataTable表头排序", "柱状图已回/待回/总计数字", "下钻"] },
-    { "id": "F-payment-projects", "name": "回款项目", "page": "/payment/projects", "status": "done", "items": ["项目回款明细表"] },
-    { "id": "F-payment-nodes", "name": "回款节点", "page": "/payment/nodes", "status": "done",
-      "items": ["节点汇总条", "维度分组(部门/阶段/档位/进度)", "节点明细(状态5态)"] },
-    { "id": "F-payment-plan", "name": "回款进度", "page": "/payment/plan", "status": "done", "items": ["进度3态桶", "项目明细", "列筛选"] },
-    { "id": "F-payment-risk", "name": "风险项目", "page": "/payment/risk", "status": "done", "items": ["延期节点", "低回款项目Top10", "超支项目"] },
-    { "id": "F-calendar", "name": "回款日历", "page": "/calendar", "status": "done",
-      "items": ["顶部5卡", "年热力/月网格(4态)/日详情/议程", "三筛(L3-1/L4/经理)", "即将到期(15·30天)"] },
-    { "id": "F-ledger", "name": "回款台账", "page": "/ledger", "status": "done",
-      "items": ["汇总+状态卡(进度3态+延期)+档位卡", "明细表(搜索/区间/状态/列筛选)"] },
-    { "id": "F-filterbar", "name": "全局筛选", "page": "global", "status": "done",
-      "items": ["日期区间+预设(月/季/年/全部)", "视角切换(L4服务组/项目经理)", "按标签排除", "异常项目排除"] },
-    { "id": "F-data-mgmt", "name": "数据管理", "page": "/data", "status": "done",
-      "items": ["云同步(SSE进度)", "离线Excel导入", "更新数据/重新处理(SSE)", "清空数据", "PMIS在线下载/离线上传", "项目域文件上传", "数据历史快照回滚/撤销", "人工数据导入(标签/跟进)+快照回滚", "标签库管理"] },
-    { "id": "F-governance", "name": "数据治理", "page": "/governance", "status": "done",
-      "items": ["数据源状态卡", "异常/缺失/未匹配/脏值告警"] },
-    { "id": "F-about", "name": "关于产品", "page": "/about", "status": "done", "items": [] },
-    { "id": "F-server-lifecycle", "name": "本地服务生命周期", "page": "backend", "status": "done",
-      "items": ["自动开浏览器", "端口占用清理", "桌面快捷方式", "停止服务API", "打包模式(frozen)路径分支", "日志按天轮转"] },
-    { "id": "F-data-pipeline", "name": "数据管线/口径", "page": "backend", "status": "done",
-      "items": ["PMIS 9表+CSV 摄取", "收款阶段台账核心源(售前节点本项目号优先)", "回款达成率=Σ流水净额÷Σ合同", "schema 校验+JSON Schema 生成 TS 类型", "快照diff→事件流/周期对比"] }
-  ],
-  "backlog_ref": "PROGRESS.md#Backlog"
+    {
+      "id": "F-overview",
+      "name": "项目总览",
+      "page": "/",
+      "group": "项目",
+      "status": "done",
+      "pageKey": "overview",
+      "items": [
+        "快捷入口门户区：读 portal 配置经 buildSections 渲染卡片(置顶+分组)；无任何入口且非超管则整块隐藏；可折叠按用户存 localStorage",
+        "超管：门户头部『配置』入口跳 /data，空配置显引导文案",
+        "体检带：健康度分段条 + 回款达成率环 + 年度回款进度 + 本月待回 + 7天临期节点(均可点击跳转)",
+        "『需要处理的异常』分诊卡：回款延期/里程碑滞后/成本超支/风险未闭环/数据异常五类，列 Top3，可深链 /projects?riskCategory=",
+        "待办/临期队列(7天/30天窗口切换)",
+        "右栏项目动态摘要：本期变化数字条(基线=上次同步) + 事件时间线(默认只看要紧，可切全部/按L4筛，最多10条)"
+      ]
+    },
+    {
+      "id": "F-projects",
+      "name": "在建项目",
+      "page": "/projects",
+      "group": "项目",
+      "status": "done",
+      "pageKey": "projects",
+      "items": [
+        "项目清单表，自定义可见列/列序(ColumnPicker，含 tags 列一次性迁移补回可见)",
+        "表头列筛选 + 工具栏搜索(名/编号/客户/经理) + 售前整合筛选",
+        "支持从其他页 KPI 深链带 query 预设筛选(health/riskCategory/presale/paused/overspend)并清历史残留",
+        "健康度四维徽章(带口径 tooltip)，关注原因彩色 pill",
+        "行内跟进 FollowupModal；点击行跳 /project/:id",
+        "导出可勾选范围(清单/标签/跟进/回款节点/里程碑)为 xlsx",
+        "分页 + 可持久化排序；数据异常项目(orgL4 缺失)标记且不进回款看板"
+      ]
+    },
+    {
+      "id": "F-project-detail",
+      "name": "项目详情",
+      "page": "/project/:id",
+      "group": "项目",
+      "status": "done",
+      "pageKey": "projects",
+      "items": [
+        "头部：名/编号/阶段/暂停/评级/健康度徽章 + 预算超支徽章(总体+交付分项) + 售前『原项目』标记",
+        "标签管理：手动加删(支持新建) + 规则标签(按签约单位自动打，只读)去重展示",
+        "五固定 Tab + 售前专属『原项目』Tab：回款(PMIS口径+节点明细+跟进) / 回款数据(流水，售前取原项目) / 进度里程碑(阶段验收款高亮) / 风险(未关闭数+全量明细) / 预算核算(毛利树+售前桥接) / 原项目(不计入当前汇总)",
+        "团队卡(经理/L4/L3/L3-1/AR/SR/CSR/CDR/Sponsor)",
+        "右栏本项目动态时间线(按 projectId 过滤)；项目不存在给 404"
+      ]
+    },
+    {
+      "id": "F-projects-closed",
+      "name": "已关闭项目",
+      "page": "/projects/closed",
+      "group": "项目",
+      "status": "done",
+      "pageKey": "projects-closed",
+      "items": [
+        "已关闭清单：自定义列 + 表头筛选(L4/L3-1/经理/类型/级别/评级/阶段/状态) + 搜索；进页清历史残留",
+        "含合同金额/预算消耗比/项目超支/关闭时间等，排序 + 分页",
+        "点击行跳 /closed-project/:id 精简详情(关闭信息/团队/客户/成本四卡区块，无 Tab、无跟进/动态)",
+        "无数据提示『提供 PMIS 已关闭三表后点更新数据』"
+      ]
+    },
+    {
+      "id": "F-activity",
+      "name": "项目动态",
+      "page": "/activity",
+      "group": "项目",
+      "status": "done",
+      "pageKey": "activity",
+      "items": [
+        "周期对比卡条(基线可切上次同步/上周/上月，六指标：阶段推进/新增延期/回款新增/风险净增/新超支/达成率变化；快照不足置灰)",
+        "事件时间线(含在建+已关闭，按日分组)",
+        "筛选：类别(全部/项目类/回款类) + 动态类型多选 + L4 下拉 + 关键词搜索",
+        "事件关联经理/L4/超支明细(交付分项实际>预算的项)",
+        "分页(50/页)；导出当前筛选为 xlsx"
+      ]
+    },
+    {
+      "id": "F-opportunities-progress",
+      "name": "商机清单",
+      "page": "/opportunities",
+      "group": "项目",
+      "status": "done",
+      "pageKey": "opportunities-progress",
+      "items": [
+        "商机清单表，自定义列 + 表头筛选 + 搜索(客户/商机名/销售负责人)",
+        "派生列『近期更新』(按 lastUpdate 计算，可筛/排/导)",
+        "列排序 + 分页 + 首行冻结",
+        "新增商机：任意登录管理员(普通管理员限本人 L4，后端 can_access_l4 校验越权)",
+        "每行编辑抽屉 OpportunityEditDrawer",
+        "超管专属：删除选中(二次确认) / 导入 xlsx / 导出",
+        "L4 隔离：非超管 GET 列表后端按 allowedL4 过滤"
+      ]
+    },
+    {
+      "id": "F-insight",
+      "name": "项目多维分析",
+      "page": "/insight",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "insight",
+      "items": [
+        "三模式：排名/交叉/透视",
+        "13 维度 × 6 指标(项目数/合同额/平均完工/平均消耗比/回款完成率/延期数)，排名取 Top15",
+        "排名图表多选(柱/折/饼)，比率指标禁饼图自动剔除",
+        "交叉：主维×次维矩阵；透视：多行×多列自由(DimPicker+PivotTable)",
+        "标签筛选(含无标签)；排名行/交叉格/透视格均可下钻明细弹窗",
+        "口径：异常项目回款列置0不参与回款聚合，非回款列(成本/进度)保留"
+      ]
+    },
+    {
+      "id": "F-insight-milestone",
+      "name": "里程碑管理",
+      "page": "/insight/milestone",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "insight-milestone",
+      "items": [
+        "5 KPI 卡(总/正常/延期/严重延期/未发布)，点击弹该状态清单",
+        "标签排除(镜像 /data 开关，写全局 filter)",
+        "到期提醒图(7天/30天/本季 × 高中低堆叠)；部门异常分布(Top15)+部门合规率(同序对照)",
+        "终验完成情况(项目数/金额双图，季/月切换+年份筛选)",
+        "关键节点分布(到货/初验/终验/服务完成月度折线，点击下钻当月)",
+        "下方三 Tab：延期清单/到期提醒/在建里程碑计划(标签筛选不影响上方)；延迟挂载优化"
+      ]
+    },
+    {
+      "id": "F-insight-costdetail",
+      "name": "成本分析",
+      "page": "/insight/costdetail",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "insight-costdetail",
+      "items": [
+        "4 KPI 卡(统计项目数/未超支/总成本超支含>5000子项/交付超支含未获取原项目预算子项)，点击就地筛选",
+        "超支分布柱(L4 × 不足5k/大于5k 堆叠)",
+        "L4 部门成本汇总表 11 列(可显隐排序)",
+        "项目成本明细 16 列(列头筛选除数组列/搜索/标签/外部排序/分页)，默认 L4 升序再项目编号升序",
+        "导出 xlsx；行跳 /project/:id；剩余预算负标红"
+      ]
+    },
+    {
+      "id": "F-insight-risk",
+      "name": "风险看板",
+      "page": "/insight/risk",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "insight-risk",
+      "items": [
+        "4 概览卡(健康度无风险占比 + 高/中/低风险数及占比，分母=有风险项目数)",
+        "风险统计：等级多选筛 + 12 维度×4 指标(项目数/有风险项目数/未关闭风险数/合同额)，柱/饼多选，下钻",
+        "风险概览透视表(行/列多选，含风险大类/小类多值炸开)，点击格下钻",
+        "口径：仅统计未关闭风险；无未关闭记『无风险』，有但字段空记『未分类』；大类/小类多值一项目可计入多桶"
+      ]
+    },
+    {
+      "id": "F-opportunities-board",
+      "name": "商机看板",
+      "page": "/opportunities/board",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "opportunities-board",
+      "items": [
+        "4 KPI(本周新增/更新商机数、金额、商机总数、总额，万元)",
+        "覆盖产品条形(Top10)、主观预测饼、阶段分布饼",
+        "各团队(L4)金额/数量柱 + 仅重点商机对照(共4张)",
+        "数量/金额月趋势多系列折线(按团队)；各级别客户商机数/金额、预估落单时间堆叠",
+        "AI 商机专区(数/金额饼+2 KPI，口径：productCategory 含 AI 不分大小写)",
+        "近7天口径：firstReg 或 lastUpdate 距今 0~7 天"
+      ]
+    },
+    {
+      "id": "F-insight-board",
+      "name": "回款多维分析",
+      "page": "/insight/board",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "insight-board",
+      "items": [
+        "三模式排名/交叉/透视，与全局筛选联动",
+        "7 维度(L4/级别/行业/阶段/标签/TOP1000/象限，标签多值炸开) × 5 指标(项目数/合同额/计划回款/完成率/延期节点)",
+        "排名 4 指标排序 + 图表多选(比率禁饼提示)；支持 ?dim= 初始化(orgL4→dept 别名兼容)",
+        "交叉堆叠柱(Top15)+矩阵；透视多行多列；下钻 BoardDrilldownModal",
+        "口径：完成率分子恒全时流水(不随日期区间)，计划回款/延期/未收随区间"
+      ]
+    },
+    {
+      "id": "F-insight-calendar",
+      "name": "回款日历",
+      "page": "/insight/calendar",
+      "group": "项目分析",
+      "status": "done",
+      "pageKey": "insight-calendar",
+      "items": [
+        "5 仪表卡(当月待回/已回万、7天到期、当月节点数、延期节点)",
+        "年度热力图(点月跳转) + 月历网格(仅未回款)/议程列表切换",
+        "点日联动当日/当月次月节点明细",
+        "三级筛选(PM L3-1 / 经理 L4 / 经理)，一键清除；即将到期双栏(15天/30天)",
+        "年月导航跨年进位；口径：网格/热力仅未回款，仪表卡含全部"
+      ]
+    },
+    {
+      "id": "F-projects-key",
+      "name": "重点项目进展",
+      "page": "/projects/key",
+      "group": "重点跟进",
+      "status": "done",
+      "pageKey": "projects-key",
+      "items": [
+        "范围硬编码不可配：级别=P1 或(TOP1000 且 合同>100万)；无『范围设置』入口",
+        "列含级别/经理/AR/SR/L4/合同(万)/立项日期(默认隐)/风险/本周进展/后续计划/跟进日期/跟进人",
+        "本周进展/后续计划富文本就地编辑(仅当前数据，存带编辑时间前缀)",
+        "数据集当前/历史(快照)切换，超管删历史",
+        "超管：更新(归档+清空，clear_on_archive=true) / 多 sheet 导出",
+        "列选/排序按用户+表ID持久化；行跳 /project/:id；底部合同合计(去重)+条数"
+      ]
+    },
+    {
+      "id": "F-opportunity-followup",
+      "name": "重点商机跟进",
+      "page": "/opportunities/key",
+      "group": "重点跟进",
+      "status": "done",
+      "pageKey": "opportunity-followup",
+      "items": [
+        "范围基于商机字段单表匹配(OPP_SCOPE_CATALOG)，超管 ScopeBuilder 两级 AND/OR；范围空则 0 条(不回退全量)",
+        "列由 OPP_COLUMNS 动态生成 + 跟进4列(本周进展/后续计划/跟进日期/跟进人)",
+        "本周进展/后续计划富文本就地编辑(仅当前数据)",
+        "数据集当前/历史、超管删历史、更新(归档+清空)、多数据集导出",
+        "与其余跟进页不同：行点击不跳转；底部只显条数不显金额合计"
+      ]
+    },
+    {
+      "id": "F-temp-followup",
+      "name": "临时重点跟进",
+      "page": "/projects/temp",
+      "group": "重点跟进",
+      "status": "done",
+      "pageKey": "temp-followup",
+      "items": [
+        "多实例：顶部可切换跟进事项标签页，各实例独立 scope/current/archives；面板 TempInstancePanel 由 :key=activeId 驱动重建",
+        "超管 +新建(可复制已有实例范围) / 管理(重命名/删除)，删除二次确认(连归档一起删)，后端拒删最后一个实例",
+        "记住上次实例(localStorage)，不存在回落第一个；一次性列 key 迁移(旧→按实例)",
+        "范围三段式(project/paymentNode/milestone，含节点/里程碑存在性，非单表匹配)",
+        "比重点项目进展多一批默认隐藏扩展列(阶段/类型/健康度/完工%/回款完成率/…/立项日期/计划终验/实际终验)",
+        "富文本就地编辑；数据集/归档/导出均在当前实例级；各实例独立列/排序持久化；行跳详情+底部合同合计"
+      ]
+    },
+    {
+      "id": "F-risk-followup",
+      "name": "风险跟进",
+      "page": "/risk",
+      "group": "重点跟进",
+      "status": "done",
+      "pageKey": "risk-followup",
+      "items": [
+        "数据源=各项目 riskRecords 拍平的风险行(一项目多行)，范围单表匹配 riskRowMatches(~25 字段)",
+        "语义特殊：范围为空则展示全部风险记录(非 0 条)，仅配了带条件分组才过滤",
+        "跟进3列：跟进动作/rev结论(富文本)、下次rev时间(日期就地编辑)；历史只读",
+        "风险列动态生成(基于实际出现字段)+固定项目列+跟进列；等 data 到位才建列(防冷加载锁死)",
+        "useDeferredMount 延迟挂载 + 骨架屏",
+        "超管：范围设置、归档(留存跟进 clear_on_archive=false，更新数据后按风险编码重挂)、删历史、多数据集导出",
+        "比率列百分比、日期列统一格式；行跳 /project/:id；底部合同合计(按项目金额去重)+条数"
+      ]
+    },
+    {
+      "id": "F-payment-key",
+      "name": "回款重点跟进",
+      "page": "/payment/key",
+      "group": "重点跟进",
+      "status": "done",
+      "pageKey": "payment-key",
+      "items": [
+        "范围项目级三段式(复用 tempScope，独立 store/scope)；范围空则 0 条",
+        "列含项目基础 + 默认隐藏可选列(回款完成率/状态/风险/阶段/…) + 跟进3列：动作/rev结论(富文本)/下次rev时间(日期)",
+        "历史只读",
+        "超管：范围设置、归档(留存跟进 clear_on_archive=false，按项目编号重挂)、删历史、多数据集导出",
+        "列选/排序按用户+表ID持久化；行跳 /project/:id；底部合同合计+条数"
+      ]
+    },
+    {
+      "id": "F-payment",
+      "name": "回款总览",
+      "page": "/payment",
+      "group": "回款",
+      "status": "done",
+      "pageKey": "payment",
+      "items": [
+        "纯展示仪表盘(不用跟进引擎)，走全局 FilterBar(视角/L4/经理/排除/日期区间联动)",
+        "DashMetrics 6 卡(项目数/回款节点数/已回款万/待回款万/完成率/延期项目数)，完成率阈值着色(≥80绿/≥50黄/否红)，部分卡可跳转",
+        "PaymentL4Table 按 L4 汇总(含合计行)",
+        "NoStageProjectsTable 列『无回款阶段数据』在建项目(分页/导出/行跳详情)",
+        "加载中/失败/空三态文案"
+      ]
+    },
+    {
+      "id": "F-payment-projects",
+      "name": "回款项目",
+      "page": "/payment/projects",
+      "group": "回款",
+      "status": "done",
+      "pageKey": "payment-projects",
+      "items": [
+        "受全局 FilterBar(含日期区间过滤回款记录)",
+        "搜索(编号/名称) + 标签多选 + 列头筛选(经理/部门/级别)",
+        "列可配(默认全可见)：合同/已回款/完成率/计划回款/节点数/达成/延期(万)，完成率 rateColorPmis 着色",
+        "外部排序(全量，持久化) + 分页(默认50) + 导出 xlsx",
+        "行点击打开项目详情抽屉(非跳路由)；进页清列筛选残留"
+      ]
+    },
+    {
+      "id": "F-payment-nodes",
+      "name": "回款节点",
+      "page": "/payment/nodes",
+      "group": "回款",
+      "status": "done",
+      "pageKey": "payment-nodes",
+      "items": [
+        "受全局 FilterBar，节点按『计划日 ∈ 区间』过滤",
+        "顶部5卡(节点总数/已回款/延期/待回款/计划回款Σ万)，口径固定=区间过滤后全集，不随列筛/标签/排序变",
+        "标签多选 + 列头筛选(经理/L4/阶段/状态)",
+        "固定9列(无 ColumnPicker)，状态列徽标着色(已回款绿/延期红/待回款·部分·质保黄)",
+        "外部排序(全量，持久化) + 分页(默认50) + 导出；行点击开详情抽屉；进页清列筛选"
+      ]
+    },
+    {
+      "id": "F-yitian",
+      "name": "倚天工时总览",
+      "page": "/yitian",
+      "group": "倚天工时",
+      "status": "done",
+      "pageKey": "yitian",
+      "items": [
+        "KPI 带(总工时含人均、平均饱和度含补全、未填人数、加班人数)，4 卡下钻统计页锚点",
+        "合规率环(≥90绿/<90黄，『问题N条』，点击跳合规页)",
+        "工时类型占比饼、L4 组织工时横向柱(实际vs基础，点柱下钻)",
+        "分层汇总表(仅 L4 层剔除未分配，固定合计行，行点击下钻)",
+        "数据源=工时.xlsx 离线导入 + 超管配的排除工时类型，受 YitianToolbar 日期/L4 联动"
+      ]
+    },
+    {
+      "id": "F-yitian-compliance",
+      "name": "工时合规检查",
+      "page": "/yitian/compliance",
+      "group": "倚天工时",
+      "status": "done",
+      "pageKey": "yitian-compliance",
+      "items": [
+        "健康带(总问题/问题人次/涉及组织数 + 合规率环)",
+        "问题分布横柱(HINT_黄/其余红，点击下钻)、按 L4 分布横柱、问题码×L4 热力图(点击下钻两列)",
+        "问题明细表(列头筛选/分页/导出含日期区间)",
+        "跨页下钻落地(接 dStart/dEnd，设区间后清 query 防重放)",
+        "口径：超管配的排除工时类型影响问题数，与总览/趋势同源"
+      ]
+    },
+    {
+      "id": "F-yitian-analytics",
+      "name": "工时统计分析",
+      "page": "/yitian/analytics",
+      "group": "倚天工时",
+      "status": "done",
+      "pageKey": "yitian-analytics",
+      "items": [
+        "人数结构分段条(达标/欠填/完全未填，点击滚动)",
+        "饱和度 TOP10 横柱(基础工时参考线，按工号精确下钻防同名误配)",
+        "加班/欠填发散条、饱和度散点(点击下钻)",
+        "三辅助小表(TOP10/未按时填/完全未填) + 员工工时明细表(列头筛选+分页)",
+        "全站下钻统一落地页(接 dL4/dStart/dEnd/dScroll，设置后清 query)"
+      ]
+    },
+    {
+      "id": "F-yitian-trend",
+      "name": "工时趋势分析",
+      "page": "/yitian/trend",
+      "group": "倚天工时",
+      "status": "done",
+      "pageKey": "yitian-trend",
+      "items": [
+        "粒度切换(周/月/季，仅本页)",
+        "6 趋势图(问题数、总工时/合规率双轴、加班、平均饱和度、未填人数、类型占比堆叠柱)",
+        "均值线 + 峰谷标记 + 缩放条",
+        "假期周(零工作日)合规率/饱和度按 null 断线不画0(防假暴跌)",
+        "时间点下钻(问题/合规→合规页；工时/饱和/未填→统计页，带分桶起止)；类型占比图不下钻"
+      ]
+    },
+    {
+      "id": "F-yitian-customer",
+      "name": "客户支持分析",
+      "page": "/yitian/customer",
+      "group": "倚天工时",
+      "status": "done",
+      "pageKey": "yitian-customer",
+      "items": [
+        "TOP1000 大客户：各 L4 堆叠柱(TOP1000 vs 其余) + 明细表(固定合计，仅项目/售前/售后类，剔除未分配 L4)",
+        "跨 BG 支持：本BG/跨BG MetricGrid + 饼 + L4 分组柱(仅项目/售前类，按销售 L2 判本BG，口径与 TOP1000 不同)",
+        "TOP 客户排行(不限类型，前10)",
+        "部分图/表行下钻统计页按 L4 筛；明确标注各卡口径差异"
+      ]
+    },
+    {
+      "id": "F-data",
+      "name": "数据管理",
+      "page": "/data",
+      "group": "工具",
+      "status": "done",
+      "pageKey": "data",
+      "items": [
+        "Tab 化(数据源/配置/蓝信回复/维护)，顶部常驻状态栏 + 『更新数据(重新处理)』带进度",
+        "数据源签：主域源卡(取本机 PMIS cookie / 下载覆盖 input/ 九表 + 项目域文件状态网格 / 上传自动分派 / 手动粘贴 cookie 兜底) + 倚天源卡(状态网格/上传/holidays 模板/取倚天 cookie)",
+        "配置签：项目标签库(全员) + 倚天合规(超管：范围+规则 JSON/Excel 导入导出恢复默认，保存即重算) + 蓝信推送配置(超管：凭证/回调/路由/自检/验签被拒统计+预览推送) + 首页门户(超管：入口分组增删排序可见性)",
+        "蓝信回复签(超管：收件箱来源/解析状态/验签被拒统计，归入各跟进域/删除单条)",
+        "维护签：人工导入/回滚(整表替换前自动快照) + 数据历史回滚(留最近5份，回滚前备份可撤销) + 倚天累积库管理(超管) + 清空数据(两步二次确认)"
+      ]
+    },
+    {
+      "id": "F-governance",
+      "name": "数据治理",
+      "page": "/governance",
+      "group": "工具",
+      "status": "done",
+      "pageKey": "governance",
+      "items": [
+        "结论横幅三态(缺主数据红/有告警黄/就绪绿)",
+        "9 张数据源状态卡(云文档/PMIS七表/组织架构/售前映射/预算/里程碑/流水/全预算/桥接)",
+        "分级告警(高/中/低，按严重度+条数排序)：数据源缺失/PMIS未匹配/负责人不在清单/回填待办/售前未映射/口径冲突/脏值/回款排除L4缺失等",
+        "每条可展开明细表，部分支持导出；无明细的以建议文字呈现",
+        "纯前端聚合(buildHealthReport 纯函数，零后端依赖)"
+      ]
+    },
+    {
+      "id": "F-budget",
+      "name": "概算工具",
+      "page": "/budget",
+      "group": "工具",
+      "status": "done",
+      "pageKey": "budget",
+      "items": [
+        "表单：基础信息 + 费率速查 + 产品/PM/服务项人天 + 直接成本",
+        "结果实时联动：成本比例卡(三态，异常强制填说明) + CRM 文案(手改后停自动覆盖) + 汇总 + 销售下单金额(总成本×(1+毛利率))",
+        "存档：查看/恢复历史(放弃改动二次确认)、保存/另存为新报价、离开拦截未保存",
+        "费率快照：每份报价冻结当时费率，改费率不影响旧档；费率更新有横幅可重算",
+        "超管：费率与目录配置抽屉(后端 403 为真闸)；导出用报价生效费率；进页强制重取配置",
+        "口径：成本比例=销售下单金额(含税)÷项目金额(V3.1.0 修漏乘 1+毛利率)"
+      ]
+    },
+    {
+      "id": "F-about",
+      "name": "关于产品",
+      "page": "/about",
+      "group": "工具",
+      "status": "done",
+      "pageKey": "about",
+      "items": [
+        "展示版本号 + 发布日期(来自 version.ts)",
+        "分模块罗列功能文案(项目/分析/回款/工具)",
+        "健康度规则说明(四维异常 + 总评)",
+        "纯信息展示无交互"
+      ]
+    },
+    {
+      "id": "F-admin",
+      "name": "账号管理",
+      "page": "/admin",
+      "group": "系统管理",
+      "status": "done",
+      "items": [
+        "超管专属(requiresSuper，非超管重定向 firstAllowedPath)",
+        "Tab：账号管理 + 审计日志(切签才挂载)",
+        "账号列表(账号/显示名/类型/可访问页面/可见L4/密码状态)",
+        "新建/编辑弹窗(可访问页面多选27项 + 可见L4多选含全部，密码留空=不改)",
+        "删除二次确认；超管账号禁编辑/删除",
+        "审计签：按账号/类型/日期/结果/关键词筛 + 分页 + 导出"
+      ]
+    },
+    {
+      "id": "F-auth",
+      "name": "登录与鉴权",
+      "page": "/login·/change-password",
+      "group": "横切/系统",
+      "status": "done",
+      "items": [
+        "登录页(全屏)，后端 auth.py PBKDF2 + 会话 token",
+        "首次登录 mustChangePassword 强制跳 /change-password 改密",
+        "会话失效/未登录 401，路由守卫拦截到 /login",
+        "密码仅存 hash，绝不存明文/token(accounts.json)"
+      ]
+    },
+    {
+      "id": "F-access-control",
+      "name": "页面门禁与 L4 数据隔离",
+      "page": "backend + global",
+      "group": "横切/系统",
+      "status": "done",
+      "items": [
+        "页面门禁：按 pageKey(27 项) canAccess，账号 allowedPages 超管可配，超管 '*' 通行",
+        "路由守卫 + 侧栏按 canAccess 过滤，requiresSuper 页非超管重定向",
+        "L4 数据隔离：data_scope.py 按 allowedL4 切 analysis_data / yitian('*'=全量，不改入参)",
+        "商机/回款等按 allowedL4 过滤，普通管理员写操作后端 can_access_l4 校验越权"
+      ]
+    },
+    {
+      "id": "F-filterbar",
+      "name": "全局筛选",
+      "page": "global",
+      "group": "横切/系统",
+      "status": "done",
+      "items": [
+        "在未设 hideFilter 的页面(回款总览/项目/节点、回款多维分析、日历)显示",
+        "日期区间(默认本年度) + 预设(月/季/年/全部)",
+        "视角切换(全局 / L4 服务组 / 项目经理)",
+        "按标签排除、按异常项目排除"
+      ]
+    },
+    {
+      "id": "F-lanxin",
+      "name": "蓝信双向推送",
+      "page": "backend + /data",
+      "group": "横切/系统",
+      "status": "done",
+      "items": [
+        "出站：异常项目/工时问题 → 应用号‖机器人卡片(逐项路由：启用/发本人/汇总级别)，预览+手动推送(超管)",
+        "入站：免登录回调 /api/lanxin/callback(SHA1 验签 → 存证 → AES 解密 → 两套键名解析 → 事件去重)，员工回复进收件箱",
+        "归入：超管把回复追加进 risk/temp/payment_key/progress(html 转义、不覆盖)",
+        "凭证/回调双密钥超管可配(脱敏)，零依赖 AES；验签被拒计数含原因(signature/stale)",
+        "状态：凭证未申请，全链路从未联调(存证设计兜底)"
+      ]
+    },
+    {
+      "id": "F-server-lifecycle",
+      "name": "本地服务生命周期",
+      "page": "backend",
+      "group": "横切/系统",
+      "status": "done",
+      "items": [
+        "ThreadingHTTPServer 绑 127.0.0.1(仅回环)",
+        "自动开浏览器、端口占用清理、/api/stop 停服",
+        "打包(frozen)/开发两套路径(_MEIPASS 静态、sys.executable 目录数据)",
+        "日志按天轮转(TimedRotatingFileHandler)"
+      ]
+    }
+  ]
 }
