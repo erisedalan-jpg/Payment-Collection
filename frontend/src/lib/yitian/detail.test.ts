@@ -19,9 +19,9 @@ const DATA = {
   dims: { types: ['项目类'], workTypes: [], customers: ['某客户'], products: [], productNames: [],
           projectTypes: [], salesL2: [], serviceModes: [] },
   entries: [
-    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: true, ok: 2, iss: ['MISS_SUMMARY'] },
-    { d: '2026-06-02', e: 'A2', t: 0, h: 6, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO2', top: false, ok: 1, iss: ['HINT_PRESALE_PRODUCT'] },
-    { d: '2026-06-02', e: 'A1', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO1', top: true, ok: 2, iss: ['MISS_SUMMARY'], ct: '张三完整的工作成果全文内容，超过一百二十字的部分也应完整展示不截断' },
+    { d: '2026-06-02', e: 'A2', t: 0, h: 6, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: 'WO2', top: false, ok: 1, iss: ['HINT_PRESALE_PRODUCT'], ct: '李四的工作内容' },
+    { d: '2026-06-02', e: 'A1', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [], ct: '张三的日常管理工作' },
   ],
   issues: [
     { i: 0, codes: ['MISS_SUMMARY'], msgs: ['缺少工作概述'], snippet: '张三的正文' },
@@ -44,6 +44,12 @@ describe('buildDetailRows', () => {
     expect(rows[0].snippet).toBe('张三的正文')
     expect(rows[1].issueReason).toBe('售前服务类产品类别不应为「其他」') // codes 兜底(msgs 空)
     expect(rows[1].snippet).toBe('') // ok=1 不带 snippet
+  })
+
+  it('工作成果全文(content)整列还原:所有行(含合规行 ok=0)都带全文、不截断', () => {
+    const rows = buildDetailRows(DATA)
+    expect(rows[0].content).toBe('张三完整的工作成果全文内容，超过一百二十字的部分也应完整展示不截断')
+    expect(rows[2].content).toBe('张三的日常管理工作') // 合规行也有全文,不再仅问题行摘要
   })
 })
 
@@ -76,6 +82,13 @@ describe('列常量 + 导出', () => {
     expect(DEFAULT_VISIBLE.every((k) => keys.has(k))).toBe(true)
     expect(FILTERABLE.has('okText')).toBe(true)
     expect(FILTERABLE.has('date')).toBe(false)
+  })
+  it('工作成果列存在且默认可见;纳入可见列时导出全文(不截断)', () => {
+    expect(ALL_COLUMNS.some((c) => c.key === 'content' && c.label === '工作成果')).toBe(true)
+    expect(DEFAULT_VISIBLE).toContain('content')
+    const rows = buildDetailRows(DATA)
+    const out = buildDetailSheetRows(rows, ALL_COLUMNS.filter((c) => c.key === 'content'))
+    expect(out[0]).toEqual({ 工作成果: '张三完整的工作成果全文内容，超过一百二十字的部分也应完整展示不截断' })
   })
   it('buildDetailSheetRows 按可见列用中文列名作键、不含 snippet', () => {
     const rows = buildDetailRows(DATA)

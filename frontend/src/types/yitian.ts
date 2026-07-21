@@ -53,6 +53,7 @@ export type Wo = string;
 export type Top = boolean;
 export type Ok = number;
 export type Iss = string[];
+export type Ct = string;
 export type Entries = YitianEntry[];
 export type I = number;
 export type Codes = string[];
@@ -128,6 +129,7 @@ export interface YitianEntry {
   top: Top;
   ok: Ok;
   iss: Iss;
+  ct: Ct;
   [k: string]: unknown;
 }
 export interface YitianIssue {

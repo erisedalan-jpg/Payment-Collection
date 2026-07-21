@@ -27,6 +27,7 @@ export interface DetailRow {
   okText: string
   issueReason: string
   snippet: string
+  content: string
 }
 
 const OK_TEXT = ['合规', '提示', '问题'] // 下标 = ok(0/1/2)
@@ -73,7 +74,8 @@ export function buildDetailRows(data: YitianData): DetailRow[] {
       ok: e.ok,
       okText: OK_TEXT[e.ok] ?? '合规',
       issueReason,
-      snippet: e.ok === 2 ? (iss?.snippet ?? '') : '', // 正文摘要仅问题行下发
+      snippet: e.ok === 2 ? (iss?.snippet ?? '') : '', // 问题行 120 字摘要(向后兼容,问题原因 tooltip 用)
+      content: e.ct ?? '',                              // 工作成果全文(V4.1.3 起下发,整列展示)
     }
   })
 }
@@ -138,9 +140,10 @@ export const ALL_COLUMNS: DataColumn[] = [
   { key: 'top', label: 'TOP客户', width: 90, formatter: (v) => (v ? '是' : '') },
   { key: 'okText', label: '合规状态', width: 100 },
   { key: 'issueReason', label: '问题原因', width: 240, wrap: true },
+  { key: 'content', label: '工作成果', width: 360, wrap: true },
 ]
 export const ALL_KEYS: string[] = ALL_COLUMNS.map((c) => c.key)
-export const DEFAULT_VISIBLE: string[] = ['date', 'empName', 'l4', 'type', 'hours', 'customer', 'workOrder', 'okText', 'issueReason']
+export const DEFAULT_VISIBLE: string[] = ['date', 'empName', 'l4', 'type', 'hours', 'customer', 'workOrder', 'okText', 'issueReason', 'content']
 export const FILTERABLE = new Set(['l4', 'l2', 'l3', 'l31', 'category', 'type', 'workType3', 'projectType', 'serviceMode', 'salesL2', 'top', 'okText', 'customer', 'empName'])
 
 /** 导出行:按传入的可见列,用中文列名作键;走 formatter(如 top→是/空);不含 snippet 正文。 */

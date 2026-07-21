@@ -397,6 +397,7 @@ class YitianEntry(_Base):
     top: bool                        # 客户 ∈ TOP1000
     ok: int                          # 0 合规 / 1 合规(提示) / 2 问题
     iss: List[str]                   # 问题码
+    ct: str                          # 工作成果全文（V4.1.3 起下发供明细页整列展示；此前按隐私裁列、仅问题行带 120 字摘要，用户 2026-07-21 授权开放全文）
 
 
 class YitianIssue(_Base):

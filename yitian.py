@@ -210,6 +210,9 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
             "top": bool(r["customer"]) and r["customer"] in top_names,
             "ok": ok,
             "iss": codes,
+            # 工作成果全文（V4.1.3 起随明细页下发，供整列展示）。此前按隐私裁列、仅问题行
+            # 带 120 字摘要(snippet)，用户 2026-07-21 授权开放全文；snippet 保留不动向后兼容。
+            "ct": r["content"],
         })
         if ok != 0:
             issues.append({
