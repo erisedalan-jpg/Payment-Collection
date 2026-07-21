@@ -136,13 +136,15 @@ class TestBuildYitianData:
         assert data["dims"]["types"][e["t"]] == "项目类"
         assert data["issues"] == []
 
-    def test_privacy_no_phone_and_no_content_for_clean_rows(self, tmp_path):
+    def test_privacy_no_phone_but_content_now_downloaded(self, tmp_path):
         base = _make_input(tmp_path, [_ts_row()])
         Y.ingest(base)
         data = Y.build_yitian_data(base)
         blob = repr(data)
-        assert "13500000000" not in blob                        # 电话绝不落盘
-        assert GOOD not in blob                                 # 合规行不下发工作成果正文
+        assert "13500000000" not in blob                        # 电话/隐私列绝不落盘(隐私护栏不变)
+        # V4.1.3 起工作成果全文随明细页下发(用户 2026-07-21 授权);合规行也带 ct 全文
+        assert data["entries"][0]["ct"] == GOOD
+        assert GOOD in blob
 
     def test_issue_row_gets_snippet(self, tmp_path):
         base = _make_input(tmp_path, [_ts_row(工作成果="今天干了点活", 服务方式="")])
@@ -157,9 +159,9 @@ class TestBuildYitianData:
         assert len(iss["codes"]) == len(iss["msgs"])
 
     def test_hint_only_row_gets_no_snippet(self, tmp_path):
-        # I-6(用户裁决:收紧):只有真问题行(ok=2)才下发 120 字摘要;
-        # 合规(提示)行(ok=1,如 HINT_PRESALE_PRODUCT)不下发工作成果正文。
-        content = GOOD + "这是提示行的工作成果全文不应下发"
+        # snippet(120字摘要)仍只有真问题行(ok=2)才下发,提示行(ok=1)snippet 保持空串;
+        # 但 V4.1.3 起工作成果全文改为随 ct 字段整列下发(所有行含提示行),见断言。
+        content = GOOD + "这是提示行的工作成果全文"
         base = _make_input(tmp_path, [_ts_row(
             项目类型="售前服务类", 工作类型三="环境调研", 产研侧产品线="其他",
             工作成果=content,
@@ -171,8 +173,8 @@ class TestBuildYitianData:
         assert e["iss"] == ["HINT_PRESALE_PRODUCT"]
         iss = data["issues"][0]
         assert iss["codes"] == ["HINT_PRESALE_PRODUCT"]
-        assert iss["snippet"] == ""                              # 提示行 snippet 为空串
-        assert content not in repr(data)                          # 提示行正文绝不落盘
+        assert iss["snippet"] == ""                              # 提示行 snippet 仍为空串(摘要逻辑不变)
+        assert data["entries"][0]["ct"] == content               # V4.1.3:提示行工作成果全文改为随 ct 下发
 
     def test_excluded_type_still_gets_entry_but_no_codes(self, tmp_path):
         # 假期类没有必填字段规则 → 判定结果为空码/ok=0,但仍是一条正常 entry;

@@ -308,6 +308,8 @@
 
 ## 进行中
 
+- [x] **/yitian/detail 增「工作成果」全文列（2026-07-21，V4.1.3，Z 级；打破隐私裁列旧设计，用户授权）**：用户要工作成果在明细表整列正常展示(非仅问题行 120 字摘要)。**打破了「工作成果全文绝不下发前端」的旧承重设计**——经用户 2026-07-21 明确授权，且拍板可见范围=L4 内可见(与其他列一致)、随导出。改动:后端 `yitian.py` build entry 加 `ct`=工作成果全文、`schema.YitianEntry` 加 `ct: str`、重生成 yitian.ts;前端 `lib/yitian/detail.ts` DetailRow 加 content、buildDetailRows `content: e.ct`、ALL_COLUMNS 加「工作成果」列(wrap,360宽)、DEFAULT_VISIBLE 加 content(默认显示)。导出走既有「按可见列导出」自动含全文。**snippet(问题行 120 字摘要)保留不动**(向后兼容,问题原因 tooltip 用)。**电话/省市/岗位等隐私列仍不读**(那条隐私没变)。更新旧隐私护栏测试(test_yitian 的 no_content 断言改为 content 现下发,保留 no_phone;test_schema fixture 加 ct) + yitian_store.py 注释。体积:yitian_data.json ~251KB→~1MB 量级。verify.sh 全绿。
+
 - [x] **/insight/costdetail 明细表改固定高度表内滚动（2026-07-21，V4.1.2，Z 级）**：修正 V4.1.1 对 costdetail 的处理方向。用户真实诉求=像 /projects 一样「表内固定高度滚动、一次展示多行」。V4.1.1 去掉 sticky-header 后表格变自然高度铺满页面、需滚整页，不是所需形态；且 DataTable 的表内固定高度滚动仅在 sticky-header 开启时生效。V4.1.2 改为 **`sticky-header` + `:max-height-px="640"`**（约 15 行可见、表内滚动看完整 20 行、表头冻结，与 /projects 一致）——固定值绕过「在长页面底部按位置动态测高触底 200px」的塌缩根因。测试相应改为断言 stickyHeader=true + maxHeightPx=640。
 
 - [x] **/projects 导出按可见列 + /insight/costdetail 表格显示修复（2026-07-21，V4.1.1，Z 级）**：① `/projects` 导出「项目清单」sheet 由写死 8 列改为**按当前可见列导出**（`projectExport` 加可选 `listColumns`，复用列 formatter 保持文本一致、排除操作列、riskReasons 取 category；不传回退旧固定列向后兼容）；`ProjectsView.doExport` 传 `visibleColumns`。② `/insight/costdetail` 明细表**去掉 `sticky-header`**——上方 L4 汇总表本就无 sticky-header 显示正常、唯明细表有，其动态 max-height 在长页面下触底 200px 保底叠加 wrap 长行只露极少行，去掉后 20 个分页行自然全渲染。回归护栏:25 项目→每页 20 行、明细表不带 stickyHeader。**注**:costdetail 未能本地登录眼见验证，若生产仍少行则看「共 X 条」判别是高度问题(已修)还是全局 excludeOn 按标签排除开着(去 /data 关)。verify.sh 全绿。提交 22ed884(导出)/4dadca1(costdetail)。
