@@ -77,20 +77,24 @@ DetailRow = {
   date, empId, empName, l2, l3, l31, l4, category,
   type, hours, workType3, customer, productLine, productName,
   projectType, serviceMode, salesL2, workOrder, top,
-  ok /*0|1|2*/, issueReason /*string*/, snippet /*string, tooltip*/,
-  issueCodes /*string[], 原始问题码, 供 dIssue 下钻*/,
-  issueLabels /*string[], codes→中文标签(ISSUE_LABELS), 供表头筛选显示, 与 compliance issueTypes 同源*/
+  ok /*0|1|2*/, okText /*'合规'|'提示'|'问题', 供显示徽章 + 手动筛选*/,
+  issueReason /*string, msgs 拼接；空则 codes→ISSUE_LABELS 兜底*/, snippet /*string, tooltip*/
 }
 
 buildDetailRows(data: YitianData): DetailRow[]
+  - **处理全量 data.entries**（一行一 entry、带原始下标遍历）——`issues[].i` 是全量 entries 的原始下标，
+    **绝不可先按日期/L4 过滤再还原**（否则下标失配、问题原因串到错的行；同 compliance.ts 顶部注释）。
+    日期/L4/仅异常过滤一律在还原之后（filterDetailRows 内）做。
   - Map(roster.id→item) join 员工/组织各级/序列
   - dims 码表还原各维度（null/undefined → ''）
-  - Map(issue.i→issue) 拼 issueReason（msgs join '；'）、snippet、issueCodes、issueLabels
+  - okText 由 ok 映射：2→'问题' / 1→'提示' / 0→'合规'
+  - Map(issue.i→issue) 拼 issueReason（`msgs.join('；')`；msgs 空则 `codes.map(c=>ISSUE_LABELS[c]??c).join('；')` 兜底，同 compliance `issueText` 逻辑）、snippet
     （ISSUE_LABELS 从 lib/yitian/compliance 复用，标签口径与合规检查页一致）
   - roster 缺失的 empId（理论不会，droppedRows 已在后端剔离域外/离职）→ empName='' 兜底，不崩
 
-filterDetailRows(rows, { start?, end?, onlyIssues? }): DetailRow[]
+filterDetailRows(rows, { start?, end?, l4s?, onlyIssues? }): DetailRow[]
   - 日期闭区间 [start, end]（空=不限）
+  - l4s：L4 粗筛（对应 YitianToolbar 的 view.l4s，空数组=不筛；行 l4 ∈ l4s）
   - onlyIssues=true → 仅 ok !== 0
 
 detailSummary(rows): { count, totalHours, ok, warn, issue }
@@ -105,16 +109,16 @@ buildDetailSheetRows(rows, visibleCols): Record<string, unknown>[]
 ## 5. 列设计
 
 `ALL_KEYS`（全列，供选列菜单）：
-`date, empName, l4, l3, l31, l2, category, type, hours, workType3, customer, productLine, productName, projectType, serviceMode, salesL2, workOrder, top, ok, issueReason`
+`date, empName, l4, l3, l31, l2, category, type, hours, workType3, customer, productLine, productName, projectType, serviceMode, salesL2, workOrder, top, okText, issueReason`
 
 `DEFAULT_VISIBLE`（首次默认显示）：
-`date, empName, l4, type, hours, customer, workOrder, ok, issueReason`
+`date, empName, l4, type, hours, customer, workOrder, okText, issueReason`
 
 默认隐藏（选列可开）：`l2, l3, l31, category, workType3, productLine, productName, projectType, serviceMode, salesL2, top`
 
-- **表头 `ColumnFilter`（`FILTERABLE`，显示筛选 UI 的列）**：`l4, l2, l3, l31, category, type, workType3, projectType, serviceMode, salesL2, top, ok, customer, empName`。参照 `analytics` 页（其 `FILTERABLE` 含 `id/name` 等高基数列，`ColumnFilter` 自带搜索、可承载长列表），`customer/empName` 纳入以支持"手动筛"与"下钻按客户/员工筛"。**不挂**：`date`（区间在顶部）、`hours`（数值）、`workOrder` / `issueReason`（自由文本）。
-  - **隐藏可筛键（供下钻精确过滤，表头不显示 `ColumnFilter` UI）**：`empId`（员工下钻按工号精确、避同名，与 analytics 用 `id` 而非 `name` 同理）、`issueCodes`（问题码下钻，值=原始 code）。`applyColumnFilters` 按行字段名过滤，故 `DetailRow` 带这两字段即生效，无需显示列——与 `compliance` 页 `issueTypes` 作隐藏下钻键完全同一模式。用户经顶部「清除所有筛选」按钮（`cf.clearAll`）一键恢复全量。
-- **合规状态列（ok）**：「淡底+深字」三态徽章——合规=中性(`--sub`/`--mut` 底)、提示=`--warn-bg`+`--warn-text`、问题=`--danger-bg`+`--danger-text`，遵循设计规范三态（禁止实底+小号白字）。
+- **表头 `ColumnFilter`（`FILTERABLE`，显示筛选 UI 的列）**：`l4, l2, l3, l31, category, type, workType3, projectType, serviceMode, salesL2, top, okText, customer, empName`。参照 `analytics` 页（其 `FILTERABLE` 含 `id/name` 等高基数列，`ColumnFilter` 自带搜索、可承载长列表），`customer/empName` 纳入以支持"手动筛"与"下钻按 L4/员工筛"。**不挂**：`date`（区间在顶部）、`hours`（数值）、`workOrder` / `issueReason`（自由文本）。合规状态列挂在 `okText`（值为「合规/提示/问题」，比数字 `ok` 筛选友好）。
+  - **隐藏可筛键（供下钻精确过滤，表头不显示 `ColumnFilter` UI）**：`empId`（员工下钻按工号精确、避同名，与 analytics 用 `id` 而非 `name` 同理）。`applyColumnFilters` 按行字段名过滤，故 `DetailRow` 带 `empId` 即生效、无需显示列——与 `compliance` 页 `issueTypes` 作隐藏下钻键完全同一模式。用户经顶部「清除所有筛选」按钮（`cf.clearAll`）一键恢复全量。
+- **合规状态列（`okText`）**：「淡底+深字」三态徽章，`cell-okText` slot 按 `row.ok` 数字选 tone——合规(ok=0)=中性(`--sub`/`--mut` 底)、提示(ok=1)=`--warn-bg`+`--warn-text`、问题(ok=2)=`--danger-bg`+`--danger-text`，遵循设计规范三态（禁止实底+小号白字）。
 - **工时数（hours）**：右对齐 + `.u-num`（tabular-nums）。
 - **问题原因（issueReason）**：`wrap` 或 tooltip 截断；单元格 tooltip 显示 `snippet`（若有）。
 - **日期列**默认排序倒序（`usePersistentSort` 默认 `{ prop: 'date', order: 'descending' }`）。
@@ -125,13 +129,20 @@ buildDetailSheetRows(rows, visibleCols): Record<string, unknown>[]
 
 自上而下：
 
+0. **YitianToolbar（复用倚天域统一工具条）**：日期区间（daterange）+ 周模式 + L4 多选 + 数据跨度提示，绑 `yitianView` store 的 `view.start/end/l4s`。与其他倚天页完全一致——**日期区间与 L4 粗筛不自建**，由本组件承载（`view.start/end` 供 filterDetailRows 的日期、`view.l4s` 供 l4s）。
 1. **汇总条**：总条数 / 总工时 / 合规·提示·问题三态计数——取自 `detailSummary(filtered)`，随筛选实时更新（数字挂 `.u-num`）。
-2. **日期区间选择**：`el-date-picker` range，默认空=全时口径（回归安全网：全时=不限）。
-3. **「仅看异常」开关**：`el-switch`，开=`onlyIssues`（`ok !== 0`），一键聚焦提示+问题行。
+2. **「仅看异常」开关**：`el-switch`，开=`onlyIssues`（`ok !== 0`），一键聚焦提示+问题行。
 4. **导出按钮**：见 §7。
-5. **「清除所有筛选」按钮**：`v-if="cf.hasFilters(TABLE_ID)"` 时显示，点击 `cf.clearAll(TABLE_ID)`（复用 analytics/compliance 模式）。这是下钻落地（§16）后恢复全量的统一出口，也覆盖 `empId/issueCodes` 等隐藏可筛键。
+5. **「清除所有筛选」按钮**：`v-if="cf.hasFilters(TABLE_ID)"` 时显示，点击 `cf.clearAll(TABLE_ID)`（复用 analytics/compliance 模式）。这是下钻落地（§16）后恢复全量的统一出口，也覆盖 `empId` 隐藏可筛键。
 
-顶部筛选（日期 + 仅异常）与表头 `ColumnFilter` 叠加：`filtered = filterDetailRows(applyColumnFilters(rows, cf.tableFilters(TABLE_ID)), {start, end, onlyIssues})`。
+数据流（还原→粗筛→细筛）：
+```
+rows     = buildDetailRows(data)                                          // 全量还原，issues.i 对齐
+scoped   = filterDetailRows(rows, { start: view.start, end: view.end,     // 日期+L4+仅异常
+                                    l4s: view.l4s, onlyIssues })
+filtered = applyColumnFilters(scoped, cf.tableFilters(TABLE_ID))          // 表头 ColumnFilter 细筛
+summary  = detailSummary(filtered)
+```
 
 ## 7. 导出
 
@@ -162,8 +173,9 @@ buildDetailSheetRows(rows, visibleCols): Record<string, unknown>[]
 - `router/index.ts`：在 `/yitian` 与 `/yitian/compliance` 之间插
   `{ path: '/yitian/detail', name: 'yitian-detail', component: YitianDetailView, meta: { title: '工时明细', hideFilter: true, pageKey: 'yitian-detail' } }`
   （精确路径，勿引入 `/yitian/:param` 通配以免遮蔽）。
-- `nav.ts`：倚天分组在 `{ label:'倚天工时总览' }` 与 `{ label:'工时合规检查' }` 之间插
+- `nav.ts`：倚天分组（`YITIAN_LINKS`）在 `{ label:'倚天工时总览' }` 与 `{ label:'工时合规检查' }` 之间插
   `{ label: '工时明细', to: '/yitian/detail', key: 'yitian-detail' }`。
+- `lib/pageAccess.ts`：`PageKey` 联合类型加 `'yitian-detail'`（否则 router `meta.pageKey` typecheck 报错 + 权限门禁不认新页；`PAGE_OPTIONS` 从 nav 自动派生，无需另改）。这是 V3.0.0"漏改页面注册"类坑，必须同步。
 
 ## 12. 测试计划
 
@@ -172,11 +184,11 @@ buildDetailSheetRows(rows, visibleCols): Record<string, unknown>[]
   - `filterDetailRows`：日期区间闭边界、空区间=全量、`onlyIssues` 只留 ok≠0
   - `detailSummary`：count/totalHours/三态计数
   - `buildDetailSheetRows`：按可见列构建、不含 snippet
-  - `buildDetailRows` 补：`issueCodes`/`issueLabels` 还原正确（labels 用 ISSUE_LABELS、与 compliance 同源）
+  - `buildDetailRows` 补：`issueReason`（msgs 拼接 + codes→ISSUE_LABELS 兜底）、`okText` 三态映射正确
 - `lib/yitian/detailDrill.test.ts`（纯函数）：`buildDetailDrill` 空字段不输出、`parseDetailDrill` 往返一致 / 数组取首项 / 未知键忽略 / `dOnly='1'` 解为真
 - `views/YitianDetailView.test.ts`：路由解析到本组件（非 PageStub）、渲染行数、切「仅看异常」行数变化、选列显隐、汇总随筛选更新；**下钻落地**：带 `?dL4=..&dOnly=1` 挂载后，cf 对应列被设 + `onlyIssues` 为真 + 下钻键被 `router.replace` 清除
 - `router/index.test.ts`：加 `/yitian/detail` 解析到 `YitianDetailView`（`__name` 断言）+ 纳入可解析路径清单
-- **各入口 view 测试**（在既有 `Yitian*View.test.ts` 补）：点表格「明细」列 → `router.push` 的 path=`/yitian/detail`、query 维度键正确（overview→dL4 / analytics→dEmp / compliance→dEmp+dOnly / customer→dCustomer）；并断言现有 `@row-click`/图表下钻去向未变（回归护栏）
+- **各入口 view 测试**（在既有 `Yitian*View.test.ts` 补）：点表格「明细」列 → `router.push` 的 path=`/yitian/detail`、query 维度键正确（overview→dL4 / analytics→dEmp / compliance→dEmp+dOnly / customer→dL4）；并断言现有 `@row-click`/图表下钻去向未变（回归护栏）
 - `verify.sh` 全绿（typecheck + vitest + build + pytest）+ 手动启动冒烟（`python server.py` + `npm run dev`，核对明细行数 ≈ meta.rows、合规三态计数与合规检查页一致）
 
 ## 13. 版本
@@ -215,16 +227,14 @@ buildDetailSheetRows(rows, visibleCols): Record<string, unknown>[]
 |---|---|---|
 | `dL4` | 组织 L4 | `cf` 筛 `l4` 列 |
 | `dEmp` | 员工工号（精确，避同名） | `cf` 筛 `empId` 隐藏键 |
-| `dCustomer` | 客户 | `cf` 筛 `customer` 列 |
-| `dIssue` | 问题码（原始 code） | `cf` 筛 `issueCodes` 隐藏键 |
-| `dStart` / `dEnd` | 周期区间（入口依赖 trend 方案 B / 未来周期下钻；trend 走方案 A 时无 view 入口，但仍解析并落地顶部区间，供分享 URL 复用——有意预留，非漏接线） | 顶部日期区间 |
+| `dStart` / `dEnd` | 周期区间（入口依赖 trend 方案 B / 未来周期下钻；trend 走方案 A 时无 view 入口，但仍解析并落地顶部区间，供分享 URL 复用——有意预留，非漏接线） | 顶部日期区间（view.start/end） |
 | `dOnly` | `'1'` = 仅看异常 | `onlyIssues` 开关置真 |
 
-> **不设 `dType`（工时类型）等无入口维度键**：当前四个入口只用到 `dL4/dEmp/dCustomer/dIssue/dOnly`。避免定义生产零调用方的死键（V4.0.5 教训）。`type` 列仍是明细页显示的可筛列，用户可手动筛，只是暂无统计页下钻入口设置它——日后确有工时类型下钻入口时再加对应键。
+> **不设 `dCustomer`/`dIssue`/`dType` 等无入口维度键**：核实四个入口页的表格维度后，真正有干净入口的只有 `dL4`（overview 组织表 + customer 的 TOP1000 表**均为 L4 维度**）、`dEmp`（analytics 员工表 + compliance 问题表）、`dOnly`（compliance）。customer 主表按 L4 聚合（无单客户行）、compliance 问题码图的 `datapoint-click` 已被页内 drillTable 占用（单击多义不宜再接），故 `dCustomer`/`dIssue` 无干净入口；连同 `dType` 一并不设，避免定义生产零调用方的死键（V4.0.5 教训）。这些维度日后确有入口再加。
 
 - `buildDetailDrill(d): Record<string,string>` — 空字段不输出（同 `buildDrillQuery`）
 - `parseDetailDrill(q): DetailDrill` — 数组取首项、未知键忽略（`firstStr` 同思路）
-- 多维度可叠加（如 `dL4 + dIssue + dOnly`）
+- 多维度可叠加（如 `dEmp + dOnly`）
 
 ### 16.2 明细页落地（`YitianDetailView` 的 `applyDrillLanding`）
 
@@ -238,7 +248,7 @@ applyDrillLanding():
   q = route.query; 若无键 → 置 drillApplied 返回
   d = parseDetailDrill(q)
   若有任一 cf 维度 → cf.clearAll(TABLE_ID) 再逐个 setColumnFilter：
-    dL4→'l4' / dEmp→'empId' / dCustomer→'customer' / dIssue→'issueCodes'
+    dL4→'l4' / dEmp→'empId'（隐藏键，避同名）
     （total 传 cfUniqueValues(rows, col).length；rows 已由 ready 门控保证就绪）
   dStart&dEnd → 顶部日期区间 state
   dOnly==='1' → onlyIssues=true
@@ -254,7 +264,7 @@ applyDrillLanding():
 | 总览 overview | 组织表行「明细」 | `dL4` = 组织名 |
 | 统计分析 analytics | 员工表行「明细」 | `dEmp` = 工号（行带 `id`） |
 | 合规检查 compliance | 问题表行「明细」 | `dEmp` = 该行工号 + `dOnly=1`（需 `issueRows` 暴露 `empId`；退化可 `dL4`+`dOnly`） |
-| 客户支持 customer | 客户表行「明细」 | `dCustomer` = 客户名 |
+| 客户支持 customer | TOP1000 大客户支持表行「明细」 | `dL4` = 该行 L4 组织（该表按 L4 聚合） |
 
 各页图表 `datapoint-click`、行 `@row-click` 的现有去向**全部保留不动**；「明细」列是独立触发点。
 
