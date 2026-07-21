@@ -1021,9 +1021,61 @@ def send_bot_message(cfg, token, staff_ids, msg_data):
 同时把 `dispatch` docstring 里「单线程 HTTPServer」改为「串行发送以控速」——
 该服务早已是 `ThreadingHTTPServer`（见 Task 9）。
 
-**注意：** `build_plan` 产出的 `recipients` 项须带 `routeKey` 与 `projectIds`。
-若现有 `build_plan` 未产出这两个键，在本任务中补上（`projectIds` 取该收件人卡片涉及的项目号列表，
-`routeKey` 取该行来源路由的 key），并补一条断言其存在的测试。
+- [ ] **Step 3b: 让 `build_plan` 产出 `routeKey` 与 `projectIds`**
+
+控制者已核实：现有 `recipients` 项**只有** `employId` / `name` / `role` / `card` 四个键，
+两个新键**必须在本任务补上**，否则 Task 6 的归因候选拿不到项目。
+
+坑在这里：`build_plan` 现在把项目**名称**存进桶
+（`bucket.setdefault(r, []).append(str(pm.get("projectName") or pid))`），
+**项目号在聚合过程中被丢掉了**。而归入需要的是 `projectId`（要写进跟进域的 key）。
+所以要**另开一个只存项目号的桶**，不要动现有的名称桶（卡片文案依赖它，改了会连带改卡片内容）。
+
+具体改法：
+
+1. 在 `proj_by_emp` 旁边加 `proj_ids_by_emp: Dict[str, List[str]] = {}`
+2. 项目分桶处（`bucket.setdefault(r, []).append(...)` 那行所在的 for 循环内）追加：
+
+```python
+            ids = proj_ids_by_emp.setdefault(emp, [])
+            if pid and pid not in ids:
+                ids.append(pid)
+```
+
+3. 四处 `recipients.append({...})` 各补两个键：
+   - 工时 primary：`"routeKey": "timesheet", "projectIds": []`
+   - 项目 primary：`"routeKey": "project", "projectIds": list(proj_ids_by_emp.get(emp) or [])`
+   - 工时 supervisor：`"routeKey": "timesheet", "projectIds": []`
+   - 项目 supervisor：`"routeKey": "project", "projectIds": <该 sup 名下所有 owner 的项目号并集>`
+     （由 `agg[sup]` 的 owner 键去 `proj_ids_by_emp` 取并集，按首次出现顺序去重）
+
+工时侧 `projectIds` 恒为空列表：工时问题是人维度的，没有项目。**不要为了"看起来对称"而编造值。**
+
+补一条测试：
+
+```python
+def test_build_plan_recipients_carry_route_and_project_ids():
+    """归因候选依赖这两个键;缺了 Task 6 的候选下拉会恒为空。"""
+    plan = _build_minimal_project_plan()      # 沿用该文件既有的构造辅助
+    proj = [r for r in plan["recipients"] if r["routeKey"] == "project"]
+    assert proj, "应有项目侧收件人"
+    assert all(isinstance(r["projectIds"], list) for r in proj)
+    assert any(r["projectIds"] for r in proj), "项目侧收件人必须带到项目号"
+
+
+def test_build_plan_timesheet_recipients_have_empty_project_ids():
+    """工时问题是人维度的,没有项目 —— 不得编造。"""
+    plan = _build_minimal_timesheet_plan()    # 沿用该文件既有的构造辅助
+    ts = [r for r in plan["recipients"] if r["routeKey"] == "timesheet"]
+    assert ts, "应有工时侧收件人"
+    assert all(r["projectIds"] == [] for r in ts)
+```
+
+`_build_minimal_project_plan` / `_build_minimal_timesheet_plan` 按 `tests/test_lanxin.py`
+**既有的** plan 构造写法实现（该文件已有大量 `build_plan` 用例，直接复用其 fixture 构造方式）。
+
+**卡片内容必须零变化**：本步只加键，不得改任何 `build_*_card` 的入参。
+若既有卡片相关用例出现 diff，说明改错了。
 
 - [ ] **Step 4: 改 `lanxin_recipients.py` 加引导语**
 
@@ -1770,38 +1822,31 @@ def _lanxin_append_reply(existing, name, received_at, text):
         progress 域【不走 followup_store】,其 store 逻辑内联在本文件,
         故必须单开分支,不可假定四域同构。
         """
-        def _append(rec_getter):
-            def _mutate(store):
-                old = (rec_getter(store) or {}).get(field, '')
-                return _lanxin_append_reply(old, name, received_at, text)
-            return _mutate
+        def _appended(container):
+            """从容器(store 或 temp 的 instance)取现有内容并追加。"""
+            old = (container.get('current', {}).get(project_id) or {}).get(field, '')
+            return _lanxin_append_reply(old, name, received_at, text)
 
         if domain == 'risk':
             def _m(store):
-                old = (store.get('current', {}).get(project_id) or {}).get(field, '')
-                return risk_followup.apply_update(
-                    store, project_id, field,
-                    _lanxin_append_reply(old, name, received_at, text), account, now)
+                return _riskfu.apply_update(store, project_id, field,
+                                            _appended(store), account, now)
             return self._followup_txn(_risk_lock, _load_risk_followup, _m, _save_risk_followup)
 
         if domain == 'payment_key':
             def _m(store):
-                old = (store.get('current', {}).get(project_id) or {}).get(field, '')
-                return payment_key_followup.apply_update(
-                    store, project_id, field,
-                    _lanxin_append_reply(old, name, received_at, text), account, now)
-            return self._followup_txn(_payment_key_lock, _load_payment_key_followup,
-                                      _m, _save_payment_key_followup)
+                return _paykey.apply_update(store, project_id, field,
+                                            _appended(store), account, now)
+            return self._followup_txn(_paykey_lock, _load_paykey_followup,
+                                      _m, _save_paykey_followup)
 
         if domain == 'temp':
             def _m(store):
-                inst = temp_followup.find_instance(store, instance_id)
+                inst = _temp.find_instance(store, instance_id)
                 if inst is None:
                     raise ValueError("临时跟进实例不存在,请重新选择")
-                old = (inst.get('current', {}).get(project_id) or {}).get(field, '')
-                return temp_followup.apply_update(
-                    inst, project_id, field,
-                    _lanxin_append_reply(old, name, received_at, text), account, now)
+                return _temp.apply_update(inst, project_id, field,
+                                          _appended(inst), account, now)
             return self._followup_txn(_temp_lock, _load_temp_followup, _m, _save_temp_followup)
 
         # progress
@@ -1813,11 +1858,20 @@ def _lanxin_append_reply(existing, name, received_at, text):
         return self._followup_txn(_progress_lock, _load_progress, _m, _save_progress)
 ```
 
-**实现者注意：** 上面的 `_risk_lock` / `_load_risk_followup` / `_save_risk_followup`
-等名称需按 `server.py` 中的**实际名称**核对后使用（各域的锁与读写函数已存在，
-在 `/api/risk-followup/*`、`/api/payment-key-followup/*`、`/api/temp-followup/*`、
-`/api/progress/*` 的 handler 里可以找到）。`temp_followup.find_instance` 若不存在，
-按 `temp_followup.py` 的实际实例查找方式调整。**不要新增或修改 `followup_store.py`。**
+**以上名称已由控制者逐一核实存在，可直接使用**（模块别名 `_riskfu` / `_paykey` / `_temp`
+在 `server.py:36-40` 已 import；`_temp.find_instance` 在 `temp_followup.py:64`）：
+
+| 域 | 锁 | 读 | 写 |
+|---|---|---|---|
+| risk | `_risk_lock` (`server.py:602`) | `_load_risk_followup` (605) | `_save_risk_followup` (622) |
+| payment_key | `_paykey_lock` (633) | `_load_paykey_followup` (636) | `_save_paykey_followup` (653) |
+| temp | `_temp_lock` (514) | `_load_temp_followup` (517) | `_save_temp_followup` (564) |
+| progress | `_progress_lock` (461) | `_load_progress` (464) | `_save_progress` (480) |
+
+注：`_save_paykey_followup` 内部自己 `with _paykey_lock`，而 `_followup_txn` 外层也持同一把锁 ——
+四把锁**都是 `RLock`**，可重入，与既有 handler 的用法一致，不会死锁。
+
+**不要新增或修改 `followup_store.py`。**
 
 - [ ] **Step 7: `audit.py` 登记动作**
 
