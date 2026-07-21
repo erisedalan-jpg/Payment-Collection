@@ -6,9 +6,9 @@
 
 ## 1. 这是什么
 
-一个**单机/内网离线**运行的**项目管理平台**：从最初的回款（收款）跟踪看板，已扩展为覆盖 **项目主域 / 回款 / 商机 / 概算工具 / 倚天工时 / 首页门户** 的多域平台。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**（旧原生 JS 前端 app.js/index.html/analysis_data.js 已退役删除）。数据分**三条脉络**（数据血缘详见 §2）：① **主域管线** PMIS 导出 + CSV → `preprocess_data.py` → `data/analysis_data.json`（前端主业务数据源）；② **倚天工时管线** `input/yitian/工时.xlsx` → 累积库 `data/yitian_store.json` → `data/yitian_data.json`（独立数据源，脉络②在「更新数据」里与主域一并跑，只是产出独立文件）；③ **配置/存档/跟进/门户类** 不进管线，经 `server.py` 的 `/api/*` 直接读写 `data/*.json`，改完即时生效。主域/倚天数据经页面上传或本地放置进入 `input/`（PMIS 9 表放 `input/pmis/`，收款阶段/回款流水/预算等 CSV 放 `input/`，倚天工时放 `input/yitian/`），`组织架构.xlsx` 决定项目/员工花名册，`A.xlsx` 售前↔原项目映射；点「更新数据」（`/api/reprocess`，SSE）生效。可用 PyInstaller 打包成单 exe 分发。
+一个**单机/内网离线**运行的**项目管理平台**：从最初的回款（收款）跟踪看板，已扩展为覆盖 **项目主域 / 回款 / 商机 / 概算工具 / 倚天工时 / 首页门户** 的多域平台。后端是纯 Python 标准库的本地 HTTP 服务（`server.py`），前端是 `frontend/` 下的 **Vue3 + Vite + TS + Pinia + Element Plus + ECharts**（旧原生 JS 前端 app.js/index.html/analysis_data.js 已退役删除）。数据分**三条脉络**（数据血缘详见 §2）：① **主域管线** PMIS 导出 + CSV → `preprocess_data.py` → `data/analysis_data.json`（前端主业务数据源）；② **倚天工时管线** `input/yitian/工时.xlsx` → 累积库 `data/yitian_store.json` → `data/yitian_data.json`（独立数据源，脉络②在「更新数据」里与主域一并跑，只是产出独立文件）；③ **配置/存档/跟进/门户/蓝信类** 不进管线，经 `server.py` 的 `/api/*` 直接读写 `data/*.json`，改完即时生效（含 **蓝信双向闭环**：出站推送异常项目/工时提醒 + 入站回调接收员工回复进收件箱、超管归入各跟进域，见 §4 蓝信约定）。主域/倚天数据经页面上传或本地放置进入 `input/`（PMIS 9 表放 `input/pmis/`，收款阶段/回款流水/预算等 CSV 放 `input/`，倚天工时放 `input/yitian/`），`组织架构.xlsx` 决定项目/员工花名册，`A.xlsx` 售前↔原项目映射；点「更新数据」（`/api/reprocess`，SSE）生效。可用 PyInstaller 打包成单 exe 分发。
 
-- 当前版本：见 `frontend/src/version.ts`（本文刷新时 **V3.2.1**；单一来源，改版本只改此处，本文件不逐版同步）；版本史/各期结论见 `PROGRESS.md`
+- 当前版本：见 `frontend/src/version.ts`（本文刷新时 **V4.0.5**；单一来源，改版本只改此处，本文件不逐版同步）；版本史/各期结论见 `PROGRESS.md`
 - 产品名称：**项目管理平台**（2026-06-12 起；桌面快捷方式/.vbs/.bat/exe 文件名仍为旧名「项目回款跟踪与管控平台」，随下次打包专项更名）
 - 访问地址：`http://localhost:8080`
 - 交流语言：**简体中文**
@@ -32,7 +32,8 @@
 脉络③ 配置/存档/跟进/门户 —— 不进管线; 经 server.py 的 /api/* 直接读写 data/*.json, 改完即时生效
   budget_config/budget_estimates(概算) · portal_links + portal_files/(门户) · opportunities(商机)
   followup_records + {risk,temp,payment_key,opportunity}_followup + project_progress(各域跟进)
-  project_tags(标签) · accounts(账号) · audit_log.jsonl(审计) · yitian_settings(倚天合规范围, 超管可配)
+  project_tags(标签) · accounts(账号) · audit_log.jsonl(审计) · yitian_settings/yitian_rules(倚天合规范围+规则, 超管可配)
+  lanxin_config(蓝信凭证+路由,含回调双密钥) · lanxin_inbox(蓝信双向:发送台账+收件箱+去重) · lanxin_callback_raw.jsonl(回调存证,只增+滚动归档)
 
   三脉络产物统一下发:
   server.py(本地HTTP: 静态 dist + /data/*.json + /api/*)  ──fetch/请求──>
@@ -41,12 +42,13 @@
 
 | 文件/目录 | 职责 |
 |---|---|
-| `server.py` | 本地 HTTP：静态 dist + `/data/*.json` + `/api/*`。含 `/api/reprocess`(更新数据,SSE) / `/api/inputs/upload` / `/api/pmis/upload` / `/api/files/status` / `/api/clear-data` / 各域跟进 `/api/{followup,risk-followup,temp-followup,payment-key-followup,opportunity-followup,progress}/*` / `/api/opportunities/*` / `/api/tags` / `/api/budget/*` / `/api/portal/*` / `/api/yitian/{data,store,settings,cookie}` / `/api/admin/*`(超管账号+审计) / `/api/login`·`/api/auth/me` / `/api/manual/*` / 历史回滚 / `/api/stop`。**打包(frozen)/开发两套代码路径见 §5** |
+| `server.py` | 本地 HTTP：静态 dist + `/data/*.json` + `/api/*`。含 `/api/reprocess`(更新数据,SSE) / `/api/inputs/upload` / `/api/pmis/upload` / `/api/files/status` / `/api/clear-data` / 各域跟进 `/api/{followup,risk-followup,temp-followup,payment-key-followup,opportunity-followup,progress}/*` / `/api/opportunities/*` / `/api/tags` / `/api/budget/*` / `/api/portal/*` / `/api/yitian/{data,store,settings,rules,cookie}` / `/api/lanxin/{config,selftest,preview,send,inbox,inbox/handle,inbox/delete}`(超管) + `/api/lanxin/callback`(**免登录**入站,验签边界见 §4) / `/api/admin/*`(超管账号+审计) / `/api/login`·`/api/auth/me` / `/api/manual/*` / 历史回滚 / `/api/stop`。**打包(frozen)/开发两套代码路径见 §5** |
 | `preprocess_data.py` | **主域核心管线**：摄取各源→项目主域/回款/健康/治理指标→`data/analysis_data.json`（经 schema 校验）；末段 9f 系统核心口径回款回填；**末段并调 `yitian.ingest/build_yitian_data` 产出 `data/yitian_data.json`**（脉络②，缺倚天源不阻断主管线） |
 | `pmis.py` / `projects.py` / `collection_stages.py` / `milestones.py` / `profit.py` | 主域各域解析：PMIS 项目域 / 主域 join / 收款阶段节点 / 里程碑 / 预算流水 |
 | `yitian.py` + `yitian_calendar/check/rules/store/settings/config.py` | **倚天工时域**：`yitian.py` 管线组装(ingest 当周工时→累积库、build→`yitian_data.json`)；`calendar` 工作日/双周(年度无关,不写死年份)；`rules` 合规规则常量 + `check` 判定(纯函数)；`store` 累积库(按工时ID去重,服务端私有)；`settings` 合规检查范围(超管可配)；`config` cookie |
 | `opportunities.py` / `opportunity_followup.py` / `risk_followup.py` / `temp_followup.py` / `payment_key_followup.py` / `followup_store.py` | 商机进展(线上可编辑表格) + 各域跟进(薄封装统一 `followup_store`：分组/单表 scope、归档留存或清空) |
 | `portal.py` | 首页门户/快捷入口(Launchpad)：配置校验 + 可见性过滤 + 文件名消毒 + 下载头 |
+| `lanxin.py` + `lanxin_config/recipients/crypto/callback/inbox.py` | **蓝信双向域**（脉络③,不进管线）：`lanxin.py` 客户端(urllib,`get_app_token`/`id_mapping`/`send_message`·`send_bot_message` 应用号‖机器人双身份/`build_plan`·`dispatch` 编排,产 sentLog 发送台账)；`config` 凭证+逐项路由(超管可配,含回调双密钥,`public_config` 三密钥脱敏)；`recipients` 卡片拼装(appCard 双重字节/字符截断 + 回复引导语)；`crypto` **零依赖 AES-256-CBC 解密 + SHA1 验签**(官方向量回归)；`callback` 回调报文解析(两套键名兼容,看不懂落「未解析」不丢)；`inbox` 收件箱+台账存储(身份反查/归因候选/去重/滚动清理,纯数据无 IO)。**凭证未申请,全链路从未联调** |
 | `budget_config.py` / `budget_store.py` | 概算工具：费率与目录配置(超管可配,`budget_config.json`) / 报价存档(按账号隔离 + 费率快照,`budget_estimates.json`) |
 | `auth.py` / `audit.py` / `data_scope.py` | 账号鉴权(PBKDF2+会话) / 操作审计(绝不记密码token) / 按 allowedL4 切 `analysis_data`(L4 数据隔离,SP-4) |
 | `schema.py` | pydantic 数据契约(主域 + 倚天两套) + 导出 JSON Schema 供前端 `npm run gen:types` |
@@ -54,7 +56,7 @@
 | `data_history.py` / `manual_history.py` / `manual_import.py` | 数据历史快照回滚 / 人工数据备份与导入 |
 | `config.py` / `pmis_config.py` | 集中配置常量(消除硬编码) / PMIS 下载 cookie 读写 |
 | `frontend/` | Vue3 前端：`router/`(路由) `views/`(页面) `components/` `lib/`(纯计算口径,含 `lib/yitian`·`lib/budget`) `stores/`(Pinia) `charts/` `styles/theme.css`(设计令牌单一落地) |
-| `data/*.json` | 管线产物 `analysis_data`·`yitian_data`；配置/存档/跟进类 `budget_config`·`budget_estimates`·`portal_links`·`opportunities`·`followup_records`·`*_followup`·`project_progress`·`project_tags`·`yitian_settings`·`yitian_store`(私有)·`accounts`·`events` 等（部分含敏感数据,已 gitignore） |
+| `data/*.json` | 管线产物 `analysis_data`·`yitian_data`；配置/存档/跟进类 `budget_config`·`budget_estimates`·`portal_links`·`opportunities`·`followup_records`·`*_followup`·`project_progress`·`project_tags`·`yitian_settings`·`yitian_rules`·`yitian_store`(私有)·`accounts`·`events`·`lanxin_config`(含 AppSecret+回调双密钥)·`lanxin_inbox`(存员工回复正文)·`lanxin_callback_raw.jsonl`(回调存证) 等（部分含敏感数据/密钥,**已 gitignore**） |
 | `input/` | 数据源输入：`input/pmis/`(PMIS 9 表 xlsx)、`input/`(收款阶段/回款流水/预算 CSV + 组织架构/A/TOP1000 xlsx)、`input/yitian/`(工时.xlsx)；经页面上传或本地放置，点「更新数据」生效 |
 | `停止服务.py/.bat/.command`、`*_启动.bat/.command` | 启停脚本（Windows / macOS） |
 
@@ -97,6 +99,14 @@ python server.py --stop     # 停止运行中的服务
 - **物料单价与毛利率解耦**：单价只有一套，毛利率只作为 `(1 + margin)` 的乘数（原工具选 6% 时会静默回退用 13% 的单价表）。
 - **费率快照**：每条存档冻结当时的完整费率配置；打开旧档用它自己的快照算 —— **报价是要拿去 CRM 上单的对外产物，必须可复现**。改费率不会改写历史报价。
 - 费率/系数/阈值/产品目录/服务目录/物料/PM阶段模板**全部超管可配**（`data/budget_config.json`，`/budget` 页内抽屉），改完立即生效、**无需点「更新数据」**（本域不进数据管线）。
+
+### 蓝信双向约定（2026-07-20 起，V4.0.5；改任一处先读本节，四条承重设计违一即缺陷）
+- **绝不记密钥**：`appSecret` / `callbackAesKey` / `callbackSignToken` / `app_token` 绝不进日志、审计、异常消息、前端下发；读取接口一律脱敏（`public_config` 三密钥抹空只透 `has*` 布尔）。`data/lanxin_config.json` **必须 gitignore**。
+- **后端不接受前端传来的标识**：只认 `projectId` / `employId` / `riskCode`；`staffId` 由服务端发送台账反查得出，`riskKey` 由后端拼（risk 归入是四域唯一复合键 `${projectId}::${风险编码}`，前端传 riskCode）。
+- **① 验签必须先于存证**：`/api/lanxin/callback` 是全站唯一免登录写入口，安全边界是 SHA1 验签而非会话；先无条件落盘则同网段任何人可灌满磁盘。验签未过只记数（`_lanxin_rejected`，含 `lastReason` 区分 signature/stale）、绝不落 body。新鲜度检查插在验签之后、存证之前。
+- **② 解析失败仍返回 `errCode 0`**：存证一旦落盘，重推毫无意义（内容一样会再失败三次，白烧蓝信 3 次重试额度）——「成功」定义为「我已持久化」而非「我已理解」；唯一返回非 0 的分支是**存证落盘失败**。看不懂的报文落 `status:"unparsed"` 进收件箱，**不静默丢弃**。
+- **③ 归入必须追加、④ 必须全量转义**：`followup_store.apply_update` 是 `rec[field]=content` 直接赋值，原样调用会抹掉既有跟进——归入须读现有内容再拼接（`server.py` 内做，**不改 `followup_store.py`**）；回复是员工任意输入而跟进字段是富文本，必须 `html.escape` 后**换行只用 `<br>`**（`<p>` 不在 `lib/richText.ts` 白名单会被读端拆解）。progress 域不走 `followup_store`（store 逻辑内联 server.py），归入单开分支。
+- **文档不可靠、凭证未联调**：蓝信文档字段表与真实密文键名对不上（`eventType/appId` vs `type/app_id`），解析两套键名都认；回调 `timestamp` 单位/格式文档未记载，代码按 epoch 秒解读是**未证实假设**（`lastReason=stale` 且收件箱空即疑此）。全链路从未联调，改动靠 `lanxin_crypto` 官方向量回归 + 伪造报文单测兜底。**债 L-31：nonce 重放缓存未做，依赖时间戳窗口+存证轮转两道叠加，摘窗口会无声重开此债**。
 
 ## 设计底层规范（展示形式）
 
