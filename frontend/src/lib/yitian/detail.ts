@@ -148,7 +148,7 @@ export function buildDetailSheetRows(rows: DetailRow[], cols: DataColumn[]): Rec
   return rows.map((r) => {
     const o: Record<string, unknown> = {}
     for (const c of cols) {
-      const raw = (r as Record<string, unknown>)[c.key]
+      const raw = (r as unknown as Record<string, unknown>)[c.key]
       o[c.label] = c.formatter ? c.formatter(raw, r as Record<string, any>) : raw
     }
     return o
