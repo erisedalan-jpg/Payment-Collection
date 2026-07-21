@@ -120,3 +120,9 @@ lts/*.zip
 # 蓝信推送配置(含 AppSecret,绝不入库)
 data/lanxin_config.json
 data/lanxin_config.json.tmp
+# 蓝信收件箱(含员工真实回复正文)与回调原始报文存证,均为运行数据,绝不入库
+data/lanxin_inbox.json
+data/lanxin_inbox.json.tmp
+data/lanxin_callback_raw.jsonl
+# 存证滚动归档(I-2):内容与上面的活动文件同性质,同样绝不入库
+data/lanxin_raw_archive/

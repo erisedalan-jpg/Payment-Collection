@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
-import { getLanxinConfig, saveLanxinConfig, lanxinSelftest,
+import { getLanxinConfigFull, saveLanxinConfig, lanxinSelftest,
          type LanxinConfig } from '@/lib/lanxinApi'
 
 const emit = defineEmits<{ (e: 'open-push'): void }>()
@@ -10,8 +10,27 @@ const emit = defineEmits<{ (e: 'open-push'): void }>()
 const cfg = ref<LanxinConfig | null>(null)
 const busy = ref(false)
 const newSecret = ref('')
+const newCallbackAesKey = ref('')
+const newCallbackSignToken = ref('')
+// 验签被拒次数——回调端点免登录，验签失败时只记数不落报文体(见 lanxin_callback 设计)。
+// 这是超管判断「回调签名令牌是否填对」的唯一线索。数据源是 GET /api/lanxin/config 的
+// 顶层 rejected 字段(Task 6 提供);该任务落地前接口不含此字段,load() 里按 0 兜底。
+// lastReason(Important-2)区分最近一次是验签失败还是时间戳新鲜度失败——两者共用
+// 同一个 count，不分原因超管只看到计数在涨，会去查 signToken/aesKey/nginx，
+// 而真正的原因可能是时间戳格式或两端时钟对不上。
+const rejected = ref<{ count: number; lastAt: string; lastReason?: string }>(
+  { count: 0, lastAt: '', lastReason: '' })
 const selftestEmp = ref('')
 const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
+
+// 系统不知道自己的对外地址；但超管是从浏览器打开这个页面的，他看到的 origin
+// 就是蓝信要访问的地址(同一张内网)，故直接用 location.origin 拼。
+const callbackUrl = computed(() => `${location.origin}/api/lanxin/callback`)
+
+async function copyCallbackUrl() {
+  await navigator.clipboard.writeText(callbackUrl.value)
+  ElMessage.success('回调地址已复制')
+}
 
 /** code → 展示名。工时码查 ISSUE_LABELS(同表见 yitian_rules.py);项目关注原因的 code 本身就是中文,直接显示。
  *  items 恒为完整白名单长度(后端 lanxin_config._validate_items 按白名单补齐),不必在前端再拼全集。 */
@@ -30,7 +49,14 @@ const LEVEL_OPTS = [
 ]
 
 async function load() {
-  try { cfg.value = await getLanxinConfig() } catch { /* 未登录/缺接口静默 */ }
+  try {
+    // 一次请求拿 config + rejected,不再对同一个端点分别发两次 GET。
+    // Task 6 落地前响应不含 rejected 字段,undefined 时按 0 兜底——
+    // 缺这个字段是预期状态,不能让整卡因此报错或渲染异常。
+    const res = await getLanxinConfigFull()
+    cfg.value = res.config
+    rejected.value = res.rejected ?? { count: 0, lastAt: '', lastReason: '' }
+  } catch { /* 未登录/缺接口静默 */ }
 }
 
 async function onSave() {
@@ -40,8 +66,12 @@ async function onSave() {
     const payload: LanxinConfig = JSON.parse(JSON.stringify(cfg.value))
     // 空串 = 不修改密钥(后端沿用旧值);填了才覆盖
     payload.credentials.appSecret = newSecret.value
+    payload.credentials.callbackAesKey = newCallbackAesKey.value
+    payload.credentials.callbackSignToken = newCallbackSignToken.value
     cfg.value = await saveLanxinConfig(payload)
     newSecret.value = ''
+    newCallbackAesKey.value = ''
+    newCallbackSignToken.value = ''
     ElMessage.success('已保存')
   } catch (e) {
     ElMessage.error('保存失败：' + (e instanceof Error ? e.message : String(e)))
@@ -60,6 +90,10 @@ async function onSelftest() {
 }
 
 onMounted(load)
+
+// 数据源为 GET /api/lanxin/config 的 rejected 字段(Task 6 提供)；测试仍需要能直接注入
+// 取值，覆盖「接口暂缺该字段/超管排查凭证时数值恰好如此」等 load() 之外的展示逻辑分支。
+defineExpose({ rejected })
 </script>
 
 <template>
@@ -91,6 +125,50 @@ onMounted(load)
           style="width: 220px" :placeholder="cfg.credentials.hasSecret ? '已配置，留空则不修改' : '未配置'" />
         <span class="dv-hint" :class="cfg.credentials.hasSecret ? 'ok' : 'warn'">
           {{ cfg.credentials.hasSecret ? '已配置' : '未配置' }} · 密钥不回显、不入日志与审计
+        </span>
+      </div>
+
+      <div class="dv-row">
+        <span class="dv-label">发送身份</span>
+        <el-radio-group v-model="cfg.sendAs" size="small" data-test="lx-send-as">
+          <el-radio-button value="account">应用号</el-radio-button>
+          <el-radio-button value="bot">智能机器人</el-radio-button>
+        </el-radio-group>
+        <span class="dv-hint">机器人须由组织管理员额外开通「机器人能力」；应用号无需额外审批</span>
+      </div>
+
+      <div class="dv-sub-head">回调（员工回复回流本系统，向蓝信组织管理员申请，与 AppId/AppSecret 是另外两个凭证）</div>
+      <div class="dv-row">
+        <span class="dv-label">回调密钥</span>
+        <el-input v-model="newCallbackAesKey" size="small" type="password" show-password
+          style="width: 220px" data-test="lx-callback-aes-key"
+          :placeholder="cfg.credentials.hasCallbackAesKey ? '已配置，留空则不修改' : '未配置'" />
+        <span class="dv-hint" :class="cfg.credentials.hasCallbackAesKey ? 'ok' : 'warn'">
+          {{ cfg.credentials.hasCallbackAesKey ? '已配置' : '未配置' }} · 不回显、不入日志与审计
+        </span>
+      </div>
+      <div class="dv-row">
+        <span class="dv-label">回调签名令牌</span>
+        <el-input v-model="newCallbackSignToken" size="small" type="password" show-password
+          style="width: 220px" data-test="lx-callback-sign-token"
+          :placeholder="cfg.credentials.hasCallbackSignToken ? '已配置，留空则不修改' : '未配置'" />
+        <span class="dv-hint" :class="cfg.credentials.hasCallbackSignToken ? 'ok' : 'warn'">
+          {{ cfg.credentials.hasCallbackSignToken ? '已配置' : '未配置' }} · 不回显、不入日志与审计
+        </span>
+      </div>
+      <div class="dv-row">
+        <span class="dv-label">回调地址</span>
+        <span class="lx-callback-url" data-test="lx-callback-url">{{ callbackUrl }}</span>
+        <button class="dv-btn" data-test="lx-copy-callback" @click="copyCallbackUrl">复制</button>
+        <span class="dv-hint">填到开发者中心「回调事件」页的「订阅事件回调地址」</span>
+      </div>
+      <div v-if="rejected.count > 0" class="dv-row" data-test="lx-rejected">
+        <span class="dv-label">已拒绝</span>
+        <span class="dv-hint warn" data-test="lx-rejected-reason">
+          {{ rejected.count }} 次回调被拒 · 最近 {{ rejected.lastAt }} ——
+          {{ rejected.lastReason === 'stale'
+              ? '最近一次因时间戳超出有效窗口，多半是时间戳格式或两端时钟对不上，而非签名填错'
+              : '最近一次是验签失败，通常意味着回调签名令牌填错了' }}
         </span>
       </div>
 
@@ -158,4 +236,6 @@ onMounted(load)
 .lx-steps { flex-direction: column; align-items: stretch; gap: var(--sp-2); }
 .lx-step { display: flex; align-items: center; gap: var(--sp-2); }
 .lx-step-name { font-size: var(--fs-1); color: var(--txt); font-weight: 600; }
+.lx-callback-url { padding: var(--sp-1) var(--sp-2); background: var(--hover-tint);
+  border-radius: var(--r-sm); color: var(--txt); font-size: var(--fs-1); }
 </style>

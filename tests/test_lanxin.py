@@ -2,6 +2,7 @@ import json
 import pytest
 import lanxin as LX
 import lanxin_config as LC
+import lanxin_recipients as LR
 
 
 CFG = {
@@ -667,3 +668,228 @@ def test_dispatch_reuses_staffid_cache_within_one_run(monkeypatch):
     assert r["sent"] == 2
     id_calls = [c for c in fake.calls if "id_mapping" in c["url"]]
     assert len(id_calls) == 1
+
+
+# ── Task 4:发送侧双身份(应用号/机器人) + 发送台账 ─────────────────────────
+
+def test_send_bot_message_hits_bot_path(monkeypatch):
+    """机器人与应用号只差一个 path,必须各自打到正确 URL。"""
+    seen = {}
+
+    def fake_http(url, data=None, headers=None, timeout=None):
+        seen["url"] = url
+        return {"errCode": 0, "errMsg": "ok", "data": {}}
+
+    monkeypatch.setattr(LX, "_http", fake_http)
+    cfg = {"credentials": {"apiGateway": "https://gw.example"}}
+    LX.send_bot_message(cfg, "tk", ["s1"], {"appCard": {}})
+    assert "/v1/bot/messages/create" in seen["url"]
+
+
+def test_send_message_still_hits_account_path(monkeypatch):
+    seen = {}
+
+    def fake_http(url, data=None, headers=None, timeout=None):
+        seen["url"] = url
+        return {"errCode": 0, "errMsg": "ok", "data": {}}
+
+    monkeypatch.setattr(LX, "_http", fake_http)
+    cfg = {"credentials": {"apiGateway": "https://gw.example"}}
+    LX.send_message(cfg, "tk", ["s1"], {"appCard": {}})
+    assert "/v1/messages/create" in seen["url"]
+    assert "/v1/bot/" not in seen["url"]
+
+
+def test_dispatch_uses_bot_when_send_as_bot(monkeypatch):
+    calls = []
+    monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
+    monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
+    monkeypatch.setattr(LX, "send_message",
+                        lambda *a, **k: calls.append("account") or {"msgId": "m"})
+    monkeypatch.setattr(LX, "send_bot_message",
+                        lambda *a, **k: calls.append("bot") or {"msgId": "m"})
+    plan = {"recipients": [{"employId": "A1", "name": "张三", "card": {},
+                            "projectIds": ["P1"], "routeKey": "project"}]}
+    LX.dispatch(plan, {"sendAs": "bot", "sendIntervalMs": 0})
+    assert calls == ["bot"]
+
+
+def test_dispatch_defaults_to_account(monkeypatch):
+    calls = []
+    monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
+    monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
+    monkeypatch.setattr(LX, "send_message",
+                        lambda *a, **k: calls.append("account") or {"msgId": "m"})
+    monkeypatch.setattr(LX, "send_bot_message",
+                        lambda *a, **k: calls.append("bot") or {"msgId": "m"})
+    plan = {"recipients": [{"employId": "A1", "name": "张三", "card": {},
+                            "projectIds": [], "routeKey": "timesheet"}]}
+    LX.dispatch(plan, {"sendIntervalMs": 0})          # 未配 sendAs
+    assert calls == ["account"]
+
+
+def test_dispatch_returns_sent_log_for_identity_lookup(monkeypatch):
+    """台账是回调反查身份的唯一依据 —— 必须带回 staffId↔employId。"""
+    monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
+    monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
+    monkeypatch.setattr(LX, "send_message", lambda *a, **k: {"msgId": "m1"})
+    plan = {"recipients": [{"employId": "A1", "name": "张三", "card": {},
+                            "projectIds": ["P1", "P2"], "routeKey": "project"}]}
+    out = LX.dispatch(plan, {"sendIntervalMs": 0})
+    assert out["sentLog"] == [{"staffId": "sid-A1", "employId": "A1", "name": "张三",
+                               "routeKey": "project", "projectIds": ["P1", "P2"],
+                               "msgId": "m1"}]
+
+
+def test_dispatch_sent_log_omits_failed(monkeypatch):
+    """发失败的人不进台账 —— 否则会拿他当「推送过」去反查身份和推荐项目。"""
+    monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
+    monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
+
+    def boom(*a, **k):
+        raise LX.LanxinError(10005, "无权限")
+
+    monkeypatch.setattr(LX, "send_message", boom)
+    plan = {"recipients": [{"employId": "A1", "name": "张三", "card": {},
+                            "projectIds": ["P1"], "routeKey": "project"}]}
+    out = LX.dispatch(plan, {"sendIntervalMs": 0})
+    assert out["sentLog"] == []
+    assert len(out["failed"]) == 1
+
+
+# ── Task 4:卡片底部回复引导语(仅回调凭证已配置时才加) ─────────────────────
+#
+# 注:任务书给的调用示例 LR.build_timesheet_card(name, issues, reply_hint=True) 只传了
+# 2 个位置参数,但 build_timesheet_card 的 start/end 是既有的必填位置参数(Step 4 只要求
+# 新增 reply_hint,未要求给 start/end 加默认值)。为不改变既有签名的必填性,这里改为显式
+# 传 start="", end="" —— 取值仍是空串(与任务书意图一致),只是显式写出。该差异已在任务
+# 报告里注明。
+
+def test_card_has_reply_hint_when_callback_configured():
+    card = LR.build_timesheet_card("张三", [{"label": "缺少工作概述", "count": 2}], "", "",
+                                   reply_hint=True)
+    assert LR.REPLY_HINT in json.dumps(card, ensure_ascii=False)
+
+
+def test_card_omits_reply_hint_when_callback_not_configured():
+    """回调没配就不许写「请直接回复」—— 那是让人对着收不到的地方说话。"""
+    card = LR.build_timesheet_card("张三", [{"label": "缺少工作概述", "count": 2}], "", "",
+                                   reply_hint=False)
+    assert LR.REPLY_HINT not in json.dumps(card, ensure_ascii=False)
+
+
+# ── Task 4 / Step 3b:build_plan 产出 routeKey 与 projectIds(归因候选用) ─────
+
+def _build_minimal_project_plan():
+    """最小项目侧 plan:P1 → 张三(A006),命中「回款延期」,primary 开。"""
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, 0)})
+    items = [{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}]
+    return LX.build_plan(items, cfg, TREE, PMIS)
+
+
+def _build_minimal_timesheet_plan():
+    """最小工时侧 plan:A006 命中 MISS_SUMMARY,primary 开。"""
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    items = [{"kind": "timesheet", "employId": "A006",
+              "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
+    return LX.build_plan(items, cfg, TREE, PMIS)
+
+
+def test_build_plan_recipients_carry_route_and_project_ids():
+    """归因候选依赖这两个键;缺了 Task 6 的候选下拉会恒为空。"""
+    plan = _build_minimal_project_plan()      # 沿用该文件既有的构造辅助
+    proj = [r for r in plan["recipients"] if r["routeKey"] == "project"]
+    assert proj, "应有项目侧收件人"
+    assert all(isinstance(r["projectIds"], list) for r in proj)
+    assert any(r["projectIds"] for r in proj), "项目侧收件人必须带到项目号"
+
+
+def test_build_plan_timesheet_recipients_have_empty_project_ids():
+    """工时问题是人维度的,没有项目 —— 不得编造。"""
+    plan = _build_minimal_timesheet_plan()    # 沿用该文件既有的构造辅助
+    ts = [r for r in plan["recipients"] if r["routeKey"] == "timesheet"]
+    assert ts, "应有工时侧收件人"
+    assert all(r["projectIds"] == [] for r in ts)
+
+
+def test_reply_hint_never_truncated_at_byte_limit():
+    """引导语是操作指引,截半了比不显示更糟 —— 用户不知道该做什么。
+    最坏情形(正文塞满 + 有未列出项目 + 引导语)下,引导语必须完整。"""
+    by_reason = {
+        "回款延期":   ["项" * 3 + "目%04d" % j for j in range(154)],
+        "里程碑滞后": ["另批目%04d" % j for j in range(30)],
+    }
+    card = LR.build_project_card("张三", by_reason, reply_hint=True)
+    content = card["bodyContent"]
+    assert len(content.encode("utf-8")) <= LR.LIMIT_BODY_CONTENT
+    assert LR.REPLY_HINT in content        # 完整,不是半截
+
+
+# ── I-1 回归:reply_hint 必须由 build_plan 真正接线到四种卡片 ──────────────────
+#
+# 为什么这一组【必须打 build_plan 的产物】而不是打 builder:
+# 上面 Task 4 的两条测试直接调 LR.build_*_card(..., reply_hint=True) 并手动传 True,
+# 于是 build_plan 一次都没传过 reply_hint(生产调用方 0 处)也照样全绿 ——
+# 定义 8 处、测试 8 处、生产 0 处,员工收到的卡片底部从来没有过引导语,
+# 没人知道这张卡能回,收件箱恒空,而链路本身完全正常、查不出任何毛病。
+
+def _cfg_with_callback(cfg, aes="A" * 43, token="tok-abc"):
+    """给配置填上回调双凭证。空串 = 未配置。"""
+    cfg["credentials"]["callbackAesKey"] = aes
+    cfg["credentials"]["callbackSignToken"] = token
+    return cfg
+
+
+def _plan_cards_json(plan):
+    return json.dumps([r["card"] for r in plan["recipients"]], ensure_ascii=False)
+
+
+def _all_four_card_kinds_cfg():
+    """一次同时产出四种卡片:工时 primary / 项目 primary / 工时汇总 / 项目汇总。
+    supervisorLevels=1 让 A006(张三)卷到 A005(耿磊磊)。"""
+    return _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 1)},
+                      pj_items={"回款延期": (True, True, 1)})
+
+
+_FOUR_KIND_ITEMS = [
+    {"kind": "project", "projectId": "P1", "reasons": ["回款延期"]},
+    {"kind": "timesheet", "employId": "A006",
+     "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]},
+]
+
+
+def test_build_plan_adds_reply_hint_when_callback_credentials_configured():
+    """I-1 核心:凭证配齐 → build_plan 产出的【每一张】卡片都带引导语。"""
+    cfg = _cfg_with_callback(_all_four_card_kinds_cfg())
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+
+    assert len(plan["recipients"]) == 4, "夹具应同时覆盖四种卡片"
+    for r in plan["recipients"]:
+        card_json = json.dumps(r["card"], ensure_ascii=False)
+        assert LR.REPLY_HINT in card_json, \
+            "%s/%s 的卡片缺少回复引导语" % (r["routeKey"], r["role"])
+
+
+def test_build_plan_omits_reply_hint_when_callback_not_configured():
+    """未配凭证 → 一张都不许带:引导用户回复一个收不到的地方,比不提示更糟。"""
+    cfg = _all_four_card_kinds_cfg()          # default_config 里两个回调凭证均为空串
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+
+    assert len(plan["recipients"]) == 4
+    assert LR.REPLY_HINT not in _plan_cards_json(plan)
+
+
+def test_build_plan_omits_reply_hint_when_only_one_credential_configured():
+    """只配一个 = 验签或解密必然失败,回复照样石沉大海 —— 仍不许提示。"""
+    for aes, token in (("A" * 43, ""), ("", "tok-abc")):
+        cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes=aes, token=token)
+        plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+        assert LR.REPLY_HINT not in _plan_cards_json(plan), \
+            "aes=%r token=%r 时不应出现引导语" % (aes, token)
+
+
+def test_build_plan_treats_whitespace_credentials_as_unconfigured():
+    """全空白的凭证等同于没配 —— 它过不了验签,只会让回复石沉大海。"""
+    cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes="   ", token="  ")
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+    assert LR.REPLY_HINT not in _plan_cards_json(plan)
