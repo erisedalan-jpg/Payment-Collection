@@ -216,7 +216,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
           <button class="cd-btn" data-test="cost-export" @click="onExport">导出Excel</button>
         </div>
         <div class="cd-scroll">
-          <DataTable :columns="DETAIL_COLS" :rows="pagedSeq" :show-count="false" clickable external-sort sticky-header
+          <DataTable :columns="DETAIL_COLS" :rows="pagedSeq" :show-count="false" clickable external-sort
             @row-click="onRow" @sort-change="onSortChange" :default-sort="defaultSort">
             <template v-for="col in DETAIL_COLS" :key="col.key" #[`header-${col.key}`]="{ col: c }">
               <span class="cd-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>

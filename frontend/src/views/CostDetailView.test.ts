@@ -65,6 +65,28 @@ describe('CostDetailView 明细表', () => {
     expect(w.find('[data-test="cost-export"]').exists()).toBe(true)
   })
 
+  it('分页:超过 20 项目时明细表每页上限 20(数据路径产多行,非"只显示1行"的数据 bug)', () => {
+    const ds = useDataStore()
+    const projects = Array.from({ length: 25 }, (_, i) => ({
+      projectId: 'P' + i, projectName: '项目' + i, projectManager: '张', orgL4: 'D1', orgL3_1: 'L31', paymentPmis: { contract: 1000000 },
+    }))
+    const projectPmis: any = {}
+    for (const p of projects) projectPmis[p.projectId] = { status: { 项目类型: '正常实施类' }, team: { L3部门: '一部' }, cost: { 总预算: 1000, 核算: 500, 剩余预算: 500 } }
+    ds.data = { meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, followupRecords: {}, projects, projectPmis } as any
+    const w = mount(CostDetailView, opts)
+    const tables = w.findAllComponents({ name: 'DataTable' })
+    const detail = tables[tables.length - 1]
+    expect((detail.props('rows') as any[]).length).toBe(20)
+  })
+
+  it('明细表不用 sticky-header(避免动态 max-height 在长页面塌缩成 ~1 行,与上方 L4 汇总表一致)', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    const tables = w.findAllComponents({ name: 'DataTable' })
+    const detail = tables[tables.length - 1]
+    expect(detail.props('stickyHeader')).toBeFalsy()
+  })
+
   it('明细列:删 L3/L3-1、含交付部门剩余/交付外包剩余、金额列去 ¥(纯数字)', () => {
     seed()
     const w = mount(CostDetailView, opts)
