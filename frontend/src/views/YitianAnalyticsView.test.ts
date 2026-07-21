@@ -74,6 +74,7 @@ describe('YitianAnalyticsView', () => {
       routes: [
         { path: '/', component: YitianAnalyticsView },
         { path: '/yitian/analytics', component: YitianAnalyticsView },
+        { path: '/yitian/detail', component: { template: '<div/>' } },
       ],
     })
   })
@@ -266,5 +267,13 @@ describe('YitianAnalyticsView', () => {
     expect(w.find('#yt-unfilled').exists()).toBe(true)
     expect(w.find('#yt-neverfilled').exists()).toBe(true)
     expect(w.find('#yt-emp').exists()).toBe(true)
+  })
+
+  it('员工表「明细」入口跳 /yitian/detail 带 dEmp(工号)', async () => {
+    const w = mountView()
+    await flushPromises()
+    const push = vi.spyOn(router, 'push')
+    ;(w.vm as any).goDetailEmp({ id: 'A1' })
+    expect(push).toHaveBeenCalledWith({ path: '/yitian/detail', query: { dEmp: 'A1' } })
   })
 })

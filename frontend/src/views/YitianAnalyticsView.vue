@@ -11,6 +11,7 @@ import { useYitianViewStore } from '@/stores/yitianView'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { parseDrillQuery } from '@/lib/yitian/drill'
+import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 import { empStats, saturationTop, unfilledList, neverFilledList, type EmpStat } from '@/lib/yitian/metrics'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import { useSettingsStore } from '@/stores/settings'
@@ -86,6 +87,9 @@ function drillEmpById(id: string) {
 function onEmpChartClick(p: any) {
   const id = p?.data?.id ?? p?.value?.[3] // 柱:data.id;散点:value[3]
   if (id) drillEmpById(String(id))
+}
+function goDetailEmp(row: { id: string }) {
+  if (row?.id) router.push({ path: '/yitian/detail', query: buildDetailDrill({ emp: row.id }) })
 }
 // HealthSegmentBar 人数结构段点击:滚到对应结构段(欠填/完全未填走各自子表,达标无对应子表→落员工明细)。
 function onSegClick(key: string) {
@@ -187,6 +191,7 @@ const empCols: DataColumn[] = [
   { key: 'baseText', label: '基础工时', width: 110, num: true },
   { key: 'satText', label: '饱和度', width: 100, num: true, sortable: true },
   { key: 'diffText', label: '差值', width: 100, num: true, sortable: true },
+  { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },
 ]
 
 const shortCols: DataColumn[] = [
@@ -206,7 +211,7 @@ const neverCols: DataColumn[] = [
 defineExpose({
   empRows, topRows, unfilledRows, neverRows, headcountSegments,
   filtered, paged, currentPage, pageSize,
-  drillEmpById, onEmpChartClick, onSegClick, scrollTo,
+  drillEmpById, onEmpChartClick, onSegClick, scrollTo, goDetailEmp,
 })
 </script>
 
@@ -271,6 +276,9 @@ defineExpose({
         <DataTable :columns="empCols" :rows="paged" :show-count="false" sticky-header :max-height-px="560">
           <template v-for="col in empCols" :key="col.key" #[`header-${col.key}`]="{ col: c }">
             <span class="yt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="empRows" /></span>
+          </template>
+          <template #cell-detailAction="{ row }">
+            <el-link type="primary" :underline="false" @click.stop="goDetailEmp(row)">明细</el-link>
           </template>
         </DataTable>
         <div class="yt-pager">
