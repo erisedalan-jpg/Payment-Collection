@@ -69,3 +69,47 @@ def test_data_scoped_by_l4(tmp_path, monkeypatch):
         assert conn3.getresponse().status == 401
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def _write_analysis_with_pm(tmp_path, monkeypatch):
+    f = tmp_path / "analysis_data.json"
+    f.write_text(json.dumps({
+        "meta": {"lastUpdate": "x", "totalProjects": 3, "totalClosed": 0, "totalPaymentNodes": 0},
+        "projects": [
+            {"projectId": "P1", "orgL4": "D1", "projectManager": "张三"},
+            {"projectId": "P2", "orgL4": "D2", "projectManager": "李四"},
+            {"projectId": "P3", "orgL4": "D2", "projectManager": "王五"},
+        ],
+        "closedProjects": [], "projectPmis": {"P1": {}, "P2": {}, "P3": {}}, "paymentNodes": {},
+        "events": [], "dataQuality": {"summary": {}},
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(server, "ANALYSIS_FILE", str(f))
+    if hasattr(server, "_analysis_cache"):
+        server._analysis_cache["mtime"] = None
+
+
+def test_data_scoped_by_staff_pm(tmp_path, monkeypatch):
+    # emp: 无 L4,可见员工工号 E_LI(李四) → 仅见李四管的 P2
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(tmp_path / "accounts.json"))
+    auth._sessions.clear()
+    salt = "s"
+    auth.save_accounts({"version": 1, "users": {
+        "emp": {"salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
+                "allowedPages": ["*"], "allowedL4": [], "allowedStaff": ["E_LI"], "displayName": "emp"},
+    }})
+    _write_analysis_with_pm(tmp_path, monkeypatch)
+    monkeypatch.setattr(server, "_load_roster_cached",
+                        lambda: [{"id": "E_LI", "name": "李四", "l4": "D2"}])
+    srv = server.create_server(host="127.0.0.1", port=0)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        conn, ck = _login(port, "emp")
+        conn.request("GET", "/data/analysis_data.json", headers={"Cookie": ck})
+        r = conn.getresponse()
+        assert r.status == 200
+        body = json.loads(r.read())
+        assert [p["projectId"] for p in body["projects"]] == ["P2"]
+        assert set(body["projectPmis"].keys()) == {"P2"}
+    finally:
+        srv.shutdown(); srv.server_close()

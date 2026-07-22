@@ -33,6 +33,7 @@ import data_history
 import data_scope
 import manual_import
 import manual_history
+import projects
 import opportunities as _opp
 import temp_followup
 import temp_followup as _temp
@@ -540,6 +541,36 @@ def _load_yitian_cached():
             except Exception:
                 return None
         return _yitian_cache['data']
+
+
+_roster_cache = {'mtime': None, 'rows': []}
+
+
+def _load_roster_cached():
+    """input/组织架构.xlsx 花名册(projects.read_org_roster),按 mtime 惰性缓存。
+    缺文件/解析失败 → 返回上次结果或 []。供账号「可见员工」选择器与项目经理工号解析共用。"""
+    path = os.path.join(BASE_DIR, 'input', config.ORG_FILE)
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return _roster_cache['rows'] or []
+    if _roster_cache['mtime'] != mtime:
+        try:
+            _roster_cache['rows'] = projects.read_org_roster(path)
+            _roster_cache['mtime'] = mtime
+        except Exception:
+            return _roster_cache['rows'] or []
+    return _roster_cache['rows']
+
+
+def _staff_pm_names(staff):
+    """工号列表 → 项目经理姓名集(经花名册解析)。空/缺 → 空集。
+    注:项目里 projectManager 存姓名非工号,故按姓名并集匹配(重名过匹配为已知限制)。"""
+    sset = set(staff or ())
+    if not sset:
+        return set()
+    return {r.get('name') for r in _load_roster_cached()
+            if r.get('id') in sset and r.get('name')}
 
 
 _tags_lock = threading.RLock()
@@ -1051,6 +1082,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_admin_accounts_list()
         elif parsed.path == '/api/admin/audit':
             self.handle_admin_audit()
+        elif parsed.path == '/api/admin/roster':
+            self.handle_admin_roster()
         elif parsed.path == '/api/portal/config':
             self.handle_portal_config_get()
         elif parsed.path == '/api/portal/download':
@@ -2802,7 +2835,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, "数据文件不存在"))
             return
-        self._send_json(200, data_scope.filter_analysis_data(data, allowed))
+        pm_names = _staff_pm_names(rec.get('allowedStaff', []))
+        self._send_json(200, data_scope.filter_analysis_data(data, allowed, pm_names))
 
     def handle_yitian_data(self):
         """GET /api/yitian/data - 倚天工时数据。登录 + 持有任一倚天页面授权;
@@ -2825,7 +2859,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if rec.get('isSuper') or '*' in allowed:
             self._send_json(200, data)
             return
-        self._send_json(200, data_scope.scope_yitian_data(data, allowed))
+        self._send_json(200, data_scope.scope_yitian_data(data, allowed, rec.get('allowedStaff', [])))
 
     def handle_yitian_settings_get(self):
         """GET /api/yitian/settings - 合规检查范围配置。登录 + 持有任一倚天页面授权即可读
@@ -3744,6 +3778,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._send_json(200, {"success": True, "accounts": auth.list_public_accounts()})
 
+    def handle_admin_roster(self):
+        """GET /api/admin/roster —— 花名册(工号/姓名/L4),供账号「可见员工」选择器。
+        超管专属(/api/admin/ 前缀已由 _authz_gate 要求超管)。只出 id/name/l4,不含隐私列。"""
+        if self._require_super() is None:
+            return
+        rows = [{'id': r.get('id'), 'name': r.get('name'), 'l4': r.get('l4')}
+                for r in _load_roster_cached() if r.get('id')]
+        self._send_json(200, {"success": True, "roster": rows})
+
     def handle_admin_audit(self):
         # 超管专属审计查询：筛选(账号/事件/时间/结果/关键词) + 分页 + facets
         if self._require_super() is None:
@@ -3780,12 +3823,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         self._audit_target = str(data.get('account', ''))
-        self._audit_detail = '授予页面%s L4%s' % (data.get('allowedPages', []), data.get('allowedL4', []))
+        self._audit_detail = '授予页面%s L4%s 员工%s' % (
+            data.get('allowedPages', []), data.get('allowedL4', []), data.get('allowedStaff', []))
         try:
             user = auth.add_account(
                 data.get('account', ''), data.get('password', ''),
                 data.get('displayName', ''), data.get('allowedPages', []),
-                data.get('allowedL4', []))
+                data.get('allowedL4', []), data.get('allowedStaff', []))
         except ValueError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
             return
@@ -3807,6 +3851,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _changed.append('页面权限')
         if data.get('allowedL4') is not None:
             _changed.append('L4权限')
+        if data.get('allowedStaff') is not None:
+            _changed.append('员工范围')
         if data.get('password'):
             _changed.append('重置密码')
         self._audit_detail = '修改:' + ('、'.join(_changed) or '无')
@@ -3816,6 +3862,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 display_name=data.get('displayName'),
                 pages=data.get('allowedPages'),
                 l4=data.get('allowedL4'),
+                staff=data.get('allowedStaff'),
                 password=data.get('password'))
         except KeyError:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, f"账号不存在: {account}"))
