@@ -284,3 +284,16 @@ def test_super_create_with_domain_scopes(admin_server):
     _, lst = _req(port, "GET", "/api/admin/accounts", cookie)
     dm = next(a for a in lst["accounts"] if a["account"] == "dm")
     assert dm["domainScopes"]["yitian"]["l4"] == ["Dx"]
+
+
+def test_super_create_with_page_scopes(admin_server):
+    port = admin_server
+    _, cookie, _ = _login(port, "boss", "bosspw")
+    status, data = _req(port, "POST", "/api/admin/accounts/create", cookie,
+        {"account": "pp", "password": "pw12345", "displayName": "逐页",
+         "allowedPages": ["*"], "allowedL4": ["*"], "allowedStaff": [],
+         "pageScopes": {"temp-followup": {"l4": ["Dx"], "staff": []},
+                        "opportunities-progress": {"l4": ["D2"], "staff": ["E9"]}}})
+    assert status == 200
+    assert data["user"]["pageScopes"]["temp-followup"] == {"l4": ["Dx"], "staff": []}
+    assert data["user"]["pageScopes"]["opportunities-progress"] == {"l4": ["D2"], "staff": []}  # 商机 staff 清空
