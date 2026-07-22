@@ -6,10 +6,10 @@ def _fixture():
     return {
         "meta": {"lastUpdate": "2026-06-20", "totalProjects": 3, "totalClosed": 1, "totalPaymentNodes": 3},
         "projects": [
-            {"projectId": "P1", "orgL4": "D1"},
-            {"projectId": "P2", "orgL4": "D2"},
-            {"projectId": "P3", "orgL4": "D1", "relatedClosedId": "C9"},
-            {"projectId": "PX", "orgL4": ""},
+            {"projectId": "P1", "orgL4": "D1", "projectManager": "张三"},
+            {"projectId": "P2", "orgL4": "D2", "projectManager": "李四"},
+            {"projectId": "P3", "orgL4": "D1", "projectManager": "王五", "relatedClosedId": "C9"},
+            {"projectId": "PX", "orgL4": "", "projectManager": "赵六"},
         ],
         "closedProjects": [{"projectId": "C1", "orgL4": "D1"}, {"projectId": "C2", "orgL4": "D2"}],
         "projectPmis": {"P1": {}, "P2": {}, "P3": {}, "C9": {}},
@@ -72,3 +72,30 @@ def test_no_foreign_projectid_leak():
     out = data_scope.filter_analysis_data(f, ["D1"])
     blob = json.dumps(out, ensure_ascii=False)
     assert "P2" not in blob
+
+
+def test_allowed_project_ids_by_pm():
+    f = _fixture()
+    # 王五管 P3(D1);无 L4 授权,仅按项目经理姓名命中 → P3 + relatedClosedId C9
+    keep = data_scope.allowed_project_ids(f["projects"], [], pm_names={"王五"})
+    assert keep == {"P3", "C9"}
+
+
+def test_filter_by_pm_names_only():
+    f = _fixture()
+    out = data_scope.filter_analysis_data(f, [], pm_names={"李四"})   # 仅按 PM 李四(D2)命中 P2
+    assert [p["projectId"] for p in out["projects"]] == ["P2"]
+    assert set(out["projectPmis"].keys()) == {"P2"}
+    assert set(out["paymentNodes"].keys()) == {"P2"}
+    assert [e["projectId"] for e in out["events"]] == ["P2"]
+
+
+def test_filter_l4_and_pm_union():
+    f = _fixture()
+    out = data_scope.filter_analysis_data(f, ["D1"], pm_names={"李四"})  # D1(P1,P3) ∪ PM李四(P2)
+    assert [p["projectId"] for p in out["projects"]] == ["P1", "P2", "P3"]
+
+
+def test_filter_pm_none_is_backcompat():
+    f = _fixture()
+    assert data_scope.filter_analysis_data(f, ["D1"]) == data_scope.filter_analysis_data(f, ["D1"], pm_names=None)
