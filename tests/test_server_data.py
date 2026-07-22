@@ -113,3 +113,26 @@ def test_data_scoped_by_staff_pm(tmp_path, monkeypatch):
         assert set(body["projectPmis"].keys()) == {"P2"}
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_data_project_domain_override(tmp_path, monkeypatch):
+    # 默认全部(*),但 project 域覆盖为仅 D1 → /data 仅 D1(证明域覆盖压过默认 *)
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(tmp_path / "accounts.json"))
+    auth._sessions.clear()
+    salt = "s"
+    auth.save_accounts({"version": 1, "users": {
+        "u": {"salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
+              "allowedPages": ["*"], "allowedL4": ["*"], "allowedStaff": [],
+              "domainScopes": {"project": {"l4": ["D1"], "staff": []}}, "displayName": "u"},
+    }})
+    _write_analysis(tmp_path, monkeypatch)
+    srv = server.create_server(host="127.0.0.1", port=0)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        conn, ck = _login(port, "u")
+        conn.request("GET", "/data/analysis_data.json", headers={"Cookie": ck})
+        body = json.loads(conn.getresponse().read())
+        assert [p["projectId"] for p in body["projects"]] == ["P1"]
+    finally:
+        srv.shutdown(); srv.server_close()

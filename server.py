@@ -2403,7 +2403,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         try:
             store = _load_opportunities()
-            rows = _opp.filter_for_account(store.get('rows', []), rec.get('allowedL4', []), bool(rec.get('isSuper')))
+            rows = _opp.filter_for_account(store.get('rows', []),
+                                           auth.effective_scope(rec, 'opportunity')[0],
+                                           bool(rec.get('isSuper')))
             self._json_response({"rows": rows})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"读取商机失败: {e}"))
@@ -2422,7 +2424,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         is_super = bool(rec.get('isSuper'))
-        allowed = rec.get('allowedL4', []) or []
+        allowed = auth.effective_scope(rec, 'opportunity')[0] or []
         # 非超管:新增必须落在本人 L4 范围(仅一个 L4 时缺省自动补该值)
         if not is_super and '*' not in set(allowed):
             fields = dict(fields or {})
@@ -2461,7 +2463,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         is_super = bool(rec.get('isSuper'))
-        allowed = rec.get('allowedL4', []) or []
+        allowed = auth.effective_scope(rec, 'opportunity')[0] or []
         try:
             store = _load_opportunities()
             target = next((r for r in store.get('rows', []) if r.get('id') == rid), None)
@@ -2502,7 +2504,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             store = _load_opportunities()
             _opp.apply_delete(store, data['ids'])
             _save_opportunities(store)
-            rows = _opp.filter_for_account(store.get('rows', []), rec.get('allowedL4', []), bool(rec.get('isSuper')))
+            rows = _opp.filter_for_account(store.get('rows', []),
+                                           auth.effective_scope(rec, 'opportunity')[0],
+                                           bool(rec.get('isSuper')))
             self._json_response({"rows": rows})
         except Exception as e:
             self._json_response(_error_payload(ERR_INTERNAL, f"删除商机失败: {e}"))
@@ -2827,7 +2831,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not rec:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
-        allowed = rec.get('allowedL4', [])
+        allowed, staff = auth.effective_scope(rec, 'project')
         if rec.get('isSuper') or '*' in allowed:
             self._serve_raw_data_file()
             return
@@ -2835,7 +2839,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, "数据文件不存在"))
             return
-        pm_names = _staff_pm_names(rec.get('allowedStaff', []))
+        pm_names = _staff_pm_names(staff)
         self._send_json(200, data_scope.filter_analysis_data(data, allowed, pm_names))
 
     def handle_yitian_data(self):
@@ -2855,11 +2859,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, "倚天工时数据不存在,请先上传工时.xlsx并更新数据"))
             return
-        allowed = rec.get('allowedL4', [])
+        allowed, staff = auth.effective_scope(rec, 'yitian')
         if rec.get('isSuper') or '*' in allowed:
             self._send_json(200, data)
             return
-        self._send_json(200, data_scope.scope_yitian_data(data, allowed, rec.get('allowedStaff', [])))
+        self._send_json(200, data_scope.scope_yitian_data(data, allowed, staff))
 
     def handle_yitian_settings_get(self):
         """GET /api/yitian/settings - 合规检查范围配置。登录 + 持有任一倚天页面授权即可读
@@ -3823,13 +3827,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         self._audit_target = str(data.get('account', ''))
-        self._audit_detail = '授予页面%s L4%s 员工%s' % (
-            data.get('allowedPages', []), data.get('allowedL4', []), data.get('allowedStaff', []))
+        self._audit_detail = '授予页面%s L4%s 员工%s%s' % (
+            data.get('allowedPages', []), data.get('allowedL4', []), data.get('allowedStaff', []),
+            ('，分域%s' % list((data.get('domainScopes') or {}).keys())) if data.get('domainScopes') else '')
         try:
             user = auth.add_account(
                 data.get('account', ''), data.get('password', ''),
                 data.get('displayName', ''), data.get('allowedPages', []),
-                data.get('allowedL4', []), data.get('allowedStaff', []))
+                data.get('allowedL4', []), data.get('allowedStaff', []),
+                data.get('domainScopes'))
         except ValueError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
             return
@@ -3853,6 +3859,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _changed.append('L4权限')
         if data.get('allowedStaff') is not None:
             _changed.append('员工范围')
+        if data.get('domainScopes') is not None:
+            _changed.append('分域范围')
         if data.get('password'):
             _changed.append('重置密码')
         self._audit_detail = '修改:' + ('、'.join(_changed) or '无')
@@ -3863,6 +3871,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 pages=data.get('allowedPages'),
                 l4=data.get('allowedL4'),
                 staff=data.get('allowedStaff'),
+                domain_scopes=data.get('domainScopes'),
                 password=data.get('password'))
         except KeyError:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, f"账号不存在: {account}"))
