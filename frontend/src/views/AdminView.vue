@@ -3,6 +3,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { PAGE_OPTIONS } from '@/lib/pageAccess'
+import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
+import { PAGE_DOMAINS } from '@/lib/pageScope'
 import {
   listAccounts, createAccount, updateAccount, deleteAccount, listRoster,
   type AdminAccount, type RosterEntry,
@@ -16,20 +18,31 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const editing = ref(false) // true=编辑(account 只读),false=新建
 
-const DOMAIN_META = [
-  { key: 'project', label: '项目&回款', staff: true },
-  { key: 'yitian', label: '工时', staff: true },
-  { key: 'opportunity', label: '商机', staff: false },
+const NAV_GROUPS = [
+  { key: 'PROJECT', label: '项目', links: PROJECT_LINKS },
+  { key: 'ANALYSIS', label: '分析', links: ANALYSIS_LINKS },
+  { key: 'KEY_FOLLOWUP', label: '跟进', links: KEY_FOLLOWUP_LINKS },
+  { key: 'PAYMENT', label: '回款', links: PAYMENT_LINKS },
+  { key: 'YITIAN', label: '工时', links: YITIAN_LINKS },
+  { key: 'TOOL', label: '工具', links: TOOL_LINKS },
 ] as const
+// 覆盖目标下拉:域 + 有数据域的页
+const OVERRIDE_TARGETS = [
+  { value: 'domain:project', label: '域·项目&回款' },
+  { value: 'domain:yitian', label: '域·工时' },
+  { value: 'domain:opportunity', label: '域·商机' },
+  ...[...PROJECT_LINKS, ...ANALYSIS_LINKS, ...KEY_FOLLOWUP_LINKS, ...PAYMENT_LINKS, ...YITIAN_LINKS]
+    .filter((l) => PAGE_DOMAINS[l.key]).map((l) => ({ value: `page:${l.key}`, label: `页·${l.label}` })),
+]
+function targetIsOpp(t: string): boolean {
+  if (t.startsWith('domain:')) return t === 'domain:opportunity'
+  return PAGE_DOMAINS[t.slice(5)] === 'opportunity'
+}
 
 const blankForm = () => ({
   account: '', password: '', displayName: '',
   allowedPages: [] as string[], allowedL4: [] as string[], allowedStaff: [] as string[],
-  domainOverrides: {
-    project: { enabled: false, l4: [] as string[], staff: [] as string[] },
-    yitian: { enabled: false, l4: [] as string[], staff: [] as string[] },
-    opportunity: { enabled: false, l4: [] as string[], staff: [] as string[] },
-  } as Record<string, { enabled: boolean; l4: string[]; staff: string[] }>,
+  overrides: [] as { target: string; l4: string[]; staff: string[] }[],
 })
 const form = reactive(blankForm())
 
@@ -67,17 +80,34 @@ function scopeLabel(row: AdminAccount): string {
   const l4 = row.allowedL4.includes('*') ? '全部' : (row.allowedL4.join('、') || '')
   const staff = staffLabels(row.allowedStaff)
   const base = [l4, staff].filter(Boolean).join('；') || '—'
-  const hasDomain = row.domainScopes && Object.keys(row.domainScopes).length > 0
-  return hasDomain ? `${base}　＋分域` : base
+  const n = Object.keys(row.domainScopes ?? {}).length + Object.keys(row.pageScopes ?? {}).length
+  return n > 0 ? `${base}　＋${n} 覆盖` : base
 }
 
-function buildDomainScopes(): Record<string, { l4: string[]; staff: string[] }> {
-  const out: Record<string, { l4: string[]; staff: string[] }> = {}
-  for (const d of DOMAIN_META) {
-    const o = form.domainOverrides[d.key]
-    if (o.enabled) out[d.key] = { l4: o.l4, staff: d.staff ? o.staff : [] }
+function toggleGroup(groupKey: string, on: boolean) {
+  const g = NAV_GROUPS.find((x) => x.key === groupKey); if (!g) return
+  const keys = g.links.map((l) => l.key)
+  const set = new Set(form.allowedPages.filter((k) => k !== '*'))
+  keys.forEach((k) => (on ? set.add(k) : set.delete(k)))
+  form.allowedPages = [...set]
+}
+function groupChecked(groupKey: string): boolean {
+  if (form.allowedPages.includes('*')) return true
+  const g = NAV_GROUPS.find((x) => x.key === groupKey)
+  return !!g && g.links.every((l) => form.allowedPages.includes(l.key))
+}
+function addOverride() { form.overrides.push({ target: '', l4: [], staff: [] }) }
+function removeOverride(i: number) { form.overrides.splice(i, 1) }
+function buildScopes(): { domainScopes: Record<string, { l4: string[]; staff: string[] }>; pageScopes: Record<string, { l4: string[]; staff: string[] }> } {
+  const domainScopes: Record<string, { l4: string[]; staff: string[] }> = {}
+  const pageScopes: Record<string, { l4: string[]; staff: string[] }> = {}
+  for (const o of form.overrides) {
+    if (!o.target) continue
+    const staff = targetIsOpp(o.target) ? [] : o.staff
+    if (o.target.startsWith('domain:')) domainScopes[o.target.slice(7)] = { l4: o.l4, staff }
+    else pageScopes[o.target.slice(5)] = { l4: o.l4, staff }
   }
-  return out
+  return { domainScopes, pageScopes }
 }
 
 async function reload() {
@@ -110,13 +140,10 @@ function openEdit(row: AdminAccount) {
     allowedPages: [...row.allowedPages], allowedL4: [...row.allowedL4],
     allowedStaff: [...(row.allowedStaff ?? [])],
   })
-  const ds = row.domainScopes ?? {}
-  for (const d of DOMAIN_META) {
-    const v = ds[d.key]
-    form.domainOverrides[d.key] = v
-      ? { enabled: true, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])] }
-      : { enabled: false, l4: [], staff: [] }
-  }
+  const ovs: { target: string; l4: string[]; staff: string[] }[] = []
+  for (const [dom, v] of Object.entries(row.domainScopes ?? {})) ovs.push({ target: `domain:${dom}`, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])] })
+  for (const [pk, v] of Object.entries(row.pageScopes ?? {})) ovs.push({ target: `page:${pk}`, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])] })
+  form.overrides = ovs
   dialogVisible.value = true
 }
 
@@ -129,7 +156,7 @@ async function submitForm() {
         allowedPages: form.allowedPages,
         allowedL4: form.allowedL4,
         allowedStaff: form.allowedStaff,
-        domainScopes: buildDomainScopes(),
+        ...buildScopes(),
         ...(form.password ? { password: form.password } : {}),
       })
       ElMessage.success('已保存')
@@ -137,7 +164,7 @@ async function submitForm() {
       await createAccount({
         account: form.account, password: form.password, displayName: form.displayName,
         allowedPages: form.allowedPages, allowedL4: form.allowedL4, allowedStaff: form.allowedStaff,
-        domainScopes: buildDomainScopes(),
+        ...buildScopes(),
       })
       ElMessage.success('已创建')
     }
@@ -169,7 +196,10 @@ function pageLabels(keys: string[]): string {
   return keys.map((k) => map.get(k) || k).join('、') || '—'
 }
 onMounted(reload)
-defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster, DOMAIN_META })
+defineExpose({
+  dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster,
+  NAV_GROUPS, OVERRIDE_TARGETS, toggleGroup, groupChecked, addOverride, removeOverride,
+})
 </script>
 
 <template>
@@ -233,9 +263,12 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
           <el-input v-model="form.displayName" placeholder="展示用名称" />
         </el-form-item>
         <el-form-item label="可访问页面">
-          <el-select v-model="form.allowedPages" multiple filterable class="admin-select" placeholder="选择可访问页面">
-            <el-option v-for="o in PAGE_OPTIONS" :key="o.key" :label="o.label" :value="o.key" />
-          </el-select>
+          <el-checkbox :model-value="form.allowedPages.includes('*')"
+            @change="(v:boolean)=> form.allowedPages = v ? ['*'] : []">全部页面</el-checkbox>
+          <span v-if="!form.allowedPages.includes('*')">
+            <el-checkbox v-for="g in NAV_GROUPS" :key="g.key" :model-value="groupChecked(g.key)"
+              @change="(v:boolean)=> toggleGroup(g.key, v)">{{ g.label }}</el-checkbox>
+          </span>
         </el-form-item>
         <el-form-item label="默认可见 L4">
           <el-select v-model="form.allowedL4" multiple filterable class="admin-select" placeholder="选择可见 L4 组织">
@@ -250,21 +283,21 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
           </el-select>
           <span class="admin-hint">按姓名选择;实际按工号隔离。空=不额外放行个人</span>
         </el-form-item>
-        <el-divider content-position="left">分域覆盖（可选，不设则各域用上面的默认范围）</el-divider>
-        <el-form-item v-for="d in DOMAIN_META" :key="d.key" :label="d.label">
-          <el-checkbox v-model="form.domainOverrides[d.key].enabled">自定义该域范围</el-checkbox>
-          <template v-if="form.domainOverrides[d.key].enabled">
-            <el-select v-model="form.domainOverrides[d.key].l4" multiple filterable
-              class="admin-select" placeholder="该域可见 L4">
-              <el-option label="全部 L4" value="*" />
-              <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
-            </el-select>
-            <el-select v-if="d.staff" v-model="form.domainOverrides[d.key].staff" multiple filterable
-              class="admin-select" placeholder="该域可见员工(按姓名选,存工号)">
-              <el-option v-for="o in staffOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-          </template>
+        <el-divider content-position="left">范围覆盖（可选，只加例外；页 &gt; 域 &gt; 默认）</el-divider>
+        <el-form-item v-for="(o,i) in form.overrides" :key="i" label="覆盖">
+          <el-select v-model="o.target" filterable class="admin-select" placeholder="选目标(域/页)">
+            <el-option v-for="t in OVERRIDE_TARGETS" :key="t.value" :label="t.label" :value="t.value" />
+          </el-select>
+          <el-select v-model="o.l4" multiple filterable class="admin-select" placeholder="L4">
+            <el-option label="全部 L4" value="*" />
+            <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
+          </el-select>
+          <el-select v-if="!targetIsOpp(o.target)" v-model="o.staff" multiple filterable class="admin-select" placeholder="员工(按姓名)">
+            <el-option v-for="op in staffOptions" :key="op.value" :label="op.label" :value="op.value" />
+          </el-select>
+          <el-button link type="danger" @click="removeOverride(i)">删除</el-button>
         </el-form-item>
+        <el-button link type="primary" @click="addOverride">+ 添加覆盖</el-button>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
