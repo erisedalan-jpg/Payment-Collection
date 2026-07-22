@@ -106,3 +106,21 @@ SIGN_UNIT_TAG_RULES = {"上海伟仕佳杰科技有限公司": "佳杰"}
 
 PRODUCT_OVERSPEND_TAG = "产品超支"
 PRODUCT_COST_SUBJECT_CODE = "2.1"   # 损益科目「产品、商品成本」
+
+# 逐页数据范围(V4.3.1):pageKey → 数据域。无数据域页(about/budget/data)不入表。
+# 与前端 lib/pageScope.ts 的 PAGE_DOMAINS 由跨语言同步测试锁一致。
+PAGE_DOMAINS = {
+    'overview': 'project', 'projects': 'project', 'projects-closed': 'project',
+    'activity': 'project', 'insight': 'project', 'insight-milestone': 'project',
+    'insight-costdetail': 'project', 'insight-risk': 'project', 'insight-board': 'project',
+    'insight-calendar': 'project', 'payment': 'project', 'payment-projects': 'project',
+    'payment-nodes': 'project', 'projects-key': 'project', 'temp-followup': 'project',
+    'risk-followup': 'project', 'payment-key': 'project', 'governance': 'project',
+    'yitian': 'yitian', 'yitian-detail': 'yitian', 'yitian-compliance': 'yitian',
+    'yitian-analytics': 'yitian', 'yitian-trend': 'yitian', 'yitian-customer': 'yitian',
+    'opportunities-progress': 'opportunity', 'opportunities-board': 'opportunity',
+    'opportunity-followup': 'opportunity',
+}
+DOMAIN_PAGES = {}
+for _pk, _dom in PAGE_DOMAINS.items():
+    DOMAIN_PAGES.setdefault(_dom, []).append(_pk)
