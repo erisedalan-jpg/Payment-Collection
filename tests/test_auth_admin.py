@@ -146,7 +146,7 @@ def test_list_public_accounts_strips_secrets(tmp_path, monkeypatch):
     for a in lst:
         assert 'salt' not in a and 'hash' not in a
         assert set(a.keys()) == {'account', 'displayName', 'isSuper',
-                                 'allowedPages', 'allowedL4', 'mustChangePassword'}
+                                 'allowedPages', 'allowedL4', 'allowedStaff', 'mustChangePassword'}
 
 
 def test_add_edit_remove_roundtrip(tmp_path, monkeypatch):

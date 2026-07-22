@@ -68,7 +68,7 @@ def save_accounts(data: dict) -> None:
 
 def _make_user(password: str, display_name: str, is_super: bool = True,
                pages: list | None = None, l4: list | None = None,
-               must_change: bool = False) -> dict:
+               staff: list | None = None, must_change: bool = False) -> dict:
     salt = secrets.token_hex(16)
     return {
         'salt': salt,
@@ -76,6 +76,7 @@ def _make_user(password: str, display_name: str, is_super: bool = True,
         'isSuper': is_super,
         'allowedPages': pages if pages is not None else ['*'],
         'allowedL4': l4 if l4 is not None else ['*'],
+        'allowedStaff': staff if staff is not None else [],
         'displayName': display_name,
         'mustChangePassword': bool(must_change),
     }
@@ -103,6 +104,7 @@ def public_user(account: str, rec: dict) -> dict:
         'isSuper': bool(rec.get('isSuper', False)),
         'allowedPages': rec.get('allowedPages', []),
         'allowedL4': rec.get('allowedL4', []),
+        'allowedStaff': rec.get('allowedStaff', []),
         'mustChangePassword': bool(rec.get('mustChangePassword', False)),
     }
 
@@ -187,7 +189,7 @@ def _validate_display_name(display_name) -> None:
         raise ValueError('显示名须为字符串')
 
 
-def _validate_str_list(values, field: str) -> list:
+def _validate_str_list(values, field: str, cap: int = 100) -> list:
     if not isinstance(values, list):
         raise ValueError(f'{field} 须为数组')
     out: list = []
@@ -196,13 +198,13 @@ def _validate_str_list(values, field: str) -> list:
             raise ValueError(f'{field} 各项须为 1-64 位字符串')
         if v not in out:
             out.append(v)
-    if len(out) > 100:
+    if len(out) > cap:
         raise ValueError(f'{field} 项数过多')
     return out
 
 
 def create_account(accounts: dict, account: str, password: str, display_name: str,
-                   pages: list, l4: list) -> dict:
+                   pages: list, l4: list, staff: list | None = None) -> dict:
     name = _validate_account_name(account)
     _validate_password(password)
     _validate_display_name(display_name)
@@ -211,9 +213,10 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
         raise ValueError(f'账号 {name} 已存在')
     pages = _validate_str_list(pages, 'allowedPages')
     l4 = _validate_str_list(l4, 'allowedL4')
+    staff = _validate_str_list(staff or [], 'allowedStaff', cap=1000)
     new_users = dict(users)
     new_users[name] = _make_user(password, (display_name or name)[:64],
-                                 is_super=False, pages=pages, l4=l4,
+                                 is_super=False, pages=pages, l4=l4, staff=staff,
                                  must_change=True)
     out = dict(accounts)
     out['users'] = new_users
@@ -221,7 +224,7 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
 
 
 def update_account(accounts: dict, account: str, *, display_name=None, pages=None,
-                   l4=None, password=None) -> dict:
+                   l4=None, staff=None, password=None) -> dict:
     if not isinstance(account, str):
         raise ValueError('账号名须为字符串')
     _validate_display_name(display_name)
@@ -237,6 +240,8 @@ def update_account(accounts: dict, account: str, *, display_name=None, pages=Non
         rec['allowedPages'] = _validate_str_list(pages, 'allowedPages')
     if l4 is not None:
         rec['allowedL4'] = _validate_str_list(l4, 'allowedL4')
+    if staff is not None:
+        rec['allowedStaff'] = _validate_str_list(staff, 'allowedStaff', cap=1000)
     if password is not None:
         _validate_password(password)
         salt = secrets.token_hex(16)
@@ -275,20 +280,22 @@ def list_public_accounts() -> list:
     return [public_user(acc, users[acc]) for acc in sorted(users)]
 
 
-def add_account(account: str, password: str, display_name: str, pages: list, l4: list) -> dict:
+def add_account(account: str, password: str, display_name: str, pages: list, l4: list,
+                staff: list | None = None) -> dict:
     with _accounts_mutate_lock:
         data = load_accounts()
-        data = create_account(data, account, password, display_name, pages, l4)
+        data = create_account(data, account, password, display_name, pages, l4, staff)
         save_accounts(data)
         name = _validate_account_name(account)
         return public_user(name, data['users'][name])
 
 
-def edit_account(account: str, *, display_name=None, pages=None, l4=None, password=None) -> dict:
+def edit_account(account: str, *, display_name=None, pages=None, l4=None, staff=None,
+                 password=None) -> dict:
     with _accounts_mutate_lock:
         data = load_accounts()
         data = update_account(data, account, display_name=display_name, pages=pages,
-                              l4=l4, password=password)
+                              l4=l4, staff=staff, password=password)
         save_accounts(data)
         return public_user(account, data['users'][account])
 
