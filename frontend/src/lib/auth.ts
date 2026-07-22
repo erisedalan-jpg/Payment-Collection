@@ -6,6 +6,7 @@ export interface AuthUser {
   isSuper: boolean
   allowedPages: string[]
   allowedL4: string[]
+  allowedStaff?: string[]
   mustChangePassword?: boolean
 }
 

@@ -4,8 +4,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { PAGE_OPTIONS } from '@/lib/pageAccess'
 import {
-  listAccounts, createAccount, updateAccount, deleteAccount,
-  type AdminAccount,
+  listAccounts, createAccount, updateAccount, deleteAccount, listRoster,
+  type AdminAccount, type RosterEntry,
 } from '@/lib/admin'
 import AuditLogTab from '@/components/AuditLogTab.vue'
 
@@ -18,7 +18,7 @@ const editing = ref(false) // true=编辑(account 只读),false=新建
 
 const blankForm = () => ({
   account: '', password: '', displayName: '',
-  allowedPages: [] as string[], allowedL4: [] as string[],
+  allowedPages: [] as string[], allowedL4: [] as string[], allowedStaff: [] as string[],
 })
 const form = reactive(blankForm())
 
@@ -31,10 +31,42 @@ const l4Options = computed<string[]>(() => {
   return Array.from(set).sort()
 })
 
+const roster = ref<RosterEntry[]>([])
+const nameCount = computed(() => {
+  const m = new Map<string, number>()
+  for (const r of roster.value) m.set(r.name, (m.get(r.name) ?? 0) + 1)
+  return m
+})
+const staffOptions = computed(() =>
+  roster.value.map((r) => ({
+    value: r.id,
+    label: (nameCount.value.get(r.name) ?? 0) > 1 ? `${r.name}（${r.id}）` : r.name,
+  })),
+)
+const idToName = computed(() => {
+  const m = new Map<string, string>()
+  for (const r of roster.value) m.set(r.id, r.name)
+  return m
+})
+function staffLabels(ids: string[] | undefined): string {
+  if (!ids || !ids.length) return ''
+  return ids.map((id) => idToName.value.get(id) || id).join('、')
+}
+function scopeLabel(row: AdminAccount): string {
+  const l4 = row.allowedL4.includes('*') ? '全部' : (row.allowedL4.join('、') || '')
+  const staff = staffLabels(row.allowedStaff)
+  return [l4, staff].filter(Boolean).join('；') || '—'
+}
+
 async function reload() {
   loading.value = true
   try {
     accounts.value = await listAccounts()
+    try {
+      roster.value = await listRoster()
+    } catch {
+      roster.value = []   // 花名册缺失/失败 → 选择器空,不阻断账号管理
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
@@ -53,6 +85,7 @@ function openEdit(row: AdminAccount) {
   Object.assign(form, {
     account: row.account, password: '', displayName: row.displayName,
     allowedPages: [...row.allowedPages], allowedL4: [...row.allowedL4],
+    allowedStaff: [...(row.allowedStaff ?? [])],
   })
   dialogVisible.value = true
 }
@@ -65,13 +98,14 @@ async function submitForm() {
         displayName: form.displayName,
         allowedPages: form.allowedPages,
         allowedL4: form.allowedL4,
+        allowedStaff: form.allowedStaff,
         ...(form.password ? { password: form.password } : {}),
       })
       ElMessage.success('已保存')
     } else {
       await createAccount({
         account: form.account, password: form.password, displayName: form.displayName,
-        allowedPages: form.allowedPages, allowedL4: form.allowedL4,
+        allowedPages: form.allowedPages, allowedL4: form.allowedL4, allowedStaff: form.allowedStaff,
       })
       ElMessage.success('已创建')
     }
@@ -102,13 +136,8 @@ function pageLabels(keys: string[]): string {
   const map = new Map(PAGE_OPTIONS.map((o) => [o.key, o.label]))
   return keys.map((k) => map.get(k) || k).join('、') || '—'
 }
-function l4Labels(keys: string[]): string {
-  if (keys.includes('*')) return '全部'
-  return keys.join('、') || '—'
-}
-
 onMounted(reload)
-defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload })
+defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster })
 </script>
 
 <template>
@@ -135,8 +164,8 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
       <el-table-column label="可访问页面" min-width="200">
         <template #default="{ row }">{{ row ? pageLabels(row.allowedPages) : '' }}</template>
       </el-table-column>
-      <el-table-column label="可见 L4" min-width="160">
-        <template #default="{ row }">{{ row ? l4Labels(row.allowedL4) : '' }}</template>
+      <el-table-column label="可见范围" min-width="220">
+        <template #default="{ row }">{{ row ? scopeLabel(row) : '' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="120">
         <template #default="{ row }">
@@ -181,6 +210,13 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
             <el-option label="全部 L4" value="*" />
             <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="可见员工">
+          <el-select v-model="form.allowedStaff" multiple filterable class="admin-select"
+            placeholder="按姓名选择员工(实际存工号)">
+            <el-option v-for="o in staffOptions" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+          <span class="admin-hint">按姓名选择;实际按工号隔离。空=不额外放行个人</span>
         </el-form-item>
       </el-form>
       <template #footer>

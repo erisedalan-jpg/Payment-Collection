@@ -20,8 +20,13 @@ describe('AdminView', () => {
     setActivePinia(createPinia())
     vi.restoreAllMocks()
     vi.mocked(adminApi.listAccounts).mockResolvedValue([
-      { account: 'boss', displayName: '超管', isSuper: true, allowedPages: ['*'], allowedL4: ['*'], mustChangePassword: false },
-      { account: 'liu', displayName: '老刘', isSuper: false, allowedPages: ['projects'], allowedL4: ['北京'], mustChangePassword: true },
+      { account: 'boss', displayName: '超管', isSuper: true, allowedPages: ['*'], allowedL4: ['*'], allowedStaff: [], mustChangePassword: false },
+      { account: 'liu', displayName: '老刘', isSuper: false, allowedPages: ['projects'], allowedL4: ['北京'], allowedStaff: ['E001'], mustChangePassword: true },
+    ])
+    vi.mocked(adminApi.listRoster).mockResolvedValue([
+      { id: 'E001', name: '张三', l4: '北京组' },
+      { id: 'E002', name: '张三', l4: '上海组' },   // 与 E001 同名 → 消歧
+      { id: 'E003', name: '李四', l4: '北京组' },
     ])
   })
 
@@ -66,5 +71,40 @@ describe('AdminView', () => {
     await flushPromises()
     expect(adminApi.createAccount).toHaveBeenCalledWith(expect.objectContaining({ account: 'newbie', allowedL4: ['上海'] }))
     expect(adminApi.listAccounts).toHaveBeenCalledTimes(2)
+  })
+
+  it('员工选择器按姓名展示、同名附工号消歧', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const opts = (wrapper.vm as any).staffOptions
+    expect(opts).toContainEqual({ value: 'E003', label: '李四' })            // 唯一姓名只显姓名
+    expect(opts).toContainEqual({ value: 'E001', label: '张三（E001）' })     // 同名附工号
+    expect(opts).toContainEqual({ value: 'E002', label: '张三（E002）' })
+  })
+
+  it('可见范围列按姓名展示员工(非工号)', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('张三')      // liu 的 allowedStaff=['E001'] → 显示「张三」
+    expect(wrapper.text()).not.toContain('E001')  // 不显示原始工号
+  })
+
+  it('提交新建携带 allowedStaff(工号)', async () => {
+    vi.mocked(adminApi.createAccount).mockResolvedValue()
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.form.account = 'emp'
+    vm.form.password = 'pw12345'
+    vm.form.displayName = '员工'
+    vm.form.allowedPages = ['yitian']
+    vm.form.allowedL4 = []
+    vm.form.allowedStaff = ['E001', 'E003']
+    await vm.submitForm()
+    await flushPromises()
+    expect(adminApi.createAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ allowedStaff: ['E001', 'E003'] }),
+    )
   })
 })
