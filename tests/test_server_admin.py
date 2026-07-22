@@ -226,3 +226,43 @@ def test_super_update_non_string_account_400(admin_server):
         {"account": ["liu"], "displayName": "x"},
     )
     assert status == 400
+
+
+def test_super_create_with_staff_persists(admin_server):
+    port = admin_server
+    _, cookie, _ = _login(port, "boss", "bosspw")
+    status, data = _req(
+        port, "POST", "/api/admin/accounts/create", cookie,
+        {"account": "emp", "password": "pw12345", "displayName": "员工范围",
+         "allowedPages": ["yitian"], "allowedL4": [], "allowedStaff": ["E001", "E002"]},
+    )
+    assert status == 200
+    assert data["user"]["allowedStaff"] == ["E001", "E002"]
+    _, lst = _req(port, "GET", "/api/admin/accounts", cookie)
+    emp = next(a for a in lst["accounts"] if a["account"] == "emp")
+    assert emp["allowedStaff"] == ["E001", "E002"]
+
+
+def test_super_update_staff(admin_server):
+    port = admin_server
+    _, cookie, _ = _login(port, "boss", "bosspw")
+    assert _req(port, "POST", "/api/admin/accounts/update", cookie,
+                {"account": "liu", "allowedStaff": ["E9"]})[0] == 200
+    _, lst = _req(port, "GET", "/api/admin/accounts", cookie)
+    liu = next(a for a in lst["accounts"] if a["account"] == "liu")
+    assert liu["allowedStaff"] == ["E9"]
+
+
+def test_roster_endpoint_super_only(admin_server, monkeypatch):
+    port = admin_server
+    monkeypatch.setattr(
+        server, "_load_roster_cached",
+        lambda: [{"id": "E001", "name": "张三", "l4": "银行组", "category": "正式"}],
+    )
+    _, boss_cookie, _ = _login(port, "boss", "bosspw")
+    status, data = _req(port, "GET", "/api/admin/roster", boss_cookie)
+    assert status == 200 and data["success"]
+    assert data["roster"] == [{"id": "E001", "name": "张三", "l4": "银行组"}]   # 无 category 隐私列
+    _, liu_cookie, _ = _login(port, "liu", "liupw")
+    assert _req(port, "GET", "/api/admin/roster", liu_cookie)[0] == 403
+    assert _req(port, "GET", "/api/admin/roster")[0] == 401
