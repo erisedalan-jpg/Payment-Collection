@@ -108,26 +108,32 @@ describe('AdminView', () => {
     )
   })
 
-  it('分域覆盖:启用域 → 载荷含 domainScopes(商机 staff 强制空)', async () => {
+  it('覆盖列表:域目标写 domainScopes、页目标写 pageScopes(商机 staff 空)', async () => {
     vi.mocked(adminApi.createAccount).mockResolvedValue()
     const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
     await flushPromises()
     const vm = wrapper.vm as any
     vm.openCreate()
-    vm.form.account = 'dm'
-    vm.form.password = 'pw12345'
-    vm.form.displayName = '分域'
-    vm.form.allowedPages = ['*']
-    vm.form.allowedL4 = ['*']
-    vm.form.domainOverrides.yitian = { enabled: true, l4: ['Dx'], staff: ['E001'] }
-    vm.form.domainOverrides.opportunity = { enabled: true, l4: ['D2'], staff: ['E001'] }
-    await vm.submitForm()
+    vm.form.account = 'pp'; vm.form.password = 'pw12345'; vm.form.displayName = 'P'
+    vm.form.allowedPages = ['*']; vm.form.allowedL4 = ['*']
+    vm.form.overrides = [
+      { target: 'domain:yitian', l4: ['Dy'], staff: ['E1'] },
+      { target: 'page:temp-followup', l4: ['Dp'], staff: [] },
+      { target: 'page:opportunities-progress', l4: ['Do'], staff: ['E9'] },
+    ]
+    await vm.submitForm(); await flushPromises()
+    const p = vi.mocked(adminApi.createAccount).mock.calls[0][0] as any
+    expect(p.domainScopes).toEqual({ yitian: { l4: ['Dy'], staff: ['E1'] } })
+    expect(p.pageScopes['temp-followup']).toEqual({ l4: ['Dp'], staff: [] })
+    expect(p.pageScopes['opportunities-progress']).toEqual({ l4: ['Do'], staff: [] })  // 商机 staff 空
+  })
+
+  it('组级选页:勾选一组写入该组全部 pageKey', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
     await flushPromises()
-    const payload = vi.mocked(adminApi.createAccount).mock.calls[0][0] as any
-    expect(payload.domainScopes).toEqual({
-      yitian: { l4: ['Dx'], staff: ['E001'] },
-      opportunity: { l4: ['D2'], staff: [] },   // 商机 staff 强制空
-    })
-    expect(payload.domainScopes.project).toBeUndefined()   // 未启用的域不入载荷
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.toggleGroup('PAYMENT', true)
+    expect(vm.form.allowedPages).toEqual(expect.arrayContaining(['payment', 'payment-projects', 'payment-nodes']))
   })
 })
