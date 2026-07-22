@@ -164,3 +164,14 @@ python -m pytest -q
 - `data/analysis_data.json` 全量 fetch（~2MB），前端一次性加载；vite 构建产物单 chunk >500KB（未做代码分割）。
 - `/insight` 项目分析"回款完成率"口径（节点已收/PMIS合同）与主域口径（流水/合同）不同源，待归并统一。
 - `collection_stages.csv` 导出端覆盖风险：导出脚本若漏在建项目则其回款节点静默缺失（无校验告警）——建议加"在建项目收款阶段覆盖率"治理告警。
+
+## 9. GitHub 远端与定期上传（2026-07-21 起，用户钦定）
+
+- **远端**：`origin` = `https://github.com/erisedalan-jpg/Payment-Collection.git`，**public 公开仓库**；默认推送分支 `master`（全功能演进与 `lts/` 精简副本同仓，一并上传）。
+- **定期上传约定**：每完成一个版本/功能且 `verify.sh` 全绿、`PROGRESS.md` 已更新后，`git push origin master`。不要攒一堆再推；一个可交付单元一提交一推送。
+- **⚠ 上传前安全红线（public 仓库，全网可读，一旦推出洗不掉）**：
+  - **绝不 push 任何密钥/凭证/真实业务数据**。`data/*.json`（含 `lanxin_config`/`accounts`/`audit_log`/`budget_*`/各 `*_followup`/`analysis_data`/`yitian_*` 等）、`input/`、`release/`、`lts/data/`、`lts/input/`、`pmisdata/`、`lts/pmisdata/`、`client/config.json` 等**均已 gitignore**。
+  - 新增任何数据文件/配置文件前，**先确认 `.gitignore` 已覆盖**再提交；宁可漏推、绝不误推。
+  - **绝不 `git add -A` / `git add .` 无差别暂存**——工作树里常年散落 `client.zip`/`*.xlsx`/`*.pdf`/临时抓数脚本等未跟踪脏文件（部分含真实数据），无差别暂存会把它们一并入库。只 `git add` 本次明确改动的文件。
+  - 推送前用 `git status` + `git diff --cached --stat` 核一眼暂存内容，确认无敏感项。
+- **历史教训（2026-07-21 首次接入时）**：`lts/pmisdata/` 曾误随「复制精简副本」进库，内含真实 PMIS 会话 cookie + 项目数据；接入 GitHub 前用 `git filter-repo --path lts/pmisdata --invert-paths` 从全历史清除后才首推。该目录是临时 PMIS 抓数脚本、非平台组成部分，已 gitignore。

@@ -64,7 +64,6 @@ sudo -u pmapp /opt/pmplatform/.venv/bin/python -c "import pydantic, openpyxl; pr
 
 ## 4. 数据与账号(已随包,无需准备/无需改密)
 - 数据已在 `/opt/pmplatform/data/`(analysis_data.json 等)与 `/opt/pmplatform/input/`(PMIS 9 表 + CSV + 组织架构/A.xlsx),**无需再生成**。
-- 超管账号已在 `data/accounts.json`(**预制口令**),**无需重置**,直接用预制口令登录。
 - 后续要更新数据:把新文件投到 `input/`(PMIS 9 表放 `input/pmis/`),页面「数据管理 → 更新数据」或 `sudo -u pmapp /opt/pmplatform/.venv/bin/python /opt/pmplatform/preprocess_data.py`。
 
 ## 5. systemd 托管(app 绑 127.0.0.1:8080)
