@@ -573,6 +573,34 @@ def _staff_pm_names(staff):
             if r.get('id') in sset and r.get('name')}
 
 
+def _can_page(rec, page_key):
+    """账号是否可访问某页('*' 或 allowedPages 显式含该 key)。"""
+    pages = rec.get('allowedPages') or []
+    return '*' in pages or page_key in pages
+
+
+def _scope_staff_ids(rec):
+    """账号 default/域/页 scope 里出现的全部工号集(供 staffNames 解析)。"""
+    ids = set(rec.get('allowedStaff') or [])
+    for scopes in ((rec.get('domainScopes') or {}), (rec.get('pageScopes') or {})):
+        for v in scopes.values():
+            if isinstance(v, dict):
+                ids.update(v.get('staff') or [])
+    return ids
+
+
+def _user_payload(account, rec):
+    """public_user + staffNames(仅该账号 scope 工号→姓名,前端 PM 匹配用)。"""
+    payload = auth.public_user(account, rec)
+    ids = _scope_staff_ids(rec)
+    if ids:
+        payload['staffNames'] = {r.get('id'): r.get('name') for r in _load_roster_cached()
+                                 if r.get('id') in ids and r.get('name')}
+    else:
+        payload['staffNames'] = {}
+    return payload
+
+
 _tags_lock = threading.RLock()
 
 
@@ -2404,7 +2432,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         try:
             store = _load_opportunities()
             rows = _opp.filter_for_account(store.get('rows', []),
-                                           auth.effective_scope(rec, 'opportunity')[0],
+                                           auth.domain_union_scope(
+                                               rec, 'opportunity',
+                                               [k for k in config.DOMAIN_PAGES['opportunity'] if _can_page(rec, k)])[0],
                                            bool(rec.get('isSuper')))
             self._json_response({"rows": rows})
         except Exception as e:
@@ -2424,7 +2454,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         is_super = bool(rec.get('isSuper'))
-        allowed = auth.effective_scope(rec, 'opportunity')[0] or []
+        allowed = auth.domain_union_scope(
+            rec, 'opportunity', [k for k in config.DOMAIN_PAGES['opportunity'] if _can_page(rec, k)])[0] or []
         # 非超管:新增必须落在本人 L4 范围(仅一个 L4 时缺省自动补该值)
         if not is_super and '*' not in set(allowed):
             fields = dict(fields or {})
@@ -2463,7 +2494,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
         is_super = bool(rec.get('isSuper'))
-        allowed = auth.effective_scope(rec, 'opportunity')[0] or []
+        allowed = auth.domain_union_scope(
+            rec, 'opportunity', [k for k in config.DOMAIN_PAGES['opportunity'] if _can_page(rec, k)])[0] or []
         try:
             store = _load_opportunities()
             target = next((r for r in store.get('rows', []) if r.get('id') == rid), None)
@@ -2505,7 +2537,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _opp.apply_delete(store, data['ids'])
             _save_opportunities(store)
             rows = _opp.filter_for_account(store.get('rows', []),
-                                           auth.effective_scope(rec, 'opportunity')[0],
+                                           auth.domain_union_scope(
+                                               rec, 'opportunity',
+                                               [k for k in config.DOMAIN_PAGES['opportunity'] if _can_page(rec, k)])[0],
                                            bool(rec.get('isSuper')))
             self._json_response({"rows": rows})
         except Exception as e:
@@ -2831,7 +2865,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not rec:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return
-        allowed, staff = auth.effective_scope(rec, 'project')
+        allowed, staff = auth.domain_union_scope(
+            rec, 'project', [k for k in config.DOMAIN_PAGES['project'] if _can_page(rec, k)])
         if rec.get('isSuper') or '*' in allowed:
             self._serve_raw_data_file()
             return
@@ -2859,7 +2894,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if data is None:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, "倚天工时数据不存在,请先上传工时.xlsx并更新数据"))
             return
-        allowed, staff = auth.effective_scope(rec, 'yitian')
+        allowed, staff = auth.domain_union_scope(
+            rec, 'yitian', [k for k in config.DOMAIN_PAGES['yitian'] if _can_page(rec, k)])
         if rec.get('isSuper') or '*' in allowed:
             self._send_json(200, data)
             return
@@ -3827,15 +3863,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         self._audit_target = str(data.get('account', ''))
-        self._audit_detail = '授予页面%s L4%s 员工%s%s' % (
+        self._audit_detail = '授予页面%s L4%s 员工%s%s%s' % (
             data.get('allowedPages', []), data.get('allowedL4', []), data.get('allowedStaff', []),
-            ('，分域%s' % list((data.get('domainScopes') or {}).keys())) if data.get('domainScopes') else '')
+            ('，分域%s' % list((data.get('domainScopes') or {}).keys())) if data.get('domainScopes') else '',
+            ('，逐页%d' % len(data.get('pageScopes') or {})) if data.get('pageScopes') else '')
         try:
             user = auth.add_account(
                 data.get('account', ''), data.get('password', ''),
                 data.get('displayName', ''), data.get('allowedPages', []),
                 data.get('allowedL4', []), data.get('allowedStaff', []),
-                data.get('domainScopes'))
+                data.get('domainScopes'), data.get('pageScopes'))
         except ValueError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
             return
@@ -3861,6 +3898,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _changed.append('员工范围')
         if data.get('domainScopes') is not None:
             _changed.append('分域范围')
+        if data.get('pageScopes') is not None:
+            _changed.append('逐页范围')
         if data.get('password'):
             _changed.append('重置密码')
         self._audit_detail = '修改:' + ('、'.join(_changed) or '无')
@@ -3872,6 +3911,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 l4=data.get('allowedL4'),
                 staff=data.get('allowedStaff'),
                 domain_scopes=data.get('domainScopes'),
+                page_scopes=data.get('pageScopes'),
                 password=data.get('password'))
         except KeyError:
             self._send_json(404, _error_payload(ERR_NOT_FOUND, f"账号不存在: {account}"))
@@ -3926,7 +3966,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         token = auth.create_session(account)
         self._audit_login(account, True)
-        self._send_json(200, {"success": True, "user": user},
+        rec = auth.load_accounts().get('users', {}).get(account)
+        self._send_json(200, {"success": True, "user": _user_payload(account, rec)},
                         [('Set-Cookie', auth.build_set_cookie(token))])
 
     def handle_logout(self):
@@ -3983,7 +4024,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not account or not rec:
             self._send_json(401, _error_payload(ERR_AUTH, "未登录"))
             return
-        self._send_json(200, {"success": True, "user": auth.public_user(account, rec)})
+        self._send_json(200, {"success": True, "user": _user_payload(account, rec)})
 
     def log_message(self, format, *args):
         # API 请求记录到日志文件
