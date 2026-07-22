@@ -60,3 +60,25 @@ class TestScopeYitian:
     def test_empty_allow_yields_nothing(self):
         out = DS.scope_yitian_data(_data(), [])
         assert out["roster"] == [] and out["entries"] == [] and out["issues"] == []
+
+    def test_staff_union_adds_employee(self):
+        # allowedL4=[] 但按工号 B1 命中李四(浙江服务组)
+        out = DS.scope_yitian_data(_data(), [], allowed_staff={"B1"})
+        assert [p["id"] for p in out["roster"]] == ["B1"]
+        assert [e["e"] for e in out["entries"]] == ["B1"]
+        assert len(out["issues"]) == 1
+        assert out["issues"][0]["i"] == 0
+        assert out["issues"][0]["snippet"] == "李四的正文"
+
+    def test_l4_and_staff_union(self):
+        out = DS.scope_yitian_data(_data(), ["银行服务组"], allowed_staff={"B1"})
+        assert {p["id"] for p in out["roster"]} == {"A1", "B1"}
+        assert len(out["entries"]) == 3
+
+    def test_staff_none_backcompat(self):
+        assert DS.scope_yitian_data(_data(), ["银行服务组"]) == \
+               DS.scope_yitian_data(_data(), ["银行服务组"], allowed_staff=None)
+
+    def test_offroster_staff_yields_nothing(self):
+        out = DS.scope_yitian_data(_data(), [], allowed_staff={"ZZZ"})   # 离册工号
+        assert out["roster"] == [] and out["entries"] == []

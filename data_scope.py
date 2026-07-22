@@ -8,10 +8,12 @@ _PID_KEYED = (
 )
 
 
-def allowed_project_ids(projects: list, allowed_l4: list) -> set:
-    """orgL4 ∈ allowed_l4 的项目 id ∪ 其 relatedClosedId。allowed_l4 含 '*' → 全部 id(含 relatedClosedId)。"""
+def allowed_project_ids(projects: list, allowed_l4: list, pm_names=None) -> set:
+    """orgL4 ∈ allowed_l4 或 项目经理姓名 ∈ pm_names 的项目 id ∪ 其 relatedClosedId。
+    allowed_l4 含 '*' → 全部 id(含 relatedClosedId)。pm_names=None/空 → 仅 L4 口径(向后兼容)。"""
     allow = set(allowed_l4 or [])
     star = '*' in allow
+    pmset = set(pm_names or ())
     keep: set = set()
     for p in projects or []:
         if not isinstance(p, dict):
@@ -20,7 +22,8 @@ def allowed_project_ids(projects: list, allowed_l4: list) -> set:
         if pid is None:
             continue
         org = str(p.get('orgL4') or '').strip()
-        if star or org in allow:
+        pm = str(p.get('projectManager') or '').strip()
+        if star or org in allow or (pm and pm in pmset):
             keep.add(pid)
             rel = p.get('relatedClosedId')
             if rel:
@@ -28,8 +31,9 @@ def allowed_project_ids(projects: list, allowed_l4: list) -> set:
     return keep
 
 
-def filter_analysis_data(data: dict, allowed_l4: list) -> dict:
-    """返回按 allowed_l4 过滤的新 dict;'*' → 原样返回;不改入参 data。"""
+def filter_analysis_data(data: dict, allowed_l4: list, pm_names=None) -> dict:
+    """返回按 allowed_l4(L4) 与 pm_names(项目经理姓名)并集过滤的新 dict;
+    '*' → 原样返回;不改入参 data。pm_names=None/空 → 仅 L4 口径(向后兼容)。"""
     if not isinstance(data, dict):
         return data
     allow = set(allowed_l4 or [])
@@ -37,11 +41,11 @@ def filter_analysis_data(data: dict, allowed_l4: list) -> dict:
         return data
 
     projects = data.get('projects') or []
-    keep = allowed_project_ids(projects, allowed_l4)
+    keep = allowed_project_ids(projects, allowed_l4, pm_names)   # 含 PM 命中 + relatedClosedId
 
     out = dict(data)  # 浅拷顶层(透传块随之保留引用)
     out['projects'] = [p for p in projects
-                       if isinstance(p, dict) and str(p.get('orgL4') or '').strip() in allow]
+                       if isinstance(p, dict) and p.get('projectId') in keep]
     closed = data.get('closedProjects') or []
     out['closedProjects'] = [c for c in closed
                              if isinstance(c, dict) and str(c.get('orgL4') or '').strip() in allow]
@@ -69,20 +73,24 @@ def filter_analysis_data(data: dict, allowed_l4: list) -> dict:
     return out
 
 
-def scope_yitian_data(data: dict, allowed_l4: list) -> dict:
-    """按 allowed_l4 裁倚天数据(roster/entries/issues);'*' → 原样返回;不改入参。
+def scope_yitian_data(data: dict, allowed_l4: list, allowed_staff=None) -> dict:
+    """按 allowed_l4(L4) 与 allowed_staff(工号)并集裁倚天数据(roster/entries/issues);
+    '*' → 原样返回;不改入参。allowed_staff=None/空 → 仅 L4 口径(向后兼容)。
 
-    工时是员工级敏感数据:非本 L4 的员工、其工时行、其问题正文摘要,一律不下发。
-    issues[].i 指向 entries 下标——裁行后必须重映射,否则指到别人头上。"""
+    工时是员工级敏感数据:非命中员工、其工时行、其问题正文摘要,一律不下发。
+    issues[].i 指向 entries 下标——裁行后必须重映射,否则指到别人头上。
+    离册工号(不在 roster)自动不命中——即「工号 ∩ 花名册」的防脏值。"""
     if not isinstance(data, dict):
         return data
     allow = set(allowed_l4 or [])
     if '*' in allow:
         return data
+    staff = set(allowed_staff or ())
 
     roster = data.get('roster') or []
     keep_roster = [p for p in roster
-                   if isinstance(p, dict) and str(p.get('l4') or '').strip() in allow]
+                   if isinstance(p, dict) and (
+                       str(p.get('l4') or '').strip() in allow or p.get('id') in staff)]
     keep_ids = {p.get('id') for p in keep_roster}
 
     entries = data.get('entries') or []
