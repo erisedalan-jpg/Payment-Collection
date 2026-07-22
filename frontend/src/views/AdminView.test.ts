@@ -107,4 +107,27 @@ describe('AdminView', () => {
       expect.objectContaining({ allowedStaff: ['E001', 'E003'] }),
     )
   })
+
+  it('分域覆盖:启用域 → 载荷含 domainScopes(商机 staff 强制空)', async () => {
+    vi.mocked(adminApi.createAccount).mockResolvedValue()
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.form.account = 'dm'
+    vm.form.password = 'pw12345'
+    vm.form.displayName = '分域'
+    vm.form.allowedPages = ['*']
+    vm.form.allowedL4 = ['*']
+    vm.form.domainOverrides.yitian = { enabled: true, l4: ['Dx'], staff: ['E001'] }
+    vm.form.domainOverrides.opportunity = { enabled: true, l4: ['D2'], staff: ['E001'] }
+    await vm.submitForm()
+    await flushPromises()
+    const payload = vi.mocked(adminApi.createAccount).mock.calls[0][0] as any
+    expect(payload.domainScopes).toEqual({
+      yitian: { l4: ['Dx'], staff: ['E001'] },
+      opportunity: { l4: ['D2'], staff: [] },   // 商机 staff 强制空
+    })
+    expect(payload.domainScopes.project).toBeUndefined()   // 未启用的域不入载荷
+  })
 })

@@ -16,9 +16,20 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const editing = ref(false) // true=编辑(account 只读),false=新建
 
+const DOMAIN_META = [
+  { key: 'project', label: '项目&回款', staff: true },
+  { key: 'yitian', label: '工时', staff: true },
+  { key: 'opportunity', label: '商机', staff: false },
+] as const
+
 const blankForm = () => ({
   account: '', password: '', displayName: '',
   allowedPages: [] as string[], allowedL4: [] as string[], allowedStaff: [] as string[],
+  domainOverrides: {
+    project: { enabled: false, l4: [] as string[], staff: [] as string[] },
+    yitian: { enabled: false, l4: [] as string[], staff: [] as string[] },
+    opportunity: { enabled: false, l4: [] as string[], staff: [] as string[] },
+  } as Record<string, { enabled: boolean; l4: string[]; staff: string[] }>,
 })
 const form = reactive(blankForm())
 
@@ -55,7 +66,18 @@ function staffLabels(ids: string[] | undefined): string {
 function scopeLabel(row: AdminAccount): string {
   const l4 = row.allowedL4.includes('*') ? '全部' : (row.allowedL4.join('、') || '')
   const staff = staffLabels(row.allowedStaff)
-  return [l4, staff].filter(Boolean).join('；') || '—'
+  const base = [l4, staff].filter(Boolean).join('；') || '—'
+  const hasDomain = row.domainScopes && Object.keys(row.domainScopes).length > 0
+  return hasDomain ? `${base}　＋分域` : base
+}
+
+function buildDomainScopes(): Record<string, { l4: string[]; staff: string[] }> {
+  const out: Record<string, { l4: string[]; staff: string[] }> = {}
+  for (const d of DOMAIN_META) {
+    const o = form.domainOverrides[d.key]
+    if (o.enabled) out[d.key] = { l4: o.l4, staff: d.staff ? o.staff : [] }
+  }
+  return out
 }
 
 async function reload() {
@@ -82,11 +104,19 @@ function openCreate() {
 
 function openEdit(row: AdminAccount) {
   editing.value = true
+  Object.assign(form, blankForm())
   Object.assign(form, {
     account: row.account, password: '', displayName: row.displayName,
     allowedPages: [...row.allowedPages], allowedL4: [...row.allowedL4],
     allowedStaff: [...(row.allowedStaff ?? [])],
   })
+  const ds = row.domainScopes ?? {}
+  for (const d of DOMAIN_META) {
+    const v = ds[d.key]
+    form.domainOverrides[d.key] = v
+      ? { enabled: true, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])] }
+      : { enabled: false, l4: [], staff: [] }
+  }
   dialogVisible.value = true
 }
 
@@ -99,6 +129,7 @@ async function submitForm() {
         allowedPages: form.allowedPages,
         allowedL4: form.allowedL4,
         allowedStaff: form.allowedStaff,
+        domainScopes: buildDomainScopes(),
         ...(form.password ? { password: form.password } : {}),
       })
       ElMessage.success('已保存')
@@ -106,6 +137,7 @@ async function submitForm() {
       await createAccount({
         account: form.account, password: form.password, displayName: form.displayName,
         allowedPages: form.allowedPages, allowedL4: form.allowedL4, allowedStaff: form.allowedStaff,
+        domainScopes: buildDomainScopes(),
       })
       ElMessage.success('已创建')
     }
@@ -137,7 +169,7 @@ function pageLabels(keys: string[]): string {
   return keys.map((k) => map.get(k) || k).join('、') || '—'
 }
 onMounted(reload)
-defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster })
+defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster, DOMAIN_META })
 </script>
 
 <template>
@@ -205,18 +237,33 @@ defineExpose({ dialogVisible, editing, form, openCreate, openEdit, submitForm, o
             <el-option v-for="o in PAGE_OPTIONS" :key="o.key" :label="o.label" :value="o.key" />
           </el-select>
         </el-form-item>
-        <el-form-item label="可见 L4">
+        <el-form-item label="默认可见 L4">
           <el-select v-model="form.allowedL4" multiple filterable class="admin-select" placeholder="选择可见 L4 组织">
             <el-option label="全部 L4" value="*" />
             <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
           </el-select>
         </el-form-item>
-        <el-form-item label="可见员工">
+        <el-form-item label="默认可见员工">
           <el-select v-model="form.allowedStaff" multiple filterable class="admin-select"
             placeholder="按姓名选择员工(实际存工号)">
             <el-option v-for="o in staffOptions" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
           <span class="admin-hint">按姓名选择;实际按工号隔离。空=不额外放行个人</span>
+        </el-form-item>
+        <el-divider content-position="left">分域覆盖（可选，不设则各域用上面的默认范围）</el-divider>
+        <el-form-item v-for="d in DOMAIN_META" :key="d.key" :label="d.label">
+          <el-checkbox v-model="form.domainOverrides[d.key].enabled">自定义该域范围</el-checkbox>
+          <template v-if="form.domainOverrides[d.key].enabled">
+            <el-select v-model="form.domainOverrides[d.key].l4" multiple filterable
+              class="admin-select" placeholder="该域可见 L4">
+              <el-option label="全部 L4" value="*" />
+              <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
+            </el-select>
+            <el-select v-if="d.staff" v-model="form.domainOverrides[d.key].staff" multiple filterable
+              class="admin-select" placeholder="该域可见员工(按姓名选,存工号)">
+              <el-option v-for="o in staffOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+          </template>
         </el-form-item>
       </el-form>
       <template #footer>
