@@ -18,7 +18,7 @@ describe('lib/admin', () => {
   it('createAccount POST 正确 body', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) })
     vi.stubGlobal('fetch', fetchMock)
-    await createAccount({ account: 'x', password: 'p', displayName: 'X', allowedPages: ['projects'], allowedL4: ['北京'] })
+    await createAccount({ account: 'x', password: 'p', displayName: 'X', allowedPages: ['projects'], allowedL4: ['北京'], allowedStaff: [] })
     const [url, opts] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/admin/accounts/create')
     expect(opts.method).toBe('POST')
