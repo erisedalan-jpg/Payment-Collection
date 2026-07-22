@@ -126,3 +126,18 @@ data/lanxin_inbox.json.tmp
 data/lanxin_callback_raw.jsonl
 # 存证滚动归档(I-2):内容与上面的活动文件同性质,同样绝不入库
 data/lanxin_raw_archive/
+
+# ── 非平台组成部分:临时 PMIS 抓数脚本 + 散落数据/产物(含真实 cookie/业务数据,绝不入库) ──
+# pmisdata/ 是临时 PMIS 抓数脚本(config.json 含真实会话 cookie、A.xlsx/_wbs_id_map.json 为真实项目数据),
+# 非平台组成部分。2026-07-21 接入 GitHub 前已用 git filter-repo 从 lts/pmisdata/ 全历史清除。
+pmisdata/
+lts/pmisdata/
+lts/frontend/*.tsbuildinfo
+# 散落在工作树的一次性产物/实验目录,不入库
+client.zip
+oppoboard.pdf
+demo.html
+CostBudgetEstimate.html
+nul
+yitian-analyze/
+项目数据运营工具/
