@@ -4,6 +4,7 @@ import { usePagedRows } from '@/lib/usePagedRows'
 import { useExternalSort } from '@/lib/useExternalSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
@@ -22,6 +23,7 @@ defineOptions({ name: 'PayNodesView' })
 
 const TABLE_ID = 'pay-nodes'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()
 const tags = useProjectTagsStore()
@@ -32,14 +34,14 @@ onMounted(() => { if (!tags.tags.length) tags.load() })
 cf.clearAll(TABLE_ID)
 
 const rows = computed(() => {
-  const ps = filterProjects(data.data?.projects ?? [], {
+  const ps = filterProjects(scoped.value?.projects ?? [], {
     viewMode: filter.viewMode,
     viewL4: filter.viewL4,
     viewPM: filter.viewPM,
     excludeActive: filter.excludeOn,
     excludedIds: filter.excludedIds,
   })
-  const allNodes = paymentNodeRows(data.data?.paymentNodes, ps, data.data?.projectPmis ?? {})
+  const allNodes = paymentNodeRows(scoped.value?.paymentNodes, ps, scoped.value?.projectPmis ?? {})
   // 按计划日∈区间过滤（全部区间时 inRange 恒真）
   return allNodes.filter((n) => inRange(n.planDate, filter.dateStart, filter.dateEnd))
 })

@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useFilterStore } from '@/stores/filter'
 import { useSettingsStore } from '@/stores/settings'
 import { useProjectTagsStore } from '@/stores/projectTags'
@@ -25,6 +26,7 @@ import BoardDrilldownModal from '@/components/BoardDrilldownModal.vue'
 
 const route = useRoute()
 const data = useDataStore()
+const scoped = useScopedProjects()
 const filter = useFilterStore()
 const settings = useSettingsStore()
 const projectTags = useProjectTagsStore()
@@ -54,12 +56,12 @@ const SORT_OPTS = PAY_BOARD_SORTS.map((s) => ({ value: s.key, label: s.label }))
 
 const boardRows = computed(() =>
   buildPayBoardRows(
-    filterProjects(data.data?.projects ?? [], {
+    filterProjects(scoped.value?.projects ?? [], {
       viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
       excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
     }),
     data.data?.projectPmis ?? {},
-    data.data?.paymentNodes,
+    scoped.value?.paymentNodes,
     filter.payRecordsAll,
     filter.dateStart,
     filter.dateEnd,

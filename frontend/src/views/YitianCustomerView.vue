@@ -6,6 +6,7 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
+import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { top1000ByL4, bgSupport, top1000TotalsRow, topCustomers, bgSupportByL4 } from '@/lib/yitian/customer'
 import { NO_L4 } from '@/lib/yitian/metrics'
@@ -13,6 +14,7 @@ import { buildDrillQuery } from '@/lib/yitian/drill'
 import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 
 const store = useYitianStore()
+const scopedYitian = useScopedYitian()
 const view = useYitianViewStore()
 const router = useRouter()
 
@@ -43,9 +45,9 @@ function pct(v: number): string {
 }
 
 const topRowsRaw = computed(() => {
-  if (!store.data) return []
+  if (!scopedYitian.value) return []
   // 去掉「未分配L4」行(部门负责人,无客户支持归属)
-  return top1000ByL4(store.data, view.start, view.end, view.l4s).filter((r) => r.l4 !== NO_L4)
+  return top1000ByL4(scopedYitian.value, view.start, view.end, view.l4s).filter((r) => r.l4 !== NO_L4)
 })
 
 const topRows = computed(() => topRowsRaw.value.map((r) => ({
@@ -93,8 +95,8 @@ const topCols: DataColumn[] = [
 ]
 
 function topSummaryMethod({ columns }: { columns: { property: string }[] }): string[] {
-  if (!store.data) return columns.map(() => '')
-  const t = top1000TotalsRow(store.data, view.start, view.end, view.l4s, topRowsRaw.value)
+  if (!scopedYitian.value) return columns.map(() => '')
+  const t = top1000TotalsRow(scopedYitian.value, view.start, view.end, view.l4s, topRowsRaw.value)
   const disp: Record<string, string> = {
     l4: '合计',
     hoursText: hrs(t.hours),
@@ -106,7 +108,7 @@ function topSummaryMethod({ columns }: { columns: { property: string }[] }): str
 }
 
 const bg = computed(() =>
-  store.data ? bgSupport(store.data, view.start, view.end, view.l4s)
+  scopedYitian.value ? bgSupport(scopedYitian.value, view.start, view.end, view.l4s)
              : { thisBg: 0, crossBg: 0, thisPct: 0, crossPct: 0, total: 0 })
 
 const bgMetrics = computed(() => [
@@ -132,7 +134,7 @@ const bgOption = computed(() => ({
 // 本/跨 BG × L4 分组柱:与 bgSupport 同口径(仅项目类/售前类工时),按 L4 拆分;
 // 未分配 L4(部门负责人)与 TOP1000 表一致予以剔除。聚合逻辑下沉到 lib/yitian/customer.ts(bgSupportByL4)。
 const bgByL4Rows = computed(() =>
-  store.data ? bgSupportByL4(store.data, view.start, view.end, view.l4s) : [])
+  scopedYitian.value ? bgSupportByL4(scopedYitian.value, view.start, view.end, view.l4s) : [])
 
 function bgByL4Option(rows: { l4: string; thisBg: number; crossBg: number }[]) {
   return {
@@ -153,7 +155,7 @@ const bgByL4Height = computed(() => `${Math.max(240, bgByL4Rows.value.length * 3
 
 // TOP 客户排行
 const topCustList = computed(() =>
-  store.data ? topCustomers(store.data, view.start, view.end, view.l4s, 10) : [])
+  scopedYitian.value ? topCustomers(scopedYitian.value, view.start, view.end, view.l4s, 10) : [])
 const topCustChartOption = computed(() => topCustOption(topCustList.value))
 const topCustHeight = computed(() => `${Math.max(240, topCustList.value.length * 28 + 96)}px`)
 

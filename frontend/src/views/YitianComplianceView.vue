@@ -8,6 +8,7 @@ import RatioRing from '@/components/RatioRing.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import { useYitianStore } from '@/stores/yitian'
+import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -22,6 +23,7 @@ import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 
 const TABLE_ID = 'yitian-compliance'
 const store = useYitianStore()
+const scopedYitian = useScopedYitian()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
 const themeStore = useSettingsStore()
@@ -61,7 +63,7 @@ watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, f
 // excludedTypes 必须传进去,否则超管在 /data 剔除某类型后,总览/趋势页的问题数变了,
 // 这里仍原样列出,两页口径漂移(I-7)。
 const allRows = computed(() =>
-  store.data ? issueRows(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes) : [])
+  scopedYitian.value ? issueRows(scopedYitian.value, view.start, view.end, view.l4s, settings.settings.excludedTypes) : [])
 
 const codeDist = computed(() => countByCode(allRows.value))
 const l4Dist = computed(() => countByL4(allRows.value))
@@ -101,8 +103,8 @@ function goDetailIssue(row: { empId: string }) {
 }
 
 // 健康带:合规率环 + 三项计数卡(均取自 issueRows 派生,与问题明细同源,不会对不上)。
-const k = computed(() => (store.data
-  ? kpi(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes)
+const k = computed(() => (scopedYitian.value
+  ? kpi(scopedYitian.value, view.start, view.end, view.l4s, settings.settings.excludedTypes)
   : null))
 const complianceRatio = computed(() => k.value?.complianceRate ?? null)
 // 合规率环按阈值上色(与总览页同口径):≥90% 达标绿,<90% 警示黄,null 交给 RatioRing 默认(mut)。

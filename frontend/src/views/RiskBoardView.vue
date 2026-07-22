@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
   buildRiskRows, riskSummary, groupRisk, riskPivot,
@@ -17,11 +18,12 @@ import DimPicker from '@/components/DimPicker.vue'
 import PivotTable from '@/components/PivotTable.vue'
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 onMounted(() => { if (!data.data) data.load() })
 
 const rows = computed(() =>
   buildRiskRows(
-    (data.data?.projects ?? []) as Project[],
+    (scoped.value?.projects ?? []) as Project[],
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
   ),
 )

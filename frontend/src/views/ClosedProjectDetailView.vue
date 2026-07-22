@@ -2,13 +2,15 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import type { ClosedProject } from '@/types/analysis'
 import { fmtRatio } from '@/lib/format'
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 const route = useRoute()
 const p = computed<ClosedProject | undefined>(() =>
-  ((data.data?.closedProjects ?? []) as ClosedProject[]).find((x) => x.projectId === String(route.params.id)))
+  ((scoped.value?.closedProjects ?? []) as ClosedProject[]).find((x) => x.projectId === String(route.params.id)))
 
 const fmtWan = (v: number | null | undefined) => (v == null ? '-' : (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 }))
 const yn = (v: unknown) => (v === true ? '是' : v === false ? '否' : '-')

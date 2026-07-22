@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
@@ -22,6 +23,7 @@ import InsightDrillModal from '@/components/InsightDrillModal.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 const projectTags = useProjectTagsStore()
 onMounted(() => {
   if (!data.data) data.load()
@@ -31,7 +33,7 @@ onMounted(() => {
 const selectedTags = ref<string[]>([])
 
 const rows = computed(() => {
-  const ps = ((data.data?.projects ?? []) as Project[])
+  const ps = ((scoped.value?.projects ?? []) as Project[])
     .filter((p) => tagMatch(projectTags.tagsOf(p.projectId), selectedTags.value))
   return buildInsightRows(ps, (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 })

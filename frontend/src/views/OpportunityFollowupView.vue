@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOpportunitiesStore } from '@/stores/opportunities'
+import { useScopedOpportunities } from '@/composables/useScopedData'
 import { useOpportunityFollowupStore } from '@/stores/opportunityFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { OPP_COLUMNS, FILTERABLE as OPP_FILTERABLE, type OppColumn } from '@/lib/opportunityColumns'
@@ -26,6 +27,7 @@ import { htmlToPlainText } from '@/lib/richText'
 const TABLE_ID = 'opportunity-followup'
 const auth = useAuthStore()
 const opps = useOpportunitiesStore()
+const scopedOpportunities = useScopedOpportunities()
 const oppf = useOpportunityFollowupStore()
 const cf = useCrossFilterStore()
 
@@ -37,7 +39,7 @@ onMounted(() => {
 const now = new Date()
 
 // 全部商机行(注入派生+跟进) → 供 ScopeBuilder 命中计数;再按 scope 过滤为当前清单
-const allRows = computed<OppFollowupRow[]>(() => buildOppFollowupRows(opps.rows, oppf.current, now))
+const allRows = computed<OppFollowupRow[]>(() => buildOppFollowupRows(scopedOpportunities.value, oppf.current, now))
 const inScopeRows = computed<OppFollowupRow[]>(() => allRows.value.filter((r) => opportunityMatches(r, oppf.scope)))
 
 const fp = useFollowupPage(oppf, inScopeRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as OppFollowupRow[])

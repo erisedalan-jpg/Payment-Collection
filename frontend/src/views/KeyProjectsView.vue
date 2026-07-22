@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -30,6 +31,7 @@ useViewScrollMemory()
 
 const TABLE_ID = 'key-projects'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const auth = useAuthStore()
 const progress = useProjectProgressStore()
 const cf = useCrossFilterStore()
@@ -45,8 +47,8 @@ onMounted(() => {
 
 const currentRows = computed<KeyProjectRow[]>(() =>
   buildKeyProjectRows(
-    (data.data?.projects ?? []) as Project[],
-    (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
+    (scoped.value?.projects ?? []) as Project[],
+    (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>,
     progress.current,
   ),
 )

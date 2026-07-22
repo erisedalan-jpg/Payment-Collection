@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useOpportunitiesStore } from '@/stores/opportunities'
+import { useScopedOpportunities } from '@/composables/useScopedData'
 import { buildRankingOption } from '@/lib/chartOptions'
 import {
   boardKpis, aiKpis, groupBy, customerTierAgg, monthlyTrendByTeam, expectedDateStack,
@@ -11,10 +12,11 @@ import { L4_OPTIONS } from '@/lib/opportunityColumns'
 import ChartBox from '@/charts/ChartBox.vue'
 
 const opps = useOpportunitiesStore()
+const scopedOpportunities = useScopedOpportunities()
 onMounted(() => { if (!opps.loaded) opps.load() })
 
 const now = new Date()
-const rows = computed(() => opps.rows)
+const rows = computed(() => scopedOpportunities.value)
 const keyRows = computed(() => rows.value.filter((r) => String(r.keyOpp ?? '').trim() === '是'))
 const aiRows = computed(() => rows.value.filter(isAiRow))
 

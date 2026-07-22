@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDataStore } from './data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import type { ViewMode } from '@/lib/filterNodes'
 import { paymentNodeRows, filterProjects } from '@/lib/paymentPmis'
@@ -24,6 +25,7 @@ function loadExcludeTags(): string[] {
 
 export const useFilterStore = defineStore('filter', () => {
   const data = useDataStore()
+  const scoped = useScopedProjects()
 
   const _y = new Date().getFullYear()
   const dateStart = ref(`${_y}-01-01`)   // 默认本年度(Task 11)
@@ -75,9 +77,9 @@ export const useFilterStore = defineStore('filter', () => {
   })
 
   const payNodeRowsAll = computed(() =>
-    paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis),
+    paymentNodeRows(scoped.value?.paymentNodes, scoped.value?.projects ?? [], data.data?.projectPmis),
   )
-  const payRecordsAll = computed(() => data.data?.paymentRecords ?? {})
+  const payRecordsAll = computed(() => scoped.value?.paymentRecords ?? {})
   const filteredPayNodes = computed(() =>
     filterPayNodes(payNodeRowsAll.value, {
       dateStart: dateStart.value, dateEnd: dateEnd.value, viewMode: viewMode.value, viewL4: viewL4.value, viewPM: viewPM.value,

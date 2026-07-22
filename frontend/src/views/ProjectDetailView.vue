@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis, Event, MilestoneItem, PaymentRecordsEntry, ProjectProfit } from '@/types/analysis'
 import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from '@/lib/projectPage'
@@ -17,6 +18,7 @@ import ProfitTree from '@/components/ProfitTree.vue'
 
 const route = useRoute()
 const data = useDataStore()
+const scoped = useScopedProjects()
 const projectTags = useProjectTagsStore()
 onMounted(() => {
   if (!data.data) data.load()
@@ -49,7 +51,7 @@ function removeOne(name: string) {
 
 const page = computed(() =>
   buildProjectPage(
-    (data.data?.projects ?? []) as Project[],
+    (scoped.value?.projects ?? []) as Project[],
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
     String(route.params.id || ''),
   ),
@@ -101,7 +103,7 @@ watch(() => route.params.id, () => { tab.value = 'payment' })
 // —— 回款（PMIS 口径）——
 const pmisPay = computed(() => p.value?.paymentPmis ?? null)
 const pmisNodes = computed(() =>
-  ((data.data?.paymentNodes ?? {}) as Record<string, any[]>)[p.value?.projectId || ''] ?? [])
+  ((scoped.value?.paymentNodes ?? {}) as Record<string, any[]>)[p.value?.projectId || ''] ?? [])
 const pmisPaySummary = computed(() => {
   const s = pmisPay.value
   if (!s) return []
@@ -141,12 +143,12 @@ const progressInfo = computed(() => [
 
 // —— R2:项目里程碑(PMIS 里程碑两表)/回款流水/全预算 ——
 const myMilestones = computed(() =>
-  ((data.data?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[p.value?.projectId || ''] ?? [])
+  ((scoped.value?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[p.value?.projectId || ''] ?? [])
 const originMilestones = computed(() =>
-  ((data.data?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[page.value.closedId || ''] ?? [])
+  ((scoped.value?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>)[page.value.closedId || ''] ?? [])
 
 const payRec = computed(() => {
-  const m = (data.data?.paymentRecords ?? {}) as Record<string, PaymentRecordsEntry>
+  const m = (scoped.value?.paymentRecords ?? {}) as Record<string, PaymentRecordsEntry>
   const pid = p.value?.projectId || ''
   const rid = p.value?.relatedClosedId || ''
   return m[pid] ?? (rid ? m[rid] : null) ?? null
@@ -175,7 +177,7 @@ const PAYREC_COLS: DataColumn[] = [
 ]
 
 const profit = computed(() =>
-  ((data.data?.projectProfit ?? {}) as Record<string, ProjectProfit>)[p.value?.projectId || ''] ?? null)
+  ((scoped.value?.projectProfit ?? {}) as Record<string, ProjectProfit>)[p.value?.projectId || ''] ?? null)
 const profitSummary = computed(() => {
   const s = (profit.value?.summary ?? {}) as Record<string, number | null>
   return [
@@ -259,7 +261,7 @@ const teamInfo = computed(() => [
 
 // —— 右栏:本项目动态(P3;spec 4.2 布局 B 右栏,与 /activity 同构) ——
 const myEvents = computed(() =>
-  ((data.data?.events ?? []) as Event[]).filter((e) => !!p.value?.projectId && e.projectId === p.value.projectId),
+  ((scoped.value?.events ?? []) as Event[]).filter((e) => !!p.value?.projectId && e.projectId === p.value.projectId),
 )
 
 // —— 原项目（售前整合，两份信息并存：spec 3.2 + 5）——

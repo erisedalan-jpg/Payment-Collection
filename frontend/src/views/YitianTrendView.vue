@@ -5,6 +5,7 @@ import YitianToolbar from '@/components/YitianToolbar.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useYitianStore } from '@/stores/yitian'
+import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { weekBuckets, monthBuckets, quarterBuckets, type WeekBucket } from '@/lib/yitian/calendar'
@@ -12,6 +13,7 @@ import { selectEntries, empStats, complianceRate, isIncluded, unfilledList, neve
 import { buildDrillQuery } from '@/lib/yitian/drill'
 
 const store = useYitianStore()
+const scopedYitian = useScopedYitian()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
 const router = useRouter()
@@ -39,7 +41,7 @@ const bucketsList = computed<WeekBucket[]>(() => {
 
 /** 按 gran(周/月/季)分桶,逐桶重算各指标。桶内区间 = [bucket.start, bucket.end],口径与总览页完全同源。 */
 const series = computed(() => {
-  const data = store.data
+  const data = scopedYitian.value
   const empty = {
     weeks: [] as string[], issues: [] as number[], okRate: [] as (number | null)[],
     hours: [] as number[], overtime: [] as number[], sat: [] as (number | null)[],
@@ -78,9 +80,9 @@ const series = computed(() => {
     }
   })
 
-  out.typeStack = types.map((t) => ({
+  out.typeStack = types.map((t: string) => ({
     name: t,
-    data: (typeAcc[t] ?? []).map((v) => Number((v ?? 0).toFixed(1))),
+    data: (typeAcc[t] ?? []).map((v: number) => Number((v ?? 0).toFixed(1))),
   }))
   return out
 })

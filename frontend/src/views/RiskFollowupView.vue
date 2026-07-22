@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -28,6 +29,7 @@ import { htmlToPlainText } from '@/lib/richText'
 
 const TABLE_ID = 'risk-followup'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const auth = useAuthStore()
 const risk = useRiskFollowupStore()
 const cf = useCrossFilterStore()
@@ -40,8 +42,8 @@ onMounted(() => {
   if (!risk.loaded) risk.load()
 })
 
-const projects = computed(() => (data.data?.projects ?? []) as Project[])
-const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
+const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
+const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const allRows = computed<RiskRow[]>(() => buildRiskRows(projects.value, pmisMap.value, risk.current))
 const hasScope = computed(() => risk.scope.groups.some((g) => g.conditions.length))
 const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filter((r) => riskRowMatches(r, risk.scope)) : allRows.value)

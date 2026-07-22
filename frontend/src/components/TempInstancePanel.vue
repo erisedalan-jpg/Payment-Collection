@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -29,6 +30,7 @@ import { htmlToPlainText } from '@/lib/richText'
 defineOptions({ name: 'TempInstancePanel' })   // 测试用 findComponent({name}) 找它,必须有
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 const auth = useAuthStore()
 const temp = useTempFollowupStore()
 const cf = useCrossFilterStore()
@@ -42,11 +44,11 @@ const TABLE_ID = `${TABLE_BASE}:${temp.activeId}`
 // 进页清空本表残留列筛选（keep-alive 下：菜单进入=新挂载会重置，下钻返回=缓存激活不重置）
 cf.clearAll(TABLE_ID)
 
-const projects = computed(() => (data.data?.projects ?? []) as Project[])
-const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
+const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
+const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const scopeInputs = computed(() =>
   buildScopeInputs(projects.value, pmisMap.value,
-    (data.data as any)?.paymentNodes ?? {}, (data.data as any)?.projectMilestones ?? {}))
+    (scoped.value as any)?.paymentNodes ?? {}, (scoped.value as any)?.projectMilestones ?? {}))
 const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, temp.scope)).map((i) => i.id)))
 

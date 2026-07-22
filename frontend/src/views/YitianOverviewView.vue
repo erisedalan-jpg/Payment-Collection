@@ -7,6 +7,7 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import RatioRing from '@/components/RatioRing.vue'
 import { useYitianStore } from '@/stores/yitian'
+import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { kpi, typeHours, orgSummary, selectEntries, orgL4SummaryRow, NO_L4 } from '@/lib/yitian/metrics'
@@ -14,6 +15,7 @@ import { buildDrillQuery } from '@/lib/yitian/drill'
 import { buildDetailDrill } from '@/lib/yitian/detailDrill'
 
 const store = useYitianStore()
+const scopedYitian = useScopedYitian()
 const view = useYitianViewStore()
 const settings = useYitianSettingsStore()
 const router = useRouter()
@@ -45,8 +47,8 @@ onMounted(() => { store.load(); settings.load() })
 
 const ready = computed(() => !!store.data)
 
-const k = computed(() => (store.data
-  ? kpi(store.data, view.start, view.end, view.l4s, settings.settings.excludedTypes)
+const k = computed(() => (scopedYitian.value
+  ? kpi(scopedYitian.value, view.start, view.end, view.l4s, settings.settings.excludedTypes)
   : null))
 
 function pct(v: number | null | undefined): string {
@@ -77,7 +79,7 @@ const complianceRingColor = computed(() => {
 })
 
 const typeRows = computed(() =>
-  store.data ? typeHours(store.data, selectEntries(store.data, view.start, view.end, view.l4s)) : [])
+  scopedYitian.value ? typeHours(scopedYitian.value, selectEntries(scopedYitian.value, view.start, view.end, view.l4s)) : [])
 
 const typeOption = computed(() => ({
   tooltip: { trigger: 'item' },
@@ -103,8 +105,8 @@ const orgCols: DataColumn[] = [
 // 只展示 L4 层,并剔除「未分配L4」(花名册里 L4 为空的部门负责人)。
 // 合计行同样只统计这里的可见行 —— 表里看到什么,合计就是什么之和,不会对不上。
 const l4Rows = computed(() =>
-  store.data
-    ? orgSummary(store.data, view.start, view.end, view.l4s)
+  scopedYitian.value
+    ? orgSummary(scopedYitian.value, view.start, view.end, view.l4s)
         .filter((r) => r.level === 'l4' && r.name !== NO_L4)
     : [])
 

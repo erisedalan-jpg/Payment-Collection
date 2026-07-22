@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
 import { computeKpis, healthSummary, paymentBand } from '@/lib/overview'
 import { paymentNodeRows } from '@/lib/paymentPmis'
@@ -25,6 +26,7 @@ import { useAuthStore } from '@/stores/auth'
 import { userScopedKey } from '@/lib/userScopedKey'
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 const filter = useFilterStore()
 const router = useRouter()
 onMounted(() => { if (!data.data) data.load() })
@@ -44,16 +46,16 @@ function togglePortal() {
 }
 
 const baseProjects = computed(() => {
-  const all = (data.data?.projects ?? []) as Project[]
+  const all = (scoped.value?.projects ?? []) as Project[]
   return filter.excludeOn ? all.filter((p) => !filter.excludedIds[p.projectId]) : all
 })
 const projects = baseProjects
 const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 
-const kpis = computed(() => computeKpis(projects.value, pmisMap.value, data.data?.paymentRecords))
+const kpis = computed(() => computeKpis(projects.value, pmisMap.value, scoped.value?.paymentRecords))
 const health = computed(() => healthSummary(projects.value))
 const band = computed(() => paymentBand(
-  paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis),
+  paymentNodeRows(scoped.value?.paymentNodes, projects.value, data.data?.projectPmis),
   new Date(),
   projects.value,
   filter.payRecordsAll,
@@ -77,9 +79,9 @@ const classEntries = computed(() => classifyProjects(rows.value))
 // 待办/临期 队列（7/30 天窗口）
 const todoWindow = ref<7 | 30>(7)
 const milestoneProjects = computed(() =>
-  buildMilestoneProjects(projects.value.filter((p) => !isAnomalous(p)), pmisMap.value, (data.data?.projectMilestones ?? {}) as Record<string, any>),
+  buildMilestoneProjects(projects.value.filter((p) => !isAnomalous(p)), pmisMap.value, (scoped.value?.projectMilestones ?? {}) as Record<string, any>),
 )
-const payNodes = computed(() => paymentNodeRows(data.data?.paymentNodes, projects.value, data.data?.projectPmis))
+const payNodes = computed(() => paymentNodeRows(scoped.value?.paymentNodes, projects.value, data.data?.projectPmis))
 const pidOverspend = computed(() => new Map(projects.value.map((p) => [p.projectId, p.overspendAmount ?? 0])))
 const todoRows = computed(() =>
   rows.value.map((r) => ({ projectId: r.projectId, projectName: r.projectName, riskReasons: r.riskReasons, overspendAmount: pidOverspend.value.get(r.projectId) ?? 0 })),
@@ -146,7 +148,7 @@ const l4Options = computed(() => {
   return [{ value: '', label: '全部 L4' }, ...[...set].sort((a, b) => a.localeCompare(b, 'zh-CN')).map((v) => ({ value: v, label: v }))]
 })
 const shownEvents = computed(() => {
-  let evs = (data.data?.events ?? []) as Event[]
+  let evs = (scoped.value?.events ?? []) as Event[]
   if (evScope.value === 'important') evs = evs.filter((e) => e.tone === 'warn' || e.tone === 'danger')
   if (evL4.value) evs = filterEvents(evs, { domain: '', query: '', types: [], l4: evL4.value }, pidL4.value)
   return evs.slice(0, 10)
