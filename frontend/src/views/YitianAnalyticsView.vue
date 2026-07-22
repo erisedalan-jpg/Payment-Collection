@@ -7,6 +7,7 @@ import ColumnFilter from '@/components/ColumnFilter.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { useYitianStore } from '@/stores/yitian'
+import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
@@ -17,6 +18,7 @@ import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import { useSettingsStore } from '@/stores/settings'
 
 const store = useYitianStore()
+const scopedYitian = useScopedYitian()
 const view = useYitianViewStore()
 const themeStore = useSettingsStore()
 
@@ -48,7 +50,7 @@ function shape(s: EmpStat) {
 }
 
 const stats = computed(() =>
-  store.data ? empStats(store.data, view.start, view.end, view.l4s) : [])
+  scopedYitian.value ? empStats(scopedYitian.value, view.start, view.end, view.l4s) : [])
 
 const empRows = computed(() => stats.value.map(shape))
 const topStats = computed(() => saturationTop(stats.value, 10))

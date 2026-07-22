@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useSettingsStore } from '@/stores/settings'
@@ -30,6 +31,7 @@ defineOptions({ name: 'MilestoneView' })
 useViewScrollMemory()
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 const filter = useFilterStore()
 const projectTags = useProjectTagsStore()
 const settings = useSettingsStore()
@@ -47,9 +49,9 @@ const muted = computed(() => (dark.value ? MUTED_DARK : MUTED_LIGHT))
 
 // 域：主域 ∩ 全局标签剔除
 const mps = computed(() => buildMilestoneProjects(
-  (data.data?.projects ?? []) as Project[],
+  (scoped.value?.projects ?? []) as Project[],
   (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
-  (data.data?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>,
+  (scoped.value?.projectMilestones ?? {}) as Record<string, MilestoneItem[]>,
   { excludeOn: filter.excludeOn, excludedIds: filter.excludedIds },
 ))
 

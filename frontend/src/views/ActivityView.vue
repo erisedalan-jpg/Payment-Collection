@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import type { Event, PeriodCompare, PeriodCompareEntry } from '@/types/analysis'
 import { filterEvents, distinctEventTypes, type ActivityFilters } from '@/lib/activity'
 import { fmtWan } from '@/lib/format'
@@ -9,6 +10,7 @@ import SegToggle from '@/components/SegToggle.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 onMounted(() => { if (!data.data) data.load() })
 
 // —— 周期对比(spec 4.4 顶部卡条;基线不足置灰) ——
@@ -37,7 +39,7 @@ const compareCards = computed(() => {
 })
 
 // —— 时间线 ——
-const events = computed(() => (data.data?.events ?? []) as Event[])
+const events = computed(() => (scoped.value?.events ?? []) as Event[])
 
 // projectId → orgL4 映射（涵盖在建+已关闭项目）
 const pidL4 = computed<Record<string, string>>(() => {

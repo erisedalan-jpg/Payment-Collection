@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { ClosedProject } from '@/types/analysis'
 import { buildClosedRows, filterClosedRows, type ClosedRow } from '@/lib/closedProjectList'
@@ -20,13 +21,14 @@ useViewScrollMemory()
 
 const TABLE_ID = 'projects-closed'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const cf = useCrossFilterStore()
 const router = useRouter()
 // 每次进页清空本表残留筛选，避免跨导航残留
 cf.clearAll(TABLE_ID)
 onMounted(() => { if (!data.data) data.load() })
 
-const rows = computed(() => buildClosedRows((data.data?.closedProjects ?? []) as ClosedProject[]))
+const rows = computed(() => buildClosedRows((scoped.value?.closedProjects ?? []) as ClosedProject[]))
 const search = ref('')
 // 先表头列枚举(crossFilter) -> 再全列搜索
 const filtered = computed(() => filterClosedRows(applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as ClosedRow[], { search: search.value }))

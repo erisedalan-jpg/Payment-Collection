@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
@@ -24,6 +25,7 @@ defineOptions({ name: 'PayProjectsView' })
 
 const TABLE_ID = 'pay-projects'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const filter = useFilterStore()
 const pd = useProjectDetailStore()
 const tags = useProjectTagsStore()
@@ -38,7 +40,7 @@ cf.clearAll(TABLE_ID)
 
 const rows = computed(() =>
   projectPaymentRows(
-    filterProjects(data.data?.projects ?? [], {
+    filterProjects(scoped.value?.projects ?? [], {
       viewMode: filter.viewMode,
       viewL4: filter.viewL4,
       viewPM: filter.viewPM,
@@ -46,7 +48,7 @@ const rows = computed(() =>
       excludedIds: filter.excludedIds,
     }),
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
-    data.data?.paymentNodes,
+    scoped.value?.paymentNodes,
     filter.payRecordsAll,
     filter.dateStart,
     filter.dateEnd,

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -33,6 +34,7 @@ useViewScrollMemory()
 
 const TABLE_ID = 'payment-key'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const auth = useAuthStore()
 const pk = usePaymentKeyFollowupStore()
 const cf = useCrossFilterStore()
@@ -46,11 +48,11 @@ onMounted(() => {
   if (!pk.loaded) pk.load()
 })
 
-const projects = computed(() => (data.data?.projects ?? []) as Project[])
-const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
+const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
+const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const scopeInputs = computed(() =>
   buildScopeInputs(projects.value, pmisMap.value,
-    (data.data as any)?.paymentNodes ?? {}, (data.data as any)?.projectMilestones ?? {}))
+    (scoped.value as any)?.paymentNodes ?? {}, (scoped.value as any)?.projectMilestones ?? {}))
 const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, pk.scope)).map((i) => i.id)))
 

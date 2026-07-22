@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useOpportunitiesStore } from '@/stores/opportunities'
+import { useScopedOpportunities } from '@/composables/useScopedData'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
@@ -21,6 +22,7 @@ import type { OppRow } from '@/lib/opportunitiesApi'
 const TABLE_ID = 'opportunities'
 const auth = useAuthStore()
 const store = useOpportunitiesStore()
+const scopedOpportunities = useScopedOpportunities()
 const cf = useCrossFilterStore()
 cf.clearAll(TABLE_ID)
 
@@ -48,7 +50,7 @@ const onToggle = prefs.makeToggle(cf, TABLE_ID)
 
 // 派生注入：在过滤前注入 recentUpdate，使其可筛/可排/可导出
 const withDerived = computed(() =>
-  store.rows.map((r) => ({
+  scopedOpportunities.value.map((r) => ({
     ...r,
     recentUpdate: recentUpdateOf((r as any).lastUpdate || '', now),
   })),

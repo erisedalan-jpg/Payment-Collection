@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useFilterStore } from '@/stores/filter'
 import { paymentNodeRows } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
@@ -26,6 +27,7 @@ import CalAgenda from '@/components/CalAgenda.vue'
 import CalNodeTable from '@/components/CalNodeTable.vue'
 
 const data = useDataStore()
+const scoped = useScopedProjects()
 const filter = useFilterStore()
 onMounted(() => {
   if (!data.data) data.load()
@@ -47,14 +49,14 @@ const calFilters = computed<CalFilters>(() => ({
 }))
 
 const allNodes = computed(() =>
-  paymentNodeRows(data.data?.paymentNodes, data.data?.projects ?? [], data.data?.projectPmis))
+  paymentNodeRows(scoped.value?.paymentNodes, scoped.value?.projects ?? [], scoped.value?.projectPmis))
 const baseNodes = computed(() =>
   filter.excludeOn ? allNodes.value.filter((n) => !filter.excludedIds[n.projectId]) : allNodes.value)
 const filtered = computed(() =>
   baseNodes.value.filter((n) => inRange(n.planDate || '', filter.dateStart, filter.dateEnd)))
 
 const options = computed(() => calFilterOptions(filtered.value))
-const dashboard = computed(() => calDashboardStats(filtered.value, calFilters.value, new Date(), data.data?.paymentRecords))
+const dashboard = computed(() => calDashboardStats(filtered.value, calFilters.value, new Date(), scoped.value?.paymentRecords))
 const gridNodes = computed(() => applyCalFilters(calExcludePaid(filtered.value), calFilters.value))
 const gridDateData = computed(() => calDateData(gridNodes.value))
 const yearHeat = computed(() => calYearHeat(gridNodes.value, state.year))

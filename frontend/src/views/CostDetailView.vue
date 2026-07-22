@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useSettingsStore } from '@/stores/settings'
 import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -33,6 +34,7 @@ useViewScrollMemory()
 
 const TABLE_ID = 'cost-detail'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const settings = useSettingsStore()
 const filter = useFilterStore()
 const cf = useCrossFilterStore()
@@ -49,7 +51,7 @@ cf.clearAll(TABLE_ID)
 
 const sc = computed(() => (settings.theme === 'dark' ? STATUS_DARK : STATUS_LIGHT))
 const baseProjects = computed(() => {
-  const all = (data.data?.projects ?? []) as Project[]
+  const all = (scoped.value?.projects ?? []) as Project[]
   return filter.excludeOn ? all.filter((p) => !filter.excludedIds[p.projectId]) : all
 })
 const rows = computed(() => buildCostRows(

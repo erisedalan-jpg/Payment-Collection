@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { useScopedProjects } from '@/composables/useScopedData'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
@@ -27,6 +28,7 @@ useViewScrollMemory()
 
 const TABLE_ID = 'projects-active'
 const data = useDataStore()
+const scoped = useScopedProjects()
 const projectTags = useProjectTagsStore()
 const cf = useCrossFilterStore()
 const route = useRoute()
@@ -37,7 +39,7 @@ onMounted(() => {
 })
 
 const rows = computed(() =>
-  buildProjectRows((data.data?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.effectiveAssignments))
+  buildProjectRows((scoped.value?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.effectiveAssignments))
 
 // 工具栏特殊筛选(非列枚举)
 const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', riskCategory: '' })
@@ -175,11 +177,11 @@ async function doExport() {
   const fu = exScope.value.includes('followup') ? (await followupApi.all()).records : []
   const sheets = buildExportSheets(exScope.value, {
     rows: filtered.value,
-    projects: (data.data?.projects ?? []) as any,
+    projects: (scoped.value?.projects ?? []) as any,
     assignments: projectTags.effectiveAssignments,
     followup: fu as any,
-    paymentNodes: (data.data?.paymentNodes ?? {}) as any,
-    milestones: (data.data?.projectMilestones ?? {}) as any,
+    paymentNodes: (scoped.value?.paymentNodes ?? {}) as any,
+    milestones: (scoped.value?.projectMilestones ?? {}) as any,
     // 「项目清单」sheet 按当前可见列导出(所见即所导),复用列 formatter 保持与页面文本一致。
     listColumns: visibleColumns.value.map((c) => ({ key: c.key, label: c.label, formatter: c.formatter })),
   })

@@ -7,6 +7,7 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import { useYitianStore } from '@/stores/yitian'
+import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
@@ -23,6 +24,7 @@ import { parseDetailDrill } from '@/lib/yitian/detailDrill'
 
 const TABLE_ID = 'yitian-detail'
 const store = useYitianStore()
+const scopedYitian = useScopedYitian()
 const view = useYitianViewStore()
 const cf = useCrossFilterStore()
 
@@ -32,7 +34,7 @@ const psort = usePersistentSort(userScopedKey(TABLE_ID))
 useViewScrollMemory()
 
 const ready = computed(() => !!store.data)
-const rows = computed(() => (store.data ? buildDetailRows(store.data) : []))
+const rows = computed(() => (scopedYitian.value ? buildDetailRows(scopedYitian.value) : []))
 const scoped = computed(() => filterDetailRows(rows.value, {
   start: view.start, end: view.end, l4s: view.l4s, onlyIssues: onlyIssues.value,
 }))
