@@ -43,6 +43,23 @@ class TestReadHolidays:
         assert rest == {date(2026, 2, 17)}
         assert work == set()
 
+    def test_reads_gbk_encoded_file(self, tmp_path):
+        # 中文 Excel「另存为 CSV」在中文 Windows 默认存 GBK/ANSI。read_holidays 必须兼容,
+        # 否则 UnicodeDecodeError 会穿透 build_yitian_data、被 preprocess 静默跳过,
+        # 整个倚天域不重建(线上实测:/yitian/detail 工作成果列全空)。
+        p = tmp_path / "holidays_gbk.csv"
+        p.write_bytes("日期,类型\n2026-02-16,休\n2026-02-14,班\n".encode("gbk"))
+        rest, work = C.read_holidays(str(p))
+        assert rest == {date(2026, 2, 16)}
+        assert work == {date(2026, 2, 14)}
+
+    def test_unrecognized_encoding_degrades(self, tmp_path):
+        # 两种编码都不认 → 降级为空集(不抛异常、不阻断倚天域)
+        p = tmp_path / "holidays_bad.csv"
+        p.write_bytes(b"\xff\xfe\x00\x01\x02bad")
+        rest, work = C.read_holidays(str(p))
+        assert rest == set() and work == set()
+
 
 class TestIsWorkday:
     def test_plain_weekday(self):

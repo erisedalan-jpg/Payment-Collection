@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import os
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Set, Tuple
@@ -33,24 +34,40 @@ def parse_date(s) -> Optional[date]:
 
 def read_holidays(path: str) -> Tuple[Set[date], Set[date]]:
     """holidays.csv(表头 日期,类型) → (休集合, 班集合)。
-    文件缺失/不可读 → (set(), set())(降级为纯周一~周五);坏行静默跳过。"""
+    文件缺失/不可读/编码不认 → (set(), set())(降级为纯周一~周五);坏行静默跳过。
+
+    编码容错(线上事故根因):中文 Excel「另存为 CSV」在中文 Windows 默认存 GBK/ANSI。
+    原实现只按 utf-8-sig 读,遇 GBK 文件抛 UnicodeDecodeError —— 而该异常会穿透
+    build_yitian_data、被 preprocess 的 try/except 静默吞掉,整个倚天域不重建
+    (表现:/yitian/detail「工作成果」列全空,且「更新数据」看似成功)。这里先按
+    utf-8-sig 严格解,失败回退 gb18030(GBK/GB2312 超集);两者都不认才降级为空集。"""
     rest: Set[date] = set()
     work: Set[date] = set()
     if not os.path.isfile(path):
         return rest, work
     try:
-        with open(path, "r", encoding="utf-8-sig", newline="") as f:
-            for row in csv.DictReader(f):
-                d = parse_date(row.get("日期"))
-                if d is None:
-                    continue
-                kind = str(row.get("类型") or "").strip()
-                if kind == REST:
-                    rest.add(d)
-                elif kind == WORK:
-                    work.add(d)
+        with open(path, "rb") as f:
+            raw = f.read()
     except OSError:
         return set(), set()
+    text: Optional[str] = None
+    for enc in ("utf-8-sig", "gb18030"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        return set(), set()
+    for row in csv.DictReader(io.StringIO(text)):
+        d = parse_date(row.get("日期"))
+        if d is None:
+            continue
+        kind = str(row.get("类型") or "").strip()
+        if kind == REST:
+            rest.add(d)
+        elif kind == WORK:
+            work.add(d)
     return rest, work
 
 
