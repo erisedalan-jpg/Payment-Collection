@@ -24,14 +24,15 @@ export const useOpportunityFollowupStore = defineStore('opportunityFollowup', ()
     const r = await opportunityFollowupApi.saveScope(next)
     scope.value = r.scope ?? next
   }
-  async function update(oppId: string, field: 'weekProgress' | 'nextPlan', content: string) {
+  async function update(oppId: string, field: string, content: string) {
     const r = await opportunityFollowupApi.update(oppId, field, content)
     current.value = { ...current.value, [oppId]: { ...current.value[oppId], ...r.record } }
   }
   async function archive(rows: Record<string, unknown>[]) {
     const r = await opportunityFollowupApi.archive(rows)
     archives.value = r.archives ?? []
-    current.value = {}
+    // 表级清空;但 clearOnArchive=false 的自定义列后端会留存,用回传 current 回填(缺省则空,向后兼容)。
+    current.value = r.current ?? {}
   }
   async function deleteArchive(idx: number) {
     const r = await opportunityFollowupApi.deleteArchive(idx)

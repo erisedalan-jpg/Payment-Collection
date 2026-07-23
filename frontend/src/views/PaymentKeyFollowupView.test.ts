@@ -8,6 +8,7 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { useFollowupColumnsStore } from '@/stores/followupColumns'
 
 vi.mock('@/lib/paymentKeyFollowupApi', () => ({
   paymentKeyFollowupApi: {
@@ -15,6 +16,15 @@ vi.mock('@/lib/paymentKeyFollowupApi', () => ({
       { combinator: 'AND', conditions: [{ group: 'project', field: 'orgL4', op: 'in', values: ['银行服务组'] }] },
     ] }, current: {}, archives: [] }),
     saveScope: vi.fn(), update: vi.fn(), archive: vi.fn(),
+  },
+}))
+
+// 既有测试未预置 followupColumns store 时,onMounted 会触发真实 fcStore.load();
+// mock 掉底层 API 避免真实网络调用,默认四表皆空(与升级前行为逐字一致)。
+vi.mock('@/lib/followupColumns', () => ({
+  followupColumnsApi: {
+    getAll: vi.fn().mockResolvedValue({ temp: [], risk: [], payment_key: [], opportunity: [] }),
+    add: vi.fn(), update: vi.fn(), reorder: vi.fn(), remove: vi.fn(),
   },
 }))
 
@@ -137,4 +147,13 @@ describe('PaymentKeyFollowupView', () => {
     expect(w.find('.el-pagination').exists()).toBe(true)
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
   }, 20000) // 渲染满页(51行)重表,并行争用下放宽超时
+
+  it('渲染超管配置的自定义列表头', async () => {
+    const fc = useFollowupColumnsStore()
+    fc.configs = { temp: [], risk: [], opportunity: [],
+      payment_key: [{ key: 'cf-z', label: '催收方式', type: 'text', clearOnArchive: false }] } as any
+    fc.loaded = true
+    const w = await mountAs(true)
+    expect(w.text()).toContain('催收方式')
+  })
 })

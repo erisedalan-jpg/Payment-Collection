@@ -24,14 +24,15 @@ export const usePaymentKeyFollowupStore = defineStore('paymentKeyFollowup', () =
     const r = await paymentKeyFollowupApi.saveScope(next)
     scope.value = r.scope ?? next
   }
-  async function update(projectId: string, field: 'followAction' | 'revConclusion' | 'nextRevDate', content: string) {
+  async function update(projectId: string, field: string, content: string) {
     const r = await paymentKeyFollowupApi.update(projectId, field, content)
     current.value = { ...current.value, [projectId]: { ...current.value[projectId], ...r.record } }
   }
   async function archive(rows: Record<string, unknown>[]) {
     const r: PaymentKeyArchiveResp = await paymentKeyFollowupApi.archive(rows)
     archives.value = r.archives ?? []
-    // 注意:不清空 current —— 跟进数据留存(与 temp/key 关键差异)
+    // 内置跟进数据留存;自定义列若配 clearOnArchive 由后端按字段清,用回传 current 回填(缺省则保持留存)。
+    current.value = r.current ?? current.value
   }
   async function deleteArchive(idx: number) {
     const r = await paymentKeyFollowupApi.deleteArchive(idx)

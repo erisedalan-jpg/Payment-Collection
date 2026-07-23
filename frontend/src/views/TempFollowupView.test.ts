@@ -28,6 +28,15 @@ vi.mock('@/lib/tempFollowupApi', () => ({
   },
 }))
 
+// 既有测试未预置 followupColumns store 时,onMounted 会触发真实 fcStore.load();
+// mock 掉底层 API 避免真实网络调用,默认四表皆空(与升级前行为逐字一致;同 RiskFollowupView.test.ts 的既有处理)。
+vi.mock('@/lib/followupColumns', () => ({
+  followupColumnsApi: {
+    getAll: vi.fn().mockResolvedValue({ temp: [], risk: [], payment_key: [], opportunity: [] }),
+    add: vi.fn(), update: vi.fn(), reorder: vi.fn(), remove: vi.fn(),
+  },
+}))
+
 const projects = [
   { projectId: 'P1', projectName: '项目甲', projectManager: '张三', orgL4: '银行服务组', top1000: '是',
     paymentPmis: { contract: 2_000_000 }, payment: { paymentRatio: 0.4 }, quadrant: 'A' },

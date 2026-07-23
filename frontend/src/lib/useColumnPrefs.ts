@@ -90,15 +90,17 @@ export function useColumnPrefs(viewKey: string, allKeys: string[], defaultVisibl
 export function useColumnPrefsDynamic(
   viewKey: string,
   allKeys: Ref<string[]>,
-  defaultVisible: string[],
+  defaultVisible: string[] | (() => string[]),
 ): ColumnPrefs {
+  const resolveDefault = (): string[] =>
+    typeof defaultVisible === 'function' ? defaultVisible() : defaultVisible
   const visibleKeys = ref<string[]>([])
   let inited = false
   function set(keys: string[]) { visibleKeys.value = keys; saveKeys(viewKey, keys) }
   function init(ks: string[]) {
     if (inited || !ks.length) return
     inited = true
-    visibleKeys.value = loadKeys(viewKey, ks, defaultVisible)
+    visibleKeys.value = loadKeys(viewKey, ks, resolveDefault())
   }
   init(allKeys.value)
   watch(allKeys, init)
@@ -117,6 +119,6 @@ export function useColumnPrefsDynamic(
     const i = visibleKeys.value.indexOf(key)
     if (i >= 0 && i < visibleKeys.value.length - 1) { const n = [...visibleKeys.value]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; set(n) }
   }
-  function reset() { set(defaultVisible.filter((k) => allKeys.value.includes(k))) }
+  function reset() { set(resolveDefault().filter((k) => allKeys.value.includes(k))) }
   return { visibleKeys, toggle, moveUp, moveDown, reset, makeToggle: buildMakeToggle(visibleKeys, toggle) }
 }

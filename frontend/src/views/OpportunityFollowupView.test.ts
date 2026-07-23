@@ -7,6 +7,16 @@ import { useAuthStore } from '@/stores/auth'
 import * as oppApi from '@/lib/opportunitiesApi'
 import * as oppfApi from '@/lib/opportunityFollowupApi'
 import { DEFAULT_OPP_SCOPE } from '@/lib/opportunityScope'
+import { useFollowupColumnsStore } from '@/stores/followupColumns'
+
+// 既有测试未预置 followupColumns store 时,onMounted 会触发真实 fcStore.load();
+// mock 掉底层 API 避免真实网络调用,默认四表皆空(与升级前行为逐字一致)。
+vi.mock('@/lib/followupColumns', () => ({
+  followupColumnsApi: {
+    getAll: vi.fn().mockResolvedValue({ temp: [], risk: [], payment_key: [], opportunity: [] }),
+    add: vi.fn(), update: vi.fn(), reorder: vi.fn(), remove: vi.fn(),
+  },
+}))
 
 const ROWS = [
   { id: 'opp-1', name: '甲商机', customer: '甲公司', top1000: 'TOP1000', earlyIntervene: '是', keyOpp: '是', status: '招投标', amountWan: 200, opportunityLevel: 'P1', frOwner: '王', lastUpdate: '2026-06-20' },
@@ -62,5 +72,14 @@ describe('OpportunityFollowupView', () => {
     expect(w.text()).toContain('共 51 条')
     expect(w.find('.el-pagination').exists()).toBe(true)
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
+  })
+
+  it('渲染超管配置的自定义列表头', async () => {
+    const fc = useFollowupColumnsStore()
+    fc.configs = { temp: [], risk: [], payment_key: [],
+      opportunity: [{ key: 'cf-z', label: '客户联系人', type: 'text', clearOnArchive: false }] } as any
+    fc.loaded = true
+    const w = await mountView(true)
+    expect(w.text()).toContain('客户联系人')
   })
 })

@@ -10,11 +10,12 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildTempRows, buildScopeInputs, type TempRow } from '@/lib/tempFollowup'
 import { projectMatches } from '@/lib/tempScope'
 import { applyColumnFilters } from '@/lib/crossFilter'
-import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { useColumnPrefsDynamic } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
+import { useCustomColumns } from '@/composables/useCustomColumns'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -22,6 +23,8 @@ import SegToggle from '@/components/SegToggle.vue'
 import RichTextCell from '@/components/RichTextCell.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
+import FollowupCustomCell from '@/components/FollowupCustomCell.vue'
+import FollowupColumnConfig from '@/components/FollowupColumnConfig.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
@@ -35,6 +38,12 @@ const auth = useAuthStore()
 const temp = useTempFollowupStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
+// temp.current 是 Pinia setup-store 的字段(访问时已自动解包,并非 Ref 本体);
+// useCustomColumns 需要真正的 Ref(内部读 .value),故用 computed 包一层而非直接传店内字段。
+// 自定义列配置的加载(fcStore.load())由父组件 TempFollowupView.vue 在 onMounted 里预载完成
+// (面板由 ready 门控,挂载时配置必已就绪),面板自身无需再持有/触发一次 store 加载。
+const custom = useCustomColumns('temp', { current: computed(() => temp.current) as any, rowKey: (r) => r.projectId })
+const colCfgOpen = ref(false)
 
 const TABLE_BASE = 'temp-followup'
 // 每个实例一套持久化。子组件由父组件 :key="activeId" 驱动重建,
@@ -53,12 +62,12 @@ const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, temp.scope)).map((i) => i.id)))
 
 const currentRows = computed<TempRow[]>(() =>
-  buildTempRows(projects.value, pmisMap.value, temp.current, inScopeIds.value))
+  custom.decorate(buildTempRows(projects.value, pmisMap.value, temp.current, inScopeIds.value)) as TempRow[])
 
 const fp = useFollowupPage(temp, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as TempRow[])
 const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as unknown as Array<Record<string, unknown>>, 'contractWan'))
 
-const ALL_COLUMNS: DataColumn[] = withSortable([
+const BASE_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
   { key: 'customer', label: '客户', width: 180 },
   { key: 'projectName', label: '项目名称', width: 200 },
@@ -96,17 +105,27 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'actualFinalAcceptDate', label: '实际终验时间', width: 120,
     formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
 ])
-const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
+// 自定义列直接接在静态列之后展开(不再套 withSortable):useCustomColumns 已按类型自定 sortable
+// (date=true、text=undefined,与 weekProgress/nextPlan 等长文本列同构不可排序);若整体重新
+// withSortable,会把 NON_SORTABLE_KEYS 未收录的自定义文本列 key(cf-xxxxxxxx)误判为可排序。
+const ALL_COLUMNS = computed<DataColumn[]>(() => [...BASE_COLUMNS, ...custom.columns.value])
+// 门控于 custom.loaded(而非 data 到位与否)——静态列恒在,若不门控,useColumnPrefsDynamic 会在
+// 自定义列到位前用「静态列的完整集合」就地 init 并锁定,把自定义列永久排除在持久化候选之外。
+const ALL_KEYS = computed(() => (custom.loaded.value ? ALL_COLUMNS.value.map((c) => c.key) : []))
 // 默认可见 = key 页那 14 列(额外列默认隐藏)
 const DEFAULT_VISIBLE = ['projectId', 'customer', 'projectName', 'projectLevel', 'projectManager', 'ar', 'sr',
   'orgL4', 'contractWan', 'riskLevel', 'weekProgress', 'nextPlan', 'followDate', 'followBy']
-const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate',
+const FILTERABLE = computed(() => new Set([
+  'projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate',
   'stage', 'projectType', 'projectStatus', 'health', 'paymentStatus', 'top1000', 'quadrant', 'milestoneStatus',
-  'setupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate'])
-const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
+  'setupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate',
+  ...custom.filterableKeys.value,
+]))
+const prefs = useColumnPrefsDynamic(userScopedKey(TABLE_ID), ALL_KEYS,
+  () => [...DEFAULT_VISIBLE, ...custom.defaultKeys()])
 const visibleColumns = computed(() =>
-  prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
-const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
+  prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
+const pickerColumns = computed(() => ALL_COLUMNS.value.map((c) => ({ key: c.key, label: c.label })))
 function onToggle(key: string) {
   if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
   prefs.toggle(key)
@@ -170,6 +189,7 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs, sort })
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="scopeOpen = true">范围设置</button>
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="archiveConfirm = true">更新（归档+清空）</button>
+      <button v-if="auth.isSuper" class="kp-archive-btn" @click="colCfgOpen = true">列设置</button>
       <button v-if="auth.isSuper" class="kp-export-btn" @click="fp.exportOpen.value = true">导出</button>
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
@@ -201,6 +221,10 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs, sort })
             :save-handler="(html: string) => temp.update((row as TempRow).projectId, 'nextPlan', html)"
           />
         </template>
+        <template v-for="col in custom.defs.value" :key="col.key" #[`cell-${col.key}`]="{ row }">
+          <FollowupCustomCell :col="col" :row="row" :editable="fp.isCurrent.value"
+            :save="(v: string) => temp.update((row as TempRow).projectId, col.key, v)" />
+        </template>
       </DataTable>
     </div>
 
@@ -213,6 +237,7 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs, sort })
 
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="scopeInputs" :initial="temp.scope"
       @save="(s) => temp.saveScope(s)" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="temp" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"
