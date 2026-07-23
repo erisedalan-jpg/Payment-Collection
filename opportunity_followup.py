@@ -27,12 +27,12 @@ def normalize_scope(scope: Any) -> Dict[str, Any]:
     return _fs.normalize_scope(_CFG, scope)
 
 
-def apply_update(store, opp_id, field, content, account, now) -> Dict[str, Any]:
-    return _fs.apply_update(_CFG, store, opp_id, field, content, account, now)
+def apply_update(store, opp_id, field, content, account, now, extra_fields=()) -> Dict[str, Any]:
+    return _fs.apply_update(_CFG, store, opp_id, field, content, account, now, extra_fields=extra_fields)
 
 
-def apply_archive(store, rows, now) -> None:
-    _fs.apply_archive(_CFG, store, rows, now)
+def apply_archive(store, rows, now, clear_fields=None) -> None:
+    _fs.apply_archive(_CFG, store, rows, now, clear_fields=clear_fields)
 
 
 def apply_archive_delete(store, idx) -> bool:

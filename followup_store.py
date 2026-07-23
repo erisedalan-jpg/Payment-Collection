@@ -64,8 +64,8 @@ def normalize_scope(cfg: FollowupConfig, scope: Any) -> Dict[str, Any]:
     return {"combinator": _norm_combinator(scope.get('combinator')), "groups": groups}
 
 
-def apply_update(cfg: FollowupConfig, store, key, field, content, account, now) -> Dict[str, Any]:
-    if field not in cfg.progress_fields:
+def apply_update(cfg: FollowupConfig, store, key, field, content, account, now, extra_fields=()) -> Dict[str, Any]:
+    if field not in cfg.progress_fields and field not in extra_fields:
         raise ValueError("invalid field: %s" % field)
     rec = store.setdefault('current', {}).setdefault(key, {})
     rec[field] = content
@@ -74,10 +74,20 @@ def apply_update(cfg: FollowupConfig, store, key, field, content, account, now) 
     return rec
 
 
-def apply_archive(cfg: FollowupConfig, store, rows, now) -> None:
+def apply_archive(cfg: FollowupConfig, store, rows, now, clear_fields=None) -> None:
     store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
-    if cfg.clear_on_archive:
-        store['current'] = {}
+    if clear_fields is None:
+        # 向后兼容:无自定义列时退化为原表级行为
+        if cfg.clear_on_archive:
+            store['current'] = {}
+        return
+    current = store.setdefault('current', {})
+    for rec in current.values():
+        for f in clear_fields:
+            rec.pop(f, None)
+            rec.pop(f + 'EditTime', None)
+            rec.pop(f + 'EditBy', None)
+    store['current'] = {k: v for k, v in current.items() if v}   # 丢弃清空后为空的记录
 
 
 def apply_archive_delete(store, idx) -> bool:

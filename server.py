@@ -34,6 +34,7 @@ import data_scope
 import manual_import
 import manual_history
 import projects
+import followup_columns
 import opportunities as _opp
 import temp_followup
 import temp_followup as _temp
@@ -224,6 +225,9 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/opportunity-followup/scope', '/api/opportunity-followup/archive', '/api/opportunity-followup/archive/delete',
     '/api/risk-followup/scope', '/api/risk-followup/archive', '/api/risk-followup/archive/delete',
     '/api/payment-key-followup/scope', '/api/payment-key-followup/archive', '/api/payment-key-followup/archive/delete',
+    # 跟进表超管自定义列:GET(读列定义)不入本集合——普通管理员要用它渲染列;写四端点超管专属。
+    '/api/followup-columns/add', '/api/followup-columns/update',
+    '/api/followup-columns/reorder', '/api/followup-columns/delete',
     '/api/pmis/cookie', '/api/pmis/download',
     '/api/yitian/cookie',
     '/api/yitian/store/clear', '/api/yitian/store/delete-range',
@@ -344,6 +348,9 @@ _YITIAN_PAGE_KEYS = ('yitian', 'yitian-compliance', 'yitian-analytics',
 # 所以**不能**进 _SUPER_ONLY_PATHS(那个闸按 path 匹配、不分 method)。判权在 handler 内做。
 BUDGET_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'budget_config.json')
 BUDGET_ESTIMATES_FILE = os.path.join(BASE_DIR, 'data', 'budget_estimates.json')
+
+# ── 跟进表超管自定义列(4 表共享一份配置文件,不区分域;值内联在各跟进 store 里) ──
+FOLLOWUP_COLUMNS_FILE = os.path.join(BASE_DIR, 'data', 'followup_columns.json')
 
 # ── 蓝信推送 /lanxin:凭证/路由配置(超管可配) ──
 LANXIN_CONFIG_FILE = os.path.join(BASE_DIR, 'data', 'lanxin_config.json')
@@ -900,6 +907,17 @@ def _save_paykey_followup(store):
         os.replace(tmp, PAYKEY_FOLLOWUP_FILE)
 
 
+_followup_columns_lock = threading.Lock()
+
+
+def _load_followup_columns():
+    return followup_columns.load(FOLLOWUP_COLUMNS_FILE)
+
+
+def _save_followup_columns(cfg):
+    followup_columns.save(FOLLOWUP_COLUMNS_FILE, cfg)
+
+
 # ── 商机管理(V2.0.0) ──
 OPPORTUNITIES_FILE = os.path.join(BASE_DIR, 'data', 'opportunities.json')
 # 商机字段 key → 中文标签(供审计更新详情;反转 opportunities 既有列名映射)
@@ -1092,6 +1110,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_budget_config_get()
         elif parsed.path == '/api/budget/estimates':
             self.handle_budget_estimates_get()
+        elif parsed.path == '/api/followup-columns':
+            self.handle_followup_columns_get()
         elif parsed.path == '/api/lanxin/config':
             self.handle_lanxin_config_get()
         elif parsed.path == '/api/lanxin/inbox':
@@ -1267,6 +1287,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_budget_estimates_save()
         elif parsed.path == '/api/budget/estimates/delete':
             self.handle_budget_estimates_delete()
+        elif parsed.path == '/api/followup-columns/add':
+            self.handle_followup_columns_add()
+        elif parsed.path == '/api/followup-columns/update':
+            self.handle_followup_columns_update()
+        elif parsed.path == '/api/followup-columns/reorder':
+            self.handle_followup_columns_reorder()
+        elif parsed.path == '/api/followup-columns/delete':
+            self.handle_followup_columns_delete()
         elif parsed.path == '/api/lanxin/config':
             self.handle_lanxin_config_save()
         elif parsed.path == '/api/lanxin/selftest':
@@ -1953,7 +1981,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         pid = str(data.get('projectId') or '').strip()
         field = data.get('field')
-        if not pid or field not in _temp.PROGRESS_FIELDS:
+        _cfg = _load_followup_columns()
+        _extra = followup_columns.custom_keys(_cfg, 'temp')
+        if not pid or (field not in _temp.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 weekProgress/nextPlan"))
             return
         self._audit_set(target=pid, detail='%s（已修改）' % audit.field_label(field))
@@ -1967,7 +1997,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
             if inst is None:
                 raise ValueError("instanceId 不存在")
-            return _temp.apply_update(inst, pid, field, str(data.get('content') or ''), account, now)
+            return _temp.apply_update(inst, pid, field, str(data.get('content') or ''), account, now, extra_fields=_extra)
 
         ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
         if not ok:
@@ -1987,19 +2017,24 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _cfg = _load_followup_columns()
+        _clear = followup_columns.clear_field_keys(_cfg, 'temp', _temp.PROGRESS_FIELDS, True)
+
+        holder = {}
 
         def _apply(s):
             inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
             if inst is None:
                 raise ValueError("instanceId 不存在")
-            _temp.apply_archive(inst, rows, now)
+            _temp.apply_archive(inst, rows, now, clear_fields=_clear)
+            holder['current'] = inst.get("current", {})   # 归档后 current(按字段清):前端据此回填,免整表清/留与后端错位
             return inst.get("archives", [])
 
         ok, res = self._followup_txn(_temp_lock, _load_temp_followup, _apply, _save_temp_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res})
+        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
 
     def handle_temp_followup_archive_delete(self):
         """POST /api/temp-followup/archive/delete {instanceId, archiveIdx} — 删指定实例的指定历史快照。超管专属。"""
@@ -2139,7 +2174,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         oid = str(data.get('oppId') or '').strip()
         field = data.get('field')
-        if not oid or field not in _oppf.PROGRESS_FIELDS:
+        _cfg = _load_followup_columns()
+        _extra = followup_columns.custom_keys(_cfg, 'opportunity')
+        if not oid or (field not in _oppf.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "oppId 必填、field 须为 weekProgress/nextPlan"))
             return
         self._audit_set(target=oid, detail='%s（已修改）' % audit.field_label(field))
@@ -2150,7 +2187,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ok, res = self._followup_txn(
             _opp_followup_lock, _load_opportunity_followup,
-            lambda s: _oppf.apply_update(s, oid, field, str(data.get('content') or ''), account, now),
+            lambda s: _oppf.apply_update(s, oid, field, str(data.get('content') or ''), account, now, extra_fields=_extra),
             _save_opportunity_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
@@ -2169,16 +2206,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _cfg = _load_followup_columns()
+        _clear = followup_columns.clear_field_keys(_cfg, 'opportunity', _oppf.PROGRESS_FIELDS, True)
+
+        holder = {}
 
         def _apply(s):
-            _oppf.apply_archive(s, rows, now)
+            _oppf.apply_archive(s, rows, now, clear_fields=_clear)
+            holder['current'] = s.get("current", {})
             return s.get("archives", [])
 
         ok, res = self._followup_txn(_opp_followup_lock, _load_opportunity_followup, _apply, _save_opportunity_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res})
+        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
 
     def handle_opportunity_followup_archive_delete(self):
         """POST /api/opportunity-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -2247,14 +2289,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         rk = str(data.get('riskKey') or '').strip()
         field = data.get('field')
-        if not rk or field not in _riskfu.PROGRESS_FIELDS:
+        _cfg = _load_followup_columns()
+        _extra = followup_columns.custom_keys(_cfg, 'risk')
+        if not rk or (field not in _riskfu.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "riskKey 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
         self._audit_set(target=rk, detail='%s（已修改）' % audit.field_label(field))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ok, res = self._followup_txn(
             _risk_lock, _load_risk_followup,
-            lambda s: _riskfu.apply_update(s, rk, field, str(data.get('content') or ''), account, now),
+            lambda s: _riskfu.apply_update(s, rk, field, str(data.get('content') or ''), account, now, extra_fields=_extra),
             _save_risk_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
@@ -2273,16 +2317,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _cfg = _load_followup_columns()
+        _clear = followup_columns.clear_field_keys(_cfg, 'risk', _riskfu.PROGRESS_FIELDS, False)
+
+        holder = {}
 
         def _apply(s):
-            _riskfu.apply_archive(s, rows, now)
+            _riskfu.apply_archive(s, rows, now, clear_fields=_clear)
+            holder['current'] = s.get("current", {})
             return s.get("archives", [])
 
         ok, res = self._followup_txn(_risk_lock, _load_risk_followup, _apply, _save_risk_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res})
+        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
 
     def handle_risk_followup_archive_delete(self):
         """POST /api/risk-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -2351,14 +2400,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         pid = str(data.get('projectId') or '').strip()
         field = data.get('field')
-        if not pid or field not in _paykey.PROGRESS_FIELDS:
+        _cfg = _load_followup_columns()
+        _extra = followup_columns.custom_keys(_cfg, 'payment_key')
+        if not pid or (field not in _paykey.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
         self._audit_set(target=pid, detail='%s（已修改）' % audit.field_label(field))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ok, res = self._followup_txn(
             _paykey_lock, _load_paykey_followup,
-            lambda s: _paykey.apply_update(s, pid, field, str(data.get('content') or ''), account, now),
+            lambda s: _paykey.apply_update(s, pid, field, str(data.get('content') or ''), account, now, extra_fields=_extra),
             _save_paykey_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
@@ -2377,16 +2428,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _cfg = _load_followup_columns()
+        _clear = followup_columns.clear_field_keys(_cfg, 'payment_key', _paykey.PROGRESS_FIELDS, False)
+
+        holder = {}
 
         def _apply(s):
-            _paykey.apply_archive(s, rows, now)
+            _paykey.apply_archive(s, rows, now, clear_fields=_clear)
+            holder['current'] = s.get("current", {})
             return s.get("archives", [])
 
         ok, res = self._followup_txn(_paykey_lock, _load_paykey_followup, _apply, _save_paykey_followup)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res})
+        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
 
     def handle_paykey_followup_archive_delete(self):
         """POST /api/payment-key-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -2411,6 +2467,138 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if res is False:
             self._send_json(400, _error_payload(ERR_VALIDATION, "archiveIdx 超出范围")); return
         self._json_response({"success": True, "archives": holder.get("archives", [])})
+
+    # ── 跟进表超管自定义列(GET+add/update/reorder;delete 见 handle_followup_columns_delete) ──
+
+    def handle_followup_columns_get(self):
+        """GET /api/followup-columns — 全部 4 表自定义列配置。任意登录管理员(渲染列要用)。"""
+        account, rec = self._session_account_rec()
+        if not rec:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期")); return
+        try:
+            cfg = _load_followup_columns()
+            self._json_response({"success": True, "tables": cfg.get("tables", {})})
+        except Exception as e:
+            self._json_response(_error_payload(ERR_INTERNAL, f"读取自定义列配置失败: {e}"))
+
+    def handle_followup_columns_add(self):
+        """POST /api/followup-columns/add {table,label,type,clearOnArchive} — 超管专属(_authz_gate 拦)。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        table = str(data.get('table') or '')
+        self._audit_set(target=table, detail='新增自定义列「%s」(%s)' % (str(data.get('label') or ''), str(data.get('type') or '')))
+        holder = {}
+
+        def _apply(cfg):
+            holder['col'] = followup_columns.add_column(
+                cfg, table, data.get('label'), data.get('type'), bool(data.get('clearOnArchive')))
+            return cfg["tables"][table]
+
+        ok, res = self._followup_txn(_followup_columns_lock, _load_followup_columns, _apply, _save_followup_columns)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "新增失败")); return
+        self._json_response({"success": True, "column": holder.get('col'), "columns": res})
+
+    def handle_followup_columns_update(self):
+        """POST /api/followup-columns/update {table,key,label?,type?,clearOnArchive?} — 超管专属。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        table, key = str(data.get('table') or ''), str(data.get('key') or '')
+        self._audit_set(target='%s/%s' % (table, key), detail='修改自定义列')
+        holder = {}
+
+        def _apply(cfg):
+            holder['col'] = followup_columns.update_column(
+                cfg, table, key,
+                label=data.get('label'), type_=data.get('type'),
+                clear_on_archive=data.get('clearOnArchive'))
+            return cfg["tables"][table]
+
+        ok, res = self._followup_txn(_followup_columns_lock, _load_followup_columns, _apply, _save_followup_columns)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "修改失败")); return
+        self._json_response({"success": True, "column": holder.get('col'), "columns": res})
+
+    def handle_followup_columns_reorder(self):
+        """POST /api/followup-columns/reorder {table,keys:[...]} — 超管专属。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        table = str(data.get('table') or '')
+        self._audit_set(target=table, detail='重排自定义列')
+
+        def _apply(cfg):
+            return followup_columns.reorder_columns(cfg, table, data.get('keys'))
+
+        ok, res = self._followup_txn(_followup_columns_lock, _load_followup_columns, _apply, _save_followup_columns)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "重排失败")); return
+        self._json_response({"success": True, "columns": res})
+
+    # 表键 → (锁, load, save, instances? 布尔)。temp 为多实例、值散在各 instance 的 current。
+    def _store_binding(self, table):
+        return {
+            'temp': (_temp_lock, _load_temp_followup, _save_temp_followup, True),
+            'risk': (_risk_lock, _load_risk_followup, _save_risk_followup, False),
+            'payment_key': (_paykey_lock, _load_paykey_followup, _save_paykey_followup, False),
+            'opportunity': (_opp_followup_lock, _load_opportunity_followup, _save_opportunity_followup, False),
+        }.get(table)
+
+    @staticmethod
+    def _purge_key_from_current(current, key):
+        """从一个 {记录键: 记录} 里清除 key + EditTime/EditBy;返回被动到的记录数。"""
+        n = 0
+        for rec in current.values():
+            if key in rec or (key + 'EditTime') in rec or (key + 'EditBy') in rec:
+                rec.pop(key, None); rec.pop(key + 'EditTime', None); rec.pop(key + 'EditBy', None)
+                n += 1
+        return n
+
+    def handle_followup_columns_delete(self):
+        """POST /api/followup-columns/delete {table,key} — 删列 + 清该列当前值(temp 含全实例);
+        历史归档不动。超管专属。"""
+        data = self._read_json_body()
+        if not isinstance(data, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
+        table, key = str(data.get('table') or ''), str(data.get('key') or '')
+        binding = self._store_binding(table)
+        if binding is None:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "未知跟进表")); return
+        self._audit_set(target='%s/%s' % (table, key), detail='删除自定义列')
+        holder = {}
+
+        # 先删配置(校验列存在)
+        def _apply_cfg(cfg):
+            holder['col'] = followup_columns.delete_column(cfg, table, key)
+            return cfg["tables"][table]
+
+        ok, res = self._followup_txn(_followup_columns_lock, _load_followup_columns, _apply_cfg, _save_followup_columns)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "删除失败")); return
+
+        # 再清值(store 锁)。配置已删,即便这步失败,列也不再展示;清值尽力而为。
+        lock, load_fn, save_fn, multi = binding
+
+        def _apply_store(s):
+            n = 0
+            if multi:
+                for inst in s.get('instances', []):
+                    n += self._purge_key_from_current(inst.setdefault('current', {}), key)
+            else:
+                n += self._purge_key_from_current(s.setdefault('current', {}), key)
+            holder['affected'] = n
+            return n
+
+        ok2, _res2 = self._followup_txn(lock, load_fn, _apply_store, save_fn)
+        affected = holder.get('affected', 0) if ok2 else 0
+        self._audit_set(detail='删除自定义列「%s」(清 %d 行值)' % (holder.get('col', {}).get('label', ''), affected))
+        self._json_response({"success": True, "deleted": holder.get('col'), "affectedRows": affected})
 
     # ── 商机管理处理器(V2.0.0) ──
 
