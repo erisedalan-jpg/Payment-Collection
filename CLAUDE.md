@@ -108,6 +108,13 @@ python server.py --stop     # 停止运行中的服务
 - **③ 归入必须追加、④ 必须全量转义**：`followup_store.apply_update` 是 `rec[field]=content` 直接赋值，原样调用会抹掉既有跟进——归入须读现有内容再拼接（`server.py` 内做，**不改 `followup_store.py`**）；回复是员工任意输入而跟进字段是富文本，必须 `html.escape` 后**换行只用 `<br>`**（`<p>` 不在 `lib/richText.ts` 白名单会被读端拆解）。progress 域不走 `followup_store`（store 逻辑内联 server.py），归入单开分支。
 - **文档不可靠、凭证未联调**：蓝信文档字段表与真实密文键名对不上（`eventType/appId` vs `type/app_id`），解析两套键名都认；回调 `timestamp` 单位/格式文档未记载，代码按 epoch 秒解读是**未证实假设**（`lastReason=stale` 且收件箱空即疑此）。全链路从未联调，改动靠 `lanxin_crypto` 官方向量回归 + 伪造报文单测兜底。**债 L-31：nonce 重放缓存未做，依赖时间戳窗口+存证轮转两道叠加，摘窗口会无声重开此债**。
 
+### 跟进表自定义列约定（2026-07-23 起，V4.4.0；改任一处先读本节）
+- **超管可为 4 张跟进表配自定义列**（`temp`/`risk`/`payment_key`/`opportunity`，均走 `followup_store`；「重点项目进展」独立代码路径**不含**）：文本（富文本，复用 `RichTextCell`）或日期（`el-date-picker`），列名 + 归档是否清空可配。配置存 `data/followup_columns.json`（`followup_columns.py`，超管可配、即时生效、**不进数据管线、无需点更新数据**；已 gitignore）。**新增任何 `data/*.json` 前先确认 `.gitignore` 已逐文件覆盖**（本仓 gitignore 是显式列举、非 `data/*.json` 通配）。
+- **① 值内联、不设第二数据源**：自定义列值存各 store 的 `current[记录键][customKey]`（+`EditTime`/`EditBy`），与内置列并排；`apply_update` 加 `extra_fields` 放行、`apply_archive` 加 `clear_fields` 按字段清（`clear_fields=None` 退化原表级行为，回归安全网）。行构建器白名单不 spread，前端用 `useCustomColumns.decorate` 把值并到行上（否则排序/筛选/导出读不到）。
+- **② 归档按列清 + 前端须据后端回填**：内置列保持各表原行为、每个自定义列按自己的 `clearOnArchive`；归档 handler **回传 `current`**，前端 store `archive()` 用 `r.current` 回填（`?? current.value`/`?? {}` 缺省向后兼容）——**绝不再用「整表清/留」硬编码**，否则设了反向 clearOnArchive 的列归档后 UI 与后端错位。
+- **③ 删列即删值**：删配置定义 + 清该 `customKey` 在 `current` 的全部值（temp 遍历**全部实例**）+ 提示影响行数；**历史归档 `archives` 冻结不动**。改名只改 `label`、`key` 不变故值不丢。
+- **④ 端点用静态路径 + body 传参**（`/api/followup-columns/{add,update,reorder,delete}`，写端点进 `_SUPER_ONLY_PATHS`、`GET` 不进）：审计 `_ACTION_MAP` 与超管闸都按精确 path 匹配，带 `<key>` 变量路径挂不上。
+
 ## 设计底层规范（展示形式）
 
 > 约束**展示形式**(配色/排版/间距/卡片/圆角/阴影/动效/密度)，不规定展示内容。
