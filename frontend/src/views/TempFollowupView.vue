@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
+import { useFollowupColumnsStore } from '@/stores/followupColumns'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 import TempInstancePanel from '@/components/TempInstancePanel.vue'
@@ -14,6 +15,7 @@ useViewScrollMemory()
 const data = useDataStore()
 const auth = useAuthStore()
 const temp = useTempFollowupStore()
+const fcStore = useFollowupColumnsStore()
 
 // V4.0.2 一次性迁移:多实例后表 key 从 'temp-followup' 变为 'temp-followup:{instanceId}',
 // 老用户已存的选列/排序会读不到而回落默认列 —— 用户会以为配置丢了。
@@ -42,6 +44,9 @@ const ready = ref(false)
 onMounted(async () => {
   if (!data.data) data.load()
   if (!temp.loaded) await temp.load()
+  // 预载自定义列配置(await,而非 fire-and-forget)——面板由 ready 门控,挂载前列配置已就绪,
+  // 避免 custom.loaded 由 false→true 那一拍带来的表头列闪烁/动态选列早锁窗口。
+  if (!fcStore.loaded) await fcStore.load()
   migrateLegacyTableKeys(temp.instances[0]?.id ?? '')
   try {
     const last = localStorage.getItem(userScopedKey('temp-active'))

@@ -6,12 +6,12 @@ export interface RiskArchive { archiveTime: string; rows: Record<string, unknown
 export interface RiskGetResp { success?: boolean; scope: ScopeFilter; current: Record<string, RiskFollowRecord>; archives: RiskArchive[] }
 export interface RiskScopeResp { success: boolean; scope: ScopeFilter }
 export interface RiskUpdateResp { success: boolean; record: RiskFollowRecord }
-export interface RiskArchiveResp { success: boolean; archives: RiskArchive[] }
+export interface RiskArchiveResp { success: boolean; archives: RiskArchive[]; current?: Record<string, RiskFollowRecord> }
 
 export const riskFollowupApi = {
   get: () => api.get<RiskGetResp>('/api/risk-followup'),
   saveScope: (scope: ScopeFilter) => api.post<RiskScopeResp>('/api/risk-followup/scope', scope),
-  update: (riskKey: string, field: 'followAction' | 'revConclusion' | 'nextRevDate', content: string) =>
+  update: (riskKey: string, field: string, content: string) =>
     api.post<RiskUpdateResp>('/api/risk-followup/update', { riskKey, field, content }),
   archive: (rows: Record<string, unknown>[]) => api.post<RiskArchiveResp>('/api/risk-followup/archive', { rows }),
   deleteArchive: (archiveIdx: number) => api.post<RiskArchiveResp>('/api/risk-followup/archive/delete', { archiveIdx }),

@@ -23,14 +23,16 @@ export const useRiskFollowupStore = defineStore('riskFollowup', () => {
     const r = await riskFollowupApi.saveScope(next)
     scope.value = r.scope ?? next
   }
-  async function update(riskKey: string, field: 'followAction' | 'revConclusion' | 'nextRevDate', content: string) {
+  async function update(riskKey: string, field: string, content: string) {
     const r = await riskFollowupApi.update(riskKey, field, content)
     current.value = { ...current.value, [riskKey]: { ...current.value[riskKey], ...r.record } }
   }
   async function archive(rows: Record<string, unknown>[]) {
     const r = await riskFollowupApi.archive(rows)
     archives.value = r.archives ?? []
-    // 注意:不清空 current —— 跟进数据留存(与 temp/key 关键差异)
+    // 内置跟进数据留存;但自定义列若配了 clearOnArchive 后端会按字段清,故用后端回传的 current 回填
+    // (r.current 缺省[如旧后端/测试 mock]时保持留存不变,向后兼容)。
+    current.value = r.current ?? current.value
   }
   async function deleteArchive(idx: number) {
     const r = await riskFollowupApi.deleteArchive(idx)

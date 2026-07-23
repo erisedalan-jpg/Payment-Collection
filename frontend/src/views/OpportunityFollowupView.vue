@@ -9,11 +9,13 @@ import { OPP_COLUMNS, FILTERABLE as OPP_FILTERABLE, type OppColumn } from '@/lib
 import { OPP_SCOPE_CATALOG, opportunityMatches } from '@/lib/opportunityScope'
 import { buildOppFollowupRows, type OppFollowupRow } from '@/lib/opportunityFollowup'
 import { applyColumnFilters } from '@/lib/crossFilter'
-import { useColumnPrefs } from '@/lib/useColumnPrefs'
+import { useColumnPrefsDynamic } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { withSortable } from '@/lib/columnSort'
 import { useFollowupPage } from '@/composables/useFollowupPage'
+import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { useCustomColumns } from '@/composables/useCustomColumns'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -21,6 +23,8 @@ import SegToggle from '@/components/SegToggle.vue'
 import RichTextCell from '@/components/RichTextCell.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
+import FollowupCustomCell from '@/components/FollowupCustomCell.vue'
+import FollowupColumnConfig from '@/components/FollowupColumnConfig.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { htmlToPlainText } from '@/lib/richText'
 
@@ -30,16 +34,23 @@ const opps = useOpportunitiesStore()
 const scopedOpportunities = useScopedOpportunities()
 const oppf = useOpportunityFollowupStore()
 const cf = useCrossFilterStore()
+const fcStore = useFollowupColumnsStore()
+// oppf.current 是 Pinia setup-store 的字段(访问时已自动解包,并非 Ref 本体);
+// useCustomColumns 需要真正的 Ref(内部读 .value),故用 computed 包一层而非直接传店内字段。
+const custom = useCustomColumns('opportunity', { current: computed(() => oppf.current) as any, rowKey: (r) => r.id })
+const colCfgOpen = ref(false)
 
 onMounted(() => {
   if (!opps.loaded) opps.load()
   if (!oppf.loaded) oppf.load()
+  if (!fcStore.loaded) fcStore.load()
 })
 
 const now = new Date()
 
 // 全部商机行(注入派生+跟进) → 供 ScopeBuilder 命中计数;再按 scope 过滤为当前清单
-const allRows = computed<OppFollowupRow[]>(() => buildOppFollowupRows(scopedOpportunities.value, oppf.current, now))
+const allRows = computed<OppFollowupRow[]>(() =>
+  custom.decorate(buildOppFollowupRows(scopedOpportunities.value, oppf.current, now)) as OppFollowupRow[])
 const inScopeRows = computed<OppFollowupRow[]>(() => allRows.value.filter((r) => opportunityMatches(r, oppf.scope)))
 
 const fp = useFollowupPage(oppf, inScopeRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as OppFollowupRow[])
@@ -58,15 +69,19 @@ const FOLLOWUP_COLUMNS: DataColumn[] = [
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
 ]
-const ALL_COLUMNS: DataColumn[] = withSortable([...OPP_COLUMNS.map(oppToDataColumn), ...FOLLOWUP_COLUMNS])
-const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
+const ALL_COLUMNS = computed<DataColumn[]>(() =>
+  withSortable([...OPP_COLUMNS.map(oppToDataColumn), ...FOLLOWUP_COLUMNS, ...custom.columns.value]))
+// 静态列恒在(不像 /risk 那样门控于 data.data),为避免 useColumnPrefsDynamic 在自定义列到位前
+// 就地 init 并锁定(把自定义列漏在持久化外),门控改为「自定义列配置已加载」。
+const allKeys = computed(() => (custom.loaded.value ? ALL_COLUMNS.value.map((c) => c.key) : []))
 const DEFAULT_VISIBLE = ['name', 'customer', 'top1000', 'amountWan', 'opportunityLevel', 'status', 'frOwner',
   'weekProgress', 'nextPlan', 'followDate', 'followBy']
-const FILTERABLE = new Set<string>([...OPP_FILTERABLE, 'followBy', 'followDate'])
-const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
+const FILTERABLE = computed(() => new Set<string>([...OPP_FILTERABLE, 'followBy', 'followDate', ...custom.filterableKeys.value]))
+const prefs = useColumnPrefsDynamic(userScopedKey(TABLE_ID), allKeys,
+  () => [...DEFAULT_VISIBLE, ...custom.defaultKeys()])
 const visibleColumns = computed(() =>
-  prefs.visibleKeys.value.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
-const pickerColumns = ALL_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
+  prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
+const pickerColumns = computed(() => ALL_COLUMNS.value.map((c) => ({ key: c.key, label: c.label })))
 function onToggle(key: string) {
   if (prefs.visibleKeys.value.includes(key)) cf.clearColumn(TABLE_ID, key)
   prefs.toggle(key)
@@ -132,6 +147,7 @@ defineExpose({
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="scopeOpen = true">范围设置</button>
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="archiveConfirm = true">更新（归档+清空）</button>
+      <button v-if="auth.isSuper" class="kp-archive-btn" @click="colCfgOpen = true">列设置</button>
       <button v-if="auth.isSuper" class="kp-export-btn" @click="fp.exportOpen.value = true">导出</button>
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
@@ -163,6 +179,10 @@ defineExpose({
             :save-handler="(html: string) => oppf.update((row as OppFollowupRow).id, 'nextPlan', html)"
           />
         </template>
+        <template v-for="col in custom.defs.value" :key="col.key" #[`cell-${col.key}`]="{ row }">
+          <FollowupCustomCell :col="col" :row="row" :editable="fp.isCurrent.value"
+            :save="(v: string) => oppf.update((row as OppFollowupRow).id, col.key, v)" />
+        </template>
       </DataTable>
     </div>
 
@@ -176,6 +196,7 @@ defineExpose({
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="oppf.scope"
       :catalog="OPP_SCOPE_CATALOG" :single-table="true" :match-fn="opportunityMatches"
       title="范围设置（重点商机跟进）" count-unit="商机" @save="(s) => oppf.saveScope(s)" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="opportunity" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"

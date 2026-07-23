@@ -7,6 +7,7 @@ import ColumnFilter from '@/components/ColumnFilter.vue'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
+import { useFollowupColumnsStore } from '@/stores/followupColumns'
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushMock }) }))
@@ -15,6 +16,15 @@ vi.mock('@/lib/riskFollowupApi', () => ({
   riskFollowupApi: {
     get: vi.fn().mockResolvedValue({ scope: { combinator: 'AND', groups: [] }, current: {}, archives: [] }),
     saveScope: vi.fn(), update: vi.fn(), archive: vi.fn(),
+  },
+}))
+
+// 既有测试未预置 followupColumns store 时,onMounted 会触发真实 fcStore.load();
+// mock 掉底层 API 避免真实网络调用,默认四表皆空(与升级前行为逐字一致)。
+vi.mock('@/lib/followupColumns', () => ({
+  followupColumnsApi: {
+    getAll: vi.fn().mockResolvedValue({ temp: [], risk: [], payment_key: [], opportunity: [] }),
+    add: vi.fn(), update: vi.fn(), reorder: vi.fn(), remove: vi.fn(),
   },
 }))
 
@@ -179,5 +189,15 @@ describe('RiskFollowupView', () => {
     await flushPromises()
     await w.find('.el-table__row').trigger('click')
     expect(pushMock).toHaveBeenCalledWith('/project/P1')
+  })
+  it('渲染超管配置的自定义列表头', async () => {
+    seed()
+    const fc = useFollowupColumnsStore()
+    fc.configs = { temp: [], payment_key: [], opportunity: [],
+      risk: [{ key: 'cf-z', label: '整改责任人', type: 'text', clearOnArchive: false }] } as any
+    fc.loaded = true
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.text()).toContain('整改责任人')
   })
 })

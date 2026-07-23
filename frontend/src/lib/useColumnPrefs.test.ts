@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useColumnPrefs } from './useColumnPrefs'
+import { ref, nextTick } from 'vue'
+import { useColumnPrefs, useColumnPrefsDynamic } from './useColumnPrefs'
 
 const ALL = ['a', 'b', 'c', 'd']
 const DEF = ['a', 'b', 'c']
@@ -68,5 +69,28 @@ describe('useColumnPrefs', () => {
     onToggle('d')                              // d 当前不可见 → 开列
     expect(calls).toEqual([])
     expect(p.visibleKeys.value).toEqual(['a', 'b', 'c', 'd'])
+  })
+})
+
+describe('useColumnPrefsDynamic getter defaultVisible', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('defaultVisible 为函数时,在 allKeys 首次非空(init)时求值', async () => {
+    const allKeys = ref<string[]>([])
+    // 动态默认列在 init 时才知道(如自定义列异步到达)
+    let dynamicDefaults: string[] = []
+    const prefs = useColumnPrefsDynamic('vk-getter', allKeys, () => dynamicDefaults)
+    dynamicDefaults = ['a', 'cf-x']
+    allKeys.value = ['a', 'b', 'cf-x']
+    await nextTick()
+    expect(prefs.visibleKeys.value).toEqual(['a', 'cf-x'])
+  })
+
+  it('数组入参行为不变(回归)', async () => {
+    const allKeys = ref<string[]>([])
+    const prefs = useColumnPrefsDynamic('vk-arr', allKeys, ['a'])
+    allKeys.value = ['a', 'b']
+    await nextTick()
+    expect(prefs.visibleKeys.value).toEqual(['a'])
   })
 })

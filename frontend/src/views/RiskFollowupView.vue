@@ -14,6 +14,8 @@ import { useColumnPrefsDynamic } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useFollowupPage } from '@/composables/useFollowupPage'
+import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { useCustomColumns } from '@/composables/useCustomColumns'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -21,6 +23,8 @@ import SegToggle from '@/components/SegToggle.vue'
 import RichTextCell from '@/components/RichTextCell.vue'
 import ScopeBuilder from '@/components/ScopeBuilder.vue'
 import FollowupModals from '@/components/FollowupModals.vue'
+import FollowupCustomCell from '@/components/FollowupCustomCell.vue'
+import FollowupColumnConfig from '@/components/FollowupColumnConfig.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
@@ -34,17 +38,24 @@ const auth = useAuthStore()
 const risk = useRiskFollowupStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
+const fcStore = useFollowupColumnsStore()
+// risk.current 是 Pinia setup-store 的字段(访问时已自动解包,并非 Ref 本体);
+// useCustomColumns 需要真正的 Ref(内部读 .value),故用 computed 包一层而非直接传店内字段。
+const custom = useCustomColumns('risk', { current: computed(() => risk.current) as any, rowKey: (r) => r.riskKey })
+const colCfgOpen = ref(false)
 // 延迟渲染:点击进页先出标题/工具栏,下一两帧再挂全量风险大表(数百行×数十列),消除跨页点击冻结。
 const { ready } = useDeferredMount()
 
 onMounted(() => {
   if (!data.data) data.load()
   if (!risk.loaded) risk.load()
+  if (!fcStore.loaded) fcStore.load()
 })
 
 const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
 const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
-const allRows = computed<RiskRow[]>(() => buildRiskRows(projects.value, pmisMap.value, risk.current))
+const allRows = computed<RiskRow[]>(() =>
+  custom.decorate(buildRiskRows(projects.value, pmisMap.value, risk.current)) as RiskRow[])
 const hasScope = computed(() => risk.scope.groups.some((g) => g.conditions.length))
 const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filter((r) => riskRowMatches(r, risk.scope)) : allRows.value)
 const currentRows = computed<RiskRow[]>(() => scopedRows.value)
@@ -70,11 +81,12 @@ const FOLLOW_COLS: DataColumn[] = [
   { key: 'revConclusion', label: 'rev结论', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170, sortable: true },
 ]
-const NON_RISK_KEYS = new Set<string>([
-  ...PROJECT_COLS.map((c) => c.key), ...FOLLOW_COLS.map((c) => c.key),
+const NON_RISK_KEYS = computed(() => new Set<string>([
+  ...PROJECT_COLS.map((c) => c.key), ...FOLLOW_COLS.map((c) => c.key), ...custom.keys.value,
+  ...custom.keys.value.flatMap((k) => [k + 'EditTime', k + 'EditBy']),
   'projectId', 'riskKey',
   'followActionEditTime', 'followActionEditBy', 'revConclusionEditTime', 'revConclusionEditBy', 'nextRevDateEditTime', 'nextRevDateEditBy',
-])
+]))
 // 比率型风险列以百分比展示(如 1 → 100%),口径与 /projects 一致(fmtRatio)。
 const PERCENT_RISK_KEYS = new Set<string>(['回款完成率', '完工进展'])
 const riskCols = computed<DataColumn[]>(() => {
@@ -82,7 +94,7 @@ const riskCols = computed<DataColumn[]>(() => {
   const keys: string[] = []
   const seen = new Set<string>()
   for (const r of allRows.value) for (const k of Object.keys(r)) {
-    if (!NON_RISK_KEYS.has(k) && !seen.has(k)) { seen.add(k); keys.push(k) }
+    if (!NON_RISK_KEYS.value.has(k) && !seen.has(k)) { seen.add(k); keys.push(k) }
   }
   return keys.map((k) => {
     const c = known.get(k)
@@ -99,12 +111,16 @@ const riskCols = computed<DataColumn[]>(() => {
 // 把持久化里的风险列永久过滤掉(数据到达后 inited 已真、不再 reconcile)。故业务数据到位前令列集为空,
 // 保证 allKeys 一次性从空→完整,组合式据此一次性从 localStorage 还原完整选列(排序列也随之在场,default-sort 得以落地)。
 const ALL_COLUMNS = computed<DataColumn[]>(() =>
-  data.data ? [...riskCols.value, ...PROJECT_COLS, ...FOLLOW_COLS] : [])
+  data.data ? [...riskCols.value, ...PROJECT_COLS, ...FOLLOW_COLS, ...custom.columns.value] : [])
 const allKeys = computed(() => ALL_COLUMNS.value.map((c) => c.key))
 const DEFAULT_VISIBLE = ['风险编码', '风险等级', '风险状态', '项目编号', '项目名称', '项目金额', '项目级别', '项目经理', 'L4组织',
   '风险名称', '风险大类', '风险小类', '风险描述', 'followAction', 'revConclusion', 'nextRevDate']
-const FILTERABLE = new Set(['风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户', 'nextRevDate'])
-const prefs = useColumnPrefsDynamic(userScopedKey(TABLE_ID), allKeys, DEFAULT_VISIBLE)
+const FILTERABLE = computed(() => new Set([
+  '风险等级', '风险状态', '风险大类', '风险小类', '项目级别', '项目经理', 'L4组织', '项目类型', '项目状态', '客户', 'nextRevDate',
+  ...custom.filterableKeys.value,
+]))
+const prefs = useColumnPrefsDynamic(userScopedKey(TABLE_ID), allKeys,
+  () => [...DEFAULT_VISIBLE, ...custom.defaultKeys()])
 const visibleColumns = computed(() =>
   prefs.visibleKeys.value.map((k) => ALL_COLUMNS.value.find((c) => c.key === k)).filter((c): c is DataColumn => !!c))
 const pickerColumns = computed(() => ALL_COLUMNS.value.map((c) => ({ key: c.key, label: c.label })))
@@ -180,6 +196,7 @@ defineExpose({
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="scopeOpen = true">范围设置</button>
       <button v-if="auth.isSuper" class="kp-archive-btn" @click="archiveConfirm = true">归档（留存跟进）</button>
+      <button v-if="auth.isSuper" class="kp-archive-btn" @click="colCfgOpen = true">列设置</button>
       <button v-if="auth.isSuper" class="kp-export-btn" @click="fp.exportOpen.value = true">导出</button>
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
@@ -217,6 +234,10 @@ defineExpose({
             @update:model-value="(v: string | null) => onDateChange(row as RiskRow, v)" />
           <span v-else>{{ (row as RiskRow).nextRevDate || '-' }}</span>
         </template>
+        <template v-for="col in custom.defs.value" :key="col.key" #[`cell-${col.key}`]="{ row }">
+          <FollowupCustomCell :col="col" :row="row" :editable="fp.isCurrent.value"
+            :save="(v: string) => risk.update((row as RiskRow).riskKey, col.key, v)" />
+        </template>
       </DataTable>
     </div>
     <div v-if="ready && fp.filtered.value.length" class="kp-pager">
@@ -229,6 +250,7 @@ defineExpose({
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="risk.scope"
       single-table :catalog="RISK_SCOPE_CATALOG" :match-fn="riskRowMatches"
       title="范围设置（风险跟进）" count-unit="风险" @save="(s) => risk.saveScope(s)" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="risk" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"

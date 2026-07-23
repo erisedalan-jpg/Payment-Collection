@@ -45,7 +45,7 @@ export const useTempFollowupStore = defineStore('tempFollowup', () => {
     const inst = instances.value.find((i) => i.id === id)
     if (inst) inst.scope = r.scope ?? next
   }
-  async function update(projectId: string, field: 'weekProgress' | 'nextPlan', content: string) {
+  async function update(projectId: string, field: string, content: string) {
     const id = activeId.value
     const r = await tempFollowupApi.update(id, projectId, field, content)
     const inst = instances.value.find((i) => i.id === id)
@@ -55,7 +55,8 @@ export const useTempFollowupStore = defineStore('tempFollowup', () => {
     const id = activeId.value
     const r = await tempFollowupApi.archive(id, rows)
     const inst = instances.value.find((i) => i.id === id)
-    if (inst) { inst.archives = r.archives ?? []; inst.current = {} }
+    // 表级清空;clearOnArchive=false 的自定义列后端留存,用回传 current 回填(缺省则空,向后兼容)。
+    if (inst) { inst.archives = r.archives ?? []; inst.current = r.current ?? {} }
   }
   async function deleteArchive(idx: number) {
     const id = activeId.value
