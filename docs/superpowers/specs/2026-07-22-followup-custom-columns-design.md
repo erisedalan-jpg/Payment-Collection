@@ -90,9 +90,8 @@ def save(path, cfg) -> None       # 原子写
 def columns_for(cfg, table) -> list[dict]        # 返回该表列定义列表（副本）
 def custom_keys(cfg, table) -> set[str]          # 该表所有自定义列 key 集合（喂更新校验）
 def add_column(cfg, table, label, type_, clear_on_archive) -> dict   # 生成 key、校验、追加；返回新列
-def rename_column(cfg, table, key, label) -> dict                    # 只改 label；表内查重
-def update_column(cfg, table, key, *, type_=None, clear_on_archive=None) -> dict  # 改类型/清空开关
-def reorder_columns(cfg, table, ordered_keys) -> None               # 按给定 key 顺序重排
+def update_column(cfg, table, key, *, label=None, type_=None, clear_on_archive=None) -> dict  # 改名/类型/清空开关(合并)；改名表内查重、key 不变
+def reorder_columns(cfg, table, ordered_keys) -> list               # 按给定 key 顺序重排
 def delete_column(cfg, table, key) -> dict                          # 从配置移除；返回被删列（供 server 据此清值）
 def clear_field_keys(cfg, table, builtin_fields, table_level_clear) -> set[str]  # 归档待清字段集（见 6.2）
 ```
@@ -136,13 +135,15 @@ def apply_archive(cfg, store, rows, now, clear_fields=None):
 
 **新增端点**（`/api/followup-columns/*`）：
 
-| 方法 路径 | 权限 | 作用 |
+| 方法 路径 | 权限 | body |
 |---|---|---|
-| `GET /api/followup-columns` | 任意登录管理员 | 返回全部 4 表配置（前端据此渲染列） |
-| `POST /api/followup-columns/<table>` | 超管 | 新增列 `{label,type,clearOnArchive}` |
-| `PATCH /api/followup-columns/<table>/<key>` | 超管 | 改名/改类型/切清空开关（按 body 字段） |
-| `POST /api/followup-columns/<table>/reorder` | 超管 | body `{keys:[...]}` 重排 |
-| `DELETE /api/followup-columns/<table>/<key>` | 超管 | 删列 + 清值（见下） |
+| `GET /api/followup-columns` | 任意登录管理员 | — |
+| `POST /api/followup-columns/add` | 超管 | `{table,label,type,clearOnArchive}` |
+| `POST /api/followup-columns/update` | 超管 | `{table,key,label?,type?,clearOnArchive?}` |
+| `POST /api/followup-columns/reorder` | 超管 | `{table,keys:[...]}` |
+| `POST /api/followup-columns/delete` | 超管 | `{table,key}` → 删列 + 清值（见下） |
+
+> 端点用**静态路径 + body 传参**（不用 `PATCH /<table>/<key>` 这类带变量路径）：审计 `map_action` 按精确 `(method, path)` 匹配、超管闸 `_SUPER_ONLY_PATHS` 按 path 匹配，静态路径才挂得上；也与既有 `/api/temp-followup/instances/create` 等同范式。
 
 **填写复用现有更新端点**：4 处更新 handler（temp `~1956` / opp `~2142` / risk `~2250` / paykey `~2354`）的 `field not in ..PROGRESS_FIELDS` 校验，改为查 `内置 ∪ followup_columns.custom_keys(cfg, table)`，命中则调 `apply_update(..., extra_fields=custom_keys)`。
 
