@@ -72,3 +72,42 @@ def test_apply_archive_delete_bounds():
     store = fs.new_store(cfg); store["archives"] = [{"a": 1}, {"a": 2}]
     assert fs.apply_archive_delete(store, 5) is False and len(store["archives"]) == 2
     assert fs.apply_archive_delete(store, 0) is True and store["archives"] == [{"a": 2}]
+
+
+def test_apply_update_accepts_extra_fields():
+    cfg = _single_retain()
+    store = fs.new_store(cfg)
+    rec = fs.apply_update(cfg, store, "K1", "cf-aaaa1111", "值", "admin", "t", extra_fields={"cf-aaaa1111"})
+    assert rec["cf-aaaa1111"] == "值" and rec["cf-aaaa1111EditBy"] == "admin"
+    import pytest
+    with pytest.raises(ValueError):
+        fs.apply_update(cfg, store, "K1", "cf-notallowed", "x", "admin", "t", extra_fields={"cf-aaaa1111"})
+
+
+def test_apply_archive_clear_fields_selective_on_retain_table():
+    cfg = _single_retain()      # 表级留存
+    s = fs.new_store(cfg)
+    s["current"] = {"K1": {"followAction": "keep", "cf-x": "wipe", "cf-xEditTime": "t", "cf-xEditBy": "a"}}
+    fs.apply_archive(cfg, s, [{"row": 1}], "t", clear_fields={"cf-x"})
+    assert s["current"] == {"K1": {"followAction": "keep"}}       # 只清 cf-x + 其 EditTime/EditBy
+    assert len(s["archives"]) == 1
+
+
+def test_apply_archive_clear_fields_drops_emptied_records():
+    cfg = _grouped()            # 表级清空
+    s = fs.new_store(cfg)
+    s["current"] = {"P1": {"weekProgress": "a", "cf-keep": "survive"}, "P2": {"weekProgress": "b"}}
+    # 表级清空内置 weekProgress/nextPlan;cf-keep 不在 clear_fields → 留存 → P1 保留、P2 清空后为空被丢弃
+    fs.apply_archive(cfg, s, [{"row": 1}], "t", clear_fields={"weekProgress", "nextPlan"})
+    assert s["current"] == {"P1": {"cf-keep": "survive"}}
+
+
+def test_apply_archive_none_retains_legacy_behavior():
+    grouped = _grouped()
+    s1 = fs.new_store(grouped); s1["current"] = {"P1": {"weekProgress": "a"}}
+    fs.apply_archive(grouped, s1, [{"row": 1}], "t")              # clear_fields 缺省
+    assert s1["current"] == {}                                   # 与旧行为逐字一致
+    retain = _single_retain()
+    s2 = fs.new_store(retain); s2["current"] = {"K1": {"followAction": "b"}}
+    fs.apply_archive(retain, s2, [{"row": 1}], "t")
+    assert s2["current"] == {"K1": {"followAction": "b"}}

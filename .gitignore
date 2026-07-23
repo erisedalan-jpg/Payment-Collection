@@ -103,6 +103,9 @@ data/risk_followup.json
 data/risk_followup.json.tmp
 data/payment_key_followup.json
 data/payment_key_followup.json.tmp
+# 跟进表自定义列配置(超管可配,含列名;按既有惯例数据/配置不入库)
+data/followup_columns.json
+data/followup_columns.json.tmp
 # client 本地敏感/用户态/产物:config.json 含真实 cookie(密钥)、gui_settings 含账号设置、dist 为打包产物
 client/config.json
 client/gui_settings.json
