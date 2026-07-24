@@ -105,7 +105,7 @@ defineExpose({ reload: loadFileStatus, onFetchPmisCookie })
       <button class="dv-btn" data-test="btn-download" :disabled="dlRunning || repRunning" @click="onDownload">下载数据</button>
       <span class="dv-hint">从 PMIS 抓取并覆盖 input/（只抓取不重算）</span>
     </div>
-    <div v-if="dlRunning || dlProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
+    <div v-if="dlRunning || dlProgress > 0 || dlMessage" class="dv-progress"><div v-if="dlRunning || dlProgress > 0" class="dv-bar"><div class="dv-bar-fill" :style="{ width: dlProgress + '%' }"></div></div><div class="dv-msg">{{ dlMessage }}</div></div>
 
     <div class="dv-sub-head">PMIS 九表（input/pmis/）</div>
     <div class="dv-fgrid">
