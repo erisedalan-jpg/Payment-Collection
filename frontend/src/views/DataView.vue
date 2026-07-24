@@ -84,7 +84,7 @@ defineExpose({
         <button class="dv-btn primary dv-btn-lg" :disabled="repRunning || dlRunning" @click="startReprocess()">更新数据（重新处理）</button>
         <span class="dv-hint">读取已获取数据重算看板</span>
       </div>
-      <div v-if="repRunning || repProgress > 0" class="dv-progress"><div class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
+      <div v-if="repRunning || repProgress > 0 || repMessage" class="dv-progress"><div v-if="repRunning || repProgress > 0" class="dv-bar"><div class="dv-bar-fill" :style="{ width: repProgress + '%' }"></div></div><div class="dv-msg">{{ repMessage }}</div></div>
     </div>
 
     <el-tabs v-model="activeTab" class="dv-tabs">
