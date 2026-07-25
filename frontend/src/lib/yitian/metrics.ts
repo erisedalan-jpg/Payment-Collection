@@ -1,5 +1,5 @@
 import type { YitianData, YitianEntry, YitianRosterItem } from '@/types/yitian'
-import { workdayCount } from './calendar'
+import { workdayCount, daysInRange } from './calendar'
 
 export interface EmpStat {
   id: string
@@ -8,9 +8,11 @@ export interface EmpStat {
   l31: string
   l4: string
   hours: number
-  base: number
-  sat: number | null      // 饱和度(小数);基础工时为 0 → null
-  diff: number            // 实际 − 基础(正=加班,负=欠填)
+  filledDays: number      // 有工时记录且当天是工作日的【不同日期】数
+  base: number            // filledDays × hoursPerDay —— 只喂 sat
+  expectedBase: number    // 区间工作日数 × hoursPerDay —— 只喂 diff(即 V4.4.5 之前的 base)
+  sat: number | null      // 饱和度(小数)= hours / base;base 为 0 → null
+  diff: number            // 实际 − 应填基准(正=加班,负=欠填)。语义与 V4.4.5 之前一致
   filled: boolean         // 区间内是否有任何工时记录
 }
 
@@ -83,17 +85,29 @@ export function baseHours(data: YitianData, start: string, end: string): number 
   return workdayCount(data.days, start, end) * (data.meta.hoursPerDay || 8)
 }
 
-/** 员工级统计。覆盖花名册全员——零记录的人也要出现(那正是"完全未填"清单的来源)。 */
+/** 员工级统计。覆盖花名册全员——零记录的人也要出现(那正是"完全未填"清单的来源)。
+ *  V4.4.5 双基准:base 按各人【填写天数】折算,只喂 sat;expectedBase 是全员统一的
+ *  应填基准(区间工作日×8),只喂 diff —— 「欠填/加班」六处消费方据此保持原语义。 */
 export function empStats(
   data: YitianData, start: string, end: string, l4s: string[] = [],
 ): EmpStat[] {
-  const base = baseHours(data, start, end)
+  const expectedBase = baseHours(data, start, end)
+  const hoursPerDay = data.meta.hoursPerDay || 8
+  // 只有 workday===true 的日期才计入填写天数:假期日填的工时进分子、不进分母。
+  const workdays = new Set(daysInRange(data.days, start, end).filter((d) => d.workday).map((d) => d.d))
   const hours: Record<string, number> = {}
+  const filledDates: Record<string, Set<string>> = {}
   for (const e of selectEntries(data, start, end, l4s)) {
     hours[e.e] = (hours[e.e] ?? 0) + e.h      // 实际工时含全部工时类型
+    if (workdays.has(e.d)) {
+      const set = filledDates[e.e] ?? (filledDates[e.e] = new Set<string>())
+      set.add(e.d)                            // Set 去重:同一天多条记录只算一天
+    }
   }
   return selectRoster(data, l4s).map((p) => {
     const h = hours[p.id] ?? 0
+    const filledDays = filledDates[p.id]?.size ?? 0
+    const base = filledDays * hoursPerDay
     return {
       id: p.id,
       name: p.name,
@@ -101,9 +115,11 @@ export function empStats(
       l31: p.l31 || NO_L31,   // 空 L3-1 兜底,否则该层合计对不上 L3 合计(40h 会凭空消失)
       l4: p.l4 || NO_L4,   // 空 L4 兜底,否则 L3 合计对不上各 L4 之和
       hours: h,
+      filledDays,
       base,
+      expectedBase,
       sat: base > 0 ? h / base : null,
-      diff: h - base,
+      diff: h - expectedBase,
       filled: p.id in hours,
     }
   })
@@ -144,33 +160,32 @@ export function complianceRate(
 export function orgSummary(
   data: YitianData, start: string, end: string, l4s: string[] = [],
 ): OrgRow[] {
-  const base = baseHours(data, start, end)
   const stats = empStats(data, start, end, l4s)
-  const buckets = new Map<string, { level: OrgRow['level']; name: string; parent: string; hours: number; people: number }>()
+  const buckets = new Map<string, { level: OrgRow['level']; name: string; parent: string; hours: number; base: number; people: number }>()
 
-  const bump = (level: OrgRow['level'], name: string, parent: string, hrs: number) => {
+  // V4.4.5:每人 base 各不相同(按各自填写天数折算),故必须【逐人累加】;
+  // 旧写法 base × people 依赖"全员同一分母",在新口径下直接算错。
+  const bump = (level: OrgRow['level'], name: string, parent: string, hrs: number, empBase: number) => {
     // 桶键含 parent:同名但不同上级(如两个不同 L3-1 下各自的「未分配L4」)不得合桶,
     // 否则 parent 只会记首次插入值,把工时错记到错误的上级组织名下。
     // empStats 已把 l3/l31/l4 全兜底为非空串,这里不再需要空名守卫。
     const k = level + '|' + parent + '|' + name
     const b = buckets.get(k)
-    if (!b) buckets.set(k, { level, name, parent, hours: hrs, people: 1 })
+    if (!b) buckets.set(k, { level, name, parent, hours: hrs, base: empBase, people: 1 })
     else {
       b.hours += hrs
+      b.base += empBase
       b.people += 1
     }
   }
 
   for (const s of stats) {
-    bump('l3', s.l3, '', s.hours)
-    bump('l31', s.l31, s.l3, s.hours)
-    bump('l4', s.l4, s.l31, s.hours)
+    bump('l3', s.l3, '', s.hours, s.base)
+    bump('l31', s.l31, s.l3, s.hours, s.base)
+    bump('l4', s.l4, s.l31, s.hours, s.base)
   }
 
-  return [...buckets.values()].map((b) => {
-    const orgBase = base * b.people
-    return { ...b, base: orgBase, sat: orgBase > 0 ? b.hours / orgBase : null }
-  })
+  return [...buckets.values()].map((b) => ({ ...b, sat: b.base > 0 ? b.hours / b.base : null }))
 }
 
 export interface OrgTotals {

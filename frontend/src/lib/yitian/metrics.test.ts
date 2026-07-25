@@ -72,7 +72,7 @@ describe('empStats', () => {
     const a3 = stats.find((s) => s.id === 'A3')!
     expect(a3.filled).toBe(false)
     expect(a3.hours).toBe(0)
-    expect(a3.sat).toBe(0)
+    expect(a3.sat).toBeNull()   // V4.4.5:零记录 → filledDays=0 → base=0 → null(旧口径为 0)
   })
   it('基础工时为 0 时饱和度为 null', () => {
     const s = empStats(DATA, '2026-06-06', '2026-06-07')   // 区间外无工作日
@@ -150,8 +150,8 @@ describe('orgL4SummaryRow', () => {
     const t = orgL4SummaryRow(rows)
     expect(t.people).toBe(3)
     expect(t.hours).toBe(28)
-    expect(t.base).toBe(48)          // 3 人 × 16h
-    expect(t.sat).toBeCloseTo(28 / 48)
+    expect(t.base).toBe(24)          // V4.4.5:Σ各人 base = 16(A1 填2天) + 8(A2 填1天) + 0(A3 零记录)
+    expect(t.sat).toBeCloseTo(28 / 24)
   })
   it('基础工时为 0 时比率为 null', () => {
     expect(orgL4SummaryRow([]).sat).toBeNull()
@@ -167,10 +167,10 @@ describe('kpi', () => {
     expect(k.overtimeHours).toBe(4)
   })
   it('平均饱和度 = Σ实际 ÷ Σ基础', () => {
-    expect(k.avgSat).toBeCloseTo(28 / 48)
+    expect(k.avgSat).toBeCloseTo(28 / 24)
   })
   it('补全后饱和度 = Σmax(实际,基础) ÷ Σ基础', () => {
-    expect(k.avgSatFilled).toBeCloseTo((20 + 16 + 16) / 48)
+    expect(k.avgSatFilled).toBeCloseTo((20 + 8 + 0) / 24)   // V4.4.5:max(实际,各人base)
   })
   it('合规率与问题数按 excludedTypes 口径', () => {
     expect(k.complianceRate).toBeCloseTo(1)
@@ -261,5 +261,56 @@ describe('分层汇总三层互相对平(I-1:空 L3-1 不得被吞掉,未分配L
     const byParent = Object.fromEntries(noL4Rows.map((r) => [r.parent, r.hours]))
     expect(byParent['服务二部']).toBe(8)   // A4
     expect(byParent['服务一部']).toBe(5)   // A5
+  })
+})
+
+describe('V4.4.5 双基准(填写天数分母)', () => {
+  // 三天:6/1 6/2 工作日,6/3 假期日(workday:false)
+  const D3 = {
+    ...DATA,
+    meta: { ...DATA.meta, periodEnd: '2026-06-03' },
+    days: [
+      ...DATA.days,
+      { d: '2026-06-03', workday: false, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
+    ],
+  } as unknown as YitianData
+  const mkEntry = (d: string, e: string, h: number) => ({
+    d, e, t: 0, h, wt: null, cu: null, pl: null, pn: null, pt: null,
+    sm: null, bg: null, wo: '', top: false, ok: 0, iss: [],
+  })
+
+  it('填写天数排除假期日:假期日工时进分子、不进分母', () => {
+    const data = { ...D3, entries: [mkEntry('2026-06-01', 'A1', 8), mkEntry('2026-06-03', 'A1', 4)] } as unknown as YitianData
+    const a1 = empStats(data, '2026-06-01', '2026-06-03').find((s) => s.id === 'A1')!
+    expect(a1.hours).toBe(12)      // 12h 全进分子(含假期日那 4h)
+    expect(a1.filledDays).toBe(1)  // 只有 6/1 是工作日
+    expect(a1.base).toBe(8)
+    expect(a1.sat).toBeCloseTo(1.5) // 12/8 —— 节假日加班拉高饱和度,是本口径的预期后果
+  })
+
+  it('同一天多条记录只算一天', () => {
+    const data = { ...D3, entries: [mkEntry('2026-06-01', 'A1', 3), mkEntry('2026-06-01', 'A1', 5)] } as unknown as YitianData
+    const a1 = empStats(data, '2026-06-01', '2026-06-02').find((s) => s.id === 'A1')!
+    expect(a1.filledDays).toBe(1)
+    expect(a1.hours).toBe(8)
+    expect(a1.base).toBe(8)
+  })
+
+  // 本条正面锁死双基准的设计意图:只填 1 天且填满的人,饱和度 100% 但仍算欠填。
+  it('sat 与 diff 解耦:只填一天且填满 → sat=100% 但仍在欠填清单', () => {
+    const data = { ...DATA, entries: [mkEntry('2026-06-01', 'A1', 8)] } as unknown as YitianData
+    const a1 = empStats(data, '2026-06-01', '2026-06-02').find((s) => s.id === 'A1')!
+    expect(a1.sat).toBe(1)              // 新口径:填的那天填满了
+    expect(a1.expectedBase).toBe(16)    // 应填 2 天
+    expect(a1.diff).toBe(-8)            // 旧语义:欠填 8h
+    expect(unfilledList([a1]).map((s) => s.id)).toEqual(['A1'])
+  })
+
+  it('orgSummary 组 base = Σ各人 base(不是 base × 人数)', () => {
+    const rows = orgSummary(DATA, R[0], R[1]).filter((r) => r.level === 'l4')
+    const bank = rows.find((r) => r.name === '银行服务组')!
+    expect(bank.people).toBe(2)
+    expect(bank.base).toBe(24)          // A1 16 + A2 8;若误用 base×people 会是 32
+    expect(bank.sat).toBeCloseTo(28 / 24)
   })
 })
