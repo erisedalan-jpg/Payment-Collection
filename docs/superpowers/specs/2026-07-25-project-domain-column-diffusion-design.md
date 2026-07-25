@@ -3,7 +3,7 @@
 > 本期 = 用户需求 1 + 2.1 + 2.2。需求 2.3（跟进表时间差计算列）与需求 3（倚天饱和度口径）
 > 各自独立成期，见文末「后续期次」，**不在本 spec 范围内**。
 >
-> 版本：Z 级或 Y 级由用户拍板（本文不预设版本号）。**纯前端，无需点「更新数据」。**
+> 版本：**V4.4.4**（Z 级，用户钦定；基线 V4.4.3）。**纯前端，无需点「更新数据」。**
 
 ## 1. 目标
 
@@ -27,12 +27,12 @@
 
 ### 2.2 四页不是同构的，是两个命名体系
 
-| 页面 | 行类型 | 行粒度 | 键体系 | 行构建器 |
-|---|---|---|---|---|
-| `/projects/key` | `KeyProjectRow` | 项目 | 英文 | `buildKeyProjectRows`（`keyProjects.ts:76`） |
-| `/projects/temp` | `TempRow extends KeyProjectRow` | 项目 | 英文 | `buildTempRows`（`tempFollowup.ts:13`） |
-| `/payment/key` | `PaymentKeyRow` | 项目 | 英文 | `buildPaymentKeyRows`（`paymentKeyFollowup.ts:33`） |
-| `/risk` | `RiskRow` | **风险记录**（一项目多行） | **中文** | `buildRiskRows`（`riskRows.ts:22`） |
+| 页面 | 行类型 | 行粒度 | 键体系 | 列模型 | 行构建器 |
+|---|---|---|---|---|---|
+| `/projects/key` | `KeyProjectRow` | 项目 | 英文 | 静态声明 | `buildKeyProjectRows`（`keyProjects.ts:76`） |
+| `/projects/temp` | `TempRow extends KeyProjectRow` | 项目 | 英文 | 静态声明 | `buildTempRows`（`tempFollowup.ts:13`） |
+| `/payment/key` | `PaymentKeyRow` | 项目 | 英文 | 静态声明 | `buildPaymentKeyRows`（`paymentKeyFollowup.ts:33`） |
+| `/risk` | `RiskRow` | **风险记录**（一项目多行） | **中文** | **从行键动态推导**（§3.4） | `buildRiskRows`（`riskRows.ts:22`） |
 
 `RiskRow` 用 `...rr` spread 了风险记录的全部原始中文键（`riskRows.ts:41`），其项目级字段也一律中文
 （`'立项日期'`、`'项目阶段'`、`'项目最高风险等级'`…），且 `RISK_SCOPE_CATALOG` 注释明写
@@ -115,8 +115,9 @@ export function decorateProjectDomain<T extends { projectId: string }>(
   rows: T[], prMap: Map<string, ProjectRow>,
 ): T[]
 
-/** risk 专用（§3.4.1）：按 keyMap 写中文键，同时写同名英文键供 formatter 读兄弟字段；
- *  exclude 内的 key 两侧都不写。已有键一律不覆盖。 */
+/** risk 专用（§3.4）：按 keyMap 把 ProjectRow 字段写成【中文键】。
+ *  绝不写英文键——risk 的列由行键动态推导，每个英文键都会变成一列。
+ *  exclude 内的 key 不写；日期值写入前 slice(0,10)；已有键一律不覆盖。 */
 export function decorateProjectDomainMapped<T extends { projectId: string }>(
   rows: T[], prMap: Map<string, ProjectRow>,
   keyMap: Record<string, string>, exclude: Set<string>,
@@ -150,9 +151,31 @@ const DEFAULT_VISIBLE = OWN_KEYS.filter((k) => k !== 'setupDate')   // ← 基�
 （如 `PaymentKeyFollowupView.vue:103`），concat 不影响它们；但仍按上式统一写法，避免下次有人
 改成反推式又踩一遍。
 
-### 3.4 `/risk`：同一来源 + 一层中文键映射
+### 3.4 `/risk`：值写进行即成列，不借列
 
-risk 从**同一份** `PROJECT_DOMAIN_COLUMNS` 派生，但经映射层转成中文键：
+`/risk` 的列模型与另外三页**根本不同**（`RiskFollowupView.vue:92-114`）：
+
+```ts
+const riskCols = computed(() => {   // 遍历 allRows 的所有键，排除 NON_RISK_KEYS，逐个生成列
+  for (const r of allRows.value) for (const k of Object.keys(r)) { ... }
+  return keys.map((k) => ({ key: k, label: known.get(k)?.label ?? k, width: 160, wrap: true, sortable: true, ... }))
+})
+const ALL_COLUMNS = computed(() =>
+  data.data ? [...riskCols.value, ...PROJECT_COLS, ...FOLLOW_COLS, ...custom.columns.value] : [])
+```
+
+列是从**行对象的键**动态推导的。由此：
+
+- **risk 不使用 `borrowProjectColumns`。** 只要 decorate 把中文键写进行，列自动出现
+  （`label` 取 `RISK_COLUMNS` 中的定义，查不到则**回退为 key 本身**——中文 key 天然可读；
+  `sortable: true`、`width: 160`、`wrap: true`）。现有 12 个中文项目级字段
+  （`立项日期`/`项目阶段`/`完工进展`…）正是这样出现在选列里的，并非静态声明。
+- **risk 行绝不能写入英文键。** 每个英文键都会被 `riskCols` 变成一列、label 即英文 key
+  （`setupDate`、`orgL4`…），凭空多出 20+ 个与中文列重复的列。
+- 因此 risk **不复用** `PROJECT_DOMAIN_COLUMNS` 的列定义，§3.3 那个「formatter 读兄弟字段
+  `openRisks`」的问题在 risk 上**不存在**——它自己生成列，不带 formatter。
+
+risk 仍与另外三页共用**同一份字段清单**（`PROJECT_DOMAIN_COLUMNS` 的 key 集），只是经映射层落成中文键：
 
 ```ts
 // riskRows.ts —— 英文 key → risk 行的中文 key。键集必须与 PROJECT_DOMAIN_COLUMNS 一一对应（26 条）。
@@ -183,25 +206,16 @@ export const RISK_KEY_MAP: Record<string, string> = {
 - `customer` / `openRisks` 等 `ProjectRow` 有、但 `/projects` 未做成列的字段**不进本映射表**——
   本表的职责是给 `PROJECT_DOMAIN_COLUMNS` 的每个 key 找到 risk 侧对应键，与列集严格同构。
 
-#### 3.4.1 跨字段 formatter：risk 行须同时挂英文键
+#### 3.4.1 risk 侧的取值细节
 
-`riskLevel` 列的 formatter（`ProjectsView.vue:66`）是：
-
-```ts
-formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v)
-```
-
-它读**兄弟字段** `openRisks`（英文键）。列定义来自单一来源、在 risk 页原样复用，而 risk 行是中文键
-→ `r.openRisks` 读不到，风险等级会静默丢掉括号里的未关闭风险数。
-
-**决策**：risk 的 decorate 把项目域字段**中文键与英文键同时写入行对象**。
-
-- 理由：formatter 是列定义不可分割的一部分，不该为 risk 单独重写一套（否则又回到两套定义，
-  正是本期要消灭的东西）；行上多几个英文键无副作用——列、`RISK_SCOPE_CATALOG`、导出三处
-  都按显式 key 走，不会因行上多键而多出内容。
-- **例外：`contractAmount` 英文键不得写入 risk 行。** 它与已存在的 `'项目金额'` 单位不同（元 vs 万），
-  两值并存是隐患；该列在 risk 侧不新增，无 formatter 复用需求。
-- 该决策同时覆盖将来任何「formatter 引用兄弟字段」的新列，无需再逐个体检。
+- **日期值写入前 `.slice(0, 10)`**：`prog.终验时间` 等源值可能带时间部分，而 risk 的动态列
+  **不会**套 `fmtDateCell`（`riskCols` 只对 `RISK_COLUMNS` 中标了 `date` 的键加该 formatter，
+  新增的项目域键不在其中）。不切片就会在单元格里露出时间戳。
+- **数组值（`tags`）按原样写入**，显示为逗号分隔——与 risk 已有的 `关注原因`（同为数组）行为一致，
+  本期不为其单独加 formatter。
+- `contractAmount → '项目金额'`：目标键已由 `buildRiskRows` 写入（单位万），decorate 的
+  「已有键不覆盖」规则天然跳过它；仍在 `exclude` 中显式列出，避免日后有人改动覆盖规则时踩到
+  元/万混淆。
 
 ### 3.5 结构性保证：契约测试
 
@@ -209,12 +223,16 @@ formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v)
 
 1. **映射完备（双向严格相等）**：`RISK_KEY_MAP` 的键集 **===** `PROJECT_DOMAIN_COLUMNS` 的 key 集。
    将来 `/projects` 加列却忘了给 risk 映射（或映射表留了已删列的残条），测试直接红。
-2. **列覆盖**：
-   - 英文三页：各自 `ALL_KEYS` ⊇（`PROJECT_DOMAIN_COLUMNS` 的 key − `BORROW_EXCLUDE`）。
-   - `/risk`：`ALL_KEYS` ⊇ `RISK_KEY_MAP` 的全部**值**（26 个中文键）。
-3. **值可达**：对四页各造一行样本数据跑完整构建链（含 decorate），断言每个借入列的 key 在行对象上
-   **确实取得到值**。只测列定义不测行，会漏掉「列加了但行上没值」这一类——那正是 decorate 存在的理由。
-4. **默认不展示**：四页各自 `DEFAULT_VISIBLE` ∩ 借入列 key = ∅。专防 `/projects/key` 那种反推式
+2. **列覆盖（英文三页）**：各自 `ALL_KEYS` ⊇（`PROJECT_DOMAIN_COLUMNS` 的 key − `BORROW_EXCLUDE`）。
+   risk 不适用——它的列由行键推导，改由第 3 条覆盖。
+3. **值可达**：对四页各造样本数据跑完整构建链（含 decorate），断言：
+   - 英文三页：每个借入列的 key 在行对象上**确实取得到值**。
+   - `/risk`：`RISK_KEY_MAP` 的全部**值**（26 个中文键）都在行上；且行上**不含**
+     `RISK_KEY_MAP` 的任何**键**（英文键），`projectId`/`riskKey` 等既有例外除外。
+     后半条是防回归的关键——写错成英文键不会报错，只会让选列面板多出 20+ 个重复列。
+
+   只测列定义不测行，会漏掉「列加了但行上没值」这一类——那正是 decorate 存在的理由。
+4. **默认不展示**：四页各自 `DEFAULT_VISIBLE` ∩ 新增列 key = ∅。专防 `/projects/key` 那种反推式
    写法（§3.3.1）——它不会让任何现有断言变红，只会让新列静默地全部默认可见。
 
 ### 3.6 范围设置
