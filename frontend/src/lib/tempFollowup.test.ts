@@ -20,12 +20,18 @@ const pmis = (): Record<string, ProjectPmis> => ({
 })
 
 describe('keyProjects 重构回归', () => {
-  it('buildProgressRowBase 与 buildKeyProjectRows 输出一致(同一项目)', () => {
+  // V4.4.4 起 buildKeyProjectRows 末尾会 decorateProjectDomain 扩散项目域字段(tags/signUnit/
+  // 关闭时间等),输出必然比 buildProgressRowBase 多键,故不再逐字段相等。改断言【基础字段逐个
+  // 一字不差】—— 这正好守住 decorate 的核心不变式「已有键不覆盖」:decorate 若误覆盖 base 产出的
+  // 任何一个值,这里立刻红。比原来的 toEqual 更精准,不是放宽。
+  it('buildKeyProjectRows 完整包含 buildProgressRowBase 的全部字段且值一致', () => {
     const ps = [proj({})]
     const m = pmis()
-    const fromKey = buildKeyProjectRows(ps, m, {})[0]
-    const fromBase = buildProgressRowBase(ps[0], m.P1, {})
-    expect(fromBase).toEqual(fromKey)
+    const fromKey = buildKeyProjectRows(ps, m, {})[0] as unknown as Record<string, unknown>
+    const fromBase = buildProgressRowBase(ps[0], m.P1, {}) as unknown as Record<string, unknown>
+    for (const [k, v] of Object.entries(fromBase)) {
+      expect(fromKey[k]).toEqual(v)
+    }
   })
 })
 
@@ -39,6 +45,36 @@ describe('buildTempRows', () => {
     expect(rows[0].health).toBeDefined()
     expect(rows[0].milestoneStatus).toBe('正常')
     expect(rows[0].paymentRatio).toBe(0.4)
+  })
+})
+
+describe('V4.4.4 项目域字段扩散', () => {
+  it('buildTempRows 带出借入的项目域字段', () => {
+    const rows = buildTempRows(
+      [{ projectId: 'T1', projectName: 'T' } as any], {} as any, {}, new Set(['T1']),
+      { T1: [{ name: '项目关闭', planDate: '2026-09-09', actualDate: '2026-09-30' }] } as any,
+    )
+    expect((rows[0] as any).plannedCloseDate).toBe('2026-09-09')
+    expect((rows[0] as any).actualCloseDate).toBe('2026-09-30')
+    expect((rows[0] as any).signUnit).toBeDefined()
+  })
+  it('decorate 不覆盖 buildTempRows 自己挑的字段', () => {
+    const rows = buildTempRows(
+      [{ projectId: 'T1', projectName: 'T' } as any],
+      { T1: { progress: { 项目阶段: '实施中' } } } as any, {}, new Set(['T1']),
+    )
+    expect(rows[0].stage).toBe('实施中')
+  })
+  it('buildScopeInputs 产出关闭时间与原项目立项日期', () => {
+    const inputs = buildScopeInputs(
+      [{ projectId: 'S1', isPresale: true, relatedClosedId: 'OLD-1' } as any],
+      { 'OLD-1': { status: { 立项日期: '2019-03-03' } } } as any,
+      undefined,
+      { S1: [{ name: '项目关闭', planDate: '2026-12-01', actualDate: '2026-12-20' }] } as any,
+    )
+    expect(inputs[0].proj.plannedCloseDate).toBe('2026-12-01')
+    expect(inputs[0].proj.actualCloseDate).toBe('2026-12-20')
+    expect(inputs[0].proj.originSetupDate).toBe('2019-03-03')
   })
 })
 

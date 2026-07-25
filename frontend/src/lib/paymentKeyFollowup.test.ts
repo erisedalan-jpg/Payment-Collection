@@ -97,3 +97,20 @@ describe('buildScopeInputs re-export', () => {
     expect(inputs[0].id).toBe('P1')
   })
 })
+
+describe('V4.4.4 项目域字段扩散', () => {
+  it('V4.4.4 buildPaymentKeyRows 带出借入的项目域字段', () => {
+    const rows = buildPaymentKeyRows(
+      [{ projectId: 'P1', projectName: 'P' } as any], {} as any, {}, new Set(['P1']),
+      { P1: [{ name: '项目关闭', planDate: '2026-10-01', actualDate: '' }] } as any,
+    )
+    expect((rows[0] as any).plannedCloseDate).toBe('2026-10-01')
+    expect((rows[0] as any).setupDate).toBeDefined()
+  })
+  it('V4.4.4 借入不覆盖自有 contractWan（单位仍为万）', () => {
+    const rows = buildPaymentKeyRows(
+      [{ projectId: 'P1', paymentPmis: { contract: 2_000_000 } } as any], {} as any, {}, new Set(['P1']))
+    expect(rows[0].contractWan).toBe(200)
+    expect((rows[0] as any).contractAmount).toBeUndefined()   // BORROW_EXCLUDE
+  })
+})

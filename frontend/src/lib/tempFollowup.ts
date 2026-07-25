@@ -1,6 +1,6 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProgressRowBase, type KeyProjectRow, type ProgressRecord } from './keyProjects'
-import { buildProjectRows, type ProjectRow } from './projectList'
+import { buildProjectRows, decorateProjectDomain, type ProjectRow } from './projectList'
 import type { ScopeProjectInput } from './tempScope'
 
 export interface TempRow extends KeyProjectRow {
@@ -15,9 +15,11 @@ export function buildTempRows(
   pmisMap: Record<string, ProjectPmis>,
   current: Record<string, ProgressRecord>,
   inScopeIds: Set<string>,
+  milestones?: Record<string, any[]>,
 ): TempRow[] {
-  const prMap = new Map<string, ProjectRow>(buildProjectRows(projects, pmisMap).map((r) => [r.projectId, r]))
-  return projects
+  const prMap = new Map<string, ProjectRow>(
+    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+  const rows = projects
     .filter((p) => inScopeIds.has(p.projectId))
     .map((p) => {
       const pmis = pmisMap[p.projectId]
@@ -41,6 +43,7 @@ export function buildTempRows(
         milestoneStatus: String(prog.里程碑进度状态 ?? '-'),
       }
     })
+  return decorateProjectDomain(rows, prMap)
 }
 
 export function buildScopeInputs(
@@ -49,7 +52,8 @@ export function buildScopeInputs(
   paymentNodes: Record<string, any[]> | undefined,
   milestones: Record<string, any[]> | undefined,
 ): ScopeProjectInput[] {
-  const prMap = new Map<string, ProjectRow>(buildProjectRows(projects, pmisMap).map((r) => [r.projectId, r]))
+  const prMap = new Map<string, ProjectRow>(
+    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
   const yn = (b: boolean) => (b ? '是' : '否')
   return projects.map((p) => {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
@@ -87,6 +91,9 @@ export function buildScopeInputs(
         finalAcceptDate: String(prog.终验时间 ?? '').slice(0, 10),
         actualFinalAcceptDate: String(prog.实际终验时间 ?? '').slice(0, 10),
         setupDate: String(pr?.setupDate ?? '').slice(0, 10),
+        originSetupDate: String(pr?.originSetupDate ?? '').slice(0, 10),
+        plannedCloseDate: String(pr?.plannedCloseDate ?? '').slice(0, 10),
+        actualCloseDate: String(pr?.actualCloseDate ?? '').slice(0, 10),
       },
       nodes: (paymentNodes?.[p.projectId] ?? []).map((n: any) => ({
         ...n,

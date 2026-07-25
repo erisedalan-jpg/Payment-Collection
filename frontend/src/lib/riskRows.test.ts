@@ -139,3 +139,41 @@ describe('buildRiskRows 立项日期 + scope date', () => {
     expect(riskRowMatches(row, scope)).toBe(true)
   })
 })
+
+import { RISK_KEY_MAP } from './riskRows'
+
+describe('V4.4.4 risk 项目域扩散', () => {
+  const ps = [{ projectId: 'R1', projectName: 'R', paymentPmis: { contract: 3_000_000 } } as any]
+  const pmis = { R1: { riskRecords: [{ 风险编码: 'RK-1', 风险等级: '高' }], status: {} } } as any
+  const MS = { R1: [{ name: '项目关闭', planDate: '2026-11-11', actualDate: '' }] } as any
+
+  it('新增 7 个中文键写入风险行', () => {
+    const [row] = buildRiskRows(ps, pmis, {}, MS)
+    expect(row['计划关闭时间']).toBe('2026-11-11')
+    expect(row['实际关闭时间']).toBeFalsy()
+    expect(row).toHaveProperty('签约单位')
+    expect(row).toHaveProperty('标签')
+    expect(row).toHaveProperty('原项目立项日期')
+  })
+
+  it('绝不写英文键（写了会各自变成一列）', () => {
+    const [row] = buildRiskRows(ps, pmis, {}, MS)
+    for (const en of Object.keys(RISK_KEY_MAP)) {
+      if (en === 'projectId') continue   // 既有例外，已在 NON_RISK_KEYS 中
+      expect(row).not.toHaveProperty(en)
+    }
+  })
+
+  it('项目金额仍为万、不被元值覆盖', () => {
+    const [row] = buildRiskRows(ps, pmis, {}, MS)
+    expect(row['项目金额']).toBe(300)
+  })
+
+  it('RISK_SCOPE_CATALOG 含新增 7 条', () => {
+    const keys = RISK_SCOPE_CATALOG.map((f) => f.key)
+    for (const k of ['签约单位', '标签', '原项目立项日期', '计划终验时间', '实际终验时间',
+      '计划关闭时间', '实际关闭时间']) {
+      expect(keys).toContain(k)
+    }
+  })
+})

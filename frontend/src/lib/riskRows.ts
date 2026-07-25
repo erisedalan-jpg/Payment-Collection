@@ -2,7 +2,7 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { leafMatch, type FieldKind } from './scopeOps'
 import type { ScopeFilter, ScopeCondition, ScopeGroup, FieldLike } from './tempScope'
-import { buildProjectRows } from './projectList'
+import { buildProjectRows, decorateProjectDomainMapped, BORROW_EXCLUDE } from './projectList'
 
 export interface RiskFollowRecord {
   followAction?: string; followActionEditTime?: string; followActionEditBy?: string
@@ -23,9 +23,10 @@ export function buildRiskRows(
   projects: Project[],
   pmisMap: Record<string, ProjectPmis>,
   current: Record<string, RiskFollowRecord>,
+  milestones?: Record<string, any[]>,
 ): RiskRow[] {
   const out: RiskRow[] = []
-  const prMap = new Map(buildProjectRows(projects, pmisMap).map((r) => [r.projectId, r]))
+  const prMap = new Map(buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
   for (const p of projects) {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     const recs = (m.riskRecords ?? []) as Record<string, any>[]
@@ -68,7 +69,7 @@ export function buildRiskRows(
       })
     }
   }
-  return out
+  return decorateProjectDomainMapped(out, prMap, RISK_KEY_MAP, BORROW_EXCLUDE)
 }
 
 /** 单表范围匹配(风险行级,两级 AND/OR)。空范围 → false(视图判空决定是否回退全量)。 */
@@ -81,6 +82,25 @@ export function riskRowMatches(row: Record<string, any>, scope: ScopeFilter): bo
       : false
   const rs = scope.groups.map(evalGroup)
   return scope.combinator === 'OR' ? rs.some(Boolean) : rs.every(Boolean)
+}
+
+/** 英文 key → risk 行的中文 key。键集必须与 PROJECT_DOMAIN_COLUMNS 严格相等（契约测试守护）。
+ *  ① 前 19 条目标键已存在于 RiskRow，只映射不新增列；值严禁改动（范围条件按 key 序列化）。
+ *  ② 后 7 条为 V4.4.4 新增。 */
+export const RISK_KEY_MAP: Record<string, string> = {
+  projectId: '项目编号',      projectName: '项目名称',    projectLevel: '项目级别',
+  projectManager: '项目经理', orgL4: 'L4组织',            projectType: '项目类型',
+  projectStatus: '项目状态',  setupDate: '立项日期',      stage: '项目阶段',
+  progress: '完工进展',       riskLevel: '项目最高风险等级',
+  costRatio: '预算消耗比',    paymentRatio: '回款完成率', health: '健康度',
+  riskReasons: '关注原因',    paymentStatus: '回款状态',  top1000: 'TOP1000',
+  quadrant: '象限',           contractAmount: '项目金额',
+  signUnit: '签约单位',       tags: '标签',
+  originSetupDate: '原项目立项日期',
+  plannedFinalAcceptDate: '计划终验时间',
+  actualFinalAcceptDate: '实际终验时间',
+  plannedCloseDate: '计划关闭时间',
+  actualCloseDate: '实际关闭时间',
 }
 
 /** ScopeBuilder 单表字段目录(key 必须与风险行键一致)。 */
@@ -111,4 +131,11 @@ export const RISK_SCOPE_CATALOG: FieldLike[] = [
   { key: '回款状态', label: '回款状态', kind: 'enum' as FieldKind },
   { key: 'TOP1000', label: 'TOP1000', kind: 'enum' as FieldKind },
   { key: '象限', label: '象限', kind: 'enum' as FieldKind },
+  { key: '签约单位', label: '签约单位', kind: 'enum' as FieldKind },
+  { key: '标签', label: '标签', kind: 'enum' as FieldKind },
+  { key: '原项目立项日期', label: '原项目立项日期', kind: 'date' as FieldKind },
+  { key: '计划终验时间', label: '计划终验时间', kind: 'date' as FieldKind },
+  { key: '实际终验时间', label: '实际终验时间', kind: 'date' as FieldKind },
+  { key: '计划关闭时间', label: '计划关闭时间', kind: 'date' as FieldKind },
+  { key: '实际关闭时间', label: '实际关闭时间', kind: 'date' as FieldKind },
 ]

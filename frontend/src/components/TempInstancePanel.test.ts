@@ -7,6 +7,7 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { BORROWABLE_KEYS } from '@/lib/projectList'
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushMock }) }))
@@ -81,5 +82,30 @@ describe('TempInstancePanel', () => {
     const wSuper = mount(TempInstancePanel, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(wSuper.text()).toContain('列设置')
+  })
+
+  // V4.4.4 契约③④：/projects/temp 分片
+  it('V4.4.4 契约③ ALL_COLUMNS 覆盖全部可借列', async () => {
+    seed()
+    const fc = useFollowupColumnsStore()
+    fc.configs = { temp: [], risk: [], payment_key: [], opportunity: [] } as any
+    fc.loaded = true
+    const w = mount(TempInstancePanel, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
+    for (const k of BORROWABLE_KEYS) expect(keys.has(k)).toBe(true)
+  })
+  it('V4.4.4 契约④ 借入列默认不可见', async () => {
+    seed()
+    const fc = useFollowupColumnsStore()
+    fc.configs = { temp: [], risk: [], payment_key: [], opportunity: [] } as any
+    fc.loaded = true
+    const w = mount(TempInstancePanel, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vis = (w.vm as any).prefs.visibleKeys.value
+    for (const k of ['plannedCloseDate', 'actualCloseDate', 'originSetupDate', 'tags', 'signUnit']) {
+      expect(vis).not.toContain(k)
+    }
+    expect(vis).toContain('weekProgress')   // 自有默认列未受影响
   })
 })

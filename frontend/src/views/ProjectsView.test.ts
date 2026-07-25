@@ -9,6 +9,7 @@ import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import * as followupApiModule from '@/lib/followupApi'
 import { userScopedKey } from '@/lib/userScopedKey'
+import { PROJECT_DOMAIN_COLUMNS } from '@/lib/projectList'
 
 let router: Router
 beforeEach(() => {
@@ -416,5 +417,28 @@ describe('ProjectsView 列排序', () => {
     for (const k of ['projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'projectStatus']) {
       expect(cols.find((c) => c.key === k)?.sortable, k).toBe(true)
     }
+  })
+})
+
+describe('V4.4.4 关闭时间列接入', () => {
+  it('两个关闭时间列在选列中存在但默认不可见', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const keys = (w.vm as any).ALL_COLUMNS.map((c: any) => c.key)
+    expect(keys).toContain('plannedCloseDate')
+    expect(keys).toContain('actualCloseDate')
+    const visible = (w.vm as any).prefs.visibleKeys.value
+    expect(visible).not.toContain('plannedCloseDate')
+    expect(visible).not.toContain('actualCloseDate')
+  })
+
+  it('契约③ /projects 自身吃全量单一来源（含 action 列）', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
+    for (const c of PROJECT_DOMAIN_COLUMNS) expect(keys.has(c.key)).toBe(true)
+    expect(keys.has('action')).toBe(true)
   })
 })

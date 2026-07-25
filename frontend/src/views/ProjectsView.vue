@@ -6,12 +6,11 @@ import { useScopedProjects } from '@/composables/useScopedData'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
-import { buildProjectRows, filterProjectRows, type ProjectFilters, type ProjectRow } from '@/lib/projectList'
+import { buildProjectRows, filterProjectRows, PROJECT_DOMAIN_COLUMNS, type ProjectFilters, type ProjectRow } from '@/lib/projectList'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
-import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -39,50 +38,25 @@ onMounted(() => {
 })
 
 const rows = computed(() =>
-  buildProjectRows((scoped.value?.projects ?? []) as Project[], (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>, projectTags.effectiveAssignments))
+  buildProjectRows(
+    (scoped.value?.projects ?? []) as Project[],
+    (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
+    projectTags.effectiveAssignments,
+    (scoped.value?.projectMilestones ?? {}) as Record<string, any[]>,
+  ))
 
 // 工具栏特殊筛选(非列枚举)
 const sp = reactive<ProjectFilters>({ search: '', presale: '', paused: '', overspend: '', riskCategory: '' })
 // 先表头列枚举(crossFilter) → 再特殊项
 const filtered = computed(() => filterProjectRows(applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID)) as ProjectRow[], sp))
 
-const ALL_COLUMNS: DataColumn[] = [
-  { key: 'projectName', label: '项目名称', width: 220 },
-  { key: 'projectId', label: '项目编号', width: 175 },
-  { key: 'contractAmount', label: '合同金额(万)', width: 110, sortable: true,
-    formatter: (v) => (v == null ? '-' : (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) },
-  { key: 'setupDate', label: '立项日期', width: 110, sortable: true,
-    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
-  { key: 'originSetupDate', label: '原项目立项日期', width: 130, sortable: true,
-    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
-  { key: 'plannedFinalAcceptDate', label: '计划终验时间', width: 120, sortable: true,
-    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
-  { key: 'actualFinalAcceptDate', label: '实际终验时间', width: 120, sortable: true,
-    formatter: (v) => (v ? String(v).slice(0, 10) : '-') },
-  { key: 'projectManager', label: '项目经理', width: 96, sortable: true },
-  { key: 'orgL4', label: 'L4组', width: 110, sortable: true },
-  { key: 'stage', label: '阶段', width: 100 },
-  { key: 'progress', label: '完工%', width: 90, sortable: true, formatter: (v) => fmtRatio(v) },
-  { key: 'riskLevel', label: '风险', width: 96, sortable: true, formatter: (v, r) => (r.openRisks ? `${v}(${r.openRisks})` : v) },
-  { key: 'projectLevel', label: '级别', width: 80, sortable: true },
-  { key: 'projectType', label: '项目类型', width: 110, sortable: true },
-  { key: 'costRatio', label: '预算消耗比', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
-  { key: 'paymentRatio', label: '回款完成率', width: 105, sortable: true, formatter: (v) => fmtRatio(v) },
-  { key: 'projectStatus', label: '项目状态', width: 100, sortable: true },
-  { key: 'health', label: '健康度', width: 96 },
-  { key: 'riskReasons', label: '关注原因', width: 220 },
-  { key: 'paymentStatus', label: '回款状态', width: 100 },
-  { key: 'signUnit', label: '签约单位', width: 180, sortable: true },
-  { key: 'tags', label: '标签', width: 160, formatter: (v) => (Array.isArray(v) && v.length ? v.join('、') : '') },
-  { key: 'top1000', label: 'TOP1000', width: 90 },
-  { key: 'quadrant', label: '象限', width: 140 },
-  { key: 'action', label: '操作', width: 80, fixed: 'right' },
-]
+const ACTION_COL: DataColumn = { key: 'action', label: '操作', width: 80, fixed: 'right' }
+const ALL_COLUMNS: DataColumn[] = [...PROJECT_DOMAIN_COLUMNS, ACTION_COL]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
 // tags 进默认可见:ColumnFilter 挂在表头,列隐藏则筛选入口一并消失。
 // 标签筛选原本是工具栏常驻的,若下沉后仍默认隐藏,升级后的观感就是「标签筛选没了」。
 const DEFAULT_VISIBLE = ['projectName', 'projectId', 'contractAmount', 'projectManager', 'orgL4', 'riskLevel', 'projectLevel', 'projectType', 'costRatio', 'paymentRatio', 'projectStatus', 'health', 'riskReasons', 'tags', 'action']
-const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate', 'originSetupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate', 'tags'])
+const FILTERABLE = new Set(['projectManager', 'orgL4', 'stage', 'projectStatus', 'riskLevel', 'projectLevel', 'projectType', 'paymentStatus', 'health', 'top1000', 'quadrant', 'riskReasons', 'signUnit', 'setupDate', 'originSetupDate', 'plannedFinalAcceptDate', 'actualFinalAcceptDate', 'tags', 'plannedCloseDate', 'actualCloseDate'])
 
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 

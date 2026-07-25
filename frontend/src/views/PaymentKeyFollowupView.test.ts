@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { BORROWABLE_KEYS } from '@/lib/projectList'
 
 vi.mock('@/lib/paymentKeyFollowupApi', () => ({
   paymentKeyFollowupApi: {
@@ -155,5 +156,19 @@ describe('PaymentKeyFollowupView', () => {
     fc.loaded = true
     const w = await mountAs(true)
     expect(w.text()).toContain('催收方式')
+  })
+
+  it('V4.4.4 契约③ ALL_COLUMNS 覆盖全部可借列', async () => {
+    const w = await mountAs(true)
+    const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
+    for (const k of BORROWABLE_KEYS) expect(keys.has(k)).toBe(true)
+  })
+  it('V4.4.4 契约④ 借入列默认不可见', async () => {
+    const w = await mountAs(true)
+    const vis = (w.vm as any).prefs.visibleKeys.value
+    for (const k of ['plannedCloseDate', 'actualCloseDate', 'originSetupDate', 'tags', 'signUnit']) {
+      expect(vis).not.toContain(k)
+    }
+    expect(vis).toContain('followAction')   // 自有默认列未受影响
   })
 })

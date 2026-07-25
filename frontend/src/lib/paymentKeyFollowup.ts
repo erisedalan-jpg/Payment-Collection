@@ -1,5 +1,5 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
-import { buildProjectRows, type ProjectRow } from './projectList'
+import { buildProjectRows, decorateProjectDomain, type ProjectRow } from './projectList'
 export { buildScopeInputs } from './tempFollowup' // 复用范围输入构建
 
 export interface PaymentKeyRecord {
@@ -33,9 +33,11 @@ export function payFollowBy(rec: PaymentKeyRecord): string {
 export function buildPaymentKeyRows(
   projects: Project[], pmisMap: Record<string, ProjectPmis>,
   current: Record<string, PaymentKeyRecord>, inScopeIds: Set<string>,
+  milestones?: Record<string, any[]>,
 ): PaymentKeyRow[] {
-  const prMap = new Map<string, ProjectRow>(buildProjectRows(projects, pmisMap).map((r) => [r.projectId, r]))
-  return projects.filter((p) => inScopeIds.has(p.projectId)).map((p) => {
+  const prMap = new Map<string, ProjectRow>(
+    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+  const rows = projects.filter((p) => inScopeIds.has(p.projectId)).map((p) => {
     const pr = prMap.get(p.projectId)
     const rec = current[p.projectId] ?? {}
     const contract = p.paymentPmis?.contract
@@ -63,4 +65,5 @@ export function buildPaymentKeyRows(
       followDate: payFollowDate(rec), followBy: payFollowBy(rec),
     }
   })
+  return decorateProjectDomain(rows, prMap)
 }

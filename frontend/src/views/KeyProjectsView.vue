@@ -8,6 +8,7 @@ import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildKeyProjectRows, type KeyProjectRow } from '@/lib/keyProjects'
+import { borrowProjectColumns } from '@/lib/projectList'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
@@ -50,13 +51,14 @@ const currentRows = computed<KeyProjectRow[]>(() =>
     (scoped.value?.projects ?? []) as Project[],
     (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>,
     progress.current,
+    (scoped.value?.projectMilestones ?? {}) as Record<string, any[]>,
   ),
 )
 
 const fp = useFollowupPage(progress, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as KeyProjectRow[])
 const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as unknown as Array<Record<string, unknown>>, 'contractWan'))
 
-const ALL_COLUMNS: DataColumn[] = withSortable([
+const OWN_COLUMNS: DataColumn[] = withSortable([
   { key: 'projectId', label: '项目编号', width: 160 },
   { key: 'customer', label: '客户', width: 180 },
   { key: 'projectName', label: '项目名称', width: 200 },
@@ -75,8 +77,12 @@ const ALL_COLUMNS: DataColumn[] = withSortable([
   { key: 'followDate', label: '跟进日期', width: 160, sortable: true },
   { key: 'followBy', label: '跟进人', width: 120 },
 ])
+const OWN_KEYS = OWN_COLUMNS.map((c) => c.key)
+// 借入列不套 withSortable：保留来源 sortable，避免把 tags/riskReasons 数组列误开成可排序
+const ALL_COLUMNS: DataColumn[] = [...OWN_COLUMNS, ...borrowProjectColumns(new Set(OWN_KEYS))]
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key)
-const DEFAULT_VISIBLE = ALL_KEYS.filter((k) => k !== 'setupDate')
+// 原写法是 ALL_KEYS.filter(...)，直接 concat 借入列会让它们【全部默认可见】——必须基于 OWN_KEYS
+const DEFAULT_VISIBLE = OWN_KEYS.filter((k) => k !== 'setupDate')
 const FILTERABLE = new Set(['projectLevel', 'projectManager', 'ar', 'sr', 'orgL4', 'riskLevel', 'followBy', 'followDate', 'setupDate'])
 const prefs = useColumnPrefs(userScopedKey(TABLE_ID), ALL_KEYS, DEFAULT_VISIBLE)
 const visibleColumns = computed(() =>
@@ -148,7 +154,9 @@ function exportRow(r: KeyProjectRow): Record<string, unknown> {
 // 暴露供测试
 defineExpose({
   mode: fp.mode, historyIdx: fp.historyIdx, isCurrent: fp.isCurrent,
-  exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
+  exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts,
+  toggleAllExport: fp.toggleAllExport,
+  ALL_COLUMNS, prefs,
 })
 </script>
 

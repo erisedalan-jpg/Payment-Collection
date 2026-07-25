@@ -8,6 +8,7 @@ import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildPaymentKeyRows, type PaymentKeyRow } from '@/lib/paymentKeyFollowup'
+import { borrowProjectColumns } from '@/lib/projectList'
 import { buildScopeInputs } from '@/lib/tempFollowup'
 import { projectMatches } from '@/lib/tempScope'
 import { applyColumnFilters } from '@/lib/crossFilter'
@@ -67,7 +68,8 @@ const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, pk.scope)).map((i) => i.id)))
 
 const currentRows = computed<PaymentKeyRow[]>(() =>
-  custom.decorate(buildPaymentKeyRows(projects.value, pmisMap.value, pk.current, inScopeIds.value)) as PaymentKeyRow[])
+  custom.decorate(buildPaymentKeyRows(projects.value, pmisMap.value, pk.current, inScopeIds.value,
+    (scoped.value as any)?.projectMilestones ?? {})) as PaymentKeyRow[])
 
 const fp = useFollowupPage(pk, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as PaymentKeyRow[])
 const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as unknown as Array<Record<string, unknown>>, 'contractWan'))
@@ -96,7 +98,9 @@ const BASE_COLUMNS: DataColumn[] = withSortable([
   { key: 'revConclusion', label: 'rev结论', width: 480, wrap: true, formatter: (v) => htmlToPlainText(String(v ?? '')) },
   { key: 'nextRevDate', label: '下次rev时间', width: 170 },
 ])
-const ALL_COLUMNS = computed<DataColumn[]>(() => [...BASE_COLUMNS, ...custom.columns.value])
+const OWN_KEYS = new Set(BASE_COLUMNS.map((c) => c.key))
+const BORROWED = borrowProjectColumns(OWN_KEYS)
+const ALL_COLUMNS = computed<DataColumn[]>(() => [...BASE_COLUMNS, ...BORROWED, ...custom.columns.value])
 // 静态列恒在(不像 /risk 那样门控于 data.data),为避免 useColumnPrefsDynamic 在自定义列到位前
 // 就地 init 并锁定(把自定义列漏在持久化外),门控改为「自定义列配置已加载」。
 const allKeys = computed(() => (custom.loaded.value ? ALL_COLUMNS.value.map((c) => c.key) : []))
@@ -165,6 +169,7 @@ defineExpose({
   scopeOpen,
   exportSel: fp.exportSel, allSelected: fp.allSelected, datasetOpts: fp.datasetOpts, toggleAllExport: fp.toggleAllExport,
   inScopeIds, scopeInputs,
+  ALL_COLUMNS, prefs,
 })
 </script>
 

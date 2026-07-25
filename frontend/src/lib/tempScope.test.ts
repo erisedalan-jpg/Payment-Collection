@@ -132,3 +132,13 @@ describe('V4.0.1 终验字段目录', () => {
     expect(projectMatches(inp({ proj: { actualFinalAcceptDate: '2027-01-01' } }), f)).toBe(false)
   })
 })
+
+describe('V4.4.4 FIELD_CATALOG 新增三个项目域日期字段', () => {
+  it('plannedCloseDate/actualCloseDate/originSetupDate 均已登记为 project 组的 date 字段', () => {
+    for (const k of ['plannedCloseDate', 'actualCloseDate', 'originSetupDate']) {
+      const f = FIELD_CATALOG.find((x) => x.group === 'project' && x.key === k)
+      expect(f).toBeTruthy()
+      expect(f!.kind).toBe('date')
+    }
+  })
+})

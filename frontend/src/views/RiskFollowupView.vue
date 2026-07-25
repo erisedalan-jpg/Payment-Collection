@@ -55,7 +55,8 @@ onMounted(() => {
 const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
 const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const allRows = computed<RiskRow[]>(() =>
-  custom.decorate(buildRiskRows(projects.value, pmisMap.value, risk.current)) as RiskRow[])
+  custom.decorate(buildRiskRows(projects.value, pmisMap.value, risk.current,
+    (scoped.value as any)?.projectMilestones ?? {})) as RiskRow[])
 const hasScope = computed(() => risk.scope.groups.some((g) => g.conditions.length))
 const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filter((r) => riskRowMatches(r, risk.scope)) : allRows.value)
 const currentRows = computed<RiskRow[]>(() => scopedRows.value)

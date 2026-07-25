@@ -1,4 +1,5 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
+import { buildProjectRows, decorateProjectDomain, type ProjectRow } from './projectList'
 
 const v = (raw: unknown, fallback = ''): string => {
   const s = raw == null ? '' : String(raw).trim()
@@ -77,8 +78,12 @@ export function buildKeyProjectRows(
   projects: Project[],
   pmisMap: Record<string, ProjectPmis>,
   current: Record<string, ProgressRecord>,
+  milestones?: Record<string, any[]>,
 ): KeyProjectRow[] {
-  return projects
+  const rows = projects
     .filter((p) => isKeyProject(p, pmisMap[p.projectId]))
     .map((p) => buildProgressRowBase(p, pmisMap[p.projectId], current[p.projectId] ?? {}))
+  const prMap = new Map<string, ProjectRow>(
+    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+  return decorateProjectDomain(rows, prMap)
 }

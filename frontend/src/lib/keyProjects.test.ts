@@ -129,3 +129,16 @@ describe('V4.0.1 终验两字段', () => {
     expect(row.actualFinalAcceptDate).toBeNull()
   })
 })
+
+it('V4.4.4 行上带出项目域借入字段（tags/signUnit/关闭时间）', () => {
+  const rows = buildKeyProjectRows(
+    [{ projectId: 'K1', projectName: 'K', top1000: '是', paymentPmis: { contract: 2_000_000 } } as any],
+    { K1: { status: { 项目级别: 'P1' }, customer: { 合同总额: 2_000_000 } } } as any,
+    {},
+    { K1: [{ name: '项目关闭', planDate: '2026-08-01', actualDate: '' }] } as any,
+  )
+  expect(rows[0].projectId).toBe('K1')
+  expect((rows[0] as any).plannedCloseDate).toBe('2026-08-01')
+  expect((rows[0] as any).signUnit).toBeDefined()
+  expect((rows[0] as any).top1000).toBe('是')
+})

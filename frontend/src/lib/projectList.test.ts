@@ -280,3 +280,84 @@ describe('V4.0.1 三个日期字段', () => {
     expect(rows[0].actualFinalAcceptDate).toBeNull()
   })
 })
+
+import {
+  PROJECT_DOMAIN_COLUMNS, BORROW_EXCLUDE, borrowProjectColumns,
+  decorateProjectDomain, decorateProjectDomainMapped, type ProjectRow,
+} from './projectList'
+
+describe('V4.4.4 关闭时间取数', () => {
+  const MS = { X1: [
+    { name: '终验', planDate: '2026-05-01', actualDate: '' },
+    { name: '项目关闭', planDate: '2026-08-01', actualDate: '2026-08-20' },
+  ] }
+  it('从 projectMilestones 取「项目关闭」的计划/实际日', () => {
+    const [r] = buildProjectRows([proj({ projectId: 'X1' })], {}, undefined, MS as any)
+    expect(r.plannedCloseDate).toBe('2026-08-01')
+    expect(r.actualCloseDate).toBe('2026-08-20')
+  })
+  it('无该里程碑项 → null（不回退其他节点）', () => {
+    const [r] = buildProjectRows([proj({ projectId: 'X1' })], {}, undefined, { X1: [{ name: '终验', planDate: '2026-05-01' }] } as any)
+    expect(r.plannedCloseDate).toBeNull()
+    expect(r.actualCloseDate).toBeNull()
+  })
+  it('不传 milestones 参数 → null（现有调用点不受影响）', () => {
+    const [r] = buildProjectRows([proj({ projectId: 'X1' })], {})
+    expect(r.plannedCloseDate).toBeNull()
+  })
+})
+
+describe('V4.4.4 PROJECT_DOMAIN_COLUMNS / borrow', () => {
+  it('含两个关闭时间列，且不含 action 列', () => {
+    const keys = PROJECT_DOMAIN_COLUMNS.map((c) => c.key)
+    expect(keys).toContain('plannedCloseDate')
+    expect(keys).toContain('actualCloseDate')
+    expect(keys).not.toContain('action')
+  })
+  it('borrowProjectColumns 排除自有 key 与 BORROW_EXCLUDE', () => {
+    const got = borrowProjectColumns(new Set(['projectId', 'projectName'])).map((c) => c.key)
+    expect(got).not.toContain('projectId')
+    expect(got).not.toContain('projectName')
+    expect(got).not.toContain('contractAmount')   // BORROW_EXCLUDE：三页已有 contractWan
+    expect(got).toContain('plannedCloseDate')
+  })
+  it('借入列保留来源的 sortable 定义（tags 数组列不可排序）', () => {
+    const tags = borrowProjectColumns(new Set()).find((c) => c.key === 'tags')
+    expect(tags?.sortable).toBeFalsy()
+  })
+})
+
+describe('V4.4.4 decorate', () => {
+  const pr = { projectId: 'X1', setupDate: '2020-01-01', tags: ['A'], openRisks: 3,
+    plannedCloseDate: '2026-08-01', contractAmount: 1234567 } as unknown as ProjectRow
+  const prMap = new Map([['X1', pr]])
+
+  it('decorateProjectDomain 补缺失键、不覆盖已有键', () => {
+    const [row] = decorateProjectDomain([{ projectId: 'X1', setupDate: '已有值' }], prMap)
+    expect(row.setupDate).toBe('已有值')
+    expect((row as any).plannedCloseDate).toBe('2026-08-01')
+    expect((row as any).openRisks).toBe(3)
+  })
+  it('decorateProjectDomain 不写 BORROW_EXCLUDE 内的键', () => {
+    const [row] = decorateProjectDomain([{ projectId: 'X1' }], prMap)
+    expect((row as any).contractAmount).toBeUndefined()
+  })
+  it('decorateProjectDomainMapped 只写中文键、绝不写英文键', () => {
+    const map = { setupDate: '立项日期', plannedCloseDate: '计划关闭时间' }
+    const [row] = decorateProjectDomainMapped([{ projectId: 'X1' }], prMap, map, new Set())
+    expect((row as any)['立项日期']).toBe('2020-01-01')
+    expect((row as any)['计划关闭时间']).toBe('2026-08-01')
+    expect((row as any).setupDate).toBeUndefined()
+    expect((row as any).plannedCloseDate).toBeUndefined()
+  })
+  it('decorateProjectDomainMapped 日期值切到 10 位', () => {
+    const withTime = new Map([['X1', { projectId: 'X1', setupDate: '2020-01-01 08:30:00' } as unknown as ProjectRow]])
+    const [row] = decorateProjectDomainMapped([{ projectId: 'X1' }], withTime, { setupDate: '立项日期' }, new Set())
+    expect((row as any)['立项日期']).toBe('2020-01-01')
+  })
+  it('decorateProjectDomainMapped 跳过 exclude 内的键', () => {
+    const [row] = decorateProjectDomainMapped([{ projectId: 'X1' }], prMap,
+      { contractAmount: '项目金额' }, new Set(['contractAmount']))
+    expect((row as any)['项目金额']).toBeUndefined()
+  })
+})

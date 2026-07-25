@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import * as ppApi from '@/lib/projectProgressApi'
+import { BORROWABLE_KEYS } from '@/lib/projectList'
 
 let router: Router
 beforeEach(() => {
@@ -140,5 +141,20 @@ describe('KeyProjectsView', () => {
     expect(w.text()).toContain('合同金额合计')
     expect(w.find('.el-pagination').exists()).toBe(true)
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
+  })
+
+  // V4.4.4 契约③④：/projects/key 分片（沿用本文件既有挂载 helper mountView）
+  it('V4.4.4 契约③ ALL_COLUMNS 覆盖全部可借列', async () => {
+    seed(); const w = await mountView()
+    const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
+    for (const k of BORROWABLE_KEYS) expect(keys.has(k)).toBe(true)
+  })
+  it('V4.4.4 契约④ 借入列默认不可见（DEFAULT_VISIBLE 必须基于 OWN_KEYS）', async () => {
+    seed(); const w = await mountView()
+    const vis = (w.vm as any).prefs.visibleKeys.value
+    for (const k of ['plannedCloseDate', 'actualCloseDate', 'originSetupDate', 'tags', 'signUnit']) {
+      expect(vis).not.toContain(k)
+    }
+    expect(vis).toContain('weekProgress')   // 自有列仍默认可见
   })
 })

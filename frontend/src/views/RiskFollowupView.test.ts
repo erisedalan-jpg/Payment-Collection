@@ -8,6 +8,7 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { RISK_KEY_MAP } from '@/lib/riskRows'
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushMock }) }))
@@ -199,5 +200,32 @@ describe('RiskFollowupView', () => {
     const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(w.text()).toContain('整改责任人')
+  })
+  it('V4.4.4 契约③ allKeys 覆盖全部中文项目域键', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const keys = new Set((w.vm as any).allKeys)
+    for (const zh of Object.values(RISK_KEY_MAP)) expect(keys.has(zh)).toBe(true)
+  })
+  it('V4.4.4 契约③ 选列中不出现英文键（写错会各自变成一列）', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const keys = new Set((w.vm as any).allKeys)
+    for (const en of Object.keys(RISK_KEY_MAP)) {
+      if (en === 'projectId') continue   // 既有例外，已在 NON_RISK_KEYS 中
+      expect(keys.has(en)).toBe(false)
+    }
+  })
+  it('V4.4.4 契约④ 新增中文列默认不可见', async () => {
+    seed()
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const vis = (w.vm as any).prefs.visibleKeys.value
+    for (const zh of ['计划关闭时间', '实际关闭时间', '原项目立项日期', '标签', '签约单位']) {
+      expect(vis).not.toContain(zh)
+    }
+    expect(vis).toContain('风险编码')   // 自有默认列未受影响
   })
 })

@@ -8,6 +8,7 @@ import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildTempRows, buildScopeInputs, type TempRow } from '@/lib/tempFollowup'
+import { borrowProjectColumns } from '@/lib/projectList'
 import { projectMatches } from '@/lib/tempScope'
 import { applyColumnFilters } from '@/lib/crossFilter'
 import { useColumnPrefsDynamic } from '@/lib/useColumnPrefs'
@@ -62,7 +63,8 @@ const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, temp.scope)).map((i) => i.id)))
 
 const currentRows = computed<TempRow[]>(() =>
-  custom.decorate(buildTempRows(projects.value, pmisMap.value, temp.current, inScopeIds.value)) as TempRow[])
+  custom.decorate(buildTempRows(projects.value, pmisMap.value, temp.current, inScopeIds.value,
+    (scoped.value as any)?.projectMilestones ?? {})) as TempRow[])
 
 const fp = useFollowupPage(temp, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as TempRow[])
 const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as unknown as Array<Record<string, unknown>>, 'contractWan'))
@@ -108,7 +110,10 @@ const BASE_COLUMNS: DataColumn[] = withSortable([
 // 自定义列直接接在静态列之后展开(不再套 withSortable):useCustomColumns 已按类型自定 sortable
 // (date=true、text=undefined,与 weekProgress/nextPlan 等长文本列同构不可排序);若整体重新
 // withSortable,会把 NON_SORTABLE_KEYS 未收录的自定义文本列 key(cf-xxxxxxxx)误判为可排序。
-const ALL_COLUMNS = computed<DataColumn[]>(() => [...BASE_COLUMNS, ...custom.columns.value])
+const OWN_KEYS = new Set(BASE_COLUMNS.map((c) => c.key))
+const BORROWED = borrowProjectColumns(OWN_KEYS)
+// 顺序：自有静态列 → 借入项目域列 → 自定义列
+const ALL_COLUMNS = computed<DataColumn[]>(() => [...BASE_COLUMNS, ...BORROWED, ...custom.columns.value])
 // 门控于 custom.loaded(而非 data 到位与否)——静态列恒在,若不门控,useColumnPrefsDynamic 会在
 // 自定义列到位前用「静态列的完整集合」就地 init 并锁定,把自定义列永久排除在持久化候选之外。
 const ALL_KEYS = computed(() => (custom.loaded.value ? ALL_COLUMNS.value.map((c) => c.key) : []))
