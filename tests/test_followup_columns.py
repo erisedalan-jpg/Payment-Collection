@@ -108,3 +108,64 @@ def test_save_load_roundtrip(tmp_path):
     back = fc.load(p)
     assert back['tables']['temp'][0]['label'] == '责任人'
     assert json.loads(open(p, encoding="utf-8").read())['version'] == fc.STORE_VERSION
+
+
+DIFF_OK = {"anchor": {"kind": "today"}, "target": "setupDate"}
+
+
+def test_add_diff_column_stores_config_and_forces_clear_false():
+    cfg = fc._empty()
+    col = fc.add_column(cfg, 'temp', '立项至今', 'diff', True, diff=DIFF_OK)
+    assert col['type'] == 'diff'
+    assert col['diff'] == DIFF_OK
+    assert col['clearOnArchive'] is False   # diff 列强制 False,不接受传入的 True
+
+
+@pytest.mark.parametrize("bad", [
+    None,
+    {},
+    {"anchor": {"kind": "nope"}, "target": "a"},
+    {"anchor": {"kind": "fixed"}, "target": "a"},                    # 缺 date
+    {"anchor": {"kind": "fixed", "date": "2026/1/1"}, "target": "a"},  # 格式错
+    {"anchor": {"kind": "column"}, "target": "a"},                   # 缺 key
+    {"anchor": {"kind": "today"}},                                   # 缺 target
+    {"anchor": {"kind": "today"}, "target": "  "},                   # target 空白
+])
+def test_add_diff_column_rejects_bad_config(bad):
+    cfg = fc._empty()
+    with pytest.raises(ValueError):
+        fc.add_column(cfg, 'temp', 'X', 'diff', False, diff=bad)
+
+
+def test_writable_keys_excludes_diff():
+    cfg = fc._empty()
+    t = fc.add_column(cfg, 'temp', '文本列', 'text', False)
+    d = fc.add_column(cfg, 'temp', '日期列', 'date', False)
+    f = fc.add_column(cfg, 'temp', '差值列', 'diff', False, diff=DIFF_OK)
+    assert fc.writable_keys(cfg, 'temp') == {t['key'], d['key']}
+    assert fc.custom_keys(cfg, 'temp') == {t['key'], d['key'], f['key']}   # 语义不变
+
+
+def test_clear_field_keys_never_includes_diff():
+    cfg = fc._empty()
+    f = fc.add_column(cfg, 'temp', '差值列', 'diff', False, diff=DIFF_OK)
+    # 即便有人手改 JSON 把 diff 列的 clearOnArchive 设成 True,也不得进清空集合
+    cfg['tables']['temp'][0]['clearOnArchive'] = True
+    assert f['key'] not in fc.clear_field_keys(cfg, 'temp', ('a',), True)
+
+
+def test_update_column_switch_type_drops_orphan_diff():
+    cfg = fc._empty()
+    c = fc.add_column(cfg, 'temp', '差值列', 'diff', False, diff=DIFF_OK)
+    fc.update_column(cfg, 'temp', c['key'], type_='text')
+    assert 'diff' not in fc.columns_for(cfg, 'temp')[0]
+
+
+def test_normalize_drops_diff_column_with_broken_shape():
+    raw = {"version": 1, "tables": {"temp": [
+        {"key": "cf-1", "label": "好", "type": "diff", "diff": DIFF_OK},
+        {"key": "cf-2", "label": "坏", "type": "diff"},              # 缺 diff
+        {"key": "cf-3", "label": "更坏", "type": "diff", "diff": {"anchor": {"kind": "x"}, "target": "a"}},
+    ]}}
+    out = fc._normalize(raw)
+    assert [c['key'] for c in out['tables']['temp']] == ['cf-1']

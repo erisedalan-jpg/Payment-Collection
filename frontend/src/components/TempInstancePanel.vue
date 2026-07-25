@@ -242,7 +242,7 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs, sort })
 
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="scopeInputs" :initial="temp.scope"
       @save="(s) => temp.saveScope(s)" />
-    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="temp" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="temp" :columns="ALL_COLUMNS" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"

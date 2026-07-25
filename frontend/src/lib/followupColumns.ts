@@ -1,12 +1,15 @@
 import { api } from '@/api/client'
+import type { DiffConfig } from './diffColumn'
+export type { DiffAnchor, DiffConfig } from './diffColumn'
 
 export type FollowupTableId = 'temp' | 'risk' | 'payment_key' | 'opportunity'
-export type CustomColumnType = 'text' | 'date'
+export type CustomColumnType = 'text' | 'date' | 'diff'
 export interface CustomColumn {
   key: string
   label: string
   type: CustomColumnType
   clearOnArchive: boolean
+  diff?: DiffConfig
 }
 export type FollowupColumnsConfig = Record<FollowupTableId, CustomColumn[]>
 
@@ -20,12 +23,14 @@ export const followupColumnsApi = {
     const r = await api.get<FollowupColumnsGetResp>('/api/followup-columns')
     return (r.tables ?? {}) as FollowupColumnsConfig
   },
-  async add(table: FollowupTableId, label: string, type: CustomColumnType, clearOnArchive: boolean): Promise<CustomColumn> {
-    const r = await api.post<FollowupColumnMutateResp>('/api/followup-columns/add', { table, label, type, clearOnArchive })
+  async add(table: FollowupTableId, label: string, type: CustomColumnType,
+            clearOnArchive: boolean, diff?: DiffConfig): Promise<CustomColumn> {
+    const r = await api.post<FollowupColumnMutateResp>('/api/followup-columns/add',
+      { table, label, type, clearOnArchive, ...(diff ? { diff } : {}) })
     return r.column
   },
   async update(table: FollowupTableId, key: string,
-               patch: Partial<Pick<CustomColumn, 'label' | 'type' | 'clearOnArchive'>>): Promise<CustomColumn> {
+               patch: Partial<Pick<CustomColumn, 'label' | 'type' | 'clearOnArchive' | 'diff'>>): Promise<CustomColumn> {
     const r = await api.post<FollowupColumnMutateResp>('/api/followup-columns/update', { table, key, ...patch })
     return r.column
   },

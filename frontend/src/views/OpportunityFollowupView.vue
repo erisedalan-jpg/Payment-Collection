@@ -196,7 +196,7 @@ defineExpose({
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="oppf.scope"
       :catalog="OPP_SCOPE_CATALOG" :single-table="true" :match-fn="opportunityMatches"
       title="范围设置（重点商机跟进）" count-unit="商机" @save="(s) => oppf.saveScope(s)" />
-    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="opportunity" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="opportunity" :columns="ALL_COLUMNS" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"

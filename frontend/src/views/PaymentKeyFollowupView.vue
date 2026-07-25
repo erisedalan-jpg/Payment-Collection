@@ -244,7 +244,7 @@ defineExpose({
 
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="scopeInputs" :initial="pk.scope"
       title="范围设置（回款重点跟进）" @save="(s) => pk.saveScope(s)" />
-    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="payment_key" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="payment_key" :columns="ALL_COLUMNS" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"

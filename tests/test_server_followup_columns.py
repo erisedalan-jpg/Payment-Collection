@@ -239,3 +239,48 @@ def test_delete_unknown_column_returns_400():
 
 def test_delete_is_super_only():
     assert '/api/followup-columns/delete' in server._SUPER_ONLY_PATHS
+
+
+# ── 4) diff 派生列:写入必须被四域拒绝(V4.4.6 安全回归) ──
+
+def test_diff_column_key_is_rejected_by_all_four_update_handlers(tmp_path, monkeypatch):
+    """diff 是派生列:四域 update 必须拒绝对它的写入(400),否则存储值会压过计算值。"""
+    import followup_columns as fc
+    cfg = fc._empty()
+    made = {}
+    for table in ('temp', 'risk', 'payment_key', 'opportunity'):
+        made[table] = fc.add_column(
+            cfg, table, '差值列', 'diff', False,
+            diff={"anchor": {"kind": "today"}, "target": "setupDate"})
+    # 关键断言:任一表的 diff 列 key 都不在可写集合里
+    for table in ('temp', 'risk', 'payment_key', 'opportunity'):
+        assert made[table]['key'] not in fc.writable_keys(cfg, table)
+        assert made[table]['key'] in fc.custom_keys(cfg, table)
+
+
+def _add_diff_col(table, label, target='setupDate'):
+    r = _post('/api/followup-columns/add',
+              {"table": table, "label": label, "type": "diff", "clearOnArchive": False,
+               "diff": {"anchor": {"kind": "today"}, "target": target}})
+    assert r.status == 200, r
+    return r['column']['key']
+
+
+def test_diff_column_write_rejected_by_all_four_update_endpoints():
+    """端到端:四域 update 端点必须 400 拒绝对 diff 列的写入。
+
+    上一条只验 writable_keys 的【集合语义】——四处 handler 里若漏改一处它照样绿。
+    本条真发 HTTP 打四个端点,漏改哪个哪个红。顺带验证 add 端点确实透传了 diff 配置
+    (否则 _add_diff_col 会在 add 这一步就 400)。
+    """
+    iid = _get('/api/temp-followup')['instances'][0]['id']
+    cases = [
+        ('risk', '/api/risk-followup/update', {"riskKey": "R1"}),
+        ('payment_key', '/api/payment-key-followup/update', {"projectId": "P1"}),
+        ('opportunity', '/api/opportunity-followup/update', {"oppId": "opp-1"}),
+        ('temp', '/api/temp-followup/update', {"instanceId": iid, "projectId": "P1"}),
+    ]
+    for table, path, extra in cases:
+        key = _add_diff_col(table, '距今天数-%s' % table)
+        r = _post(path, dict(extra, field=key, content="999"))
+        assert r.status == 400, "%s 未拒绝对计算列的写入: %s" % (table, r)

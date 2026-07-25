@@ -1982,7 +1982,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         pid = str(data.get('projectId') or '').strip()
         field = data.get('field')
         _cfg = _load_followup_columns()
-        _extra = followup_columns.custom_keys(_cfg, 'temp')
+        _extra = followup_columns.writable_keys(_cfg, 'temp')
         if not pid or (field not in _temp.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 weekProgress/nextPlan"))
             return
@@ -2175,7 +2175,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         oid = str(data.get('oppId') or '').strip()
         field = data.get('field')
         _cfg = _load_followup_columns()
-        _extra = followup_columns.custom_keys(_cfg, 'opportunity')
+        _extra = followup_columns.writable_keys(_cfg, 'opportunity')
         if not oid or (field not in _oppf.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "oppId 必填、field 须为 weekProgress/nextPlan"))
             return
@@ -2290,7 +2290,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         rk = str(data.get('riskKey') or '').strip()
         field = data.get('field')
         _cfg = _load_followup_columns()
-        _extra = followup_columns.custom_keys(_cfg, 'risk')
+        _extra = followup_columns.writable_keys(_cfg, 'risk')
         if not rk or (field not in _riskfu.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "riskKey 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
@@ -2401,7 +2401,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         pid = str(data.get('projectId') or '').strip()
         field = data.get('field')
         _cfg = _load_followup_columns()
-        _extra = followup_columns.custom_keys(_cfg, 'payment_key')
+        _extra = followup_columns.writable_keys(_cfg, 'payment_key')
         if not pid or (field not in _paykey.PROGRESS_FIELDS and field not in _extra):
             self._send_json(400, _error_payload(ERR_VALIDATION, "projectId 必填、field 须为 followAction/revConclusion/nextRevDate"))
             return
@@ -2482,7 +2482,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_INTERNAL, f"读取自定义列配置失败: {e}"))
 
     def handle_followup_columns_add(self):
-        """POST /api/followup-columns/add {table,label,type,clearOnArchive} — 超管专属(_authz_gate 拦)。"""
+        """POST /api/followup-columns/add {table,label,type,clearOnArchive,diff?} — 超管专属(_authz_gate 拦)。"""
         data = self._read_json_body()
         if not isinstance(data, dict):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
@@ -2492,7 +2492,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
         def _apply(cfg):
             holder['col'] = followup_columns.add_column(
-                cfg, table, data.get('label'), data.get('type'), bool(data.get('clearOnArchive')))
+                cfg, table, data.get('label'), data.get('type'),
+                bool(data.get('clearOnArchive')), diff=data.get('diff'))
             return cfg["tables"][table]
 
         ok, res = self._followup_txn(_followup_columns_lock, _load_followup_columns, _apply, _save_followup_columns)
@@ -2502,7 +2503,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._json_response({"success": True, "column": holder.get('col'), "columns": res})
 
     def handle_followup_columns_update(self):
-        """POST /api/followup-columns/update {table,key,label?,type?,clearOnArchive?} — 超管专属。"""
+        """POST /api/followup-columns/update {table,key,label?,type?,clearOnArchive?,diff?} — 超管专属。"""
         data = self._read_json_body()
         if not isinstance(data, dict):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败")); return
@@ -2514,7 +2515,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             holder['col'] = followup_columns.update_column(
                 cfg, table, key,
                 label=data.get('label'), type_=data.get('type'),
-                clear_on_archive=data.get('clearOnArchive'))
+                clear_on_archive=data.get('clearOnArchive'), diff=data.get('diff'))
             return cfg["tables"][table]
 
         ok, res = self._followup_txn(_followup_columns_lock, _load_followup_columns, _apply, _save_followup_columns)

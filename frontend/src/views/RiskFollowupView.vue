@@ -251,7 +251,7 @@ defineExpose({
     <ScopeBuilder v-if="auth.isSuper" v-model="scopeOpen" :inputs="allRows" :initial="risk.scope"
       single-table :catalog="RISK_SCOPE_CATALOG" :match-fn="riskRowMatches"
       title="范围设置（风险跟进）" count-unit="风险" @save="(s) => risk.saveScope(s)" />
-    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="risk" />
+    <FollowupColumnConfig v-if="auth.isSuper" v-model="colCfgOpen" table="risk" :columns="ALL_COLUMNS" />
 
     <FollowupModals
       v-model:del-confirm="fp.delConfirm.value"

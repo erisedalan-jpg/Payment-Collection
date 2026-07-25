@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
   followupColumnsApi, type CustomColumn, type CustomColumnType,
-  type FollowupColumnsConfig, type FollowupTableId,
+  type FollowupColumnsConfig, type FollowupTableId, type DiffConfig,
 } from '@/lib/followupColumns'
 
 const TABLES: FollowupTableId[] = ['temp', 'risk', 'payment_key', 'opportunity']
@@ -23,13 +23,14 @@ export const useFollowupColumnsStore = defineStore('followupColumns', () => {
     configs.value = next
     loaded.value = true
   }
-  async function add(table: FollowupTableId, label: string, type: CustomColumnType, clearOnArchive: boolean) {
-    const col = await followupColumnsApi.add(table, label, type, clearOnArchive)
+  async function add(table: FollowupTableId, label: string, type: CustomColumnType,
+                     clearOnArchive: boolean, diff?: DiffConfig) {
+    const col = await followupColumnsApi.add(table, label, type, clearOnArchive, diff)
     configs.value = { ...configs.value, [table]: [...configs.value[table], col] }
     return col
   }
   async function update(table: FollowupTableId, key: string,
-                        patch: Partial<Pick<CustomColumn, 'label' | 'type' | 'clearOnArchive'>>) {
+                        patch: Partial<Pick<CustomColumn, 'label' | 'type' | 'clearOnArchive' | 'diff'>>) {
     const col = await followupColumnsApi.update(table, key, patch)
     configs.value = { ...configs.value, [table]: configs.value[table].map((c) => (c.key === key ? col : c)) }
     return col
