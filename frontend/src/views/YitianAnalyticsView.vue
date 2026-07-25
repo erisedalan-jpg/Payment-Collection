@@ -126,10 +126,12 @@ function applyDrillLanding() {
 }
 watch(ready, (r) => { if (r) nextTick(applyDrillLanding) }, { immediate: true, flush: 'post' })
 
-// 饱和度 TOP10:横向柱 + 基础工时均值参考线
+// 饱和度 TOP10:横向柱 + 应填基准参考线
+// V4.4.5:参考线取 expectedBase(全员统一的区间工作日×8),不是 base ——
+// base 已改为各人按填写天数折算,人人不同,取第一行的值当全员基准毫无意义。
 function satTopOption(top: EmpStat[]) {
   const rows = [...top].sort((a, b) => a.hours - b.hours)
-  const base = rows[0]?.base ?? 0
+  const base = rows[0]?.expectedBase ?? 0
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 8, right: 24, top: 8, bottom: 24, containLabel: true },
@@ -190,7 +192,7 @@ const empCols: DataColumn[] = [
   { key: 'l31', label: 'L3-1', width: 110, sortable: true },
   { key: 'l4', label: 'L4 组织', width: 130, sortable: true },
   { key: 'hoursText', label: '实际工时', width: 110, num: true, sortable: true },
-  { key: 'baseText', label: '基础工时', width: 110, num: true },
+  { key: 'baseText', label: '填报基准', width: 110, num: true },
   { key: 'satText', label: '饱和度', width: 100, num: true, sortable: true },
   { key: 'diffText', label: '差值', width: 100, num: true, sortable: true },
   { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },

@@ -113,7 +113,7 @@ describe('YitianOverviewView', () => {
     const vm = w.vm as any
     expect(w.text()).toContain('L4 组织工时')
     const opt = vm.orgBarChartOption
-    expect(opt.series.map((s: any) => s.name)).toEqual(['实际工时', '基础工时'])
+    expect(opt.series.map((s: any) => s.name)).toEqual(['实际工时', '填报基准'])
     expect(opt.yAxis.data).toEqual(vm.orgRows.map((r: any) => r.name))
   })
 

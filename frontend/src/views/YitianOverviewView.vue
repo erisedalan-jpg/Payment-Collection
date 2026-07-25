@@ -97,7 +97,7 @@ const orgCols: DataColumn[] = [
   { key: 'parent', label: '上级组织', width: 140, sortable: true },
   { key: 'people', label: '人数', width: 90, num: true, sortable: true },
   { key: 'hoursText', label: '实际工时', width: 110, num: true, sortable: true },
-  { key: 'baseText', label: '基础工时', width: 110, num: true },
+  { key: 'baseText', label: '填报基准', width: 110, num: true },
   { key: 'satText', label: '饱和度', width: 110, num: true, sortable: true },
   { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },
 ]
@@ -129,7 +129,7 @@ function orgBarOption(l4RowsIn: { name: string; hours: number; base: number }[])
     yAxis: { type: 'category', data: rows.map((r) => r.name) },
     series: [
       { name: '实际工时', type: 'bar', data: rows.map((r) => Number(r.hours.toFixed(1))) },
-      { name: '基础工时', type: 'bar', data: rows.map((r) => Number(r.base.toFixed(1))) },
+      { name: '填报基准', type: 'bar', data: rows.map((r) => Number(r.base.toFixed(1))) },
     ],
   }
 }
