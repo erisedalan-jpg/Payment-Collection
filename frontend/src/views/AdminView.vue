@@ -320,9 +320,9 @@ defineExpose({
           </el-select>
           <span class="admin-hint">按姓名选择;实际按工号隔离。空=不额外放行个人</span>
         </el-form-item>
-        <div class="admin-adv-h" @click="advancedOpen = !advancedOpen">
+        <button type="button" class="admin-adv-h" @click="advancedOpen = !advancedOpen">
           {{ advancedOpen ? '▾' : '▸' }} 高级 · 个别页面单设范围
-        </div>
+        </button>
         <div v-show="advancedOpen" class="admin-adv">
           <el-form-item v-for="(o,i) in form.overrides" :key="i" label="例外">
             <el-select v-model="o.target" filterable class="admin-select" placeholder="选页面">
@@ -376,8 +376,11 @@ defineExpose({
 .admin-pgroup { margin-top: var(--sp-2); }
 .admin-pgroup-h { font-weight: 700; }
 .admin-pgroup-items { display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); padding-left: var(--sp-4); }
-.admin-adv-h { margin: var(--sp-3) 0 var(--sp-2); color: var(--accent); cursor: pointer; font-size: var(--fs-2); }
-.admin-adv { padding-left: var(--sp-2); border-left: 2px solid var(--line); }
+.admin-adv-h { display: block; width: 100%; text-align: left; background: none; border: 0;
+  font-family: inherit; margin: var(--sp-3) 0 var(--sp-2); color: var(--accent);
+  cursor: pointer; font-size: var(--fs-2); }
+.admin-adv-h:hover { background: var(--hover-tint); }
+.admin-adv { padding-left: var(--sp-2); border-left: var(--sp-0) solid var(--line); }
 .admin-warn { margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
   background: var(--warn-bg); color: var(--warn-text); font-size: var(--fs-1); }
 </style>
