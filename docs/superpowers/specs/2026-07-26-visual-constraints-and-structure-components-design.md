@@ -119,7 +119,31 @@ grill 阶段我判断「四条约束合谋压低信息密度」（`--fs-base` �
 |---|---|---|---|
 | **2a-1（V4.4.9，本 plan）** | 约束修订 6 条 + `AppEmpty`(10) + `AppPager`(16) + `AppButton`(13) | ~39 | 同构度最高（三个 pager 一字不差），几乎零判断，**用于先验证「抽组件 + 全站替换 + 契约测试」这套手法** |
 | **2a-2** | `AppCard`(59，含概算工具 7 处 `.bd-card` 合并) | 59 | 最大头，需逐处判断归哪个变体，复杂度最高，放到有经验之后 |
-| **2a-3** | `SectionTitle`(10) + `StatusBadge` 推广(32) + chip(11) | 53 | 依赖 2a-1 定下的约束 |
+| **2a-3** | ~~`SectionTitle`(10) + `StatusBadge` 推广(32) + chip(11)~~ → **见 §3.2.2 缩减** | ~~53~~ → 23 | 依赖 2a-1 定下的约束 |
+
+### 3.2.2 2a-3 缩减：只做 `SectionTitle`，砍掉 `StatusBadge` 推广与 chip
+
+开工前全量核对，三项里只有一项站得住：
+
+**① 卡内小标题 —— 做，但 V4.4.9 定的约束本身是错的，要一并修正。**
+
+真正的标题类约 **23 处**（38 个候选里多数是数值显示 `.ov-acard-count`/`.pd-metric-v`、名称字段 `.pd-name`/`.ps-name`，不是标题），且**分明是两个层级**：
+
+| 层级 | 取值 | 处数 |
+|---|---|---|
+| 卡片主标题 | `--fs-4` / 700 | 10（`.bd-card-title`×8 · `.gov-banner-title` · `.pd-404-title`） |
+| 卡内小节标题 | `--fs-3` / 700 | 8（`.gov-h` · `.ob-h3` · `.rv-h3` · `.rc-h` · `.or-title` · `.tc-title` · `.lx-card-title` · `.ov-portal-title`） |
+| 同上 | `--fs-3` / 600 | 5（倚天 `.yt-h`×5） |
+
+**V4.4.9 的 E 类修订「卡内小标题固定 `--fs-3`/600，取多数派 `.yt-h`」是错的** —— `--fs-3`/600 只有 5 处，而 `--fs-3`/700 有 8 处、`--fs-4`/700 有 10 处。当时只看了 `.gov-h`(700) 与 `.yt-h`(600) 两个样本就下结论，**又是抽样**。更根本的是：卡片主标题与卡内小节标题**本就该是两级**，压成一个值本身不对。
+
+→ 2a-3 修正该条为两级，并抽 `SectionTitle`（`level?: 'card' | 'section'`），倚天 5 处 `.yt-h` 的 600 归位 700。
+
+**② `StatusBadge` 推广 —— 不做。** §3.2 写的「32 处」是按类名后缀（badge/tag/chip）数的，**没看实际形态**。真正用状态色淡底的只有 10 处候选，且 `.cpw-error`/`.lv-error` 是登录页错误提示、`.ys-danger`/`.yt-warn` 是整块警告条、`.bd-dirty`/`.rc-req` 是状态标记 —— 能换成圆角胶囊 `StatusBadge` 的不到 5 处。
+
+**③ chip 11 处 —— 不做。** 实测形态高度分裂：**3 种圆角 × 7 种 padding × 6 种背景**，且用途根本不同 —— `.rv-lvl-chip` 是可点选中的交互控件、`.pd-chip` 是 k-v 展示块、`.pv-tag` 是可删除标签（带 ✕）、`.rr-pill`/`.yd-tag`/`.yd-badge` 是状态标记且各自已有 `--warn`/`--danger` 变体化写法。硬抽会得到 `variant × tone × removable × clickable` 四维 props 爆炸。
+
+②③ 的判据与当初砍掉「提示条 24 处」完全一致：**形态本就不同的东西，硬抽只会得到一个靠 props 分裂的组件**。
 
 **一个特殊情况供 2a-2 参考**：`.bd-card` 在概算工具的 7 个子组件里各写一遍（`ProductSection`/`ServiceSection`/`PmSection`/`SummaryCard`/`RatioCard`/`SalesOrderCard`/`RateReferenceCard`）—— 同类名、同样式，复制 7 次。
 
