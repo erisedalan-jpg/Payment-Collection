@@ -89,6 +89,18 @@ function toggleGroup(groupKey: string, on: boolean) {
   keys.forEach((k) => (on ? set.add(k) : set.delete(k)))
   form.allowedPages = [...set]
 }
+function togglePage(key: string, on: boolean) {
+  const set = new Set(form.allowedPages.filter((k) => k !== '*'))
+  on ? set.add(key) : set.delete(key)
+  form.allowedPages = [...set]
+}
+function groupIndeterminate(groupKey: string): boolean {
+  if (form.allowedPages.includes('*')) return false
+  const g = NAV_GROUPS.find((x) => x.key === groupKey)
+  if (!g) return false
+  const n = g.links.filter((l) => form.allowedPages.includes(l.key)).length
+  return n > 0 && n < g.links.length
+}
 function groupChecked(groupKey: string): boolean {
   if (form.allowedPages.includes('*')) return true
   const g = NAV_GROUPS.find((x) => x.key === groupKey)
@@ -196,7 +208,7 @@ function pageLabels(keys: string[]): string {
 onMounted(reload)
 defineExpose({
   dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster,
-  NAV_GROUPS, OVERRIDE_TARGETS, toggleGroup, groupChecked, addOverride, removeOverride,
+  NAV_GROUPS, OVERRIDE_TARGETS, toggleGroup, groupChecked, togglePage, groupIndeterminate, addOverride, removeOverride,
 })
 </script>
 
@@ -247,7 +259,7 @@ defineExpose({
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑账号' : '新建账号'" width="520px">
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑账号' : '新建账号'" width="640px">
       <el-form label-width="92px">
         <el-form-item label="账号">
           <el-input v-model="form.account" :disabled="editing" placeholder="字母/数字/_-." />
@@ -262,11 +274,19 @@ defineExpose({
         </el-form-item>
         <el-form-item label="可访问页面">
           <el-checkbox :model-value="form.allowedPages.includes('*')"
-            @change="(v:boolean)=> form.allowedPages = v ? ['*'] : []">全部页面</el-checkbox>
-          <span v-if="!form.allowedPages.includes('*')">
-            <el-checkbox v-for="g in NAV_GROUPS" :key="g.key" :model-value="groupChecked(g.key)"
-              @change="(v:boolean)=> toggleGroup(g.key, v)">{{ g.label }}</el-checkbox>
-          </span>
+            @change="(v:boolean)=> form.allowedPages = v ? ['*'] : []">全部页面（含未来新增）</el-checkbox>
+          <div v-if="!form.allowedPages.includes('*')" class="admin-pages">
+            <div v-for="g in NAV_GROUPS" :key="g.key" class="admin-pgroup">
+              <el-checkbox class="admin-pgroup-h" :model-value="groupChecked(g.key)"
+                :indeterminate="groupIndeterminate(g.key)"
+                @change="(v:boolean)=> toggleGroup(g.key, v)">{{ g.label }}</el-checkbox>
+              <div class="admin-pgroup-items">
+                <el-checkbox v-for="l in g.links" :key="l.key"
+                  :model-value="form.allowedPages.includes(l.key)"
+                  @change="(v:boolean)=> togglePage(l.key, v)">{{ l.label }}</el-checkbox>
+              </div>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="默认可见 L4">
           <el-select v-model="form.allowedL4" multiple filterable class="admin-select" placeholder="选择可见 L4 组织">
@@ -325,4 +345,8 @@ defineExpose({
 .pw-must { background: var(--warn-bg); color: var(--warn-text); }
 .pw-done { background: var(--ok-bg); color: var(--ok-text); }
 .admin-hint { display: block; margin-top: var(--sp-1); font-size: var(--fs-1); color: var(--mut); }
+.admin-pages { width: 100%; }
+.admin-pgroup { margin-top: var(--sp-2); }
+.admin-pgroup-h { font-weight: 700; }
+.admin-pgroup-items { display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); padding-left: var(--sp-4); }
 </style>

@@ -151,6 +151,56 @@ describe('AdminView', () => {
       'insight', 'insight-milestone', 'insight-costdetail', 'insight-risk',
     ]))
   })
+
+  it('单页勾选:只加该页,不带出同组其它页(用户诉求「只看成本分析」)', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.togglePage('insight-costdetail', true)
+    expect(vm.form.allowedPages).toEqual(['insight-costdetail'])
+  })
+
+  it('组复选框三态:空 / 半选 / 全选', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    expect(vm.groupChecked('project')).toBe(false)
+    expect(vm.groupIndeterminate('project')).toBe(false)
+
+    vm.togglePage('insight-costdetail', true)          // 半选
+    expect(vm.groupChecked('project')).toBe(false)
+    expect(vm.groupIndeterminate('project')).toBe(true)
+
+    vm.toggleGroup('project', true)                    // 全选
+    expect(vm.groupChecked('project')).toBe(true)
+    expect(vm.groupIndeterminate('project')).toBe(false)
+  })
+
+  it('单页取消:整组已选时取消一页 → 组变半选', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.toggleGroup('payment', true)
+    vm.togglePage('payment-nodes', false)
+    expect(vm.groupChecked('payment')).toBe(false)
+    expect(vm.groupIndeterminate('payment')).toBe(true)
+    expect(vm.form.allowedPages).not.toContain('payment-nodes')
+  })
+
+  it('模板渲染出组内单页复选框(不止 7 个组标题)', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    await flushPromises()
+    // 30 个页面 + 7 个组标题 + 1 个「全部页面」= 38;断言下界防「只渲染组标题」的回退。
+    // 这条专防「函数写了但模板没接线」—— 光有 togglePage 而模板仍只渲染 7 个组标题时,
+    // 上面三条 vm 层测试全绿,只有这条会红。
+    expect(wrapper.findAll('.el-checkbox').length).toBeGreaterThanOrEqual(30)
+  })
 })
 
 describe('V4.4.8 页头', () => {
