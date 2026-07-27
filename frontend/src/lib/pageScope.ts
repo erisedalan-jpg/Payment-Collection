@@ -18,13 +18,11 @@ export const PAGE_DOMAINS: Record<string, ScopeDomain> = {
   'opportunity-followup': 'opportunity',
 }
 
-/** 三层解析:pageScopes[page] ?? domainScopes[域] ?? 默认(allowedL4/allowedStaff)。 */
+/** 两层解析:pageScopes[page] ?? 默认(allowedL4/allowedStaff)。V4.5.2 域层已删。
+ *  PAGE_DOMAINS 保留 —— 例外下拉过滤与空范围提示仍依赖它。 */
 export function effectiveScope(user: AuthUser, pageKey: PageKey): Scope {
-  const dom = PAGE_DOMAINS[pageKey]
   const ps = user.pageScopes?.[pageKey]
   if (ps) return { l4: ps.l4 ?? [], staff: ps.staff ?? [] }
-  const ds = dom ? user.domainScopes?.[dom] : undefined
-  if (ds) return { l4: ds.l4 ?? [], staff: ds.staff ?? [] }
   return { l4: user.allowedL4 ?? [], staff: user.allowedStaff ?? [] }
 }
 

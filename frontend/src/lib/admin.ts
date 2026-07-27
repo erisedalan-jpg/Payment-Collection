@@ -7,7 +7,6 @@ export interface AdminAccount {
   allowedPages: string[]
   allowedL4: string[]
   allowedStaff?: string[]
-  domainScopes?: Record<string, { l4: string[]; staff: string[] }>
   pageScopes?: Record<string, { l4: string[]; staff: string[] }>
   mustChangePassword?: boolean
 }
@@ -39,7 +38,6 @@ export async function listAccounts(): Promise<AdminAccount[]> {
 export function createAccount(p: {
   account: string; password: string; displayName: string
   allowedPages: string[]; allowedL4: string[]; allowedStaff: string[]
-  domainScopes?: Record<string, { l4: string[]; staff: string[] }>
   pageScopes?: Record<string, { l4: string[]; staff: string[] }>
 }): Promise<void> {
   return postJson('/api/admin/accounts/create', p)
@@ -48,7 +46,6 @@ export function createAccount(p: {
 export function updateAccount(p: {
   account: string; displayName?: string; allowedPages?: string[]
   allowedL4?: string[]; allowedStaff?: string[]
-  domainScopes?: Record<string, { l4: string[]; staff: string[] }>
   pageScopes?: Record<string, { l4: string[]; staff: string[] }>
   password?: string
 }): Promise<void> {

@@ -7,12 +7,12 @@ import type { AuthUser } from './auth'
 const U = (o: Partial<AuthUser>): AuthUser =>
   ({ account: 'u', displayName: 'u', isSuper: false, allowedPages: ['*'], allowedL4: [], ...o })
 
-describe('effectiveScope 三层', () => {
-  it('页 > 域 > 默认', () => {
-    const u = U({ allowedL4: ['D0'], domainScopes: { project: { l4: ['Ddom'], staff: [] } },
+describe('effectiveScope 两层', () => {
+  it('页 > 默认', () => {
+    const u = U({ allowedL4: ['D0'],
                   pageScopes: { 'temp-followup': { l4: ['Dpage'], staff: [] } } })
     expect(effectiveScope(u, 'temp-followup')).toEqual({ l4: ['Dpage'], staff: [] })
-    expect(effectiveScope(u, 'projects')).toEqual({ l4: ['Ddom'], staff: [] })
+    expect(effectiveScope(u, 'projects')).toEqual({ l4: ['D0'], staff: [] })
     expect(effectiveScope(u, 'yitian')).toEqual({ l4: ['D0'], staff: [] })
   })
   it('显式空覆盖', () => {

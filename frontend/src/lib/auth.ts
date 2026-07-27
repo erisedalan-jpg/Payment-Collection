@@ -7,7 +7,6 @@ export interface AuthUser {
   allowedPages: string[]
   allowedL4: string[]
   allowedStaff?: string[]
-  domainScopes?: Record<string, { l4: string[]; staff: string[] }>
   pageScopes?: Record<string, { l4: string[]; staff: string[] }>
   staffNames?: Record<string, string>
   mustChangePassword?: boolean
