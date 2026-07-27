@@ -20,6 +20,15 @@ describe('effectiveScope 两层', () => {
     expect(effectiveScope(u, 'projects')).toEqual({ l4: [], staff: [] })
     expect(effectiveScope(u, 'overview')).toEqual({ l4: ['*'], staff: [] })
   })
+  it('域层已删:数据里残留 domainScopes 也不再生效(防有人把域分支加回来)', () => {
+    // 这条是本次收敛唯一的回归保护 —— 上一条用例的 fixture 不带 domainScopes,
+    // 三层实现同样回退默认、结果重合,测不出实现差异。
+    // AuthUser 类型已删该字段,故用 as any 模拟「存量数据里还残留着它」。
+    const u = { ...U({ allowedL4: ['D0'], allowedStaff: ['E0'] }),
+                domainScopes: { project: { l4: ['Ddom'], staff: ['E9'] } } } as any
+    expect(effectiveScope(u, 'projects')).toEqual({ l4: ['D0'], staff: ['E0'] })
+    expect(effectiveScope(u, 'yitian')).toEqual({ l4: ['D0'], staff: ['E0'] })
+  })
 })
 
 describe('narrowProjects', () => {
