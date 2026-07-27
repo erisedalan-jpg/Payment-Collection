@@ -168,13 +168,29 @@ if (aliasDim && DIMENSIONS.some((d) => d.key === aliasDim)) dimKey.value = alias
 
 **这个发现下调了 Part B 的风险评级**：各页本来就长一样，抽成组件是**视觉零变化**的纯去重，不是重新设计。真正会被用户感知的变化只有一处 —— 操作按钮从 `.toolbar` 挪到页头右侧（B4.2）。
 
-## B2. 现状的三种形态
+## B2. 现状（写 plan 时重新精确清点，修正本节初稿）
 
-| 形态 | 页面 | 说明 |
+> **初稿错误订正**：本节曾写「无页标题 = 倚天 6 页 + 回款总览 = 7 页」。实测有误 —— 初次统计用的正则只匹配两字母类名前缀，漏掉了 `opp-title`、`yd-title` 等。准确数字见下。
+
+`views/*.vue` 共 35 个，**21 个有页级标题**（用了 **17 种不同类名**，其中 `kp-title` 被 4 张跟进表共用），**14 个没有**。
+
+| 形态 | 页面 | 数量 |
 |---|---|---|
-| 标题 + `.toolbar` | `/projects` `/projects/closed` `/projects/key` `/risk` `/opportunities/key` `/payment/key` | 主流，6 页 |
-| 标题 + 自定义 toolbar | `/activity`（`av-toolbar`）、`/budget`、`/data` | 3 页 |
-| **无页标题** | 倚天 6 页、`/payment` 回款总览 | 7 页 |
+| 标题 + `.toolbar` | `/projects` `/projects/closed` `/projects/key` `/risk` `/opportunities/key` `/payment/key` `/projects/temp` | 7 |
+| 标题 + 自定义 toolbar | `/activity` `/budget` `/data` `/opportunities` `/insight` `/insight/milestone` `/insight/costdetail` `/insight/risk` `/payment/calendar` `/governance` `/admin` `/yitian/detail` | 12 |
+| **无页标题** | `/payment` `/payment/board` `/payment/projects` `/payment/nodes` `/opportunities/board` `/yitian` `/yitian/compliance` `/yitian/analytics` `/yitian/trend` `/yitian/customer` `/about` + 首页 + 2 个详情页 | 14 |
+
+## B2.1 豁免规则：三类页面不套统一页头
+
+「全员必有」这条在 grill 时定得太绝对，逐页清点后必须开三个口子：
+
+| 豁免 | 页面 | 理由 |
+|---|---|---|
+| **全屏页** | `LoginView` `ChangePasswordView` | 走 `meta.fullscreen` 裸渲染，无侧栏无布局，其 `lv-title`/`cpw-title` 是登录页专属设计，与页头无关 |
+| **首页** | `OverviewView`（`/`） | landing page。用户点进来就知道这是首页，加一行「项目总览」是纯冗余 —— 正是 B3 要避免的「每页净损失 40~60px」 |
+| **详情页** | `ProjectDetailView` `ClosedProjectDetailView` | 标题是**动态的**（项目名），且需要返回按钮与状态标签。这是与列表页完全不同的另一种页头模式，强套同一组件会变形。**本期不做**，留待后续专门处理 |
+
+**本期实际范围：30 个页面** = 替换既有标题 19 页（21 减去两个全屏页）+ 新增页头 11 页（14 减去首页与 2 个详情页）。
 
 ## B3. 决策：全员必有页头，且页头承载页级操作
 
@@ -243,13 +259,27 @@ defineProps<{ title: string }>()
 
 **权限差异必须原样保留**：`/projects/key` 与 `/risk` 的导出是 `v-if="auth.isSuper"` 超管专属，而 `/projects` 的导出是全员可用。搬进页头后 `v-if` 一并搬，不得简化。
 
-### B4.3 七个无页标题的页面
+### B4.3 十一个新增页头的页面
 
-倚天 6 页与 `/payment` 回款总览要**新增**页头。这是本期唯一新增 UI 元素的地方，也是唯一会占用垂直空间的改动。
+这是本期唯一新增 UI 元素、也是唯一占用垂直空间的改动（每页 40~60px）：
 
-倚天 6 页的标题取侧栏 `TAB_GROUPS` / `YITIAN_LINKS` 的同名文案（工时总览 / 工时明细 / 合规检查 / 统计分析 / 趋势分析 / 客户支持分析），保证与导航一致。
+| 页面 | 标题文案 |
+|---|---|
+| `/payment` | 回款总览 |
+| `/payment/board` | 回款多维分析 |
+| `/payment/projects` | 回款项目 |
+| `/payment/nodes` | 回款节点 |
+| `/opportunities/board` | 商机看板 |
+| `/yitian` | 工时总览 |
+| `/yitian/compliance` | 合规检查 |
+| `/yitian/analytics` | 统计分析 |
+| `/yitian/trend` | 趋势分析 |
+| `/yitian/customer` | 客户支持分析 |
+| `/about` | 关于产品 |
 
-`/payment` 用「回款总览」。
+**文案一律取自 `nav.ts` 的 `NAV_SECTIONS` / `TAB_GROUPS` 同名条目**，与侧栏和 tab 条逐字一致 —— 否则会出现「侧栏叫合规检查、页头叫工时合规检查」这种同页两个说法。
+
+倚天 5 页（除已有 `yd-title` 的 `/yitian/detail`）的页头插在 `<YitianToolbar>` **之上**。
 
 ### B4.4 与第三期的分界线
 
@@ -290,7 +320,8 @@ Part B 只动**布局位置**，第三期动**实现**：
 
 1. `PageHeader` 单测：渲染标题；`actions` 插槽内容出现在 `.ph-actions` 内
 2. **权限差异回归**：`/projects/key` 与 `/risk` 的导出按钮在非超管账号下**不渲染**；`/projects` 的导出在普通账号下**渲染**
-3. 七个新增页头的页面：断言标题文案与侧栏导航文案一致
+3. **十一个新增页头**的页面：断言标题文案与 `nav.ts` 中对应条目的 `label` **逐字相等**（不是各写各的字符串字面量），防「侧栏叫合规检查、页头叫工时合规检查」
+6. **豁免规则守卫**：首页与两个详情页**不得**出现 `PageHeader`（防今后有人「顺手补齐」，破坏 B2.1 的判断）
 4. **视觉零变化的证据**：`PageHeader` 的 `.ph-title` 取值与被替换的 `.XX-title` 逐条相同（字号 `--fs-4`、字重 700、色 `--txt`），写成契约测试比对
 5. **分界线守卫**：加一条扫描测试，本期改动的 view 里不得新增对 `useFilterStore` / `hideFilter` 的引用（防 Part B 侵入第三期范围）
 
