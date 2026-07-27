@@ -38,7 +38,7 @@ def test_data_json_is_domain_union(tmp_path, monkeypatch):
     salt = "s"
     auth.save_accounts({"version": 1, "users": {"u": {
         "salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
-        "allowedPages": ["*"], "allowedL4": [], "allowedStaff": [], "domainScopes": {},
+        "allowedPages": ["*"], "allowedL4": [], "allowedStaff": [],
         "pageScopes": {"projects": {"l4": ["D1"], "staff": []}, "payment": {"l4": ["D2"], "staff": []}},
         "displayName": "u"}}})
     _write_analysis(tmp_path, monkeypatch)
@@ -61,7 +61,7 @@ def test_auth_me_has_staff_names(tmp_path, monkeypatch):
     salt = "s"
     auth.save_accounts({"version": 1, "users": {"u": {
         "salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
-        "allowedPages": ["*"], "allowedL4": [], "allowedStaff": ["E_LI"], "domainScopes": {},
+        "allowedPages": ["*"], "allowedL4": [], "allowedStaff": ["E_LI"],
         "pageScopes": {"projects": {"l4": [], "staff": ["E_WANG"]}}, "displayName": "u"}}})
     monkeypatch.setattr(server, "_load_roster_cached",
                         lambda: [{"id": "E_LI", "name": "李四", "l4": "D2"},

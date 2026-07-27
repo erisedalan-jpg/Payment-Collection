@@ -122,8 +122,8 @@ def test_data_project_domain_override(tmp_path, monkeypatch):
     salt = "s"
     auth.save_accounts({"version": 1, "users": {
         "u": {"salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
-              "allowedPages": ["*"], "allowedL4": ["*"], "allowedStaff": [],
-              "domainScopes": {"project": {"l4": ["D1"], "staff": []}}, "displayName": "u"},
+              "allowedPages": ["*"], "allowedL4": ["D1"], "allowedStaff": [],
+              "pageScopes": {}, "displayName": "u"},
     }})
     _write_analysis(tmp_path, monkeypatch)
     srv = server.create_server(host="127.0.0.1", port=0)

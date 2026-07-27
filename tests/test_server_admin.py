@@ -268,22 +268,21 @@ def test_roster_endpoint_super_only(admin_server, monkeypatch):
     assert _req(port, "GET", "/api/admin/roster")[0] == 401
 
 
-def test_super_create_with_domain_scopes(admin_server):
+def test_super_create_ignores_legacy_domain_scopes(admin_server):
+    """V4.5.2:域层已删。旧版前端仍可能提交 domainScopes —— 必须忽略而非报错。"""
     port = admin_server
     _, cookie, _ = _login(port, "boss", "bosspw")
     status, data = _req(
         port, "POST", "/api/admin/accounts/create", cookie,
         {"account": "dm", "password": "pw12345", "displayName": "分域",
          "allowedPages": ["*"], "allowedL4": ["*"], "allowedStaff": [],
-         "domainScopes": {"yitian": {"l4": ["Dx"], "staff": ["E1"]},
-                          "opportunity": {"l4": ["D2"], "staff": ["E9"]}}},
+         "domainScopes": {"yitian": {"l4": ["Dx"], "staff": ["E1"]}}},
     )
     assert status == 200
-    assert data["user"]["domainScopes"]["yitian"] == {"l4": ["Dx"], "staff": ["E1"]}
-    assert data["user"]["domainScopes"]["opportunity"] == {"l4": ["D2"], "staff": []}   # 商机 staff 清空
+    assert "domainScopes" not in data["user"]
     _, lst = _req(port, "GET", "/api/admin/accounts", cookie)
     dm = next(a for a in lst["accounts"] if a["account"] == "dm")
-    assert dm["domainScopes"]["yitian"]["l4"] == ["Dx"]
+    assert "domainScopes" not in dm
 
 
 def test_super_create_with_page_scopes(admin_server):

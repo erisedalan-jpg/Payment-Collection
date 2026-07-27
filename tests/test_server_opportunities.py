@@ -31,11 +31,11 @@ def test_opportunities_scoped_by_domain(tmp_path, monkeypatch):
     monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(tmp_path / "accounts.json"))
     auth._sessions.clear()
     salt = "s"
-    # 默认 allowedL4=*,但 opportunity 域覆盖为仅 D2
+    # 默认可见范围仅 D2(V4.5.2 前此处用 domainScopes.opportunity 表达,两层模型下直接设默认)
     auth.save_accounts({"version": 1, "users": {
         "u": {"salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
-              "allowedPages": ["*"], "allowedL4": ["*"], "allowedStaff": [],
-              "domainScopes": {"opportunity": {"l4": ["D2"], "staff": []}}, "displayName": "u"},
+              "allowedPages": ["*"], "allowedL4": ["D2"], "allowedStaff": [],
+              "pageScopes": {}, "displayName": "u"},
     }})
     oppf = tmp_path / "opportunities.json"
     oppf.write_text(json.dumps({"rows": [

@@ -587,12 +587,11 @@ def _can_page(rec, page_key):
 
 
 def _scope_staff_ids(rec):
-    """账号 default/域/页 scope 里出现的全部工号集(供 staffNames 解析)。"""
+    """账号 default/页 scope 里出现的全部工号集(供 staffNames 解析)。"""
     ids = set(rec.get('allowedStaff') or [])
-    for scopes in ((rec.get('domainScopes') or {}), (rec.get('pageScopes') or {})):
-        for v in scopes.values():
-            if isinstance(v, dict):
-                ids.update(v.get('staff') or [])
+    for v in (rec.get('pageScopes') or {}).values():
+        if isinstance(v, dict):
+            ids.update(v.get('staff') or [])
     return ids
 
 
@@ -4052,16 +4051,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         self._audit_target = str(data.get('account', ''))
-        self._audit_detail = '授予页面%s L4%s 员工%s%s%s' % (
+        self._audit_detail = '授予页面%s L4%s 员工%s%s' % (
             data.get('allowedPages', []), data.get('allowedL4', []), data.get('allowedStaff', []),
-            ('，分域%s' % list((data.get('domainScopes') or {}).keys())) if data.get('domainScopes') else '',
             ('，逐页%d' % len(data.get('pageScopes') or {})) if data.get('pageScopes') else '')
+        if data.get('domainScopes'):
+            logger.warning('收到已废弃的 domainScopes 字段(V4.5.2 已删除),忽略')
         try:
             user = auth.add_account(
                 data.get('account', ''), data.get('password', ''),
                 data.get('displayName', ''), data.get('allowedPages', []),
                 data.get('allowedL4', []), data.get('allowedStaff', []),
-                data.get('domainScopes'), data.get('pageScopes'))
+                data.get('pageScopes'))
         except ValueError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION, str(e)))
             return
@@ -4085,8 +4085,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             _changed.append('L4权限')
         if data.get('allowedStaff') is not None:
             _changed.append('员工范围')
-        if data.get('domainScopes') is not None:
-            _changed.append('分域范围')
         if data.get('pageScopes') is not None:
             _changed.append('逐页范围')
         if data.get('password'):
@@ -4099,7 +4097,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 pages=data.get('allowedPages'),
                 l4=data.get('allowedL4'),
                 staff=data.get('allowedStaff'),
-                domain_scopes=data.get('domainScopes'),
                 page_scopes=data.get('pageScopes'),
                 password=data.get('password'))
         except KeyError:
@@ -4633,6 +4630,9 @@ def main():
 
     # 首次启动：账号种子（仅文件不存在时生成两个超管）
     auth.seed_default_accounts()
+    _migrated = auth.migrate_accounts_file()          # V4.5.2 域层物化迁移(幂等,无域覆盖时空操作)
+    if _migrated:
+        logger.info(f"账号权限迁移:{_migrated} 个账号的 domainScopes 已物化进 pageScopes")
     # 首次启动创建桌面快捷方式
     _create_desktop_shortcut()
     
