@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 /** 费率速查:只读,全部由 store.effectiveConfig 渲染。
  *  原工具在 HTML 里另抄了一份静态费率表,与 JS 常量成了两份真相源(且 PM 那两格抄的是销售价) —— 这里只有一个源。 */
@@ -44,7 +45,7 @@ defineExpose({ laborRows, hotelRows, materialRows })
     <el-collapse class="rr-card">
       <el-collapse-item name="rr">
         <template #title>
-          <span class="bd-card-title">费率速查</span>
+          <SectionTitle level="card">费率速查</SectionTitle>
           <span class="rr-note">只读 · 取自当前生效的费率配置（改费率去「费率配置」）</span>
         </template>
 
@@ -133,7 +134,6 @@ defineExpose({ laborRows, hotelRows, materialRows })
   border-bottom-color: var(--line);
 }
 .rr-card :deep(.el-collapse-item__content) { padding-bottom: 0; }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); }
 .rr-note { font-size: var(--fs-1); color: var(--mut); margin-left: var(--sp-3); }
 .rr-grid {
   display: grid;

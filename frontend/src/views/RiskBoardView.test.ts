@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
@@ -45,6 +47,25 @@ describe('RiskBoardView', () => {
     expect(t).toContain('高风险项目')
     expect(t).toContain('中风险项目')
     expect(t).toContain('低风险项目')
+  })
+  it('V4.5.1 两处小节标题改用 SectionTitle(section 级),.rv-h3 只剩上下边距', () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    const titles = w.findAll('.rv-h3')
+    expect(titles).toHaveLength(2)      // 先钉住条数,否则下面的循环在空集上恒真
+    expect(titles.map((t) => t.text())).toEqual(['风险统计分析', '风险概览'])
+    for (const t of titles) {
+      expect(t.element.tagName).toBe('H3')
+      expect(t.classes()).toContain('st--section')
+      expect(t.classes()).not.toContain('st--card')   // 原值 --fs-3 → section
+    }
+    // 复合选择器 .st.rv-h3 是刻意的:否则与组件 .st { margin: 0 } 同特异性、靠打包顺序决胜负
+    const rule = readFileSync(resolve(__dirname, 'RiskBoardView.vue'), 'utf-8')
+      .match(/\.st\.rv-h3\s*\{([^}]*)\}/)![1]
+    for (const p of ['font-size', 'font-weight', 'color']) {
+      expect(rule, `.rv-h3 不应再自写 ${p}`).not.toContain(p)
+    }
+    expect(rule).toContain('margin: var(--sp-5) 0 var(--sp-3)')   // 布局属性必须留下
   })
   it('排名维度与统计选项存在', () => {
     seed()

@@ -103,6 +103,15 @@ describe('ProductSection', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  // 标题(字号/字重/色)统一由 SectionTitle 提供,组件不再自写 .bd-card-title。
+  // 断言到具体级别 —— 只断言「有 .st」的话,级别写错(card 写成 section)也照绿。
+  it('标题接入 SectionTitle(card 级)', () => {
+    const t = mount(ProductSection, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('产品实施')
+  })
 })
 
 describe('PmSection', () => {
@@ -155,6 +164,13 @@ describe('PmSection', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    const t = mount(PmSection, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('项目经理')
+  })
 })
 
 describe('DirectCostSection', () => {
@@ -182,6 +198,13 @@ describe('DirectCostSection', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    const t = mount(DirectCostSection, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('直接成本')
+  })
 })
 
 describe('RateReferenceCard', () => {
@@ -200,6 +223,13 @@ describe('RateReferenceCard', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    const t = mount(RateReferenceCard, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('费率速查')
+  })
 })
 
 describe('BasicInfoCard', () => {
@@ -209,6 +239,13 @@ describe('BasicInfoCard', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    const t = mount(BasicInfoCard, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('基本信息')
+  })
 })
 
 describe('ServiceSection', () => {
@@ -217,5 +254,12 @@ describe('ServiceSection', () => {
     const card = mount(ServiceSection, opts).find('.ac')
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
+  })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    const t = mount(ServiceSection, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('其他服务')
   })
 })

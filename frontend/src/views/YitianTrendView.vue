@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
@@ -178,7 +179,7 @@ defineExpose({ series })
 
     <div v-if="ready" class="yt-grid">
       <AppCard v-for="c in charts" :key="c.title" variant="default">
-        <h3 class="yt-h">{{ c.title }}</h3>
+        <SectionTitle class="yt-h">{{ c.title }}</SectionTitle>
         <ChartBox :option="c.option" height="280px" v-on="c.drill ? { 'datapoint-click': onTrendClick } : {}" />
       </AppCard>
     </div>
@@ -188,5 +189,6 @@ defineExpose({ series })
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--gap-card); }
-.yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
+/* 字号/字重/色已收归 SectionTitle(section 级);这里只留布局属性 */
+.yt-h { margin-bottom: var(--gap-stack); }
 </style>

@@ -4,6 +4,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ElementPlus from 'element-plus'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { YitianData } from '@/types/yitian'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { useYitianViewStore } from '@/stores/yitianView'
@@ -20,6 +22,7 @@ vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 import YitianAnalyticsView from './YitianAnalyticsView.vue'
 import AppPager from '@/components/AppPager.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 // 两天工作日 → 基础 16h。张三 20h(加班) 李四 8h(欠填) 王五 零记录(完全未填)
 const DATA = {
@@ -132,6 +135,22 @@ describe('YitianAnalyticsView', () => {
     const main = cards.filter((c) => c.find('h3.yt-h').exists())
     expect(main).toHaveLength(8)
     expect(main.every((c) => c.props('variant') === 'default')).toBe(true)
+  })
+
+  it('8 处卡内小标题接入 SectionTitle(section 级),.yt-h 只剩布局属性', async () => {
+    const w = mountView()
+    await flushPromises()
+    const titles = w.findAllComponents(SectionTitle)
+    expect(titles).toHaveLength(8)
+    // 卡内小节标题一律 section 级(--fs-3/700);写成 card 级会与卡片主标题混为一档
+    expect(titles.every((t) => t.classes().includes('st--section'))).toBe(true)
+    // 字号/字重/色已收归 SectionTitle;.yt-h 留着只因它还带 margin 这类布局属性
+    const rule = readFileSync(resolve(__dirname, 'YitianAnalyticsView.vue'), 'utf-8')
+      .match(/^\.yt-h\s*\{([^}]*)\}/m)![1]
+    for (const k of ['font-size', 'font-weight', 'color']) {
+      expect(rule.includes(k), `.yt-h 仍自带 ${k},未收归 SectionTitle`).toBe(false)
+    }
+    expect(rule).toContain('margin-bottom')
   })
 
   it('员工明细表 8 列全带列头筛选图标', async () => {

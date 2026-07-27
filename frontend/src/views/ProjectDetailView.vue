@@ -17,6 +17,7 @@ import MilestoneTable from '@/components/MilestoneTable.vue'
 import ProfitTree from '@/components/ProfitTree.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -284,7 +285,7 @@ const originInfo = computed(() => [
 <template>
   <div class="project-detail-view">
     <AppEmpty v-if="!p">
-      <div class="pd-404-title">未找到该项目</div>
+      <SectionTitle level="card" class="pd-404-title">未找到该项目</SectionTitle>
       <div class="pd-404-sub">项目编号 {{ route.params.id }} 不在项目主域中（仅含交付实施三部在建项目）。</div>
       <RouterLink to="/projects" class="pd-404-link">← 返回在建项目</RouterLink>
     </AppEmpty>
@@ -441,7 +442,11 @@ const originInfo = computed(() => [
 
 <style scoped>
 .project-detail-view { padding: var(--sp-4); }
-.pd-404-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-2); }
+/* 字号/字重/色已收归 SectionTitle(card 级);此处只剩底边距。
+   写成 .st.pd-404-title 而非 .pd-404-title —— 父组件给子组件根节点加样式须同时带两边的类,
+   否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、靠打包顺序决胜负。
+   注意:同页 .pd-name(项目名称)与 .pd-metric-v(数值)字号字重虽同,语义不是标题,不纳入。 */
+.st.pd-404-title { margin-bottom: var(--sp-2); }
 .pd-404-sub { font-size: var(--fs-2); color: var(--mut); margin-bottom: var(--sp-4); }
 .pd-404-link { color: var(--accent); font-size: var(--fs-2); text-decoration: none; font-weight: 600; }
 .pd-head { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-2); }

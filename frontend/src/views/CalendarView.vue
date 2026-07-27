@@ -22,6 +22,7 @@ import { fmtWan } from '@/lib/format'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import CalYearHeat from '@/components/CalYearHeat.vue'
 import CalGrid from '@/components/CalGrid.vue'
@@ -179,7 +180,7 @@ defineExpose({ view })
     </template>
 
     <div class="cal-upcoming">
-      <div class="cal-up-title">即将到期回款节点</div>
+      <SectionTitle level="card" class="cal-up-title">即将到期回款节点</SectionTitle>
       <div class="cal-up-row">
         <div class="cal-up-panel">
           <div class="cal-up-header pending">15天内到期</div>
@@ -213,7 +214,10 @@ defineExpose({ view })
 .cal-arrow:hover { background: var(--card2); color: var(--accent); }
 .cal-navlabel { font-size: var(--fs-2); font-weight: 700; color: var(--txt); min-width: 48px; text-align: center; }
 .cal-upcoming { margin-top: var(--sp-5); }
-.cal-up-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-3); }
+/* 字号/字重/色已收归 SectionTitle(card 级);此处只剩底边距。
+   写成 .st.cal-up-title 而非 .cal-up-title —— 父组件给子组件根节点加样式须同时带两边的类,
+   否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、靠打包顺序决胜负。 */
+.st.cal-up-title { margin-bottom: var(--sp-3); }
 .cal-up-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
 .cal-up-panel { flex: 1; min-width: 320px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .cal-up-header { color: var(--warn-text); font-weight: 700; font-size: var(--fs-2); padding: var(--sp-2) var(--sp-3); }

@@ -125,6 +125,44 @@ describe('V4.4.8 页头与视图状态全局守卫', () => {
     }
   })
 
+  it('V4.5.1 SectionTitle 已接入,标题类不再自带字号字重,且非标题语义未被误纳入', () => {
+    const comps = resolve(viewsDir, '../components')
+    const dirs = [viewsDir, comps, resolve(comps, 'budget')]
+    const users = dirs.flatMap((d) => {
+      try {
+        return readdirSync(d).filter((f) => f.endsWith('.vue'))
+          .filter((f) => readFileSync(resolve(d, f), 'utf-8').includes('<SectionTitle'))
+      } catch { return [] }
+    }).length
+    expect(users, 'SectionTitle 接入数下降').toBeGreaterThanOrEqual(20)
+
+    // 判据是「不再自带字号字重」而非「类名消失」—— 按铁律②,带 margin 等布局属性的
+    // 标题类要保留下来与组件并存(如 <SectionTitle class="yt-h">),此时类名仍在。
+    const NO_FONT: [string, string, string][] = [
+      [viewsDir, 'YitianOverviewView.vue', 'yt-h'], [viewsDir, 'DataQualityView.vue', 'gov-h'],
+      [viewsDir, 'RiskBoardView.vue', 'rv-h3'], [comps, 'OrgRanking.vue', 'or-title'],
+    ]
+    for (const [d, f, cls] of NO_FONT) {
+      const m = readFileSync(resolve(d, f), 'utf-8').match(new RegExp(`^\\.${cls}\\s*\\{([^}]*)\\}`, 'm'))
+      if (!m) continue                      // 整条删除也是合格结果
+      for (const k of ['font-size', 'font-weight']) {
+        expect(m[1].includes(k), `${f} 的 .${cls} 仍自带 ${k},未收归 SectionTitle`).toBe(false)
+      }
+    }
+
+    // 这些字号字重与标题相同、但【语义不是标题】(数值显示/名称字段/图标首字母/页头),
+    // 必须仍是自写样式 —— 误套 SectionTitle 是本期最容易犯的错。
+    const KEEP: [string, string, string][] = [
+      [viewsDir, 'OverviewView.vue', 'ov-acard-count'], [viewsDir, 'ProjectDetailView.vue', 'pd-metric-v'],
+      [viewsDir, 'ProjectDetailView.vue', 'pd-name'], [comps, 'TodoQueue.vue', 'tq-count-v'],
+      [comps, 'PortalLaunchpad.vue', 'pl-initial'], [comps, 'PageHeader.vue', 'ph-title'],
+    ]
+    for (const [d, f, cls] of KEEP) {
+      expect(new RegExp(`^\\.${cls}\\s*[,{]`, 'm').test(readFileSync(resolve(d, f), 'utf-8')),
+        `${f} 的 .${cls} 语义不是标题,不应被 SectionTitle 取代`).toBe(true)
+    }
+  })
+
   it('页面组件里不得出现 hideFilter(它是 router meta,不属于 view)', () => {
     for (const f of allViews()) {
       expect(read(f), `${f} 不应引用 hideFilter`).not.toContain('hideFilter')

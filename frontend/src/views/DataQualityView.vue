@@ -7,6 +7,7 @@ import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
@@ -35,7 +36,7 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
         <div class="gov-banner-main">
           <span class="gov-dot" />
           <div>
-            <div class="gov-banner-title">{{ report.title }}</div>
+            <SectionTitle level="card" class="gov-banner-title">{{ report.title }}</SectionTitle>
             <div v-if="report.sub" class="gov-banner-sub">{{ report.sub }}</div>
           </div>
         </div>
@@ -54,7 +55,7 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
         </AppCard>
       </div>
 
-      <h3 class="gov-h">告警 <span class="gov-h-hint">按严重度排序,0 条置灰</span></h3>
+      <SectionTitle>告警 <span class="gov-h-hint">按严重度排序,0 条置灰</span></SectionTitle>
       <div class="gov-alerts">
         <div v-for="a in report.alerts" :key="a.key" class="gov-alert" :class="{ zero: a.count === 0 }" :data-test="`alert-${a.key}`">
           <button class="gov-alert-row" :disabled="a.count === 0" @click="toggle(a)">
@@ -89,7 +90,8 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
 .gov-banner.green .gov-dot { background: var(--ok); }
 .gov-banner.yellow .gov-dot { background: var(--warn); }
 .gov-banner.red .gov-dot { background: var(--danger); }
-.gov-banner-title { font-size: var(--fs-4); font-weight: 700; }
+/* 横幅标题的字号/字重已收归 SectionTitle(card 级);.gov-banner-title 类名保留:
+   下面三条按体检结论上色的规则靠它选中,且特异性(0,4,0)高过组件的 .st--card(0,2,0)。 */
 .gov-banner.green .gov-banner-title { color: var(--ok-text); }
 .gov-banner.yellow .gov-banner-title { color: var(--warn-text); }
 .gov-banner.red .gov-banner-title { color: var(--danger-text); }
@@ -105,7 +107,8 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
 .gov-src-main { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight); }
 .gov-src-mlabel { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-2); }
 .gov-src-sub { font-size: var(--fs-1); color: var(--sub); }
-.gov-h { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0; }
+/* 告警小标题整条收归 SectionTitle(section 级):原规则除三属性外只剩 margin: 0,
+   与组件自带的 .st { margin: 0 } 完全一致,故类名一并去掉。 */
 .gov-h-hint { font-size: var(--fs-1); font-weight: 400; color: var(--mut); margin-left: var(--sp-2); }
 .gov-alerts { display: flex; flex-direction: column; gap: var(--gap-stack); }
 .gov-alert { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }

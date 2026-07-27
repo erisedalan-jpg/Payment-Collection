@@ -22,6 +22,7 @@ import { isAnomalous } from '@/lib/anomaly'
 import PortalLaunchpad from '@/components/PortalLaunchpad.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import { usePortalStore } from '@/stores/portal'
 import { buildSections } from '@/lib/portal'
 import { useAuthStore } from '@/stores/auth'
@@ -164,7 +165,7 @@ defineExpose({ baseProjects })
     <!-- 快捷入口 / 门户 -->
     <AppCard v-if="portalSections.length || auth.isSuper" variant="default" class="ov-portal">
       <div class="ov-portal-head">
-        <span class="ov-portal-title">快捷入口</span>
+        <SectionTitle>快捷入口</SectionTitle>
         <button v-if="portalSections.length" class="ov-portal-toggle" @click="togglePortal">
           {{ portalCollapsed ? '展开' : '收起' }}
         </button>
@@ -331,7 +332,8 @@ defineExpose({ baseProjects })
   margin-bottom: var(--gap-card);
 }
 .ov-portal-head { display: flex; align-items: center; gap: var(--sp-2); }
-.ov-portal-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }
+/* 「快捷入口」整条收归 SectionTitle(section 级):原规则只有字号/字重/色三属性,
+   无布局属性可留,故类名一并去掉。 */
 .ov-portal-toggle, .ov-portal-cfg {
   font-size: var(--fs-1); color: var(--sub); background: none; border: none;
   cursor: pointer; text-decoration: none; padding: 0 var(--sp-1);

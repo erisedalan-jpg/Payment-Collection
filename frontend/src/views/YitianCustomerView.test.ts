@@ -3,6 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ElementPlus from 'element-plus'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { YitianData } from '@/types/yitian'
 import { ALL_PAGE_LINKS } from '@/nav'
 
@@ -19,6 +21,7 @@ vi.mock('@/charts/ChartBox.vue', () => ({
 import YitianCustomerView from './YitianCustomerView.vue'
 import DataTable from '@/components/DataTable.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 function makeRouter(): Router {
   return createRouter({
@@ -98,6 +101,22 @@ describe('YitianCustomerView', () => {
     const main = cards.filter((c) => c.find('h3.yt-h').exists())
     expect(main).toHaveLength(3)
     expect(main.every((c) => c.props('variant') === 'default')).toBe(true)
+  })
+
+  it('3 处卡内小标题接入 SectionTitle(section 级),.yt-h 只剩布局属性', async () => {
+    const w = mountView()
+    await flushPromises()
+    const titles = w.findAllComponents(SectionTitle)
+    expect(titles).toHaveLength(3)
+    // 卡内小节标题一律 section 级(--fs-3/700);写成 card 级会与卡片主标题混为一档
+    expect(titles.every((t) => t.classes().includes('st--section'))).toBe(true)
+    // 字号/字重/色已收归 SectionTitle;.yt-h 留着只因它还带 margin 这类布局属性
+    const rule = readFileSync(resolve(__dirname, 'YitianCustomerView.vue'), 'utf-8')
+      .match(/^\.yt-h\s*\{([^}]*)\}/m)![1]
+    for (const k of ['font-size', 'font-weight', 'color']) {
+      expect(rule.includes(k), `.yt-h 仍自带 ${k},未收归 SectionTitle`).toBe(false)
+    }
+    expect(rule).toContain('margin-bottom')
   })
 
   it('TOP1000 标题去括号,口径说明降为表上小字,不含"未分配L4"行,含固定汇总行', async () => {

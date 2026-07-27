@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { productTotalDays } from '@/lib/budget/calc'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import type { DayCells, ProductRow } from '@/lib/budget/types'
 
 const store = useBudgetStore()
@@ -77,7 +78,7 @@ defineExpose({ addProduct, addCustom, removeProduct, totalDaysOf })
 <template>
   <AppCard variant="default" class="bd-card">
     <div class="ps-head">
-      <h3 class="bd-card-title">产品实施</h3>
+      <SectionTitle level="card">产品实施</SectionTitle>
       <div class="ps-tools">
         <el-select
           v-model="pick"
@@ -203,7 +204,6 @@ defineExpose({ addProduct, addCustom, removeProduct, totalDaysOf })
 <style scoped>
 /* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
 .bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .ps-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .ps-tools { display: flex; align-items: center; gap: var(--sp-3); }
 .ps-select { width: 320px; }

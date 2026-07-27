@@ -118,4 +118,22 @@ describe('CalendarView', () => {
     }
     expect(cd).toContain('text-align: center')   // AppCard 不接管的文本对齐必须留下
   })
+
+  it('V4.5.1「即将到期回款节点」改用 SectionTitle(card 级),.cal-up-title 只剩底边距', () => {
+    seed()
+    const w = mountView()
+    const t = w.find('.cal-up-title')
+    expect(t.exists()).toBe(true)
+    expect(t.element.tagName).toBe('H3')
+    expect(t.classes()).toContain('st--card')          // 原值 --fs-4 → card
+    expect(t.classes()).not.toContain('st--section')
+    expect(t.text()).toBe('即将到期回款节点')
+    // 复合选择器 .st.cal-up-title 是刻意的:否则与组件 .st { margin: 0 } 同特异性、靠打包顺序决胜负
+    const rule = readFileSync(resolve(__dirname, 'CalendarView.vue'), 'utf-8')
+      .match(/\.st\.cal-up-title\s*\{([^}]*)\}/)![1]
+    for (const p of ['font-size', 'font-weight', 'color']) {
+      expect(rule, `.cal-up-title 不应再自写 ${p}`).not.toContain(p)
+    }
+    expect(rule).toContain('margin-bottom: var(--sp-3)')   // 布局属性必须留下
+  })
 })

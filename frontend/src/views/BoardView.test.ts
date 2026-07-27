@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { nextTick } from 'vue'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -242,5 +244,29 @@ describe('V4.5.0 AppCard', () => {
     expect(cards.every((c) => c.classes().includes('ac--default'))).toBe(true)
     // AppCard 只接管卡片外观,横排图表卡的 flex 布局类与它并存
     expect(w.find('.bv-chart-item').classes()).toContain('ac')
+  })
+})
+
+describe('V4.5.1 SectionTitle', () => {
+  it('卡内小节标题改用 SectionTitle(section 级),.bv-title 只剩底边距', async () => {
+    seed()
+    const w = mount(BoardView, opts)
+    await flushPromises()
+    // 单维模式:图表卡 1 + 排名表卡 1。先钉住条数,否则下面的循环在空集上恒真
+    const titles = w.findAll('.bv-title')
+    expect(titles).toHaveLength(2)
+    for (const t of titles) {
+      expect(t.element.tagName).toBe('H3')
+      expect(t.classes()).toContain('st--section')
+      expect(t.classes()).not.toContain('st--card')   // 原值 --fs-3 → section,不是 card
+    }
+    // 复合选择器 .st.bv-title 是刻意的:与 .ac.bv-card 同理,否则与组件 .st { margin: 0 }
+    // 同特异性、靠打包顺序决胜负。取不到这条规则本身即视为失败。
+    const rule = readFileSync(resolve(__dirname, 'BoardView.vue'), 'utf-8')
+      .match(/\.st\.bv-title\s*\{([^}]*)\}/)![1]
+    for (const p of ['font-size', 'font-weight', 'color']) {
+      expect(rule, `.bv-title 不应再自写 ${p}`).not.toContain(p)
+    }
+    expect(rule).toContain('margin: 0 0 var(--sp-3)')   // 布局属性必须留下
   })
 })

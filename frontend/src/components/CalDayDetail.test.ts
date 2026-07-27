@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import CalDayDetail from './CalDayDetail.vue'
+import SectionTitle from './SectionTitle.vue'
 import type { CalListGroup } from '@/lib/calendar'
 
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
@@ -16,6 +17,14 @@ describe('CalDayDetail', () => {
     expect(w.text()).toContain('2026-06-10 回款节点')
     expect(w.text()).toContain('延期')
     expect(w.text()).toContain('待回款小计')
+  })
+
+  it('V4.5.1 标题走 SectionTitle 的 card 级(--fs-4/700 收归组件)', () => {
+    const w = mount(CalDayDetail, { props: { title: '2026-06-10 回款节点', groups: GROUPS } })
+    const t = w.findComponent(SectionTitle)
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('2026-06-10 回款节点')
   })
 
   it('空分组显示空态', () => {

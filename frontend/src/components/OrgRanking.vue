@@ -8,6 +8,7 @@ import { filterProjects } from '@/lib/paymentPmis'
 import { goBoard } from '@/lib/navContext'
 import { fmtWan, pct } from '@/lib/format'
 import SegToggle from './SegToggle.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const filter = useFilterStore()
 const data = useDataStore()
@@ -46,7 +47,7 @@ function rateColor(r: number | null): string {
 <template>
   <div class="org-ranking">
     <div class="or-head">
-      <h3 class="or-title">服务组达成排名</h3>
+      <SectionTitle>服务组达成排名</SectionTitle>
       <SegToggle v-model="sortBy" :options="SORT_OPTS" />
     </div>
     <div class="org-list">
@@ -75,7 +76,6 @@ function rateColor(r: number | null): string {
 .or-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 /* 列表区：展示全部 L4，超出时纵向滚动；360px ≈ 8 行 × 32px 行高 + 8px 内边距，令牌无对应行高值，故用具体 px */
 .org-list { max-height: 360px; overflow-y: auto; }
-.or-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0; }
 .rank-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: var(--fs-2); cursor: pointer; border-radius: 6px; }
 .rank-item:hover { background: var(--card2); }
 .rank-no { width: 20px; text-align: center; color: var(--mut); }

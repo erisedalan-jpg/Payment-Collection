@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -176,14 +177,14 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
 
       <div class="yt-grid">
         <AppCard variant="default">
-          <h3 class="yt-h">工时类型占比</h3>
+          <SectionTitle class="yt-h">工时类型占比</SectionTitle>
           <ChartBox :option="typeOption" height="300px" />
         </AppCard>
 
         <AppCard variant="default">
-          <h3 class="yt-h">L4 组织工时</h3>
+          <SectionTitle class="yt-h">L4 组织工时</SectionTitle>
           <ChartBox :option="orgBarChartOption" :height="orgBarHeight" @datapoint-click="onOrgBarClick" />
-          <h3 class="yt-h yt-h--sub">分层汇总</h3>
+          <SectionTitle class="yt-h yt-h--sub">分层汇总</SectionTitle>
           <DataTable :columns="orgCols" :rows="orgRows" :show-count="false" clickable
             :show-summary="true" :summary-method="orgSummaryMethod" @row-click="onOrgRow">
             <template #cell-detailAction="{ row }">
@@ -214,6 +215,7 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
 .yt-ring-sub { font-size: var(--fs-1); color: var(--mut); }
 .yt-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(480px, 2fr); gap: var(--gap-card); }
 @media (max-width: 1200px) { .yt-grid { grid-template-columns: 1fr; } }
-.yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
+/* 字号/字重/色已收归 SectionTitle(section 级);这里只留布局属性 */
+.yt-h { margin-bottom: var(--gap-stack); }
 .yt-h--sub { margin-top: var(--gap-card); }
 </style>

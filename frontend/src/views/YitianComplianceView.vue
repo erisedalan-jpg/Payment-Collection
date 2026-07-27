@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -228,7 +229,7 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
 
       <AppCard variant="default">
         <div class="yt-head">
-          <h3 class="yt-h">问题分布</h3>
+          <SectionTitle class="yt-h">问题分布</SectionTitle>
           <div class="yt-actions">
             <el-button @click="onExport">导出</el-button>
           </div>
@@ -238,20 +239,20 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
       </AppCard>
 
       <AppCard variant="default">
-        <h3 class="yt-h">问题按 L4 组织分布</h3>
+        <SectionTitle class="yt-h">问题按 L4 组织分布</SectionTitle>
         <div v-if="!l4Dist.length" class="yt-empty">本区间无合规问题</div>
         <ChartBox v-else :option="l4BarChartOption" :height="l4BarHeight" @datapoint-click="onL4BarClick" />
       </AppCard>
 
       <AppCard variant="default">
-        <h3 class="yt-h">问题码 × L4 热力图</h3>
+        <SectionTitle class="yt-h">问题码 × L4 热力图</SectionTitle>
         <div v-if="!heatmap.codes.length" class="yt-empty">本区间无合规问题</div>
         <ChartBox v-else :option="heatmapChartOption" :height="heatmapHeight" @datapoint-click="onHeatmapClick" />
       </AppCard>
 
       <AppCard variant="default">
         <div class="yt-head">
-          <h3 class="yt-h">问题明细</h3>
+          <SectionTitle class="yt-h">问题明细</SectionTitle>
           <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
         </div>
         <DataTable :columns="cols" :rows="paged" sticky-header :max-height-px="560">
@@ -284,7 +285,8 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
 }
 .yt-head { display: flex; justify-content: space-between; align-items: center; gap: var(--gap-stack); flex-wrap: wrap; }
 .yt-actions { display: flex; gap: var(--gap-stack); align-items: center; }
-.yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
+/* 字号/字重/色已收归 SectionTitle(section 级);这里只留布局属性 */
+.yt-h { margin-bottom: var(--gap-stack); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 .yt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 </style>

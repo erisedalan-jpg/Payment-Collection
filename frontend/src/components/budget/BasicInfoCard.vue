@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useBudgetStore } from '@/stores/budget'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 // 这四组取值是审批标签,不参与任何计算,也不进费率配置 —— 故写在组件里,不从 config 读。
 const PROJECT_LEVELS = ['P1', 'P2', 'P3', 'P4']
@@ -16,7 +17,7 @@ defineExpose({ PROJECT_LEVELS, CUSTOMER_LEVELS, SIGN_TYPES, THIRD_PARTY })
 
 <template>
   <AppCard variant="default" class="bd-card">
-    <h3 class="bd-card-title">基本信息</h3>
+    <SectionTitle level="card">基本信息</SectionTitle>
 
     <div class="bi-grid">
       <div class="bi-field">
@@ -85,12 +86,6 @@ defineExpose({ PROJECT_LEVELS, CUSTOMER_LEVELS, SIGN_TYPES, THIRD_PARTY })
 <style scoped>
 /* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
 .bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
-.bd-card-title {
-  font-size: var(--fs-4);
-  font-weight: 700;
-  color: var(--txt);
-  line-height: var(--lh-dense);
-}
 .bi-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

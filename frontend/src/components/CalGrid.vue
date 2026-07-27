@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { calMonthGrid, calDayTooltipText, type CalDayData } from '@/lib/calendar'
 import { fmtWan } from '@/lib/format'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const props = defineProps<{
   year: number
@@ -40,7 +41,7 @@ function onClick(ds: string) {
 <template>
   <div class="cal-grid-row">
     <div v-for="mo in months" :key="mo.year + '-' + mo.month" class="cal-month">
-      <div class="cal-month-title">{{ mo.year }}年{{ mo.month + 1 }}月</div>
+      <SectionTitle class="cal-month-title">{{ mo.year }}年{{ mo.month + 1 }}月</SectionTitle>
       <div class="cal-weekdays">
         <span v-for="(wd, i) in WEEKDAYS" :key="wd" :class="{ wkend: i >= 5 }">{{ wd }}</span>
       </div>
@@ -77,7 +78,10 @@ function onClick(ds: string) {
 <style scoped>
 .cal-grid-row { display: flex; gap: 16px; flex-wrap: wrap; }
 .cal-month { flex: 1; min-width: 300px; }
-.cal-month-title { text-align: center; font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin-bottom: 8px; }
+/* 字号/字重/色已收归 SectionTitle(section 级),此处只留布局。
+   写成 .st.cal-month-title 而非 .cal-month-title —— 父组件给子组件根节点加样式须同时带
+   两边的类,否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、靠打包顺序决胜负。 */
+.st.cal-month-title { text-align: center; margin-bottom: 8px; }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-1); color: var(--sub); margin-bottom: 4px; }
 .cal-weekdays .wkend { color: var(--warn-text); }
 .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }

@@ -86,6 +86,16 @@ describe('RatioCard', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  // 标题(字号/字重/色)统一由 SectionTitle 提供,组件不再自写 .bd-card-title。
+  // 断言到具体级别 —— 只断言「有 .st」的话,级别写错(card 写成 section)也照绿。
+  it('标题接入 SectionTitle(card 级)', () => {
+    setup(40, 100)
+    const t = mount(RatioCard, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('成本比例')
+  })
 })
 
 describe('SummaryCard', () => {
@@ -111,6 +121,14 @@ describe('SummaryCard', () => {
     const card = mount(SummaryCard, opts).find('.ac')
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
+  })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    setup(10, 100)
+    const t = mount(SummaryCard, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('费用汇总')
   })
 })
 
@@ -148,6 +166,14 @@ describe('CrmCard', () => {
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
   })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    setup(3, 100)
+    const t = mount(CrmCard, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('CRM 审批建议')
+  })
 })
 
 describe('SalesOrderCard', () => {
@@ -163,5 +189,13 @@ describe('SalesOrderCard', () => {
     const card = mount(SalesOrderCard, opts).find('.ac')
     expect(card.exists()).toBe(true)
     expect(card.classes()).toContain('ac--default')
+  })
+
+  it('标题接入 SectionTitle(card 级)', () => {
+    setup(10, 100)
+    const t = mount(SalesOrderCard, opts).find('.st')
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('销售下单建议')
   })
 })

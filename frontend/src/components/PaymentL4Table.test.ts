@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import PaymentL4Table from './PaymentL4Table.vue'
+import SectionTitle from './SectionTitle.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
@@ -90,6 +91,17 @@ describe('PaymentL4Table', () => {
     expect(text).toContain('回款节点数')
     expect(text).toContain('完成节点数')
     expect(text).toContain('完成节点比例')
+  })
+
+  it('V4.5.1 表标题走 SectionTitle 的 card 级(原 --fs-4/600,字重归位 700)', async () => {
+    seed()
+    useFilterStore().setPreset('all')
+    const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const t = w.findComponent(SectionTitle)
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--card')
+    expect(t.text()).toBe('回款数据')
   })
 
   it('按 L4 组分组，两个不同 orgL4 出两行', async () => {

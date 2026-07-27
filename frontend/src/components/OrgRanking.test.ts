@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import OrgRanking from './OrgRanking.vue'
+import SectionTitle from './SectionTitle.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
@@ -75,6 +76,15 @@ describe('OrgRanking', () => {
     const ai = text.indexOf('A组'); const bi = text.indexOf('B组')
     expect(ai).toBeGreaterThanOrEqual(0)
     expect(ai).toBeLessThan(bi) // A 组按 actualTotal 降序排在 B 组之前
+  })
+
+  it('V4.5.1 标题走 SectionTitle 的 section 级(--fs-3/700 收归组件)', () => {
+    seed()
+    const w = mount(OrgRanking)
+    const t = w.findComponent(SectionTitle)
+    expect(t.exists()).toBe(true)
+    expect(t.classes()).toContain('st--section')
+    expect(t.text()).toBe('服务组达成排名')
   })
 
   it('切到达成率排序：A组(80%) 在 B组(10%) 之前', async () => {

@@ -5,6 +5,7 @@ import { useBudgetConfigStore } from '@/stores/budgetConfig'
 import type {
   BudgetConfig, BudgetRates, CityRate, HotelRates, MaterialKey,
 } from '@/lib/budget/types'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 /** 费率与目录配置抽屉(入口仅超管可见)。
  *
@@ -192,7 +193,7 @@ defineExpose({
         <!-- 1. 价格与阈值 -->
         <el-tab-pane label="价格与阈值" name="price">
           <section class="rc-sec">
-            <h4 class="rc-h">人天成本单价（元/人天）</h4>
+            <SectionTitle>人天成本单价（元/人天）</SectionTitle>
             <div class="rc-cols">
               <div v-for="c in RATE_CITIES" :key="c.key" class="rc-col">
                 <span class="rc-col-head">{{ c.label }}</span>
@@ -208,7 +209,7 @@ defineExpose({
           </section>
 
           <section class="rc-sec">
-            <h4 class="rc-h">销售物料单价（元/人天）</h4>
+            <SectionTitle>销售物料单价（元/人天）</SectionTitle>
             <p class="rc-note">
               与「物料」页签是同一份数据（salesPrices），改哪边都一样。销售单价与毛利率无关 ——
               毛利率只作为 (1 + 毛利率) 的乘数。
@@ -225,7 +226,7 @@ defineExpose({
           </section>
 
           <section class="rc-sec">
-            <h4 class="rc-h">住宿标准</h4>
+            <SectionTitle>住宿标准</SectionTitle>
             <div class="rc-fields">
               <div v-for="h in HOTEL_FIELDS" :key="h.key" class="rc-field">
                 <label class="rc-label">{{ h.label }}</label>
@@ -238,7 +239,7 @@ defineExpose({
           </section>
 
           <section class="rc-sec">
-            <h4 class="rc-h">差补标准与汇率</h4>
+            <SectionTitle>差补标准与汇率</SectionTitle>
             <div class="rc-fields">
               <div class="rc-field">
                 <label class="rc-label">差补 境内（元/天）</label>
@@ -259,7 +260,7 @@ defineExpose({
           </section>
 
           <section class="rc-sec">
-            <h4 class="rc-h">成本比例正常区间（%）</h4>
+            <SectionTitle>成本比例正常区间（%）</SectionTitle>
             <p class="rc-note">闭区间。低于下限 → 偏低告警；高于上限 → 偏高告警，两者都要求填异常说明。</p>
             <div class="rc-fields">
               <div class="rc-field">
@@ -274,7 +275,7 @@ defineExpose({
           </section>
 
           <section class="rc-sec">
-            <h4 class="rc-h">毛利率档位</h4>
+            <SectionTitle>毛利率档位</SectionTitle>
             <p class="rc-note">value 是 [0, 1) 的小数（0.13 = 13%）；label 是下拉里显示的文字。</p>
             <div v-for="(m, i) in d.margins" :key="i" class="rc-row">
               <div class="rc-field">
@@ -473,12 +474,7 @@ defineExpose({
   border-bottom: 1px solid var(--line);
 }
 .rc-sec:last-child { border-bottom: none; padding-bottom: 0; }
-.rc-h {
-  font-size: var(--fs-3);
-  font-weight: 700;
-  color: var(--txt);
-  line-height: var(--lh-dense);
-}
+/* 小节标题已换成 SectionTitle(section 级),字号/字重/色/行高全由组件负责 */
 
 .rc-cols { display: flex; flex-wrap: wrap; gap: var(--gap-card); }
 .rc-col {

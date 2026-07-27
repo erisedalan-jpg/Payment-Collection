@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { fmtYuan } from '@/lib/format'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 /** 销售下单建议：成本 → 物料数量的逆运算（数量 = 含毛利金额 ÷ 销售单价，向上取整）。
  *  这里只做展示，口径全在 lib/budget/salesOrder.ts。
@@ -17,7 +18,7 @@ defineExpose({ order })
 <template>
   <AppCard variant="default" class="bd-card">
     <div class="so-head">
-      <h3 class="bd-card-title">销售下单建议</h3>
+      <SectionTitle level="card">销售下单建议</SectionTitle>
       <span class="so-note">数量向上取整；直接成本并入单价最低且有量的物料</span>
     </div>
 
@@ -54,7 +55,6 @@ defineExpose({ order })
 <style scoped>
 /* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
 .bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .so-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .so-note { font-size: var(--fs-1); color: var(--mut); line-height: var(--lh-dense); }
 

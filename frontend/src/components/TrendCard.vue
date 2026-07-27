@@ -4,6 +4,7 @@ import { useFilterStore } from '@/stores/filter'
 import { payMonthlyTrend, payQuarterlyTrend } from '@/lib/payDashboard'
 import PendingBarChart from './PendingBarChart.vue'
 import SegToggle from './SegToggle.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const filter = useFilterStore()
 const period = ref('month')
@@ -22,7 +23,7 @@ const series = computed(() =>
 <template>
   <div class="trend-card">
     <div class="tc-head">
-      <h3 class="tc-title">待回款金额</h3>
+      <SectionTitle>待回款金额</SectionTitle>
       <SegToggle v-model="period" :options="PERIOD_OPTS" />
     </div>
     <PendingBarChart :categories="series.categories" :series="series.series" />
@@ -32,5 +33,4 @@ const series = computed(() =>
 <style scoped>
 .trend-card { }
 .tc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.tc-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0; }
 </style>

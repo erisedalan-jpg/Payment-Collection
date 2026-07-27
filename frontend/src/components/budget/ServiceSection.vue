@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import type { DayCells } from '@/lib/budget/types'
 
 const store = useBudgetStore()
@@ -51,7 +52,7 @@ defineExpose({ addService, removeService })
 <template>
   <AppCard variant="default" class="bd-card">
     <div class="sv-head">
-      <h3 class="bd-card-title">其他服务</h3>
+      <SectionTitle level="card">其他服务</SectionTitle>
       <div class="sv-tools">
         <el-select v-model="pick" class="sv-select" filterable clearable placeholder="选择服务（同一服务可加多条）">
           <!-- 服务名后端不强制唯一(budget_config.validate_config 未校验 services.name 去重),
@@ -85,7 +86,6 @@ defineExpose({ addService, removeService })
 <style scoped>
 /* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
 .bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .sv-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .sv-tools { display: flex; align-items: center; gap: var(--sp-3); }
 .sv-select { width: 280px; }

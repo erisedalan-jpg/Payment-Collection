@@ -20,6 +20,7 @@ import PivotTable from '@/components/PivotTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -149,7 +150,7 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
         </AppCard>
       </div>
 
-      <h3 class="rv-h3">风险统计分析</h3>
+      <SectionTitle class="rv-h3">风险统计分析</SectionTitle>
       <div class="rv-toolbar">
         <span class="rv-label">风险等级</span>
         <span class="rv-levelfilter">
@@ -167,7 +168,7 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
       </div>
       <DataTable :columns="RANK_COLS" :rows="groups" class="rv-rank-table" clickable @row-click="onRankRow" />
 
-      <h3 class="rv-h3">风险概览</h3>
+      <SectionTitle class="rv-h3">风险概览</SectionTitle>
       <div class="rv-toolbar">
         <span class="rv-label">行维度</span><DimPicker v-model="rowDims" :options="PIVOT_DIM_OPTS" />
         <span class="rv-label">列维度</span><DimPicker v-model="colDims" :options="PIVOT_DIM_OPTS" />
@@ -182,7 +183,10 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
 
 <style scoped>
 .risk-view { padding: var(--sp-4); }
-.rv-h3 { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: var(--sp-5) 0 var(--sp-3); }
+/* 字号/字重/色已收归 SectionTitle(section 级);此处只剩上下边距。
+   写成 .st.rv-h3 而非 .rv-h3 —— 父组件给子组件根节点加样式须同时带两边的类,
+   否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、靠打包顺序决胜负。 */
+.st.rv-h3 { margin: var(--sp-5) 0 var(--sp-3); }
 .rv-cards { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
 /* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
 .rv-card { flex: 1 1 200px; min-width: 180px; display: flex; flex-direction: column; gap: var(--gap-stack); }

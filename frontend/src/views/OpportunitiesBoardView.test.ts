@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -37,5 +39,26 @@ describe('V4.5.0 AppCard', () => {
     const charts = w.findAll('.ob-chart')
     expect(charts).toHaveLength(13)
     expect(charts.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+  })
+})
+
+describe('V4.5.1 SectionTitle', () => {
+  it('13 张图表卡标题改用 SectionTitle(section 级),.ob-h3 只剩底边距', async () => {
+    const w = mount(OpportunitiesBoardView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const titles = w.findAll('.ob-h3')
+    expect(titles).toHaveLength(13)      // 先钉住条数,否则下面的循环在空集上恒真
+    for (const t of titles) {
+      expect(t.element.tagName).toBe('H3')
+      expect(t.classes()).toContain('st--section')
+      expect(t.classes()).not.toContain('st--card')   // 原值 --fs-3 → section
+    }
+    // 复合选择器 .st.ob-h3 是刻意的:否则与组件 .st { margin: 0 } 同特异性、靠打包顺序决胜负
+    const rule = readFileSync(resolve(__dirname, 'OpportunitiesBoardView.vue'), 'utf-8')
+      .match(/\.st\.ob-h3\s*\{([^}]*)\}/)![1]
+    for (const p of ['font-size', 'font-weight', 'color']) {
+      expect(rule, `.ob-h3 不应再自写 ${p}`).not.toContain(p)
+    }
+    expect(rule).toContain('margin: 0 0 var(--sp-2)')   // 布局属性必须留下
   })
 })

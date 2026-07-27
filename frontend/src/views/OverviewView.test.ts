@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
@@ -201,6 +203,23 @@ describe('OverviewView', () => {
     useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] } as any
     const w = await mountView()
     expect(w.find('.ov-portal').classes()).toContain('ac--default')
+  })
+
+  it('V4.5.1「快捷入口」标题改用 SectionTitle(section 级),原 span 变 h3', async () => {
+    seed()
+    useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] } as any
+    const w = await mountView()
+    const t = w.find('.ov-portal-head .st')
+    expect(t.exists()).toBe(true)
+    expect(t.element.tagName).toBe('H3')
+    expect(t.classes()).toContain('st--section')     // 原值 --fs-3 → section
+    expect(t.classes()).not.toContain('st--card')
+    expect(t.text()).toBe('快捷入口')
+    // .ov-portal-title 原本只有字号/字重/色三属性,无布局属性可留,类名整条移除
+    const src = readFileSync(resolve(__dirname, 'OverviewView.vue'), 'utf-8')
+    expect(src, '.ov-portal-title 应整条移除').not.toContain('ov-portal-title')
+    // 同页 .ov-acard-count 是数值显示、语义不是标题,不得被一并收编
+    expect(src).toContain('.ov-acard-count')
   })
 })
 

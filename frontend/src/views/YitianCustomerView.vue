@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -174,7 +175,7 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
 
     <template v-if="ready">
       <AppCard variant="default">
-        <h3 class="yt-h">TOP1000 大客户支持</h3>
+        <SectionTitle class="yt-h">TOP1000 大客户支持</SectionTitle>
         <p class="yt-note">仅统计项目类 / 售前类 / 售后类工时；客户数按客户去重。</p>
         <div v-if="!topRowsRaw.length" class="yt-empty">无数据</div>
         <ChartBox v-else :option="top1000ChartOption" :height="top1000Height" @datapoint-click="onL4BarClick" />
@@ -187,7 +188,7 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
       </AppCard>
 
       <AppCard variant="default">
-        <h3 class="yt-h">跨 BG 支持</h3>
+        <SectionTitle class="yt-h">跨 BG 支持</SectionTitle>
         <p class="yt-note">仅统计项目类 / 售前类工时；本 BG 按销售 L2 组织判定。</p>
         <MetricGrid :items="bgMetrics" col-min="200px" />
         <div class="yt-grid">
@@ -198,7 +199,7 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
       </AppCard>
 
       <AppCard variant="default">
-        <h3 class="yt-h">TOP 客户排行</h3>
+        <SectionTitle class="yt-h">TOP 客户排行</SectionTitle>
         <p class="yt-note">按客户汇总工时（不限工时类型，只看挂了客户的记录），取前 10。</p>
         <div v-if="!topCustList.length" class="yt-empty">无数据</div>
         <ChartBox v-else :option="topCustChartOption" :height="topCustHeight" />
@@ -210,7 +211,8 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--gap-card); }
-.yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
+/* 字号/字重/色已收归 SectionTitle(section 级);这里只留布局属性 */
+.yt-h { margin-bottom: var(--gap-stack); }
 .yt-note { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--gap-stack); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 </style>

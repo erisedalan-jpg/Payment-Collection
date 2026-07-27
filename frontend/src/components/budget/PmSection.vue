@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { fmtYuan } from '@/lib/format'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import type { PmPhaseRow } from '@/lib/budget/types'
 
 const store = useBudgetStore()
@@ -45,7 +46,7 @@ defineExpose({ pmCost1, pmCost2, techCost1, techCost2, pmTotalCost })
     <el-collapse v-model="active" class="pm-card">
       <el-collapse-item name="pm">
         <template #title>
-          <span class="bd-card-title">项目经理</span>
+          <SectionTitle level="card">项目经理</SectionTitle>
           <span class="pm-note">阶段只是分组标签，没有系数、没有工时基线</span>
         </template>
 
@@ -112,7 +113,6 @@ defineExpose({ pmCost1, pmCost2, techCost1, techCost2, pmTotalCost })
   border-bottom-color: var(--line);
 }
 .pm-card :deep(.el-collapse-item__content) { padding-bottom: 0; }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); }
 .pm-note { font-size: var(--fs-1); color: var(--mut); margin-left: var(--sp-3); }
 
 .pm-body { display: flex; flex-direction: column; gap: var(--gap-card); padding-top: var(--sp-2); }

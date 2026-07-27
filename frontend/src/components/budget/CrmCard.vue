@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import type { InputInstance } from 'element-plus'
 import { useBudgetStore } from '@/stores/budget'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 /** CRM 审批建议：这段文字是要整段复制进 CRM 走审批的，所以默认以**只读原文**呈现
  *  （所见即所贴，换行不被输入框裁掉），点「编辑」或点正文才切到 textarea 手改。
@@ -40,7 +41,7 @@ defineExpose({ editing, startEdit, restore })
 <template>
   <AppCard variant="default" class="bd-card">
     <div class="crm-head">
-      <h3 class="bd-card-title">CRM 审批建议</h3>
+      <SectionTitle level="card">CRM 审批建议</SectionTitle>
       <div class="crm-ops">
         <span v-if="store.form.crmUserEdited" class="crm-flag">已手改，不再自动更新</span>
         <el-button v-if="!editing" size="small" @click="startEdit">编辑</el-button>
@@ -73,7 +74,6 @@ defineExpose({ editing, startEdit, restore })
 <style scoped>
 /* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
 .bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .crm-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .crm-ops { display: flex; align-items: center; gap: var(--sp-2); }
 .crm-flag {

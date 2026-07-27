@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -57,5 +59,25 @@ describe('ClosedProjectDetailView', () => {
     expect(empty.exists()).toBe(true)
     expect(empty.classes()).toContain('ae--default')
     expect(empty.text()).toContain('未找到该已关闭项目')
+  })
+
+  it('V4.5.1 404 标题改用 SectionTitle(card 级),.cd-404-title 只剩底边距', async () => {
+    const ds = useDataStore(); ds.data = { closedProjects: [CP] } as any
+    const w = await mountAt('NOPE')
+    const t = w.find('.cd-404-title')
+    expect(t.exists()).toBe(true)
+    expect(t.element.tagName).toBe('H3')
+    expect(t.classes()).toContain('st--card')          // 原值 --fs-4 → card
+    expect(t.classes()).not.toContain('st--section')
+    expect(t.text()).toBe('未找到该已关闭项目')
+    const src = readFileSync(resolve(__dirname, 'ClosedProjectDetailView.vue'), 'utf-8')
+    // 复合选择器 .st.cd-404-title 是刻意的:否则与组件 .st { margin: 0 } 同特异性、靠打包顺序决胜负
+    const rule = src.match(/\.st\.cd-404-title\s*\{([^}]*)\}/)![1]
+    for (const p of ['font-size', 'font-weight', 'color']) {
+      expect(rule, `.cd-404-title 不应再自写 ${p}`).not.toContain(p)
+    }
+    expect(rule).toContain('margin-bottom: var(--sp-2)')   // 布局属性必须留下
+    // 同页 .cd-name 是项目名称、语义不是标题,字号字重虽同也不得收编
+    expect(src).toMatch(/\.cd-name\s*\{[^}]*font-size: var\(--fs-4\)/)
   })
 })

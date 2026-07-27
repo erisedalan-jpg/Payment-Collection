@@ -10,6 +10,7 @@ vi.mock('@/lib/budgetApi', () => ({
 }))
 
 import RateConfigDrawer from './RateConfigDrawer.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import { useBudgetConfigStore } from '@/stores/budgetConfig'
 import type { BudgetConfig } from '@/lib/budget/types'
 
@@ -54,6 +55,15 @@ describe('RateConfigDrawer', () => {
     const s = useBudgetConfigStore()
     ;(w.vm as any).draft.fx = 9.9
     expect(s.config!.fx).toBe(6.8)             // 草稿与生效配置解耦
+  })
+
+  it('V4.5.1 小节标题走 SectionTitle 的 section 级(--fs-3/700 收归组件)', async () => {
+    const w = mountIt()
+    await flushPromises()
+    const titles = w.findAllComponents(SectionTitle)
+    expect(titles.length).toBe(6) // 「价格与阈值」页签下的 6 个小节
+    for (const t of titles) expect(t.classes()).toContain('st--section')
+    expect(titles[0].text()).toBe('人天成本单价（元/人天）')
   })
 
   it('保存 → 调 saveBudgetConfig 并把新配置写回 store(立即生效)', async () => {

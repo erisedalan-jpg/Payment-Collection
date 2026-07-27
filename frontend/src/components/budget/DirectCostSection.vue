@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { fmtYuan } from '@/lib/format'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import type { DirectCostForm } from '@/lib/budget/types'
 
 /** 直接成本(差补/住宿/交通)。所有单价一律从 store.effectiveConfig 读 —— 一个数都不写死,
@@ -42,7 +43,7 @@ defineExpose({ allowanceFields, hotelFields, transportFields })
 <template>
   <AppCard variant="default" class="bd-card">
     <div class="dc-head">
-      <h3 class="bd-card-title">直接成本</h3>
+      <SectionTitle level="card">直接成本</SectionTitle>
       <span class="dc-total u-num">合计 {{ fmtYuan(store.result?.directCost ?? 0) }} 元</span>
     </div>
 
@@ -105,7 +106,6 @@ defineExpose({ allowanceFields, hotelFields, transportFields })
 <style scoped>
 /* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
 .bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
-.bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .dc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-card); }
 .dc-total { font-size: var(--fs-2); color: var(--sub); }
 .dc-block { display: flex; flex-direction: column; gap: var(--sp-2); }

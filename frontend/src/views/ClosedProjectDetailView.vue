@@ -6,6 +6,7 @@ import { useScopedProjects } from '@/composables/useScopedData'
 import type { ClosedProject } from '@/types/analysis'
 import { fmtRatio } from '@/lib/format'
 import AppEmpty from '@/components/AppEmpty.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -54,7 +55,7 @@ const costRows = computed(() => [
 <template>
   <div class="closed-detail-view">
     <AppEmpty v-if="!p">
-      <div class="cd-404-title">未找到该已关闭项目</div>
+      <SectionTitle level="card" class="cd-404-title">未找到该已关闭项目</SectionTitle>
       <div class="cd-404-sub">项目编号 {{ route.params.id }} 不在交付三部已关闭清单中。</div>
       <RouterLink to="/projects/closed" class="cd-404-link">← 返回已关闭项目</RouterLink>
     </AppEmpty>
@@ -80,7 +81,11 @@ const costRows = computed(() => [
 
 <style scoped>
 .closed-detail-view { padding: var(--sp-4); }
-.cd-404-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-2); }
+/* 字号/字重/色已收归 SectionTitle(card 级);此处只剩底边距。
+   写成 .st.cd-404-title 而非 .cd-404-title —— 父组件给子组件根节点加样式须同时带两边的类,
+   否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、靠打包顺序决胜负。
+   注意:同页 .cd-name 字号字重虽同,但那是项目名称、语义不是标题,不纳入。 */
+.st.cd-404-title { margin-bottom: var(--sp-2); }
 .cd-404-sub { font-size: var(--fs-2); color: var(--mut); margin-bottom: var(--sp-4); }
 .cd-404-link { color: var(--accent); font-size: var(--fs-2); text-decoration: none; font-weight: 600; }
 .cd-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-2); }

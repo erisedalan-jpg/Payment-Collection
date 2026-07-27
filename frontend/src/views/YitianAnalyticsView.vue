@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
@@ -237,44 +238,44 @@ defineExpose({
     <template v-if="ready">
       <AppCard variant="default">
         <div class="yt-head">
-          <h3 class="yt-h">人数结构</h3>
+          <SectionTitle class="yt-h">人数结构</SectionTitle>
           <span class="yt-sub">共 {{ stats.length }} 人</span>
         </div>
         <HealthSegmentBar :segments="headcountSegments" clickable @seg-click="onSegClick" />
       </AppCard>
 
       <AppCard variant="default">
-        <h3 class="yt-h">饱和度 TOP10</h3>
+        <SectionTitle class="yt-h">饱和度 TOP10</SectionTitle>
         <div v-if="!topStats.length" class="yt-empty">无数据</div>
         <ChartBox v-else :option="satTopChartOption" :height="satTopHeight" @datapoint-click="onEmpChartClick" />
       </AppCard>
 
       <AppCard id="yt-diverging" variant="default">
-        <h3 class="yt-h">加班 / 欠填<span class="yt-sub">（正 = 加班，负 = 欠填）</span></h3>
+        <SectionTitle class="yt-h">加班 / 欠填<span class="yt-sub">（正 = 加班，负 = 欠填）</span></SectionTitle>
         <div v-if="!divergingFilledCount" class="yt-empty">无数据</div>
         <ChartBox v-else :option="divergingChartOption" :height="divergingHeight" @datapoint-click="onEmpChartClick" />
       </AppCard>
 
       <AppCard variant="default">
-        <h3 class="yt-h">饱和度分布</h3>
+        <SectionTitle class="yt-h">饱和度分布</SectionTitle>
         <div v-if="!scatterPointCount" class="yt-empty">无数据</div>
         <ChartBox v-else :option="scatterChartOption" height="420px" @datapoint-click="onEmpChartClick" />
       </AppCard>
 
       <div class="yt-grid">
         <AppCard variant="default">
-          <h3 class="yt-h">饱和度 TOP10</h3>
+          <SectionTitle class="yt-h">饱和度 TOP10</SectionTitle>
           <DataTable :columns="shortCols" :rows="topRows" :show-count="false" />
         </AppCard>
 
         <AppCard id="yt-unfilled" variant="default">
-          <h3 class="yt-h">未按时填写<span class="yt-sub">（有记录但工时不足）</span></h3>
+          <SectionTitle class="yt-h">未按时填写<span class="yt-sub">（有记录但工时不足）</span></SectionTitle>
           <div v-if="!unfilledRows.length" class="yt-empty">无</div>
           <DataTable v-else :columns="shortCols" :rows="unfilledRows" :show-count="false" />
         </AppCard>
 
         <AppCard id="yt-neverfilled" variant="default">
-          <h3 class="yt-h">完全未填<span class="yt-sub">（本区间一条记录都没有）</span></h3>
+          <SectionTitle class="yt-h">完全未填<span class="yt-sub">（本区间一条记录都没有）</span></SectionTitle>
           <div v-if="!neverRows.length" class="yt-empty">无</div>
           <DataTable v-else :columns="neverCols" :rows="neverRows" :show-count="false" />
         </AppCard>
@@ -282,7 +283,7 @@ defineExpose({
 
       <AppCard id="yt-emp" variant="default">
         <div class="yt-head">
-          <h3 class="yt-h">员工工时明细</h3>
+          <SectionTitle class="yt-h">员工工时明细</SectionTitle>
           <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
         </div>
         <DataTable :columns="empCols" :rows="paged" :show-count="false" sticky-header :max-height-px="560">
@@ -305,7 +306,8 @@ defineExpose({
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--gap-card); }
 .yt-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--gap-stack); flex-wrap: wrap; margin-bottom: var(--gap-stack); }
 .yt-head .yt-h { margin-bottom: 0; }
-.yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
+/* 字号/字重/色已收归 SectionTitle(section 级);这里只留布局属性 */
+.yt-h { margin-bottom: var(--gap-stack); }
 .yt-sub { font-size: var(--fs-1); font-weight: 400; color: var(--mut); margin-left: var(--sp-2); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 .yt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }

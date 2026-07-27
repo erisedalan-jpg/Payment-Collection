@@ -8,6 +8,7 @@ import { issueRows } from '@/lib/yitian/compliance'
 import { projectItems, timesheetItems, type PushItem } from '@/lib/lanxin/items'
 import { getLanxinConfig, lanxinPreview, lanxinSend,
          type LanxinConfig, type LanxinPlan, type LanxinSendResult } from '@/lib/lanxinApi'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
@@ -145,7 +146,7 @@ function cardFields(card: Record<string, unknown>): { key: string; value: string
             <span class="lx-name">{{ r.name }}（{{ r.employId }}）</span>
           </div>
           <div class="lx-card-body">
-            <div class="lx-card-title">{{ cardStr(r.card, 'bodyTitle') }}</div>
+            <SectionTitle class="lx-card-title">{{ cardStr(r.card, 'bodyTitle') }}</SectionTitle>
             <div v-if="cardStr(r.card, 'bodySubTitle')" class="dv-hint">
               {{ cardStr(r.card, 'bodySubTitle') }}
             </div>
@@ -174,7 +175,10 @@ function cardFields(card: Record<string, unknown>): { key: string; value: string
 .lx-card-prev { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3);
   display: flex; flex-direction: column; gap: var(--sp-2); }
 .lx-card-body { background: var(--card2, var(--card)); border-radius: var(--r-sm); padding: var(--sp-3); }
-.lx-card-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-2); }
+/* 类名里虽有 card,但原值是 --fs-3 → 归 section 级;字号/字重/色已收归 SectionTitle,
+   此处只剩底边距。写成 .st.lx-card-title 而非 .lx-card-title —— 父组件给子组件根节点加样式
+   须同时带两边的类,否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、靠打包顺序决胜负。 */
+.st.lx-card-title { margin-bottom: var(--sp-2); }
 .lx-field { display: flex; justify-content: space-between; gap: var(--sp-3);
   padding: 2px 0; border-bottom: 1px dashed var(--line); }
 .lx-field-k { color: var(--sub); font-size: var(--fs-1); }

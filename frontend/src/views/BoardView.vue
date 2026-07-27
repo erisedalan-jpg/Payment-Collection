@@ -18,6 +18,7 @@ import { buildRankingOption, valueKindForPie, type ValueKind } from '@/lib/chart
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
@@ -259,13 +260,13 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
             variant="default"
             class="bv-card bv-chart-item"
           >
-            <h3 class="bv-title">{{ activeChart.label }}排名（Top {{ chartTop.length }}）</h3>
+            <SectionTitle class="bv-title">{{ activeChart.label }}排名（Top {{ chartTop.length }}）</SectionTitle>
             <ChartBox v-if="type !== 'pie' || pieRenderable" :option="chartOptionForType(type)" height="320px" />
             <div v-else class="bv-empty">完成率为比率，不宜用饼图（请改用柱状/折线）</div>
           </AppCard>
         </div>
         <AppCard variant="default" class="bv-card">
-          <h3 class="bv-title">分组排名（点击行下钻该组项目）</h3>
+          <SectionTitle class="bv-title">分组排名（点击行下钻该组项目）</SectionTitle>
           <DataTable :columns="tableColumns" :rows="sortedGroups" clickable @row-click="(r) => openDrill(r as PayBoardGroup)">
             <template #cell-rate="{ value }">
               <span class="u-num" :style="{ color: rateColorPmis(value) }">{{ fmtRatio(value) }}</span>
@@ -280,11 +281,11 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
       <!-- 交叉 -->
       <template v-else-if="mode === 'cross'">
         <AppCard v-if="crossChartOption" variant="default" class="bv-card">
-          <h3 class="bv-title">{{ METRIC_BY_KEY[metricKey].label }} 交叉堆叠（行 Top 15）</h3>
+          <SectionTitle class="bv-title">{{ METRIC_BY_KEY[metricKey].label }} 交叉堆叠（行 Top 15）</SectionTitle>
           <ChartBox :option="crossChartOption" height="320px" />
         </AppCard>
         <AppCard variant="default" class="bv-card">
-          <h3 class="bv-title">交叉矩阵（点击单元格下钻）</h3>
+          <SectionTitle class="bv-title">交叉矩阵（点击单元格下钻）</SectionTitle>
           <BoardMatrix
             v-if="matrix"
             :matrix="matrix"
@@ -300,7 +301,7 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
       <!-- 透视 -->
       <template v-else>
         <AppCard variant="default" class="bv-card">
-          <h3 class="bv-title">透视表 · {{ METRIC_BY_KEY[metricKey].label }}（点击单元格下钻）</h3>
+          <SectionTitle class="bv-title">透视表 · {{ METRIC_BY_KEY[metricKey].label }}（点击单元格下钻）</SectionTitle>
           <PivotTable v-if="pivot" :pivot="pivot" :format="metricFormat" @cell-click="onPivotCellClick" />
           <div v-else class="bv-empty">请选择至少一个行维度</div>
         </AppCard>
@@ -328,7 +329,11 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
 .ac.bv-card { margin-bottom: var(--sp-3); }
 /* 图表卡在 .bv-charts-row 里横排,不要底边距 —— 与上一条同特异性,靠书写顺序压过 */
 .ac.bv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
-.bv-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
+/* 字号/字重/色已收归 SectionTitle(section 级);此处只剩底边距。
+   写成 .st.bv-title 而非 .bv-title —— 与上面 .ac.bv-card 同一条理由:父组件给子组件
+   根节点加样式须同时带两边的类,否则与 SectionTitle 自身的 .st { margin: 0 } 同特异性、
+   靠打包顺序决胜负。 */
+.st.bv-title { margin: 0 0 var(--sp-3); }
 .bv-danger { color: var(--danger); font-weight: 700; }
 .bv-empty { color: var(--mut); padding: var(--sp-4); text-align: center; }
 </style>

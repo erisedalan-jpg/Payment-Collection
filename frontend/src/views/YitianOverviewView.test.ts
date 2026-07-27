@@ -3,6 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ElementPlus from 'element-plus'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { YitianData } from '@/types/yitian'
 import { ALL_PAGE_LINKS } from '@/nav'
 
@@ -15,6 +17,7 @@ vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianOverviewView from './YitianOverviewView.vue'
 import AppCard from '@/components/AppCard.vue'
+import SectionTitle from '@/components/SectionTitle.vue'
 
 // 跨页下钻断言只需路由能解析到目标路径,不依赖目标页真实实现(与其它并行任务隔离)。
 const StubPage = { template: '<div class="stub-page" />' }
@@ -227,6 +230,22 @@ describe('YitianOverviewView', () => {
     expect(ring, '环卡未接 AppCard').toBeTruthy()
     // 主卡 default(带阴影)与环卡 flat(无阴影)必须是不同变体,同写成 default 则两者层次差别消失
     expect(ring!.props('variant')).toBe('flat')
+  })
+
+  it('3 处卡内小标题接入 SectionTitle(section 级),.yt-h 只剩布局属性', async () => {
+    const w = mountView()
+    await flushPromises()
+    const titles = w.findAllComponents(SectionTitle)
+    expect(titles).toHaveLength(3)
+    // 卡内小节标题一律 section 级(--fs-3/700);写成 card 级会与卡片主标题混为一档
+    expect(titles.every((t) => t.classes().includes('st--section'))).toBe(true)
+    // 字号/字重/色已收归 SectionTitle;.yt-h 留着只因它还带 margin 这类布局属性
+    const rule = readFileSync(resolve(__dirname, 'YitianOverviewView.vue'), 'utf-8')
+      .match(/^\.yt-h\s*\{([^}]*)\}/m)![1]
+    for (const k of ['font-size', 'font-weight', 'color']) {
+      expect(rule.includes(k), `.yt-h 仍自带 ${k},未收归 SectionTitle`).toBe(false)
+    }
+    expect(rule).toContain('margin-bottom')
   })
 
   it('分层汇总表 DataTable 标记 clickable(行 hover 有点击态)', async () => {

@@ -6,6 +6,7 @@ import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
 import type { YitianData } from '@/types/yitian'
 import type { PushItem } from '@/lib/lanxin/items'
 import LanxinPushDrawer from './LanxinPushDrawer.vue'
+import SectionTitle from './SectionTitle.vue'
 
 const PLAN = {
   recipients: [
@@ -118,6 +119,14 @@ describe('LanxinPushDrawer', () => {
     expect(w.text()).toContain('张三')
     expect(w.text()).toContain('耿磊磊')
     expect(w.text()).toContain('你名下 2 个项目存在关注原因')
+  })
+
+  it('V4.5.1 卡片标题走 SectionTitle 的 section 级(类名含 card,但原值是 --fs-3)', async () => {
+    const w = await mountDrawer()
+    const titles = w.findAllComponents(SectionTitle)
+    expect(titles.length).toBe(2) // 两位收件人各一张卡片预览
+    for (const t of titles) expect(t.classes()).toContain('st--section')
+    expect(titles[0].text()).toBe('你名下 2 个项目存在关注原因')
   })
 
   it('未解析清单必须可见(不静默丢)', async () => {

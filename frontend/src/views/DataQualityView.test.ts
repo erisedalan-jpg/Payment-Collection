@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import DataQualityView from './DataQualityView.vue'
@@ -89,6 +91,29 @@ describe('DataQualityView', () => {
     const alerts = w.findAll('.gov-alert')
     expect(alerts.length).toBeGreaterThan(0)
     expect(alerts.every((a) => !a.classes().includes('ac'))).toBe(true)
+  })
+
+  it('V4.5.1 横幅标题归 card 级、告警小标题归 section 级 —— 同页两个级别不可混', () => {
+    seed()
+    const w = mountView()
+    // 体检横幅标题:原值 --fs-4 → card
+    const banner = w.find('.gov-banner-title')
+    expect(banner.exists()).toBe(true)
+    expect(banner.element.tagName).toBe('H3')
+    expect(banner.classes()).toContain('st--card')
+    expect(banner.classes()).not.toContain('st--section')
+    // 告警小标题:原值 --fs-3 → section。.gov-h 类已整条移除,故按级别类定位
+    const sections = w.findAll('.st--section')
+    expect(sections).toHaveLength(1)
+    expect(sections[0].element.tagName).toBe('H3')
+    expect(sections[0].text()).toContain('告警')
+
+    const src = readFileSync(resolve(__dirname, 'DataQualityView.vue'), 'utf-8')
+    // .gov-banner-title 自身规则(只有字号字重)已删,类名留着是给下面三条上色规则用的
+    expect(src, '.gov-banner-title 不应再自写字号字重').not.toMatch(/^\.gov-banner-title\s*\{/m)
+    expect(src).toContain('.gov-banner.green .gov-banner-title { color: var(--ok-text); }')
+    // .gov-h 原本除三属性外只剩 margin: 0,与组件同值,故整条移除
+    expect(src, '.gov-h 规则应整条移除').not.toMatch(/^\.gov-h\s*\{/m)
   })
 
   it('0 条告警置灰且按钮禁用', () => {
