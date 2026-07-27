@@ -43,7 +43,7 @@
 
 **非目标（本期明确不做）**
 
-- 不动任何 `views/*.vue` 页面组件（见 §4.3，本期靠路由 meta 驱动，页面零改动）
+- 不动 34 个业务页面组件（见 §4.3，本期靠路由 meta 驱动）；唯一例外是配置页 `AdminView.vue`，仅换派生源、不改 UI 结构
 - 不动视觉令牌与 `theme.css`（属第二期「视觉约束整体重写」）
 - 不动筛选逻辑、不删 `hideFilter`、不拆全局单例 `filterStore`（属第三期）
 - 不新增/删除任何业务页面与数据口径
@@ -103,11 +103,18 @@
 
 ### 4.2 `nav.ts` 重构：侧栏项与 tab 项分离，但授权选项合并派生
 
-**承重点 ①（违反则 10 个页面静默失去授权能力）**
+**承重点 ①（违反则 10 个页面静默失去授权与数据范围配置能力）**
 
-`lib/pageAccess.ts:17` 的 `PAGE_OPTIONS`（账号管理页「可访问页面」下拉的唯一来源）目前从 6 个侧栏 LINKS 常量派生。分析页收进 tab 后将不再出现在侧栏 LINKS 中 —— **若不处理，超管将无法为这 10 个页面授权，且不报错、测试照绿**。
+从 6 个侧栏 LINKS 常量派生的消费方共有**四处**，分析页收进 tab、不再出现在侧栏 LINKS 后，每一处都会静默失效（不报错、测试照绿）：
 
-解法：`nav.ts` 显式区分两类，`PAGE_OPTIONS` 从两类**合并**派生。
+| 消费方 | 用途 | 失效后果 |
+|---|---|---|
+| `lib/pageAccess.ts:19` `PAGE_OPTIONS` | 账号「可访问页面」下拉唯一来源 | 超管无法为 10 个 tab 页授权 |
+| `stores/auth.ts:78` `firstAllowedPath()` | 登录后落地页 | 只有 tab 页权限的账号登录后跳向错误路径 |
+| `views/AdminView.vue:21-28` `NAV_GROUPS` | 组级选页 UI 分组 | 10 个 tab 页在配置界面里整个消失 |
+| `views/AdminView.vue:30-36` `OVERRIDE_TARGETS` | 逐页数据范围覆盖下拉 | **V4.3.1 的 `pageScopes` 对这 10 页失效** |
+
+解法：`nav.ts` 显式区分两类，并导出唯一的展开函数 `sectionPageLinks(section)`（一级 `NavLink` + 容器入口展开后的 tab 页），上述四处**全部**改用它派生。`ALL_PAGE_LINKS = NAV_SECTIONS.flatMap(sectionPageLinks)`。
 
 ```ts
 export interface NavLink { label: string; to: string; key: PageKey }
@@ -141,9 +148,11 @@ export const TAB_GROUPS: Record<string, NavLink[]> = {
 
 `lib/pageAccess.ts:16` 的注释写「27 个 PageKey」，实际是 30 个，注释已陈旧，本期顺手订正。
 
-### 4.3 `PageTabs` 组件：由路由 meta 驱动，页面组件零改动
+### 4.3 `PageTabs` 组件：由路由 meta 驱动，业务页面零改动
 
 **承重点 ③**
+
+> 订正：本节初稿称「35 个 view 零改动」，实测有误 —— `views/AdminView.vue` 消费 6 个侧栏 LINKS 常量（见 §4.2 承重点 ① 表格后两行），**必须改**。准确表述是：**34 个业务页面零改动，仅 AdminView 一个配置页需同步派生源**。
 
 tab 条**不由页面组件自己渲染**，而是在 `AppLayout` 中根据路由 meta 统一渲染：
 
@@ -159,7 +168,7 @@ meta: { title: '里程碑管理', pageKey: 'insight-milestone', tabGroup: 'proje
 <router-view ... />
 ```
 
-这样 **1a 不需要修改任何一个 `views/*.vue` 文件**，35 个页面组件零改动。风险因此集中在路由表、`nav.ts`、`AppSidebar`、`AppLayout` 四处，故障定位容易。
+这样 **34 个业务页面（`views/*.vue`）零改动**，唯一需要动的 view 是配置页 `AdminView.vue`（且只改派生源，不改 UI 结构）。风险因此集中在 `nav.ts`、路由表、`AppSidebar`、`AppLayout`、`AdminView` 五处，故障定位容易。
 
 `PageTabs.vue` 职责（新建，预计 40 行内）：
 - 入参 `group: string`，从 `TAB_GROUPS[group]` 取 tab 列表
