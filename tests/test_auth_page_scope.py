@@ -6,20 +6,19 @@ def _accounts():
     return {"version": 1, "users": {}}
 
 
-def test_effective_scope_three_tier():
+def test_effective_scope_two_tier():
     rec = {"allowedL4": ["D0"], "allowedStaff": ["E0"],
-           "domainScopes": {"project": {"l4": ["Ddom"], "staff": []}},
            "pageScopes": {"temp-followup": {"l4": ["Dpage"], "staff": []}}}
-    assert auth.effective_scope(rec, "project", "temp-followup") == (["Dpage"], [])   # 页覆盖
-    assert auth.effective_scope(rec, "project", "projects") == (["Ddom"], [])          # 域覆盖
-    assert auth.effective_scope(rec, "yitian", "yitian") == (["D0"], ["E0"])           # 默认
-    assert auth.effective_scope(rec, "project") == (["Ddom"], [])                      # 不传页=Phase2 兼容
+    assert auth.effective_scope(rec, "temp-followup") == (["Dpage"], [])   # 页覆盖
+    assert auth.effective_scope(rec, "projects") == (["D0"], ["E0"])       # 回退默认
+    assert auth.effective_scope(rec, "yitian") == (["D0"], ["E0"])         # 回退默认
+    assert auth.effective_scope(rec) == (["D0"], ["E0"])                   # 不传页=默认
 
 
 def test_effective_scope_explicit_empty_page():
     rec = {"allowedL4": ["*"], "allowedStaff": [], "pageScopes": {"projects": {"l4": [], "staff": []}}}
-    assert auth.effective_scope(rec, "project", "projects") == ([], [])
-    assert auth.effective_scope(rec, "project", "overview") == (["*"], [])
+    assert auth.effective_scope(rec, "projects") == ([], [])
+    assert auth.effective_scope(rec, "overview") == (["*"], [])
 
 
 def test_domain_union_scope():
@@ -37,7 +36,7 @@ def test_domain_union_star_short_circuit():
 
 
 def test_create_with_page_scopes_and_public():
-    a = auth.create_account(_accounts(), "u", "pw", "U", ["*"], ["*"], [], None,
+    a = auth.create_account(_accounts(), "u", "pw", "U", ["*"], ["*"], [],
                             {"temp-followup": {"l4": ["Dx"], "staff": []}})
     rec = a["users"]["u"]
     assert rec["pageScopes"] == {"temp-followup": {"l4": ["Dx"], "staff": []}}
@@ -53,19 +52,19 @@ def test_page_scopes_defaults_and_migration():
 
 def test_page_scopes_validation():
     with pytest.raises(ValueError):    # 未知 pageKey
-        auth.create_account(_accounts(), "x", "pw", "x", [], [], [], None, {"nope": {"l4": [], "staff": []}})
+        auth.create_account(_accounts(), "x", "pw", "x", [], [], [], {"nope": {"l4": [], "staff": []}})
     with pytest.raises(ValueError):    # 值非 dict
-        auth.create_account(_accounts(), "x", "pw", "x", [], [], [], None, {"projects": ["D"]})
+        auth.create_account(_accounts(), "x", "pw", "x", [], [], [], {"projects": ["D"]})
 
 
 def test_opportunity_page_staff_cleared():
-    a = auth.create_account(_accounts(), "x", "pw", "x", [], [], [], None,
+    a = auth.create_account(_accounts(), "x", "pw", "x", [], [], [],
                             {"opportunities-progress": {"l4": ["D1"], "staff": ["E1"]}})
     assert a["users"]["x"]["pageScopes"]["opportunities-progress"] == {"l4": ["D1"], "staff": []}
 
 
 def test_update_page_scopes_none_keeps():
-    a = auth.create_account(_accounts(), "u", "pw", "U", ["*"], ["*"], [], None,
+    a = auth.create_account(_accounts(), "u", "pw", "U", ["*"], ["*"], [],
                             {"projects": {"l4": ["D1"], "staff": []}})
     a = auth.update_account(a, "u", display_name="新")
     assert a["users"]["u"]["pageScopes"] == {"projects": {"l4": ["D1"], "staff": []}}

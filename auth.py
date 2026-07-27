@@ -68,7 +68,7 @@ def save_accounts(data: dict) -> None:
 
 def _make_user(password: str, display_name: str, is_super: bool = True,
                pages: list | None = None, l4: list | None = None,
-               staff: list | None = None, domain_scopes: dict | None = None,
+               staff: list | None = None,
                page_scopes: dict | None = None, must_change: bool = False) -> dict:
     salt = secrets.token_hex(16)
     return {
@@ -78,7 +78,6 @@ def _make_user(password: str, display_name: str, is_super: bool = True,
         'allowedPages': pages if pages is not None else ['*'],
         'allowedL4': l4 if l4 is not None else ['*'],
         'allowedStaff': staff if staff is not None else [],
-        'domainScopes': domain_scopes if domain_scopes is not None else {},
         'pageScopes': page_scopes if page_scopes is not None else {},
         'displayName': display_name,
         'mustChangePassword': bool(must_change),
@@ -108,7 +107,6 @@ def public_user(account: str, rec: dict) -> dict:
         'allowedPages': rec.get('allowedPages', []),
         'allowedL4': rec.get('allowedL4', []),
         'allowedStaff': rec.get('allowedStaff', []),
-        'domainScopes': rec.get('domainScopes', {}),
         'pageScopes': rec.get('pageScopes', {}),
         'mustChangePassword': bool(rec.get('mustChangePassword', False)),
     }
@@ -208,53 +206,30 @@ def _validate_str_list(values, field: str, cap: int = 100) -> list:
     return out
 
 
-_SCOPE_DOMAINS = ('project', 'yitian', 'opportunity')
-
-
-def _validate_domain_scopes(value) -> dict:
-    """校验 domainScopes:{域键: {l4:[...], staff:[...]}}。未知域键/非 dict 值 → ValueError。
-    商机(opportunity)域 staff 恒清空(不做工号级)。None → {}。"""
-    if value is None:
-        return {}
-    if not isinstance(value, dict):
-        raise ValueError('domainScopes 须为对象')
-    out: dict = {}
-    for k, v in value.items():
-        if k not in _SCOPE_DOMAINS:
-            raise ValueError(f'domainScopes 含未知数据域: {k}')
-        if not isinstance(v, dict):
-            raise ValueError(f'domainScopes.{k} 须为对象')
-        l4 = _validate_str_list(v.get('l4', []), f'domainScopes.{k}.l4')
-        staff = _validate_str_list(v.get('staff', []), f'domainScopes.{k}.staff', cap=1000)
-        if k == 'opportunity':
-            staff = []                                   # 商机不做工号级,恒忽略
-        out[k] = {'l4': l4, 'staff': staff}
-    return out
-
-
-def effective_scope(rec: dict, domain: str, page_key: str | None = None) -> tuple:
-    """(l4, staff) 三层解析:pageScopes[page_key] ?? domainScopes[domain] ?? 默认范围。
-    page_key=None → 退化为 域 ?? 默认(Phase 2 调用点兼容)。显式空覆盖返回空。"""
+def effective_scope(rec: dict, page_key: str | None = None) -> tuple:
+    """(l4, staff) 两层解析:pageScopes[page_key] ?? 默认范围(allowedL4/allowedStaff)。
+    page_key=None → 直接取默认。显式空覆盖返回空(≠缺省回退)。
+    V4.5.2:域层已删除,原三层的中间一跳不复存在。"""
     if page_key is not None:
         ps = (rec.get('pageScopes') or {}).get(page_key)
         if isinstance(ps, dict):
             return list(ps.get('l4', []) or []), list(ps.get('staff', []) or [])
-    ds = (rec.get('domainScopes') or {}).get(domain)
-    if isinstance(ds, dict):
-        return list(ds.get('l4', []) or []), list(ds.get('staff', []) or [])
     return list(rec.get('allowedL4', []) or []), list(rec.get('allowedStaff', []) or [])
 
 
 def domain_union_scope(rec: dict, domain: str, page_keys) -> tuple:
-    """对 page_keys 求 effective_scope 并集。任一 l4 含 '*' → (['*'], [])。空 page_keys → 回退默认。"""
+    """对 page_keys 求 effective_scope 并集。任一 l4 含 '*' → (['*'], [])。空 page_keys → 回退默认。
+
+    V4.5.2:`domain` 参数已不参与解析(两层模型无域层),保留仅为调用点兼容 ——
+    server.py 6 处调用点属服务端裁剪链路(安全边界),本期承诺不触碰其签名。"""
     keys = list(page_keys or [])
     if not keys:
-        l4, staff = effective_scope(rec, domain, None)
+        l4, staff = effective_scope(rec, None)
         return (['*'], []) if '*' in l4 else (l4, staff)
     l4set: set = set()
     staffset: set = set()
     for pk in keys:
-        l4, staff = effective_scope(rec, domain, pk)
+        l4, staff = effective_scope(rec, pk)
         if '*' in l4:
             return ['*'], []
         l4set.update(l4)
@@ -285,9 +260,67 @@ def _validate_page_scopes(value) -> dict:
     return out
 
 
+def migrate_domain_scopes(accounts: dict) -> tuple:
+    """把 domainScopes 物化进 pageScopes 后删除该字段(V4.5.2 两层收敛)。
+    返回 (新 accounts, 改动账号数)。幂等;不改入参。
+
+    为什么必须物化而非直接忽略:域覆盖的典型用途是【收窄】(默认 ['*']、某域限某 L4)。
+    若代码删了域分支而数据里仍躺着非空 domainScopes,该域会回退到【更宽的默认】——
+    服务端将下发越权数据,即权限放大。物化把域层语义无损翻译到优先级更高的页层,
+    杜绝这个窗口。生产虽全空,但备份回滚/其它部署副本/lts 变体都可能带非空数据进来。
+
+    物化目标是最高优先级层,因此升级后的数据拿回旧版程序跑行为也一致(双向兼容)。"""
+    import config
+    users = accounts.get('users', {})
+    new_users: dict = {}
+    changed = 0
+    for acc, rec in users.items():
+        if 'domainScopes' not in rec:
+            new_users[acc] = rec
+            continue
+        new_rec = dict(rec)
+        ds = new_rec.pop('domainScopes')
+        if isinstance(ds, dict) and ds and not rec.get('isSuper'):
+            pages = rec.get('allowedPages') or []
+            star = '*' in pages
+            ps = dict(new_rec.get('pageScopes') or {})
+            for dom, scope in ds.items():
+                if not isinstance(scope, dict):
+                    continue
+                for pk in config.DOMAIN_PAGES.get(dom, []):
+                    if pk in ps:                        # 页层本就优先,绝不覆写
+                        continue
+                    if not (star or pk in pages):       # 账号进不去的页不必落
+                        continue
+                    ps[pk] = {'l4': list(scope.get('l4') or []),
+                              'staff': list(scope.get('staff') or [])}
+            new_rec['pageScopes'] = ps
+        new_users[acc] = new_rec
+        changed += 1
+    out = dict(accounts)
+    out['users'] = new_users
+    return out, changed
+
+
+def migrate_accounts_file() -> int:
+    """读 accounts.json → 迁移 → 有改动则先备份再写回。返回改动账号数。
+    备份名 accounts.json.bak-YYYYMMDD,同日重复运行不覆盖已有备份。"""
+    with _accounts_mutate_lock:
+        data = load_accounts()
+        out, changed = migrate_domain_scopes(data)
+        if changed:
+            import shutil
+            stamp = time.strftime('%Y%m%d')
+            bak = f'{ACCOUNTS_FILE}.bak-{stamp}'
+            if os.path.exists(ACCOUNTS_FILE) and not os.path.exists(bak):
+                shutil.copy2(ACCOUNTS_FILE, bak)
+            save_accounts(out)
+        return changed
+
+
 def create_account(accounts: dict, account: str, password: str, display_name: str,
                    pages: list, l4: list, staff: list | None = None,
-                   domain_scopes: dict | None = None, page_scopes: dict | None = None) -> dict:
+                   page_scopes: dict | None = None) -> dict:
     name = _validate_account_name(account)
     _validate_password(password)
     _validate_display_name(display_name)
@@ -297,12 +330,11 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
     pages = _validate_str_list(pages, 'allowedPages')
     l4 = _validate_str_list(l4, 'allowedL4')
     staff = _validate_str_list(staff or [], 'allowedStaff', cap=1000)
-    domain_scopes = _validate_domain_scopes(domain_scopes)
     page_scopes = _validate_page_scopes(page_scopes)
     new_users = dict(users)
     new_users[name] = _make_user(password, (display_name or name)[:64],
                                  is_super=False, pages=pages, l4=l4, staff=staff,
-                                 domain_scopes=domain_scopes, page_scopes=page_scopes,
+                                 page_scopes=page_scopes,
                                  must_change=True)
     out = dict(accounts)
     out['users'] = new_users
@@ -310,7 +342,7 @@ def create_account(accounts: dict, account: str, password: str, display_name: st
 
 
 def update_account(accounts: dict, account: str, *, display_name=None, pages=None,
-                   l4=None, staff=None, domain_scopes=None, page_scopes=None,
+                   l4=None, staff=None, page_scopes=None,
                    password=None) -> dict:
     if not isinstance(account, str):
         raise ValueError('账号名须为字符串')
@@ -329,8 +361,6 @@ def update_account(accounts: dict, account: str, *, display_name=None, pages=Non
         rec['allowedL4'] = _validate_str_list(l4, 'allowedL4')
     if staff is not None:
         rec['allowedStaff'] = _validate_str_list(staff, 'allowedStaff', cap=1000)
-    if domain_scopes is not None:
-        rec['domainScopes'] = _validate_domain_scopes(domain_scopes)
     if page_scopes is not None:
         rec['pageScopes'] = _validate_page_scopes(page_scopes)
     if password is not None:
@@ -372,23 +402,23 @@ def list_public_accounts() -> list:
 
 
 def add_account(account: str, password: str, display_name: str, pages: list, l4: list,
-                staff: list | None = None, domain_scopes: dict | None = None,
+                staff: list | None = None,
                 page_scopes: dict | None = None) -> dict:
     with _accounts_mutate_lock:
         data = load_accounts()
         data = create_account(data, account, password, display_name, pages, l4, staff,
-                              domain_scopes, page_scopes)
+                              page_scopes)
         save_accounts(data)
         name = _validate_account_name(account)
         return public_user(name, data['users'][name])
 
 
 def edit_account(account: str, *, display_name=None, pages=None, l4=None, staff=None,
-                 domain_scopes=None, page_scopes=None, password=None) -> dict:
+                 page_scopes=None, password=None) -> dict:
     with _accounts_mutate_lock:
         data = load_accounts()
         data = update_account(data, account, display_name=display_name, pages=pages,
-                              l4=l4, staff=staff, domain_scopes=domain_scopes,
+                              l4=l4, staff=staff,
                               page_scopes=page_scopes, password=password)
         save_accounts(data)
         return public_user(account, data['users'][account])
