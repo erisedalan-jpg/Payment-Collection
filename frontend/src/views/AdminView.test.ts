@@ -291,17 +291,24 @@ describe('AdminView', () => {
   })
 
   it('复制是深拷贝:改新表单不影响源账号对象', async () => {
+    // 用原地变更(push)而非 togglePage —— togglePage 是整体重赋值,天生分辨不出深浅拷贝。
+    // fixture 必须带非空 pageScopes,否则 overrides 恒为 [],子数组展开的代码路径跑不到。
     vi.mocked(adminApi.listAccounts).mockResolvedValue([
       { account: 'src', displayName: '源', isSuper: false, allowedPages: ['projects'],
-        allowedL4: ['北京'], allowedStaff: [], pageScopes: {}, mustChangePassword: false },
+        allowedL4: ['北京'], allowedStaff: [],
+        pageScopes: { projects: { l4: ['D1'], staff: ['E1'] } }, mustChangePassword: false },
     ])
     const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
     await flushPromises()
     const vm = wrapper.vm as any
     vm.openCreate()
     vm.applyCopy('src')
-    vm.togglePage('yitian', true)
+    vm.form.allowedPages.push('yitian')
+    vm.form.overrides[0].l4.push('D2')
+    vm.form.overrides[0].staff.push('E2')
     expect(vm.accounts[0].allowedPages).toEqual(['projects'])
+    expect(vm.accounts[0].pageScopes.projects.l4).toEqual(['D1'])
+    expect(vm.accounts[0].pageScopes.projects.staff).toEqual(['E1'])
   })
 
   it('编辑模式不渲染复制下拉', async () => {

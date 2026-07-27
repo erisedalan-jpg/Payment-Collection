@@ -165,14 +165,14 @@ const copyOptions = computed(() =>
 /** 复制权限四件套。不复制账号名/密码/显示名 —— 身份必须重新填。 */
 function applyCopy(account: string) {
   const src = accounts.value.find((a) => a.account === account)
-  if (!src) return
+  if (!src || src.isSuper) return
   form.allowedPages = [...src.allowedPages]
   form.allowedL4 = [...src.allowedL4]
   form.allowedStaff = [...(src.allowedStaff ?? [])]
   form.overrides = Object.entries(src.pageScopes ?? {}).map(([pk, v]) => ({
     target: pk, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])],
   }))
-  if (form.overrides.length) advancedOpen.value = true
+  advancedOpen.value = form.overrides.length > 0
 }
 
 function openCreate() {
