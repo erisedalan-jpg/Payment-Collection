@@ -18,6 +18,7 @@ const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianAnalyticsView from './YitianAnalyticsView.vue'
+import AppPager from '@/components/AppPager.vue'
 
 // 两天工作日 → 基础 16h。张三 20h(加班) 李四 8h(欠填) 王五 零记录(完全未填)
 const DATA = {
@@ -143,6 +144,35 @@ describe('YitianAnalyticsView', () => {
     await w.vm.$nextTick()
     expect((w.vm as any).currentPage).toBe(1)
     expect((w.vm as any).filtered.length).toBe(30)
+  })
+
+  it('分页改用 AppPager,且 v-model:size 仍绑持久化的那个 pageSize', async () => {
+    // 本页 pageSize 由 usePersistedRefs 托管。若替换时把 size 绑到新建的局部 ref,
+    // 分页看着照常工作、V4.4.8 的往返测试也照绿(它只断言 ref 的值,不关心谁在改它),
+    // 持久化却已静默失效 —— 故这里从 AppPager 发 update:size,一路验到 localStorage。
+    getSpy.mockResolvedValue(bigData())
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toMatch(/共\s*60\s*条/)
+    w.findComponent(AppPager).vm.$emit('update:size', 20)
+    await nextTick()
+    expect((w.vm as any).pageSize).toBe(20)
+    expect((w.vm as any).paged.length).toBe(20)
+    const saved = JSON.parse(localStorage.getItem(userScopedKey('view_yitian_analytics')) ?? '{}')
+    expect(saved.pageSize).toBe(20)
+    w.unmount()
+  })
+
+  it('分页 AppPager 的 v-model:page 绑 currentPage(切页生效)', async () => {
+    getSpy.mockResolvedValue(bigData())
+    const w = mountView()
+    await flushPromises()
+    w.findComponent(AppPager).vm.$emit('update:page', 2)
+    await nextTick()
+    expect((w.vm as any).currentPage).toBe(2)
+    expect((w.vm as any).paged.length).toBe(10)
+    w.unmount()
   })
 
   it('员工级图表单点(柱图 data.id)下钻:按工号精确筛到该员工 + 滚到明细表', async () => {

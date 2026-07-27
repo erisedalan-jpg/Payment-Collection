@@ -6,6 +6,7 @@ import CostDetailView from './CostDetailView.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable from '@/components/DataTable.vue'
+import AppPager from '@/components/AppPager.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
@@ -242,10 +243,39 @@ describe('CostDetailView 标签筛选(仅明细表)', () => {
     ;(w.vm as any).selectedTags = ['重点']
     await w.vm.$nextTick()
     expect(((w.vm as any).filtered as any[]).length).toBe(1)
-    const resetBtn = w.findAll('button.cd-btn').find((b) => b.text() === '重置')!
+    // V4.4.9 起两个自写按钮由 AppButton 承担(原 .cd-btn),类名改 .ab
+    const resetBtn = w.findAll('button.ab').find((b) => b.text() === '重置')!
     await resetBtn.trigger('click')
     expect((w.vm as any).selectedTags).toEqual([])
     expect(((w.vm as any).filtered as any[]).length).toBe(3)
+  })
+})
+
+describe('CostDetailView V4.4.9 三组件接入', () => {
+  it('空态改用 AppEmpty 渲染', () => {
+    const ds = useDataStore()
+    ds.data = { meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, followupRecords: {}, projects: [], projectPmis: {} } as any
+    const w = mount(CostDetailView, opts)
+    expect(w.find('.ae').exists()).toBe(true)
+    expect(w.find('.ae').text()).toContain('暂无')
+  })
+
+  it('分页改用 AppPager,档位 [20,50,100] 保持原值(本期不统一档位)', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共 3 条')
+    expect(w.findComponent(AppPager).props('sizes')).toEqual([20, 50, 100])
+  })
+
+  it('按钮改用 AppButton,data-test 原样保留(既有测试靠它定位)', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    const btn = w.find('[data-test="cost-export"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.classes()).toContain('ab')
+    // 重置按钮无 data-test,靠文案定位;两个按钮都必须是 AppButton
+    expect(w.findAll('button.ab').map((b) => b.text())).toEqual(['重置', '导出Excel'])
   })
 })
 

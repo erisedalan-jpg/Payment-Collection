@@ -13,6 +13,8 @@ import DataTable, { type DataColumn } from './DataTable.vue'
 import StatusBadge from './StatusBadge.vue'
 import ColumnFilter from './ColumnFilter.vue'
 import ColumnPicker from './ColumnPicker.vue'
+import AppButton from './AppButton.vue'
+import AppPager from './AppPager.vue'
 
 const props = defineProps<{ projects: MilestoneProject[]; now: Date }>()
 const router = useRouter()
@@ -94,13 +96,13 @@ defineExpose({ rangeModel, filtered })
     <div class="mrt-bar">
       <el-date-picker v-model="rangeModel" type="daterange" value-format="YYYY-MM-DD" unlink-panels
         range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" size="small" clearable style="width: 260px" />
-      <button class="mrt-btn" data-test="rng-d7" @click="preset('d7')">未来7天</button>
-      <button class="mrt-btn" data-test="rng-m1" @click="preset('m1')">未来1个月</button>
-      <button class="mrt-btn" data-test="rng-quarter" @click="preset('quarter')">本季度</button>
+      <AppButton variant="subtle" data-test="rng-d7" @click="preset('d7')">未来7天</AppButton>
+      <AppButton variant="subtle" data-test="rng-m1" @click="preset('m1')">未来1个月</AppButton>
+      <AppButton variant="subtle" data-test="rng-quarter" @click="preset('quarter')">本季度</AppButton>
       <el-input v-model="fKw" size="small" placeholder="编号/名称" clearable style="width: 150px" data-test="mrt-kw" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
-      <button class="mrt-btn" data-test="mrt-export" @click="onExport">导出Excel</button>
+      <AppButton variant="subtle" data-test="mrt-export" @click="onExport">导出Excel</AppButton>
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
     <div class="mrt-stats">
@@ -122,10 +124,7 @@ defineExpose({ rangeModel, filtered })
         <template #cell-priorityLabel="{ row, value }"><StatusBadge :label="value" :tone="PR_TONE[row.priority]" /></template>
       </DataTable>
     </div>
-    <div class="mrt-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 80, 100]" :total="filtered.length" layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
   </div>
 </template>
 
@@ -136,12 +135,9 @@ defineExpose({ rangeModel, filtered })
 .mrt-k { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
 .mrt-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight); }
 .mrt-v-danger { color: var(--danger); }
-.mrt-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.mrt-btn:hover { background: var(--bg); color: var(--accent); }
 .mrt-scroll { overflow-x: auto; }
 .mrt-link { color: var(--accent); cursor: pointer; }
 .mrt-date-urgent { color: var(--danger); font-weight: 600; }
 .mrt-date-warn { color: var(--warn-text); font-weight: 600; }
-.mrt-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 .mrt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 </style>

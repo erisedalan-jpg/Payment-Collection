@@ -15,6 +15,7 @@ import FollowupRecords from '@/components/FollowupRecords.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
 import MilestoneTable from '@/components/MilestoneTable.vue'
 import ProfitTree from '@/components/ProfitTree.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -281,11 +282,11 @@ const originInfo = computed(() => [
 
 <template>
   <div class="project-detail-view">
-    <div v-if="!p" class="pd-404">
+    <AppEmpty v-if="!p">
       <div class="pd-404-title">未找到该项目</div>
       <div class="pd-404-sub">项目编号 {{ route.params.id }} 不在项目主域中（仅含交付实施三部在建项目）。</div>
       <RouterLink to="/projects" class="pd-404-link">← 返回在建项目</RouterLink>
-    </div>
+    </AppEmpty>
 
     <template v-else>
       <div class="pd-body">
@@ -439,7 +440,6 @@ const originInfo = computed(() => [
 
 <style scoped>
 .project-detail-view { padding: var(--sp-4); }
-.pd-404 { text-align: center; padding: var(--sp-7) 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .pd-404-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-2); }
 .pd-404-sub { font-size: var(--fs-2); color: var(--mut); margin-bottom: var(--sp-4); }
 .pd-404-link { color: var(--accent); font-size: var(--fs-2); text-decoration: none; font-weight: 600; }

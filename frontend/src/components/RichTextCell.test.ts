@@ -90,6 +90,13 @@ describe('RichTextCell 编辑态', () => {
     await flushPromises()
     expect(w.find('.rtc-editor').exists()).toBe(true)
   })
+  it('取消/保存改用 AppButton,类名保留作定位钩子;保存禁用态仍透传', async () => {
+    const w = mountCell({ content: '', editable: true })
+    await w.find('.rtc-empty').trigger('click')
+    expect(w.find('.rtc-cancel').classes()).toContain('ab')
+    expect(w.find('.rtc-save').classes()).toContain('ab')
+    expect((w.find('.rtc-save').element as HTMLButtonElement).disabled).toBe(false)
+  })
   it('保存用进入编辑时快照的 saveHandler(行复用 prop 重绑不串行)', async () => {
     const A = vi.fn().mockResolvedValue(undefined)
     const B = vi.fn().mockResolvedValue(undefined)

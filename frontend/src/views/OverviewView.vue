@@ -20,6 +20,7 @@ import { buildTodoQueue } from '@/lib/todoQueue'
 import { buildMilestoneProjects } from '@/lib/milestoneAnalytics'
 import { isAnomalous } from '@/lib/anomaly'
 import PortalLaunchpad from '@/components/PortalLaunchpad.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
 import { usePortalStore } from '@/stores/portal'
 import { buildSections } from '@/lib/portal'
 import { useAuthStore } from '@/stores/auth'
@@ -227,7 +228,7 @@ defineExpose({ baseProjects })
             </div>
           </div>
         </div>
-        <div v-else class="ov-anomaly-empty">暂无需要处理的异常</div>
+        <AppEmpty v-else variant="plain">暂无需要处理的异常</AppEmpty>
       </section>
 
       <section class="ov-todo">
@@ -302,7 +303,6 @@ defineExpose({ baseProjects })
 .ov-acard-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-acard-item-detail { color: var(--sub); white-space: nowrap; }
 .ov-acard-all { font-size: var(--fs-1); color: var(--accent); text-decoration: none; margin-top: var(--sp-1); }
-.ov-anomaly-empty { font-size: var(--fs-1); color: var(--mut); padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 
 /* 右栏动态 */
 .ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); box-shadow: var(--shadow-1); }

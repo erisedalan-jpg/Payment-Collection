@@ -15,6 +15,8 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
+import AppPager from '@/components/AppPager.vue'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 
 defineOptions({ name: 'ClosedProjectsView' })
@@ -84,7 +86,7 @@ function onRow(row: Record<string, any>) { router.push(`/closed-project/${row.pr
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
-    <div v-if="!rows.length" class="cv-empty">暂无已关闭项目数据——请在「数据管理」提供 PMIS 已关闭三表后点「更新数据」。</div>
+    <AppEmpty v-if="!rows.length">暂无已关闭项目数据——请在「数据管理」提供 PMIS 已关闭三表后点「更新数据」。</AppEmpty>
     <div v-else class="cv-scroll">
       <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable sticky-header :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
@@ -93,21 +95,13 @@ function onRow(row: Record<string, any>) { router.push(`/closed-project/${row.pr
       </DataTable>
     </div>
 
-    <div v-if="rows.length" class="cv-pager">
-      <span class="cv-total u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
-        layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-if="rows.length" v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
   </div>
 </template>
 
 <style scoped>
 .closed-view { padding: var(--sp-4); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.cv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .cv-scroll { overflow-x: auto; }
 .cv-th { display: inline-flex; align-items: center; }
-.cv-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
-.cv-total { font-size: var(--fs-1); color: var(--sub); }
 </style>

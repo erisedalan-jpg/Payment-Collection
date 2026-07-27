@@ -6,6 +6,9 @@ import { useFilterStore } from '@/stores/filter'
 import { noStageProjects } from '@/lib/payDashboard'
 import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
+import AppButton from '@/components/AppButton.vue'
+import AppPager from '@/components/AppPager.vue'
 import { usePagedRows } from '@/lib/usePagedRows'
 
 const router = useRouter()
@@ -40,23 +43,16 @@ function onExport() {
   <div class="nsp">
     <div class="nsp-h">
       <span>无回款阶段数据项目（{{ rows.length }}）</span>
-      <button class="nsp-btn" data-test="nostage-export" @click="onExport">导出Excel</button>
+      <AppButton variant="subtle" data-test="nostage-export" @click="onExport">导出Excel</AppButton>
     </div>
-    <div v-if="!rows.length" class="nsp-empty">无——全部在建项目均有收款阶段。</div>
+    <AppEmpty v-if="!rows.length" variant="plain">无——全部在建项目均有收款阶段。</AppEmpty>
     <template v-else>
       <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable @row-click="onRow" />
-      <div class="nsp-pager">
-        <span class="u-num">共 {{ rows.length }} 条</span>
-        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="rows.length" layout="sizes, prev, pager, next" size="small" background />
-      </div>
+      <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="rows.length" :sizes="[20, 50, 100]" />
     </template>
   </div>
 </template>
 
 <style scoped>
 .nsp-h { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-3); }
-.nsp-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.nsp-btn:hover { background: var(--bg); color: var(--accent); }
-.nsp-empty { color: var(--mut); padding: var(--sp-4) 0; }
-.nsp-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 </style>

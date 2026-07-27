@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import AuditLogTab from './AuditLogTab.vue'
+import AppPager from './AppPager.vue'
 import * as auditLib from '@/lib/audit'
 import * as xlsx from '@/lib/exportXlsx'
 
@@ -41,5 +42,31 @@ describe('AuditLogTab', () => {
     await flushPromises()
     expect(spy).toHaveBeenCalledOnce()
     expect(spy.mock.calls[0][0]).toContain('审计日志')
+  })
+
+  it('分页改用 AppPager 渲染', async () => {
+    const w = mount(AuditLogTab, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共')
+  })
+
+  it('审计是服务端分页:切页与切每页条数都必须重新拉取(只改 ref 不算接好线)', async () => {
+    const w = mount(AuditLogTab, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const pager = w.findComponent(AppPager)
+
+    vi.mocked(auditLib.fetchAudit).mockClear()
+    pager.vm.$emit('update:page', 3)
+    await flushPromises()
+    expect(vi.mocked(auditLib.fetchAudit).mock.calls[0][1]).toBe(3)
+
+    vi.mocked(auditLib.fetchAudit).mockClear()
+    pager.vm.$emit('update:size', 20)
+    await flushPromises()
+    expect(vi.mocked(auditLib.fetchAudit)).toHaveBeenCalled()
+    const [, pageArg, sizeArg] = vi.mocked(auditLib.fetchAudit).mock.calls[0]
+    expect(sizeArg).toBe(20)
+    expect(pageArg).toBe(1)   // 换档位回第 1 页,否则可能停在超出范围的页码
   })
 })

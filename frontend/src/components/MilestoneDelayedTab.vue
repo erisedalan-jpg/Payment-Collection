@@ -8,6 +8,8 @@ import { usePagedRows } from '@/lib/usePagedRows'
 import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from './DataTable.vue'
 import StatusBadge from './StatusBadge.vue'
+import AppButton from './AppButton.vue'
+import AppPager from './AppPager.vue'
 
 const props = defineProps<{ projects: MilestoneProject[]; now: Date }>()
 const router = useRouter()
@@ -67,25 +69,19 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
       </el-select>
       <el-input v-model="fManager" size="small" placeholder="项目经理" style="width: 120px" />
       <el-input v-model="fKw" size="small" placeholder="编号/名称" style="width: 140px" />
-      <button class="mdt-btn" @click="reset">重置</button>
-      <button class="mdt-btn" data-test="delayed-export" @click="onExport">导出Excel</button>
+      <AppButton variant="subtle" @click="reset">重置</AppButton>
+      <AppButton variant="subtle" data-test="delayed-export" @click="onExport">导出Excel</AppButton>
     </div>
     <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable sticky-header @row-click="onRow">
       <template #cell-projectId="{ value }"><span class="mdt-link">{{ value }}</span></template>
       <template #cell-status="{ value }"><StatusBadge :label="value" :tone="TONE[value]" /></template>
     </DataTable>
-    <div class="mdt-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="filtered.length" layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" :sizes="[20, 50, 100]" />
   </div>
 </template>
 
 <style scoped>
 .mdt-summary { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); font-size: var(--fs-1); color: var(--sub); }
 .mdt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.mdt-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.mdt-btn:hover { background: var(--bg); color: var(--accent); }
 .mdt-link { color: var(--accent); cursor: pointer; }
-.mdt-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 </style>

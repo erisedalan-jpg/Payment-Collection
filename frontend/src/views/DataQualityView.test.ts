@@ -116,6 +116,16 @@ describe('DataQualityView', () => {
     const w = mountView()
     expect(w.text()).toContain('数据加载中或加载失败')
   })
+
+  it('未加载空态改用 AppEmpty(default 变体)', () => {
+    const ds = useDataStore()
+    vi.spyOn(ds, 'load').mockResolvedValue(undefined as never)
+    const w = mountView()
+    const empty = w.find('.ae')
+    expect(empty.exists()).toBe(true)
+    expect(empty.classes()).toContain('ae--default')
+    expect(empty.text()).toContain('数据加载中或加载失败')
+  })
 })
 
 describe('V4.4.8 页头', () => {

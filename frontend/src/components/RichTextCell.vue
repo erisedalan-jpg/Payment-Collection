@@ -7,6 +7,7 @@ let activeCell: { tryClose: () => boolean; contains: (n: Node) => boolean } | nu
 import { ref, computed, nextTick, onBeforeUnmount, onDeactivated } from 'vue'
 import { ElMessage } from 'element-plus'
 import { sanitizeRichText } from '@/lib/richText'
+import AppButton from './AppButton.vue'
 
 const props = withDefaults(defineProps<{
   content: string
@@ -136,8 +137,8 @@ defineExpose({ editing, dirty, startEdit, cancel, commit, tryClose: self.tryClos
       </div>
       <div ref="editorEl" class="rtc-input" contenteditable="true" @input="dirty = true" @keydown="onKeydown"></div>
       <div class="rtc-actions">
-        <button type="button" class="rtc-cancel" @click="cancel">取消</button>
-        <button type="button" class="rtc-save" :disabled="saving" @click="commit">保存</button>
+        <AppButton class="rtc-cancel" @click="cancel">取消</AppButton>
+        <AppButton class="rtc-save" :disabled="saving" @click="commit">保存</AppButton>
       </div>
     </div>
   </div>
@@ -165,8 +166,8 @@ defineExpose({ editing, dirty, startEdit, cancel, commit, tryClose: self.tryClos
   font-size: var(--fs-2); white-space: pre-wrap; outline: none; }
 .rtc-input:focus { border-color: var(--accent); }
 .rtc-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
-.rtc-cancel, .rtc-save { font-size: var(--fs-1); border: 1px solid var(--line); border-radius: var(--r-sm);
-  padding: 2px var(--sp-3); cursor: pointer; background: var(--card2); color: var(--txt); }
-.rtc-save { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.rtc-save:disabled { opacity: var(--disabled-opacity, 0.45); cursor: not-allowed; }
+/* 保存为主行动:AppButton 无 primary 变体,此处只补实底强调色(禁用态由 AppButton 自带)。
+   选择器带 .ab 是为比组件内 .ab 高一级,不依赖样式注入顺序。
+   .rtc-cancel 保留类名仅作定位钩子(样式已全数归位到 AppButton)。 */
+.ab.rtc-save { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

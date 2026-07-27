@@ -13,6 +13,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
+import AppButton from '@/components/AppButton.vue'
+import AppPager from '@/components/AppPager.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { paymentNodeRows, nodeSummary, filterProjects } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
@@ -93,7 +95,7 @@ function onExport() {
   <div class="nodes-tab">
     <PageHeader title="回款节点">
       <template #actions>
-        <button class="pv-btn" data-test="pay-nodes-export" @click="onExport">导出Excel</button>
+        <AppButton variant="subtle" data-test="pay-nodes-export" @click="onExport">导出Excel</AppButton>
       </template>
     </PageHeader>
     <section class="nsum u-num">
@@ -118,12 +120,7 @@ function onExport() {
         </template>
       </DataTable>
     </div>
-    <div v-if="sorted.length" class="pn-pager">
-      <span class="u-num">共 {{ sorted.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]" :total="sorted.length"
-        layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-if="sorted.length" v-model:page="currentPage" v-model:size="pageSize" :total="sorted.length" />
   </div>
 </template>
 
@@ -134,13 +131,9 @@ function onExport() {
 .ns-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); }
 .pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .pv-th { display: inline-flex; align-items: center; }
-.pv-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.pv-btn:hover { background: var(--bg); color: var(--accent); }
 .pv-scroll { overflow-x: auto; }
 .st-badge { padding: 2px 8px; border-radius: var(--r-sm); font-size: var(--fs-1); }
 .st-ok { background: var(--ok-bg); color: var(--ok-text); }
 .st-danger { background: var(--danger-bg); color: var(--danger-text); }
 .st-warn { background: var(--warn-bg); color: var(--warn-text); }
-.pn-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
-.pn-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

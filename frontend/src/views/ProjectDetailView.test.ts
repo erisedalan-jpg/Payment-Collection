@@ -271,6 +271,15 @@ describe('ProjectDetailView', () => {
     expect(link.exists()).toBe(true)
   })
 
+  it('404 空态容器改用 AppEmpty(default 变体,卡片外观收归组件)', async () => {
+    seed()
+    const w = await mountAt('/project/NOPE')
+    const empty = w.find('.ae')
+    expect(empty.exists()).toBe(true)
+    expect(empty.classes()).toContain('ae--default')
+    expect(empty.text()).toContain('未找到该项目')
+  })
+
   it('右栏只显示本项目动态', async () => {
     seed()
     const w = await mountAt('/project/P-1')

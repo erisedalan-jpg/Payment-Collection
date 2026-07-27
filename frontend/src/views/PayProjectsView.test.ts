@@ -93,6 +93,23 @@ describe('PayProjectsView', () => {
     expect(w.find('[data-test="pay-projects-export"]').exists()).toBe(true)
   })
 
+  it('导出按钮改用 AppButton,仍在页头 #actions 内且 data-test 原样保留', async () => {
+    seed()
+    const w = mount(PayProjectsView, opts)
+    await flushPromises()
+    const btn = w.find('.ph-actions [data-test="pay-projects-export"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.classes()).toContain('ab')
+  })
+
+  it('分页条改用 AppPager,「共 N 条」保留', async () => {
+    seed()
+    const w = mount(PayProjectsView, opts)
+    await flushPromises()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共 1 条')
+  })
+
   it('行点击触发 pd.open', async () => {
     seed()
     const w = mount(PayProjectsView, opts)

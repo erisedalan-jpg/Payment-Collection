@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import type { ClosedProject } from '@/types/analysis'
 import { fmtRatio } from '@/lib/format'
+import AppEmpty from '@/components/AppEmpty.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -52,11 +53,11 @@ const costRows = computed(() => [
 
 <template>
   <div class="closed-detail-view">
-    <div v-if="!p" class="cd-404">
+    <AppEmpty v-if="!p">
       <div class="cd-404-title">未找到该已关闭项目</div>
       <div class="cd-404-sub">项目编号 {{ route.params.id }} 不在交付三部已关闭清单中。</div>
       <RouterLink to="/projects/closed" class="cd-404-link">← 返回已关闭项目</RouterLink>
-    </div>
+    </AppEmpty>
     <template v-else>
       <div class="cd-head">
         <h2 class="cd-name">{{ p.projectName || p.projectId }}</h2>
@@ -79,7 +80,6 @@ const costRows = computed(() => [
 
 <style scoped>
 .closed-detail-view { padding: var(--sp-4); }
-.cd-404 { text-align: center; padding: var(--sp-7) 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .cd-404-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-2); }
 .cd-404-sub { font-size: var(--fs-2); color: var(--mut); margin-bottom: var(--sp-4); }
 .cd-404-link { color: var(--accent); font-size: var(--fs-2); text-decoration: none; font-weight: 600; }

@@ -18,6 +18,8 @@ import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupModal from '@/components/FollowupModal.vue'
 import Modal from '@/components/Modal.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
+import AppPager from '@/components/AppPager.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { buildExportSheets, type ExportScope } from '@/lib/projectExport'
 import { followupApi } from '@/lib/followupApi'
@@ -192,7 +194,7 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
       <span v-if="sp.riskCategory" class="pv-tag">风险分类: {{ sp.riskCategory }} <button @click="sp.riskCategory = ''">✕</button></span>
     </div>
 
-    <div v-if="!rows.length" class="pv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
+    <AppEmpty v-if="!rows.length">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</AppEmpty>
     <div v-else class="pv-scroll">
       <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable sticky-header :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
@@ -241,12 +243,7 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
       </div>
     </Modal>
 
-    <div v-if="rows.length" class="pv-pager">
-      <span class="pv-total u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
-        layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-if="rows.length" v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
   </div>
 </template>
 
@@ -257,12 +254,9 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
 .pv-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .pv-origin { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); }
 .pv-anomaly { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--warn-bg); color: var(--warn-text); }
-.pv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .pv-tags { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .pv-tag { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 2px var(--sp-3); border-radius: var(--r-full); font-size: var(--fs-1); background: var(--selected-tint); color: var(--accent); font-weight: 600; }
 .pv-tag button { border: none; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: var(--fs-1); }
-.pv-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
-.pv-total { font-size: var(--fs-1); color: var(--sub); }
 .pv-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: var(--r-full); border: 1px solid var(--sub); color: var(--sub); font-size: 10px; font-style: italic; cursor: help; line-height: 1; }
 .lst-tag { display: inline-block; padding: 1px 6px; margin: 1px; border-radius: var(--r-sm); background: var(--card2); color: var(--sub); font-size: var(--fs-1); }
 .pv-fu-btn { font-size: var(--fs-1); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 8px; cursor: pointer; }

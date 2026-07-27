@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
+import AppPager from '@/components/AppPager.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { useYitianStore } from '@/stores/yitian'
@@ -291,12 +292,8 @@ defineExpose({
             <el-link type="primary" :underline="false" @click.stop="goDetailEmp(row)">明细</el-link>
           </template>
         </DataTable>
-        <div class="yt-pager">
-          <span class="yt-total u-num">共 {{ filtered.length }} 条</span>
-          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-            :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
-            layout="sizes, prev, pager, next" size="small" background />
-        </div>
+        <!-- size 必须仍绑到上面 usePersistedRefs 托管的那个 pageSize,换成新建的局部 ref 会静默丢持久化 -->
+        <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
       </section>
     </template>
   </div>
@@ -318,6 +315,4 @@ defineExpose({
 .yt-sub { font-size: var(--fs-1); font-weight: 400; color: var(--mut); margin-left: var(--sp-2); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 .yt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
-.yt-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
-.yt-total { font-size: var(--fs-1); color: var(--sub); }
 </style>

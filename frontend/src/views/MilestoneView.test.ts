@@ -78,6 +78,19 @@ describe('MilestoneView 概览', () => {
   })
 })
 
+describe('MilestoneView 空态', () => {
+  it('空态改用 AppEmpty 渲染', () => {
+    const ds = useDataStore()
+    ds.data = {
+      meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
+      followupRecords: {}, projects: [], projectPmis: {}, projectMilestones: {},
+    } as any
+    const w = mount(MilestoneView, opts)
+    expect(w.find('.ae').exists()).toBe(true)
+    expect(w.find('.ae').text()).toContain('暂无')
+  })
+})
+
 describe('MilestoneView 终验/节点分布', () => {
   it('渲染 6 个 ChartBox(含 B 双图 + E)', () => {
     seed()

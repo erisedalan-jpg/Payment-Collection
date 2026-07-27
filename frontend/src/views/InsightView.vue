@@ -23,6 +23,7 @@ import PivotTable from '@/components/PivotTable.vue'
 import InsightDrillModal from '@/components/InsightDrillModal.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -180,7 +181,7 @@ defineExpose({ selectedTags, mode, dimKey, chartTypes, drillOpen })
       <span class="iv-dims-label">列维度</span><DimPicker v-model="colDims" :options="DIM_OPTS" />
     </div>
 
-    <div v-if="!rows.length" class="iv-empty">{{ (data.data?.projects?.length && selectedTags.length) ? '无匹配所选标签的项目。' : '暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。' }}</div>
+    <AppEmpty v-if="!rows.length">{{ (data.data?.projects?.length && selectedTags.length) ? '无匹配所选标签的项目。' : '暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。' }}</AppEmpty>
 
     <template v-else>
       <template v-if="mode === 'rank'">
@@ -228,5 +229,4 @@ defineExpose({ selectedTags, mode, dimKey, chartTypes, drillOpen })
 .iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
 .iv-hint { font-size: var(--fs-2); color: var(--mut); padding: var(--sp-5) 0; text-align: center; }
-.iv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 </style>

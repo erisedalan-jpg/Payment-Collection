@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { followupApi, type FollowupRecord, type FollowupFormData } from '@/lib/followupApi'
 import FollowupRecordForm from './FollowupRecordForm.vue'
+import AppButton from './AppButton.vue'
 
 const props = defineProps<{ projectId: string; projectName: string; defaultNextDate?: string }>()
 
@@ -112,15 +113,15 @@ defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
 
     <div v-if="history.length" class="fr-history">
       <span class="fr-hist-label">历史:</span>
-      <button
+      <AppButton
         v-for="(r, i) in history"
         :key="r['记录编号'] || i"
-        class="fr-hist-btn"
+        class="fr-hist"
         :class="{ active: expandedIdx === i }"
         @click="toggleHistory(i)"
       >
         {{ (r['跟进时间'] || '').substring(0, 16) }}
-      </button>
+      </AppButton>
     </div>
     <div v-if="expandedIdx >= 0 && history[expandedIdx]" class="fr-expanded">
       <div class="fr-meta">
@@ -168,6 +169,7 @@ defineExpose({ loadRecords, onSubmit, onDelete, openAdd })
 .fr-link.del { color: var(--danger); }
 .fr-history { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; margin-bottom: var(--sp-2); }
 .fr-hist-label { font-size: var(--fs-1); color: var(--mut); }
-.fr-hist-btn { border: 1px solid var(--accent); color: var(--accent); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-1); cursor: pointer; }
-.fr-hist-btn.active { background: var(--accent); color: var(--on-accent); }
+/* 展开中的历史项:AppButton 无 active 变体,此处只补实底强调色表达选中态。
+   选择器带 .ab 是为比组件内 .ab 高一级,不依赖样式注入顺序。 */
+.ab.fr-hist.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

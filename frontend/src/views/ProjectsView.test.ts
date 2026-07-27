@@ -144,7 +144,7 @@ describe('ProjectsView', () => {
     seed()
     const w = mountView()
     await flushPromises()
-    expect(w.find('.pv-pager').exists()).toBe(true)
+    expect(w.find('.ap').exists()).toBe(true)   // V4.4.9 起分页由 AppPager 承担(原 .pv-pager)
     expect(w.text()).toContain('共 2 条')
     expect(w.find('.el-pagination').exists()).toBe(true)
     const headers = w.findAll('th').map((n) => n.text())
@@ -441,6 +441,24 @@ describe('V4.4.4 关闭时间列接入', () => {
     const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
     for (const c of PROJECT_DOMAIN_COLUMNS) expect(keys.has(c.key)).toBe(true)
     expect(keys.has('action')).toBe(true)
+  })
+})
+
+describe('V4.4.9 三组件接入', () => {
+  it('空态改用 AppEmpty 渲染', () => {
+    const ds = useDataStore()
+    ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {} } as any
+    const w = mountView()
+    expect(w.find('.ae').exists()).toBe(true)
+    expect(w.find('.ae').text()).toContain('暂无')
+  })
+
+  it('分页改用 AppPager,「共 N 条」文案不变', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共')
   })
 })
 

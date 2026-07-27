@@ -164,6 +164,16 @@ describe('OverviewView', () => {
     expect(w.find('.ov-band').text()).toContain('在管')
   })
 
+  it('异常分诊空态改用 AppEmpty 的 plain 变体(嵌在下半区,不套第二层边框)', async () => {
+    const ds = useDataStore()
+    ds.data = { meta: {}, dashboard: {}, summary: {}, displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, rawNodes: [], events: [] } as any
+    const w = await mountView()
+    const empty = w.find('.ae')
+    expect(empty.exists()).toBe(true)
+    expect(empty.classes()).toContain('ae--plain')
+    expect(empty.text()).toContain('暂无需要处理的异常')
+  })
+
   it('中列渲染待办/临期队列(有延期回款节点时非空)', async () => {
     seed()
     const w = await mountView()

@@ -49,4 +49,13 @@ describe('ClosedProjectDetailView', () => {
     const w = await mountAt('NOPE')
     expect(w.text()).toContain('不在交付三部已关闭清单')
   })
+
+  it('404 空态容器改用 AppEmpty(default 变体,卡片外观收归组件)', async () => {
+    const ds = useDataStore(); ds.data = { closedProjects: [CP] } as any
+    const w = await mountAt('NOPE')
+    const empty = w.find('.ae')
+    expect(empty.exists()).toBe(true)
+    expect(empty.classes()).toContain('ae--default')
+    expect(empty.text()).toContain('未找到该已关闭项目')
+  })
 })

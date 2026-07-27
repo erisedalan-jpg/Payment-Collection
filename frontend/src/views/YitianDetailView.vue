@@ -7,6 +7,7 @@ import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
+import AppPager from '@/components/AppPager.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
@@ -139,12 +140,7 @@ defineExpose({ rows, scoped, filtered, paged, summary, onlyIssues, visibleColumn
         </DataTable>
       </div>
 
-      <div class="yd-pager">
-        <span class="yd-total u-num">共 {{ filtered.length }} 条</span>
-        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-          :page-sizes="[20, 50, 80, 100]" :total="filtered.length"
-          layout="sizes, prev, pager, next" size="small" background />
-      </div>
+      <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
     </template>
   </div>
 </template>
@@ -164,6 +160,4 @@ defineExpose({ rows, scoped, filtered, paged, summary, onlyIssues, visibleColumn
 .yd-badge--0 { background: var(--mut-bg, transparent); color: var(--sub); }
 .yd-badge--1 { background: var(--warn-bg); color: var(--warn-text); }
 .yd-badge--2 { background: var(--danger-bg); color: var(--danger-text); }
-.yd-pager { display: flex; align-items: center; gap: var(--gap-stack); }
-.yd-total { font-size: var(--fs-1); color: var(--mut); }
 </style>

@@ -25,6 +25,7 @@ import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
 import { tagMatch } from '@/lib/tagFilter'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
@@ -248,7 +249,7 @@ defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltere
       </el-select>
     </div>
 
-    <div v-if="!mps.length" class="mv-empty">暂无主域里程碑数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
+    <AppEmpty v-if="!mps.length">暂无主域里程碑数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</AppEmpty>
 
     <template v-else>
       <MetricGrid :items="kpiItems" @item-click="onKpiClick" />
@@ -315,7 +316,6 @@ defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltere
 .mv-card-h { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
 .mv-card-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .mv-grid2-half { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
-.mv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .mv-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
 .mv-detail { margin-top: var(--sp-4); }
 .mv-detail-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }

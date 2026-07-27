@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import NoStageProjectsTable from './NoStageProjectsTable.vue'
 import DataTable from './DataTable.vue'
+import AppPager from './AppPager.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 
@@ -63,6 +64,12 @@ describe('NoStageProjectsTable', () => {
     expect(w.find('[data-test="nostage-export"]').exists()).toBe(true)
   })
 
+  it('按钮改用 AppButton,data-test 原样保留(既有测试靠它定位)', () => {
+    seed()
+    const w = mount(NoStageProjectsTable, opts)
+    expect(w.find('[data-test="nostage-export"]').classes()).toContain('ab')
+  })
+
   it('全部有回款阶段数据时显示空态', () => {
     seed()
     const data = useDataStore()
@@ -71,6 +78,18 @@ describe('NoStageProjectsTable', () => {
     ]
     const w = mount(NoStageProjectsTable, opts)
     expect(w.text()).toContain('全部在建项目均有收款阶段')
+  })
+
+  it('空态改用 AppEmpty 的 plain 变体(嵌在卡内,不能再套一层边框)', () => {
+    seed()
+    const data = useDataStore()
+    ;(data.data as any).paymentNodes.P1 = [
+      { stage: '预付款', planDate: '2026-01-01', actualDate: '', payRatio: 0.3, expectedPayment: 600_000, receivedAmount: 0, unpaidAmount: 600_000, status: '未回款' },
+    ]
+    const w = mount(NoStageProjectsTable, opts)
+    const empty = w.find('.ae')
+    expect(empty.exists()).toBe(true)
+    expect(empty.classes()).toContain('ae--plain')
   })
 
   it('超过一页(>20行)时显示分页器与总数', () => {
@@ -92,5 +111,8 @@ describe('NoStageProjectsTable', () => {
     expect(w.find('.el-pagination').exists()).toBe(true)
     const rows = w.findComponent(DataTable).props('rows') as any[]
     expect(rows.length).toBe(20)
+    // 分页改用 AppPager,档位仍是本页原有的 [20,50,100]
+    expect(w.find('.ap').exists()).toBe(true)
+    expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([20, 50, 100])
   })
 })

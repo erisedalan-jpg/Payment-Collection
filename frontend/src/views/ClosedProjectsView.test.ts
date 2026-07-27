@@ -58,6 +58,26 @@ describe('ClosedProjectsView', () => {
     expect(w.find('.ph-title').text()).toBe('已关闭项目')
   })
 
+  it('空态改用 AppEmpty 渲染', async () => {
+    const ds = useDataStore()
+    ds.data = { closedProjects: [] } as any
+    const router = makeRouter(); router.push('/projects/closed'); await router.isReady()
+    const w = mount(ClosedProjectsView, { global: { plugins: [ElementPlus, router] } })
+    await flushPromises()
+    expect(w.find('.ae').exists()).toBe(true)
+    expect(w.find('.ae').text()).toContain('暂无')
+  })
+
+  it('分页改用 AppPager,「共 N 条」文案不变', async () => {
+    const ds = useDataStore()
+    ds.data = { closedProjects: [sampleRow] } as any
+    const router = makeRouter(); router.push('/projects/closed'); await router.isReady()
+    const w = mount(ClosedProjectsView, { global: { plugins: [ElementPlus, router] } })
+    await flushPromises()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共 1 条')
+  })
+
   it('默认列集:显示项目状态,隐藏签约单位', async () => {
     const ds = useDataStore()
     ds.data = { closedProjects: [sampleRow] } as any

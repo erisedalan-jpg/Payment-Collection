@@ -10,6 +10,7 @@ import { useOpportunitiesStore } from '@/stores/opportunities'
 import * as oppApi from '@/lib/opportunitiesApi'
 import { DEFAULT_VISIBLE } from '@/lib/opportunityColumns'
 import * as exportXlsxMod from '@/lib/exportXlsx'
+import AppPager from '@/components/AppPager.vue'
 
 let router: Router
 
@@ -231,5 +232,15 @@ describe('V4.4.8 页头', () => {
     expect(w.find('.ph-actions [data-test="opp-del"]').exists()).toBe(false)
     expect(w.find('.ph-actions [data-test="opp-import"]').exists()).toBe(false)
     expect(w.find('.ph-actions [data-test="opp-export"]').exists()).toBe(false)
+  })
+})
+
+describe('V4.4.9 分页条', () => {
+  it('分页条改用 AppPager,「共 N 条」与档位不变', async () => {
+    const w = await mountView(true)
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共 2 条')
+    // 原页面档位为 [20,50,80,100],与 AppPager 默认一致 → 不传 sizes
+    expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([20, 50, 80, 100])
   })
 })

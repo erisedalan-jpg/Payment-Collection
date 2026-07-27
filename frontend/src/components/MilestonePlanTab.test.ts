@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import MilestonePlanTab from './MilestonePlanTab.vue'
 import DataTable from './DataTable.vue'
+import AppPager from './AppPager.vue'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -28,5 +29,17 @@ describe('MilestonePlanTab', () => {
     rows = w.findComponent(DataTable).props('rows') as any[]
     expect(rows.map((r) => r.projectId)).toEqual(['B'])
     expect(w.find('[data-test="plan-export"]').exists()).toBe(true)
+  })
+  it('按钮改用 AppButton,data-test 原样保留(既有测试靠它定位)', () => {
+    const w = mount(MilestonePlanTab, { props: { projects }, ...opts })
+    const btn = w.find('[data-test="plan-export"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.classes()).toContain('ab')
+  })
+  it('分页改用 AppPager,档位仍是本页原有的 [50,100]', () => {
+    const w = mount(MilestonePlanTab, { props: { projects }, ...opts })
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共')
+    expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([50, 100])
   })
 })

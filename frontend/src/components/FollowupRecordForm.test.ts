@@ -24,7 +24,7 @@ describe('FollowupRecordForm', () => {
   })
   it('校验：缺跟进人/内容不 emit submit', async () => {
     const w = mountForm()
-    await w.find('.frf-btn.primary').trigger('click')
+    await w.find('.frf-primary').trigger('click')
     expect(w.emitted('submit')).toBeUndefined()
     expect(w.text()).toContain('请填写跟进人')
   })
@@ -32,7 +32,7 @@ describe('FollowupRecordForm', () => {
     const w = mountForm()
     await w.find('input[data-f="person"]').setValue('张三')
     await w.find('textarea').setValue('电话催款')
-    await w.find('.frf-btn.primary').trigger('click')
+    await w.find('.frf-primary').trigger('click')
     const ev = w.emitted('submit')
     expect(ev).toBeTruthy()
     expect((ev![0][0] as any)['跟进人']).toBe('张三')
@@ -41,8 +41,20 @@ describe('FollowupRecordForm', () => {
   it('编辑模式：标题含记录编号，预填字段，submit 带记录编号', async () => {
     const w = mountForm({ editRecord: { 记录编号: 'FU-9', 跟进人: '李四', 跟进内容: '已回款', 跟进类型: '电话沟通', 跟进状态: '已解决' } })
     expect(w.text()).toContain('编辑跟进记录 (FU-9)')
-    await w.find('.frf-btn.primary').trigger('click')
+    await w.find('.frf-primary').trigger('click')
     const ev = w.emitted('submit')
     expect((ev![0][0] as any)['记录编号']).toBe('FU-9')
+  })
+  it('两个按钮均改用 AppButton,保存仍是主行动(实底强调色靠 .frf-primary)', () => {
+    const w = mountForm()
+    const btns = w.findAll('.frf-actions button')
+    expect(btns).toHaveLength(2)
+    btns.forEach((b) => expect(b.classes()).toContain('ab'))
+    expect(btns[0].classes()).toContain('frf-primary')
+    expect(btns[1].classes()).not.toContain('frf-primary')
+    // .ab.frf-primary 这类「父组件覆盖子组件根节点」的写法能成立,前提是根节点同时带父/子
+    // 两个 scope id;这里实测钉死,否则主行动的实底强调色会静默失效(CSS 失效无测试会红)。
+    const scopeIds = Object.keys(btns[0].attributes()).filter((k) => k.startsWith('data-v-'))
+    expect(scopeIds.length).toBeGreaterThanOrEqual(2)
   })
 })

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fetchAudit, buildExportRows, type AuditRow, type AuditFilters, type AuditResponse } from '@/lib/audit'
 import { exportRows } from '@/lib/exportXlsx'
+import AppPager from './AppPager.vue'
 
 const rows = ref<AuditRow[]>([])
 const total = ref(0)
@@ -50,6 +51,13 @@ function onReset() {
 
 function onPageChange(p: number) {
   page.value = p
+  load()
+}
+
+// 审计是服务端分页:改每页条数须回第 1 页并重新拉取(仅改 ref 不会触发请求)
+function onSizeChange(s: number) {
+  pageSize.value = s
+  page.value = 1
   load()
 }
 
@@ -119,21 +127,14 @@ defineExpose({ onExport })
       <el-table-column prop="detail" label="详情" min-width="220" show-overflow-tooltip />
     </el-table>
 
-    <div class="audit-pager">
-      <el-pagination background layout="total, prev, pager, next" :total="total"
-        :page-size="pageSize" :current-page="page" @current-change="onPageChange" />
-    </div>
+    <AppPager :page="page" :size="pageSize" :total="total"
+      @update:page="onPageChange" @update:size="onSizeChange" />
   </div>
 </template>
 
 <style scoped>
 .audit-filters {
   margin-bottom: var(--gap-card);
-}
-.audit-pager {
-  margin-top: var(--gap-card);
-  display: flex;
-  justify-content: flex-end;
 }
 .ok-text {
   color: var(--ok-text);

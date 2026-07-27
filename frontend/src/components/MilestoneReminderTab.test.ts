@@ -5,6 +5,7 @@ import ElementPlus from 'element-plus'
 import MilestoneReminderTab from './MilestoneReminderTab.vue'
 import DataTable from './DataTable.vue'
 import ColumnPicker from './ColumnPicker.vue'
+import AppPager from './AppPager.vue'
 import * as xlsx from '@/lib/exportXlsx'
 
 const push = vi.fn()
@@ -77,5 +78,19 @@ describe('MilestoneReminderTab 表格栈', () => {
     expect(Object.keys((rowsArg as any[])[0])).toContain('项目金额(万)')
     expect(Object.keys((rowsArg as any[])[0])).toContain('是否完成')
     spy.mockRestore()
+  })
+  it('四个按钮全部改用 AppButton,data-test 原样保留(既有测试靠它定位)', () => {
+    const w = mountTab()
+    for (const t of ['rng-d7', 'rng-m1', 'rng-quarter', 'mrt-export']) {
+      const btn = w.find(`[data-test="${t}"]`)
+      expect(btn.exists()).toBe(true)
+      expect(btn.classes()).toContain('ab')
+    }
+  })
+  it('分页改用 AppPager,档位仍是本页原有的 [20,50,80,100]', () => {
+    const w = mountTab()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共')
+    expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([20, 50, 80, 100])
   })
 })

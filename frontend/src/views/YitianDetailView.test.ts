@@ -14,6 +14,7 @@ const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianDetailView from './YitianDetailView.vue'
+import AppPager from '@/components/AppPager.vue'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 
 const DATA = {
@@ -94,6 +95,28 @@ describe('YitianDetailView', () => {
     await flushPromises()
     expect((w.vm as any).filtered.length).toBe(60)
     expect((w.vm as any).paged.length).toBe(50)
+  })
+
+  it('分页改用 AppPager,「共 N 条」与 page/size 双向绑定均生效', async () => {
+    const entries = Array.from({ length: 60 }, (_, i) => ({
+      d: i % 2 === 0 ? '2026-06-01' : '2026-06-02', e: 'A1', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: `W${i}`, top: false, ok: 0, iss: [],
+    }))
+    getSpy.mockResolvedValue({ ...DATA, entries, issues: [] } as unknown as YitianData)
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toMatch(/共\s*60\s*条/)
+    // size 与 page 都必须绑到驱动 paged 的那两个 ref 上,绑错了分页会静默失灵。
+    // 三个断言的期望值(50/10/20)两两不同,才不会「绑没绑上都恒绿」。
+    expect((w.vm as any).paged.length).toBe(50)
+    w.findComponent(AppPager).vm.$emit('update:page', 2)
+    await w.vm.$nextTick()
+    expect((w.vm as any).paged.length).toBe(10)
+    w.findComponent(AppPager).vm.$emit('update:page', 1)
+    w.findComponent(AppPager).vm.$emit('update:size', 20)
+    await w.vm.$nextTick()
+    expect((w.vm as any).paged.length).toBe(20)
+    w.unmount()
   })
 
   it('页面有内边距容器', async () => {

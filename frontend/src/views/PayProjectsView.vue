@@ -12,6 +12,8 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
+import AppButton from '@/components/AppButton.vue'
+import AppPager from '@/components/AppPager.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { projectPaymentRows, filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 import { applyColumnFilters } from '@/lib/crossFilter'
@@ -114,7 +116,7 @@ function onExport() {
   <div class="pov-tab">
     <PageHeader title="回款项目">
       <template #actions>
-        <button class="pov-btn" data-test="pay-projects-export" @click="onExport">导出Excel</button>
+        <AppButton variant="subtle" data-test="pay-projects-export" @click="onExport">导出Excel</AppButton>
       </template>
     </PageHeader>
     <div class="pov-bar">
@@ -135,21 +137,12 @@ function onExport() {
         </template>
       </DataTable>
     </div>
-    <div v-if="sorted.length" class="pov-pager">
-      <span class="u-num">共 {{ sorted.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]" :total="sorted.length"
-        layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-if="sorted.length" v-model:page="currentPage" v-model:size="pageSize" :total="sorted.length" />
   </div>
 </template>
 
 <style scoped>
 .pov-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .pov-th { display: inline-flex; align-items: center; }
-.pov-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.pov-btn:hover { background: var(--bg); color: var(--accent); }
 .pov-scroll { overflow-x: auto; }
-.pov-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3); }
-.pov-pager .u-num { font-size: var(--fs-1); color: var(--sub); }
 </style>

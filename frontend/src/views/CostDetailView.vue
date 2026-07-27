@@ -25,6 +25,9 @@ import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
+import AppPager from '@/components/AppPager.vue'
+import AppButton from '@/components/AppButton.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
@@ -196,7 +199,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
   <div class="cd-view">
     <PageHeader title="成本分析" />
 
-    <div v-if="!rows.length" class="cd-empty">暂无主域成本数据——请在「数据管理」提供 PMIS 文件后点「更新数据」。</div>
+    <AppEmpty v-if="!rows.length">暂无主域成本数据——请在「数据管理」提供 PMIS 文件后点「更新数据」。</AppEmpty>
 
     <template v-else>
       <MetricGrid :items="kpiItems" :col-min="'160px'" @item-click="onKpiClick" />
@@ -219,9 +222,9 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
         <div class="cd-bar">
           <el-input v-model="fKw" size="small" placeholder="编号/名称" style="width: 160px" clearable />
           <TagFilterSelect v-model="selectedTags" />
-          <button class="cd-btn" @click="reset">重置</button>
+          <AppButton variant="subtle" @click="reset">重置</AppButton>
           <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
-          <button class="cd-btn" data-test="cost-export" @click="onExport">导出Excel</button>
+          <AppButton variant="subtle" data-test="cost-export" @click="onExport">导出Excel</AppButton>
         </div>
         <div class="cd-scroll">
           <DataTable :columns="DETAIL_COLS" :rows="pagedSeq" :show-count="false" clickable external-sort sticky-header :max-height-px="640"
@@ -241,10 +244,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
             </template>
           </DataTable>
         </div>
-        <div class="cd-pager">
-          <span class="u-num">共 {{ sorted.length }} 条</span>
-          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="sorted.length" layout="sizes, prev, pager, next" size="small" background />
-        </div>
+        <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="sorted.length" :sizes="[20, 50, 100]" />
       </div>
       </template>
     </template>
@@ -260,14 +260,10 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 .cd-th { display: inline-flex; align-items: center; }
 .cd-red { color: var(--danger-text); font-weight: 600; }
 .cd-green { color: var(--ok-text); }
-.cd-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .cd-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
 .cd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.cd-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.cd-btn:hover { background: var(--bg); color: var(--accent); }
 .cd-scroll { overflow-x: auto; }
 .cd-link { color: var(--accent); cursor: pointer; }
-.cd-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 .cd-majorcats { display: flex; flex-direction: column; gap: 2px; }
 .cd-mut { color: var(--mut); }
 </style>

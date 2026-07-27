@@ -6,6 +6,8 @@ import { buildPlanRows, NODE_TYPES } from '@/lib/milestoneDetailRows'
 import { usePagedRows } from '@/lib/usePagedRows'
 import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from './DataTable.vue'
+import AppButton from './AppButton.vue'
+import AppPager from './AppPager.vue'
 
 const props = defineProps<{ projects: MilestoneProject[] }>()
 const router = useRouter()
@@ -45,26 +47,20 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
   <div class="mpt">
     <div class="mpt-bar">
       <el-input v-model="fKw" size="small" placeholder="编号/名称" style="width: 160px" />
-      <button class="mpt-btn" @click="reset">重置</button>
-      <button class="mpt-btn" data-test="plan-export" @click="onExport">导出Excel</button>
+      <AppButton variant="subtle" @click="reset">重置</AppButton>
+      <AppButton variant="subtle" data-test="plan-export" @click="onExport">导出Excel</AppButton>
     </div>
     <div class="mpt-scroll">
       <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable sticky-header @row-click="onRow">
         <template #cell-projectId="{ value }"><span class="mpt-link">{{ value }}</span></template>
       </DataTable>
     </div>
-    <div class="mpt-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[50, 100]" :total="filtered.length" layout="sizes, prev, pager, next" size="small" background />
-    </div>
+    <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" :sizes="[50, 100]" />
   </div>
 </template>
 
 <style scoped>
 .mpt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.mpt-btn { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line2); border-radius: var(--r-sm); background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); }
-.mpt-btn:hover { background: var(--bg); color: var(--accent); }
 .mpt-scroll { overflow-x: auto; }
 .mpt-link { color: var(--accent); cursor: pointer; }
-.mpt-pager { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 </style>

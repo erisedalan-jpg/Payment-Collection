@@ -123,6 +123,14 @@ describe('InsightView', () => {
     const w = await mountView()
     expect(w.text()).toContain('暂无项目主域数据')
   })
+
+  it('空态改用 AppEmpty 渲染', async () => {
+    const ds = useDataStore()
+    ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, events: [] } as any
+    const w = await mountView()
+    expect(w.find('.ae').exists()).toBe(true)
+    expect(w.find('.ae').text()).toContain('暂无')
+  })
 })
 
 describe('InsightView 页头与视图状态持久化', () => {

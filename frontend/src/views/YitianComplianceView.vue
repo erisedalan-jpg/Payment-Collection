@@ -8,6 +8,7 @@ import MetricGrid from '@/components/MetricGrid.vue'
 import RatioRing from '@/components/RatioRing.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
+import AppPager from '@/components/AppPager.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useScopedYitian } from '@/composables/useScopedData'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
@@ -260,10 +261,7 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
             <el-link type="primary" :underline="false" @click.stop="goDetailIssue(row)">明细</el-link>
           </template>
         </DataTable>
-        <div class="yt-pager">
-          <span class="yt-total u-num">共 {{ filtered.length }} 条</span>
-          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="filtered.length" layout="prev, pager, next" size="small" background />
-        </div>
+        <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
       </section>
     </template>
   </div>
@@ -298,6 +296,4 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 .yt-th { display: inline-flex; align-items: center; gap: var(--sp-1); }
-.yt-pager { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
-.yt-total { font-size: var(--fs-1); color: var(--sub); }
 </style>

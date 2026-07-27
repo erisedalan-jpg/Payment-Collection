@@ -38,6 +38,48 @@ describe('V4.4.8 页头与视图状态全局守卫', () => {
     expect(actual).toEqual([...BASELINE].sort())
   })
 
+  it('V4.4.9 三组件已广泛接入,且本期迁移过的旧类名未复活', () => {
+    // 正向断言使用广度,而非负向禁止所有 -empty/-btn 模式 —— 后者会误伤大量【本期范围外】
+    // 的卡内局部空态(如 PivotTable 的 .pv-empty、BoardView 的 .bv-empty)与组件内部按钮。
+    const comps = resolve(viewsDir, '../components')
+    const countUsers = (tag: string) =>
+      [viewsDir, comps].flatMap((d) => readdirSync(d).filter((f) => f.endsWith('.vue'))
+        .filter((f) => readFileSync(resolve(d, f), 'utf-8').includes(`<${tag}`))).length
+    expect(countUsers('AppEmpty'), 'AppEmpty 接入数下降,可能有人改回自写空态').toBeGreaterThanOrEqual(11)
+    expect(countUsers('AppPager'), 'AppPager 接入数下降').toBeGreaterThanOrEqual(14)
+    expect(countUsers('AppButton'), 'AppButton 接入数下降').toBeGreaterThanOrEqual(11)
+
+    // 本期删除的类名(按 文件:类名 精确配对,避免与他处同名类混淆)不得复活
+    const GONE: [string, string][] = [
+      ['ProjectsView.vue', 'pv-empty'], ['ClosedProjectsView.vue', 'cv-empty'],
+      ['CostDetailView.vue', 'cd-btn'], ['YitianComplianceView.vue', 'yt-pager'],
+      ['PayNodesView.vue', 'pv-btn'], ['PayProjectsView.vue', 'pov-btn'],
+    ]
+    for (const [f, cls] of GONE) {
+      const src = readFileSync(resolve(viewsDir, f), 'utf-8')
+      expect(new RegExp(`^\\.${cls}\\s*[,{]`, 'm').test(src), `${f} 的 .${cls} 复活了`).toBe(false)
+    }
+  })
+
+  it('7 处次级按钮必须用 subtle 变体(灰底 12px),不得退回 default', () => {
+    // 初版 AppButton 只有一种取值,导致这 7 处被误换成白底 14px 主色按钮,
+    // 且当时的契约只断言 radius/padding/background 三项,【没有一条测试变红】。
+    const comps = resolve(viewsDir, '../components')
+    const SUBTLE: [string, string][] = [
+      [viewsDir, 'CostDetailView.vue'], [viewsDir, 'PayNodesView.vue'], [viewsDir, 'PayProjectsView.vue'],
+      [comps, 'MilestoneDelayedTab.vue'], [comps, 'MilestonePlanTab.vue'],
+      [comps, 'MilestoneReminderTab.vue'], [comps, 'NoStageProjectsTable.vue'],
+    ].map(([d, f]) => [d, f] as [string, string])
+    for (const [d, f] of SUBTLE) {
+      const src = readFileSync(resolve(d, f), 'utf-8')
+      const uses = src.match(/<AppButton[^>]*/g) ?? []
+      expect(uses.length, `${f} 没有 AppButton`).toBeGreaterThan(0)
+      for (const u of uses) {
+        expect(u, `${f} 的 AppButton 缺 variant="subtle"`).toContain('variant="subtle"')
+      }
+    }
+  })
+
   it('页面组件里不得出现 hideFilter(它是 router meta,不属于 view)', () => {
     for (const f of allViews()) {
       expect(read(f), `${f} 不应引用 hideFilter`).not.toContain('hideFilter')

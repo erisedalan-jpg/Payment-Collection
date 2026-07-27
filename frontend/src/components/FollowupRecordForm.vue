@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { FollowupRecord, FollowupFormData } from '@/lib/followupApi'
+import AppButton from './AppButton.vue'
 
 const props = defineProps<{
   projectId: string
@@ -84,8 +85,8 @@ function submit() {
     <div class="frf-hint">下次跟进日期默认为节点动作完成时间</div>
     <div v-if="error" class="frf-error">{{ error }}</div>
     <div class="frf-actions">
-      <button class="frf-btn primary" @click="submit">保存</button>
-      <button class="frf-btn" @click="emit('cancel')">取消</button>
+      <AppButton class="frf-primary" @click="submit">保存</AppButton>
+      <AppButton @click="emit('cancel')">取消</AppButton>
     </div>
   </div>
 </template>
@@ -100,6 +101,7 @@ function submit() {
 .frf-hint { font-size: var(--fs-1); color: var(--mut); margin: var(--sp-1) 0 var(--sp-2) 92px; }
 .frf-error { color: var(--danger); font-size: var(--fs-1); margin: var(--sp-1) 0; }
 .frf-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
-.frf-btn { border: 1px solid var(--line2); background: var(--card); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-4); font-size: var(--fs-1); cursor: pointer; color: var(--sub); }
-.frf-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+/* 主行动按钮:AppButton 无 primary 变体,此处只补实底强调色。
+   选择器带 .ab 是为比组件内 .ab 高一级,不依赖样式注入顺序。 */
+.ab.frf-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

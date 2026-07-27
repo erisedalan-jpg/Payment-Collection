@@ -61,4 +61,15 @@ describe('PortalConfigCard', () => {
     expect(w.vm.draft.items.map((i: any) => i.name)).toContain('C')
     expect(w.vm.draft.groups).toContain('新组')
   })
+
+  it('头部两个按钮改用 AppButton,data-test 原样保留;新建仍是主行动', async () => {
+    const w = mountCard()
+    await flushPromises()
+    const add = w.find('[data-test="pc-add"]')
+    const save = w.find('[data-test="pc-save"]')
+    expect(add.classes()).toContain('ab')
+    expect(add.classes()).toContain('pc-primary')
+    expect(save.classes()).toContain('ab')
+    expect(save.classes()).not.toContain('pc-primary')
+  })
 })

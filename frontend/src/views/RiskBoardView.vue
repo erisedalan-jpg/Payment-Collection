@@ -18,6 +18,7 @@ import RiskDrillModal from '@/components/RiskDrillModal.vue'
 import DimPicker from '@/components/DimPicker.vue'
 import PivotTable from '@/components/PivotTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppEmpty from '@/components/AppEmpty.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -136,7 +137,7 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
   <div class="risk-view">
     <PageHeader title="风险看板" />
 
-    <div v-if="!rows.length" class="rv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
+    <AppEmpty v-if="!rows.length">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</AppEmpty>
 
     <template v-else>
       <div class="rv-cards">
@@ -196,8 +197,6 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
 .rv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
 .rv-chart-item { flex: 1 1 400px; min-width: 300px; background: var(--card); border: 1px solid var(--line);
   border-radius: var(--r-md); padding: var(--sp-3); }
-.rv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card);
-  border: 1px solid var(--line); border-radius: var(--r-md); }
 .rv-levelfilter { display: inline-flex; gap: var(--sp-2); }
 .rv-lvl-chip { border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer;
   font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-md); }

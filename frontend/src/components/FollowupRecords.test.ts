@@ -80,4 +80,24 @@ describe('FollowupRecords', () => {
     await flushPromises()
     expect(followupApi.remove).not.toHaveBeenCalled()
   })
+
+  it('历史项按钮改用 AppButton,展开中的那条挂 active(选中态不能丢)', async () => {
+    // 本文件 afterEach 会 restoreAllMocks,把工厂里的 mockResolvedValue 一并抹掉;
+    // 需要真实记录的用例必须逐条重新上桩,否则 list 返回 undefined、records 落空。
+    ;(followupApi.list as any).mockResolvedValue({
+      records: [
+        { 记录编号: 'FU-2', 跟进时间: '2026-06-02 10:00', 跟进人: '李', 跟进类型: '电话沟通', 跟进内容: '二次催款', 跟进状态: '跟进中' },
+        { 记录编号: 'FU-1', 跟进时间: '2026-06-01 10:00', 跟进人: '张', 跟进类型: '邮件推动', 跟进内容: '首次催款', 跟进状态: '跟进中' },
+      ],
+      total: 2,
+    })
+    const w = mountRecords()
+    await flushPromises()
+    const hist = w.findAll('.fr-history button')
+    expect(hist).toHaveLength(1)          // 两条记录:最新一条单独展示,历史剩 1 条
+    expect(hist[0].classes()).toContain('ab')
+    expect(hist[0].classes()).not.toContain('active')
+    await hist[0].trigger('click')
+    expect(w.findAll('.fr-history button')[0].classes()).toContain('active')
+  })
 })

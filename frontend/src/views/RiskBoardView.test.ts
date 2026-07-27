@@ -77,6 +77,13 @@ describe('RiskBoardView', () => {
     const w = mount(RiskBoardView, opts)
     expect(w.text()).toContain('暂无项目主域数据')
   })
+  it('空态改用 AppEmpty 渲染', () => {
+    const ds = useDataStore()
+    ds.data = { meta: {}, projects: [], projectPmis: {}, displayColumns: {}, followupRecords: {} } as any
+    const w = mount(RiskBoardView, opts)
+    expect(w.find('.ae').exists()).toBe(true)
+    expect(w.find('.ae').text()).toContain('暂无')
+  })
   it('风险等级筛选去勾"无风险"只影响风险统计分析,不影响卡片', async () => {
     seed()
     const w = mount(RiskBoardView, opts)

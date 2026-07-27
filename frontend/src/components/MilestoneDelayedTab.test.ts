@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import MilestoneDelayedTab from './MilestoneDelayedTab.vue'
 import DataTable from './DataTable.vue'
+import AppPager from './AppPager.vue'
 
 const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
@@ -39,5 +40,17 @@ describe('MilestoneDelayedTab', () => {
     await w.findComponent(DataTable).vm.$emit('row-click', { projectId: 'B' })
     expect(pushSpy).toHaveBeenCalledWith('/project/B')
     expect(w.find('[data-test="delayed-export"]').exists()).toBe(true)
+  })
+  it('按钮改用 AppButton,data-test 原样保留(既有测试靠它定位)', () => {
+    const w = mount(MilestoneDelayedTab, { props: { projects, now }, ...opts })
+    const btn = w.find('[data-test="delayed-export"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.classes()).toContain('ab')
+  })
+  it('分页改用 AppPager,档位仍是本页原有的 [20,50,100]', () => {
+    const w = mount(MilestoneDelayedTab, { props: { projects, now }, ...opts })
+    expect(w.find('.ap').exists()).toBe(true)
+    expect(w.find('.ap-total').text()).toContain('共')
+    expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([20, 50, 100])
   })
 })

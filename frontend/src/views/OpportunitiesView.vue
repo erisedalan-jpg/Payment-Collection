@@ -18,6 +18,7 @@ import ColumnFilter from '@/components/ColumnFilter.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import OpportunityEditDrawer from '@/components/OpportunityEditDrawer.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppPager from '@/components/AppPager.vue'
 import type { OppRow } from '@/lib/opportunitiesApi'
 
 const TABLE_ID = 'opportunities'
@@ -296,18 +297,7 @@ defineExpose({
     </div>
 
     <!-- 分页条 -->
-    <div class="opp-pager">
-      <span class="u-num">共 {{ filtered.length }} 条</span>
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 80, 100]"
-        :total="filtered.length"
-        layout="sizes, prev, pager, next"
-        size="small"
-        background
-      />
-    </div>
+    <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
 
     <!-- 编辑抽屉 -->
     <OpportunityEditDrawer v-model="editOpen" :row="editRow" :mode="editMode" />
@@ -332,11 +322,5 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-}
-.opp-pager {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  margin-top: var(--sp-3);
 }
 </style>
