@@ -56,6 +56,7 @@ data/temp_followup.backup-*.json
 # 本地账号库(含密码哈希,敏感,运行时生成,SP-2)
 data/accounts.json
 data/accounts.json.tmp
+data/accounts.json.bak-*
 data/audit_log.jsonl
 data/audit_log.jsonl.tmp
 data/audit_archive/
