@@ -129,17 +129,37 @@ grill 阶段我判断「四条约束合谋压低信息密度」（`--fs-base` �
 
 正确顺序：**约束层先把卡片规格定死为少数几种，组件只实现这几种。**
 
-定为**三种，不设第四种**：
+> **本节两次订正（写 2a-2 plan 时全量核对得出）**：初稿定「三种，不设第四种」，是在只看了 8 个抽样时写的。全量提取 60 处的四属性后发现两个问题：① 混入了 16 处**根本不是卡片**的东西；② 真实存在一个三变体覆盖不了的形态。**与 V4.4.9 按钮那次是同一个错误模式 —— 基于部分观察定规格，实施时必被打脸。** 现按全量数据重定。
 
-| 变体 | 圆角 | 内边距 | 背景 | 阴影 | 用途 |
-|---|---|---|---|---|---|
-| `default` | `--r-lg` | `--card-pad` | `--card` | `--shadow-1` | 页面主区块（图表卡、表格卡） |
-| `flat` | `--r-md` | `--sp-3` | `--card` | 无 | 嵌套在其他卡内、或密集排列的次级块 |
-| `inset` | `--r-sm` | `--sp-2 --sp-3` | `--card2` | 无 | 卡内的小信息块（如 `av-card` 那种指标格） |
+### 非目标：16 处不纳入 `AppCard`
 
-`AppCard` 的 API 只有一个 prop：`variant?: 'default' | 'flat' | 'inset'`（默认 `default`）。**不提供** `padding` / `radius` / `shadow` 等逐项覆盖 —— 需要第四种形态时，先改本规范、再加变体，而不是在调用处传参绕过。
+它们同样满足「background + border + radius」，但语义上不是内容容器，套 `AppCard` 是错的：
 
-**迁移映射**：44 处按其当前圆角归位（`--r-lg`→default、`--r-md`→flat、`--r-sm`→inset）。少数当前 padding 与目标变体不符的，**以变体为准**（这正是本期要消除的不一致），预期会有轻微视觉变化，列入人工目验清单。
+| 类型 | 实例 |
+|---|---|
+| 交互控件 | `SegToggle.seg` · `DisplaySettings.seg` · `ChartTypeSelector.cts` · `FilterBar.fb-preset` |
+| 按钮 | `ActivityView.av-export`（类名不含 btn，故未被按钮分类捕获） |
+| 列表项 / 单元格 | `ProjectDetailDrawer.pd-cell` · `FollowupRecords.fr-record` · `TodoQueue.tq-count` |
+| 表单 / 抽屉内部件 | `FollowupRecordForm.frf` · `RateConfigDrawer.rc-col` · `ScopeBuilder.sb-group` · `PmSection.pm-phase` · `CrmCard.crm-text` · `YitianSourceCard.dv-fmt` |
+| 提示条 | `DataQualityView.gov-alert`（§3.2 已明确不抽） |
+| **本期自建组件** | `AppEmpty.ae--default`（V4.4.9 刚建，差点被当成待迁移目标） |
+
+**真实卡片数：44 处**（不是 59/60）。
+
+### 四变体（按全量分布重定）
+
+| 变体 | 圆角 | 内边距 | 背景 | 阴影 | 用途 | 完全匹配处数 |
+|---|---|---|---|---|---|---|
+| `default` | `--r-lg` | `--card-pad` | `--card` | `--shadow-1` | 页面主区块 | **17** |
+| `raised` | `--r-md` | `--card-pad` | `--card` | `--shadow-1` | 带阴影的次级主块 | 3（+2 仅 padding 异） |
+| `flat` | `--r-md` | `--card-pad` | `--card` | 无 | 无阴影的内容块 | 8（+9 仅 padding 异） |
+| `inset` | `--r-sm` | `--sp-2 --sp-3` | `--card2` | 无 | 卡内小信息块 | 1（+2 异） |
+
+**为什么必须有 `raised`**：`TodoQueue.tq` / `DataQualityView.gov-src` / `OverviewView.ov-acard` / `.ov-aside` / `DataStatusBar.dsb` 这一批是 `--r-md` + 阴影，介于 default（`--r-lg`+阴影）与 flat（`--r-md`+无阴影）之间。按三变体硬归位，它们要么丢阴影、要么圆角 10px→14px，**都是肉眼可见的变化，且都是页面主区块**。它不是为迁就现状硬造的：5 处用法一致，语义上「带阴影的主块」与 flat 的「嵌套次级块」确属不同层级。
+
+`AppCard` 的 API 只有一个 prop：`variant?: 'default' | 'raised' | 'flat' | 'inset'`（默认 `default`）。**不提供** `padding` / `radius` / `shadow` 逐项覆盖 —— 需要第五种形态时，先改本规范、再加变体，不许在调用处传参绕过。
+
+**迁移映射**：44 处按「圆角 + 有无阴影」二维归位。**11 处仅 padding 与目标变体不符**（如 `.cd-card`/`.iv-card`/`.mv-card` 现为 `--sp-3`，归位后变 `--card-pad`，12px→20px），**以变体为准** —— 这正是本期要消除的不一致，属预期内的轻微变化，全部列入人工目验清单。
 
 ## 4. 测试
 
