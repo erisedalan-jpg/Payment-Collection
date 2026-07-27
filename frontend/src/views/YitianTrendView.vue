@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
@@ -167,6 +168,7 @@ defineExpose({ series })
 
 <template>
   <div class="yt-page">
+    <PageHeader title="趋势分析" />
     <YitianToolbar v-if="ready" />
     <SegToggle v-if="ready" v-model="gran" :options="GRAN_OPTS" />
 

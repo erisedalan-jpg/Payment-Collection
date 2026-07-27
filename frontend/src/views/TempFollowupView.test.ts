@@ -133,6 +133,30 @@ describe('TempFollowupView', () => {
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
   })
 
+  // V4.4.8 页头：本页只换标题。多实例结构(V4.0.2)下操作按钮在子组件 TempInstancePanel 内，
+  // 本期不搬 —— 故页头 #actions 必须为空，且按钮仍要留在页内（不能因改标题被误删）。
+  it('V4.4.8 渲染页头标题', async () => {
+    const w = await mountAs(true)
+    expect(w.find('.ph-title').text()).toBe('临时重点跟进')
+  })
+  it('V4.4.8 超管页头 actions 区为空，操作按钮仍在子组件内', async () => {
+    const w = await mountAs(true)
+    const actions = w.find('.ph-actions')
+    expect(actions.exists()).toBe(true)
+    expect(actions.findAll('button').length).toBe(0)
+    expect(actions.text()).toBe('')
+    expect(w.text()).toContain('范围设置')          // 按钮仍在 TempInstancePanel 内
+    expect(w.text()).toContain('导出')
+  })
+  it('V4.4.8 非超管页头 actions 区同样为空，且页内不出现超管按钮', async () => {
+    const w = await mountAs(false)
+    const actions = w.find('.ph-actions')
+    expect(actions.exists()).toBe(true)
+    expect(actions.findAll('button').length).toBe(0)
+    expect(w.text()).not.toContain('范围设置')
+    expect(w.text()).not.toContain('导出')
+  })
+
   describe('V4.0.1 三个日期列', () => {
     // V4.0.2:ALL_COLUMNS/prefs/FILTERABLE 随表格区一起抽进了 TempInstancePanel 子组件，
     // 父组件 defineExpose 不再暴露它们 —— 断言改到子组件实例上找，不削弱断言本身。

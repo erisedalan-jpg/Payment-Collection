@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import DashboardView from './DashboardView.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
+import { ALL_PAGE_LINKS } from '@/nav'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -33,6 +34,14 @@ function seedData() {
 }
 
 describe('DashboardView', () => {
+  it('渲染页头标题(与 nav.ts 的 label 逐字一致)', async () => {
+    seedData()
+    const w = mount(DashboardView, { global: { stubs } })
+    await flushPromises()
+    // 与 nav.ts 比对而非各写各的字面量:否则会出现「侧栏叫回款总览、页头叫回款看板」
+    expect(w.find('.ph-title').text()).toBe(ALL_PAGE_LINKS.find((l) => l.to === '/payment')!.label)
+  })
+
   it('渲染指标 + 回款数据表格 + 无回款阶段数据项目清单', async () => {
     seedData()
     const w = mount(DashboardView, { global: { stubs } })

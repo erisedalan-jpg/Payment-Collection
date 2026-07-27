@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
@@ -21,6 +22,7 @@ import BoardMatrix from '@/components/BoardMatrix.vue'
 import PivotTable from '@/components/PivotTable.vue'
 import InsightDrillModal from '@/components/InsightDrillModal.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -68,6 +70,9 @@ const top = computed(() => groups.value.slice(0, 15))
 
 // 图表类型多选（排名模式）
 const chartTypes = ref<string[]>(['bar'])
+
+// 视图状态按账号持久化(离开页面/刷新后回到上次的视角);下钻 modal 的三个状态绝不进存档
+usePersistedRefs('view_insight', { selectedTags, mode, dimKey, secondDim, metricKey, rowDims, colDims, chartTypes })
 
 // 当前指标的 valueKind（chartOptions 的类型）
 const currentValueKind = computed((): ValueKind => {
@@ -152,12 +157,12 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
   openDrill(pivot.value?.index[p.rowKey]?.[p.colKey] as InsightGroup | undefined, `${p.rowKey}${p.colKey ? ' / ' + p.colKey : ''}`)
 }
 
-defineExpose({ selectedTags })
+defineExpose({ selectedTags, mode, dimKey, chartTypes, drillOpen })
 </script>
 
 <template>
   <div class="insight-view">
-    <h2 class="iv-title">项目分析</h2>
+    <PageHeader title="项目分析" />
 
     <div class="iv-toolbar">
       <SegToggle v-model="mode" :options="MODES" />
@@ -215,7 +220,6 @@ defineExpose({ selectedTags })
 
 <style scoped>
 .insight-view { padding: var(--sp-4); }
-.iv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .iv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-dims { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-dims-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }

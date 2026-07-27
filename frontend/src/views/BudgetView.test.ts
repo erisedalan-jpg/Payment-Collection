@@ -172,3 +172,29 @@ describe('BudgetView', () => {
     expect(useBudgetConfigStore().config?.rates.city1.tech).toBe(2600)
   })
 })
+
+describe('V4.4.8 页头', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    getCfg.mockReset()
+    getCfg.mockResolvedValue(CFG)
+  })
+
+  it('渲染页头标题', async () => {
+    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe('概算工具')
+  })
+
+  it('工具页四个主流程按钮留在原地,页头 #actions 为空', async () => {
+    // 本页是表单工具页:存档/新建报价/保存/导出 Excel 是主流程而非辅助操作,
+    // 搬进页头会把工具页套成表格页的模板(见 spec B4.2)。
+    const w = mount(BudgetView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(w.find('.ph-actions').text()).toBe('')
+    expect(w.find('.bd-actions').text()).toContain('存档')
+    expect(w.find('.bd-actions').text()).toContain('新建报价')
+    expect(w.find('.bd-footer').text()).toContain('保存')
+    expect(w.find('.bd-footer').text()).toContain('导出 Excel')
+  })
+})

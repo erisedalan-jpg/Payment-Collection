@@ -8,6 +8,7 @@ import { fmtWan } from '@/lib/format'
 import { exportRows } from '@/lib/exportXlsx'
 import SegToggle from '@/components/SegToggle.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -134,7 +135,11 @@ function doExportEvents() {
 
 <template>
   <div class="activity-view">
-    <h2 class="av-title">项目动态</h2>
+    <PageHeader title="项目动态">
+      <template #actions>
+        <button class="av-export" @click="doExportEvents">导出表格</button>
+      </template>
+    </PageHeader>
 
     <div class="av-compare">
       <div class="av-compare-head">
@@ -175,7 +180,6 @@ function doExportEvents() {
         <el-option v-for="opt in l4Options" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
       <el-input v-model="filters.query" size="small" placeholder="搜索 项目/摘要/类型" clearable style="width: 220px" />
-      <button class="av-export" @click="doExportEvents">导出表格</button>
     </div>
 
     <EventTimeline :events="pagedEvents" :pid-info="pidInfo" empty-text="首次同步，暂无变化记录" />
@@ -194,7 +198,6 @@ function doExportEvents() {
 
 <style scoped>
 .activity-view { padding: var(--sp-4); }
-.av-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .av-compare { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
 .av-compare-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .av-compare-label { font-weight: 700; font-size: var(--fs-2); color: var(--txt); }

@@ -17,6 +17,7 @@ import ColumnPicker from '@/components/ColumnPicker.vue'
 import HealthBadge from '@/components/HealthBadge.vue'
 import FollowupModal from '@/components/FollowupModal.vue'
 import Modal from '@/components/Modal.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { buildExportSheets, type ExportScope } from '@/lib/projectExport'
 import { followupApi } from '@/lib/followupApi'
@@ -168,7 +169,11 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
 
 <template>
   <div class="projects-view">
-    <h2 class="pv-title">在建项目</h2>
+    <PageHeader title="在建项目">
+      <template #actions>
+        <button class="pv-export-btn" @click="exOpen = true">导出</button>
+      </template>
+    </PageHeader>
     <div class="toolbar">
       <el-input v-model="sp.search" size="small" placeholder="搜索 项目名/编号/客户/经理" clearable style="width: 230px" />
       <el-select v-model="sp.presale" size="small" clearable placeholder="售前整合" style="width: 105px"
@@ -178,7 +183,6 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
       </el-select>
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
-      <button class="pv-export-btn" @click="exOpen = true">导出</button>
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
 
@@ -248,7 +252,6 @@ defineExpose({ ALL_COLUMNS, FILTERABLE, prefs })
 
 <style scoped>
 .projects-view { padding: var(--sp-4); }
-.pv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .pv-scroll { overflow-x: auto; }
 .pv-th { display: inline-flex; align-items: center; gap: var(--sp-1); }

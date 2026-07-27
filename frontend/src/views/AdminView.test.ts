@@ -152,3 +152,25 @@ describe('AdminView', () => {
     ]))
   })
 })
+
+describe('V4.4.8 页头', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.mocked(adminApi.listAccounts).mockResolvedValue([])
+    vi.mocked(adminApi.listRoster).mockResolvedValue([])
+  })
+
+  it('渲染页头标题', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    expect(wrapper.find('.ph-title').text()).toBe('账号管理')
+  })
+
+  it('「新建账号」留在原地,页头 #actions 为空', async () => {
+    // 本页操作按钮本期不搬(见 plan Task 7 对照表)。
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    expect(wrapper.find('.ph-actions').text()).toBe('')
+    expect(wrapper.find('.admin-head [data-test="admin-create"]').exists()).toBe(true)
+  })
+})

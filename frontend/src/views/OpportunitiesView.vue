@@ -17,6 +17,7 @@ import ColumnPicker from '@/components/ColumnPicker.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import OpportunityEditDrawer from '@/components/OpportunityEditDrawer.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import type { OppRow } from '@/lib/opportunitiesApi'
 
 const TABLE_ID = 'opportunities'
@@ -175,7 +176,40 @@ defineExpose({
 
 <template>
   <div class="opp-view">
-    <h2 class="opp-title">商机清单</h2>
+    <PageHeader title="商机清单">
+      <template #actions>
+        <!-- 新增商机:任意登录管理员(普通管理员限本人 L4,由后端 + 编辑抽屉约束) -->
+        <el-button size="small" type="primary" data-test="opp-add" @click="onCreate">
+          新增商机
+        </el-button>
+        <!-- 超管专属写操作:删除/导入/导出 -->
+        <template v-if="auth.isSuper">
+          <el-button
+            size="small"
+            type="danger"
+            data-test="opp-del"
+            :disabled="!selectedRows.length"
+            @click="onDelete"
+          >
+            删除选中
+          </el-button>
+          <el-button size="small" data-test="opp-import" @click="fileInput?.click()">
+            导入
+          </el-button>
+          <el-button size="small" data-test="opp-export" @click="onExport">
+            导出
+          </el-button>
+          <!-- 隐藏文件输入 -->
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".xlsx"
+            style="display: none"
+            @change="onFilePick"
+          />
+        </template>
+      </template>
+    </PageHeader>
 
     <!-- 工具栏 -->
     <div class="opp-toolbar">
@@ -195,36 +229,6 @@ defineExpose({
         @move-down="prefs.moveDown"
         @reset="prefs.reset"
       />
-      <!-- 新增商机:任意登录管理员(普通管理员限本人 L4,由后端 + 编辑抽屉约束) -->
-      <el-button size="small" type="primary" data-test="opp-add" @click="onCreate">
-        新增商机
-      </el-button>
-      <!-- 超管专属写操作:删除/导入/导出 -->
-      <template v-if="auth.isSuper">
-        <el-button
-          size="small"
-          type="danger"
-          data-test="opp-del"
-          :disabled="!selectedRows.length"
-          @click="onDelete"
-        >
-          删除选中
-        </el-button>
-        <el-button size="small" data-test="opp-import" @click="fileInput?.click()">
-          导入
-        </el-button>
-        <el-button size="small" data-test="opp-export" @click="onExport">
-          导出
-        </el-button>
-        <!-- 隐藏文件输入 -->
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".xlsx"
-          style="display: none"
-          @change="onFilePick"
-        />
-      </template>
       <el-button
         v-if="cf.hasFilters(TABLE_ID)"
         size="small"
@@ -313,12 +317,6 @@ defineExpose({
 <style scoped>
 .opp-view {
   padding: var(--sp-4);
-}
-.opp-title {
-  font-size: var(--fs-4);
-  font-weight: 700;
-  color: var(--txt);
-  margin: 0 0 var(--sp-3);
 }
 .opp-toolbar {
   display: flex;

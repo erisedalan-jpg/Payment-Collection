@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useSettingsStore } from '@/stores/settings'
@@ -23,6 +24,7 @@ import MilestoneStatusModal from '@/components/MilestoneStatusModal.vue'
 import MilestoneDelayedTab from '@/components/MilestoneDelayedTab.vue'
 import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { tagMatch } from '@/lib/tagFilter'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
@@ -226,12 +228,17 @@ const DETAIL_TABS = [
   { value: 'reminder', label: '到期提醒' },
   { value: 'plan', label: '在建里程碑计划' },
 ]
-defineExpose({ faGran, onNodeClick, nodeYear, mps, mpsFiltered, selectedTags })
+
+// 视图状态按账号持久化(离开页面/刷新后回到上次的视角);两个下钻 modal 的开关与载荷绝不进存档。
+// 本调用在上面 nodeYearOpts 的 immediate watch【之后】:存档里的年份是用户显式选择,应压过「默认当年」。
+usePersistedRefs('view_milestone', { selectedTags, faGran, faYear, nodeYear, detailTab })
+
+defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltered, selectedTags })
 </script>
 
 <template>
   <div class="mv-view">
-    <h2 class="mv-title">里程碑管理</h2>
+    <PageHeader title="里程碑管理" />
 
     <div class="mv-toolbar">
       <span class="mv-ex-label">按标签排除</span>
@@ -301,7 +308,6 @@ defineExpose({ faGran, onNodeClick, nodeYear, mps, mpsFiltered, selectedTags })
 
 <style scoped>
 .mv-view { padding: var(--sp-4); }
-.mv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .mv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .mv-ex-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .mv-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--gap-card); }

@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import type { YitianData } from '@/types/yitian'
+import { ALL_PAGE_LINKS } from '@/nav'
+import { userScopedKey } from '@/lib/userScopedKey'
+
+/** 页头标题取自 nav.ts 而非字面量:侧栏/tab 改了名而页头没跟,这条断言就红
+ *  (防「tab 叫合规检查、页头叫工时合规检查」这种同页两个说法)。 */
+const navLabel = (to: string) => ALL_PAGE_LINKS.find((l) => l.to === to)!.label
 
 const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
@@ -155,6 +162,38 @@ describe('YitianComplianceView', () => {
     const w = mountView()
     await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ keep: '1' })
+    w.unmount()
+  })
+
+  it('渲染页头标题「合规检查」,与 tab label 逐字一致', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe(navLabel('/yitian/compliance'))
+  })
+
+  it('pageSize 持久化:改每页条数 → 卸载 → 重新挂载后仍是该值', async () => {
+    const w1 = mountView()
+    await flushPromises()
+    ;(w1.vm as any).pageSize = 20
+    await nextTick()                 // 等 usePersistedRefs 的 watch 落盘
+    w1.unmount()
+
+    const w2 = mountView()
+    await flushPromises()
+    expect((w2.vm as any).pageSize).toBe(20)
+    w2.unmount()
+  })
+
+  it('currentPage 不进存档(回来不该还停在上次翻到的那一页)', async () => {
+    const w = mountView()
+    await flushPromises()
+    ;(w.vm as any).currentPage = 2
+    ;(w.vm as any).pageSize = 20
+    await nextTick()
+    const keys = Object.keys(JSON.parse(localStorage.getItem(userScopedKey('view_yitian_compliance')) ?? '{}'))
+    // 先证明存档确实写了 —— 否则(接线漏了/存档为空)下一条断言恒真,是假绿
+    expect(keys).toContain('pageSize')
+    expect(keys).not.toContain('currentPage')
     w.unmount()
   })
 

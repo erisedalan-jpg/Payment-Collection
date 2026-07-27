@@ -208,3 +208,28 @@ describe('OpportunitiesView', () => {
     expect(filename).toContain('条')
   })
 })
+
+describe('V4.4.8 页头', () => {
+  it('渲染页头标题', async () => {
+    const w = await mountView(true)
+    expect(w.find('.ph-title').text()).toBe('商机清单')
+  })
+
+  it('新增/删除/导入/导出已移入页头 #actions,筛选行内不再有它们', async () => {
+    const w = await mountView(true)
+    expect(w.find('.ph-actions [data-test="opp-add"]').exists()).toBe(true)
+    expect(w.find('.ph-actions [data-test="opp-del"]').exists()).toBe(true)
+    expect(w.find('.ph-actions [data-test="opp-import"]').exists()).toBe(true)
+    expect(w.find('.ph-actions [data-test="opp-export"]').exists()).toBe(true)
+    expect(w.find('.opp-toolbar [data-test="opp-add"]').exists()).toBe(false)
+    expect(w.find('.opp-toolbar [data-test="opp-export"]').exists()).toBe(false)
+  })
+
+  it('搬进页头后权限条件原样保留:普通管理员只见「新增商机」', async () => {
+    const w = await mountView(false)
+    expect(w.find('.ph-actions [data-test="opp-add"]').exists()).toBe(true)
+    expect(w.find('.ph-actions [data-test="opp-del"]').exists()).toBe(false)
+    expect(w.find('.ph-actions [data-test="opp-import"]').exists()).toBe(false)
+    expect(w.find('.ph-actions [data-test="opp-export"]').exists()).toBe(false)
+  })
+})

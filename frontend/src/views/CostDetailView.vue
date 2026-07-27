@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import { useSettingsStore } from '@/stores/settings'
 import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -23,6 +24,7 @@ import { useExternalSort } from '@/lib/useExternalSort'
 import { exportRows } from '@/lib/exportXlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
@@ -152,6 +154,10 @@ function onKpiClick(i: number) {
   detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+// 视图状态按账号持久化(本页已 keep-alive,但 project-analysis 组有 4 个 tab 而 max=2,轮换必被淘汰)。
+// detailCardRef 是 DOM 引用(HTMLElement 无法序列化)、currentPage 是浏览位置,两者绝不进存档。
+usePersistedRefs('view_costdetail', { fKw, selectedTags, kpiFilter })
+
 // 列头多选筛选 → 标签筛选(含无标签) → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
 const filtered = computed(() => {
   const colFiltered = applyColumnFilters(rows.value, cf.tableFilters(TABLE_ID))
@@ -188,7 +194,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 
 <template>
   <div class="cd-view">
-    <h2 class="cd-title">成本分析</h2>
+    <PageHeader title="成本分析" />
 
     <div v-if="!rows.length" class="cd-empty">暂无主域成本数据——请在「数据管理」提供 PMIS 文件后点「更新数据」。</div>
 
@@ -247,7 +253,6 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 
 <style scoped>
 .cd-view { padding: var(--sp-4); }
-.cd-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .cd-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--gap-card); }
 .cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
 .cd-card-h { font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }

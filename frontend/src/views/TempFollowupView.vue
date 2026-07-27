@@ -7,6 +7,7 @@ import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+import PageHeader from '@/components/PageHeader.vue'
 import TempInstancePanel from '@/components/TempInstancePanel.vue'
 
 defineOptions({ name: 'TempFollowupView' })
@@ -115,7 +116,9 @@ async function doDeleteInstance() {
 
 <template>
   <div class="temp-followup-view">
-    <h2 class="kp-title">临时重点跟进</h2>
+    <!-- 本页是多实例结构(V4.0.2),范围设置/更新/导出等操作按钮在子组件 TempInstancePanel 内,
+         本期只统一页头标题,不搬按钮 —— 故 PageHeader 无 #actions 插槽内容。 -->
+    <PageHeader title="临时重点跟进" />
 
     <div class="tf-insts">
       <button v-for="i in temp.instances" :key="i.id" data-test="temp-inst-tab"

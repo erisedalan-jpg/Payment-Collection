@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -164,6 +165,7 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
 
 <template>
   <div class="yt-page">
+    <PageHeader title="客户支持分析" />
     <YitianToolbar v-if="ready" />
 
     <el-alert v-if="store.error" :title="store.error" type="error" show-icon :closable="false" />

@@ -10,6 +10,7 @@ import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { useAuthStore } from '@/stores/auth'
 import { NO_TAG_VALUE } from '@/lib/tagFilter'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -245,5 +246,48 @@ describe('CostDetailView 标签筛选(仅明细表)', () => {
     await resetBtn.trigger('click')
     expect((w.vm as any).selectedTags).toEqual([])
     expect(((w.vm as any).filtered as any[]).length).toBe(3)
+  })
+})
+
+describe('CostDetailView 页头与视图状态持久化', () => {
+  function login() {
+    useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] }
+  }
+
+  it('渲染页头标题', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    expect(w.find('.ph-title').text()).toBe('成本分析')
+  })
+
+  it('关键词/标签/KPI 就地筛选持久化:改选 → 卸载 → 重新挂载后仍是该值', async () => {
+    login()
+    seed()
+    const w1 = mount(CostDetailView, opts)
+    ;(w1.vm as any).fKw = 'WS'
+    ;(w1.vm as any).selectedTags = ['重点']
+    ;(w1.vm as any).kpiFilter = 'totalOverspend'
+    await w1.vm.$nextTick()
+    w1.unmount()
+
+    const w2 = mount(CostDetailView, opts)
+    expect((w2.vm as any).fKw).toBe('WS')
+    expect((w2.vm as any).selectedTags).toEqual(['重点'])
+    expect((w2.vm as any).kpiFilter).toBe('totalOverspend')
+  })
+
+  it('DOM 引用 detailCardRef 与页码 currentPage 不进存档', async () => {
+    // detailCardRef 是 HTMLElement(无法序列化);currentPage 是浏览位置,数据变化后可能越界
+    login()
+    seed()
+    const w = mount(CostDetailView, opts)
+    ;(w.vm as any).currentPage = 2
+    ;(w.vm as any).fKw = 'WS'   // 改一个受监听的状态,确保这一轮确实落了盘
+    await w.vm.$nextTick()
+
+    const keys = Object.keys(JSON.parse(localStorage.getItem('s:view_costdetail') ?? '{}'))
+    expect(keys).toContain('fKw')   // 存档非空,下面两条否定断言才有意义
+    expect(keys).not.toContain('detailCardRef')
+    expect(keys).not.toContain('currentPage')
   })
 })

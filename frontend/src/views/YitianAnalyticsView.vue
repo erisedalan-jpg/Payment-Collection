@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
@@ -8,6 +9,7 @@ import ChartBox from '@/charts/ChartBox.vue'
 import HealthSegmentBar from '@/components/HealthSegmentBar.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useScopedYitian } from '@/composables/useScopedData'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
@@ -72,6 +74,9 @@ const headcountSegments = computed(() => {
 const filtered = computed(() => applyColumnFilters(empRows.value, cf.tableFilters(TABLE_ID)))
 const pageSize = ref(50)
 const currentPage = ref(1)
+// 只持久化 pageSize:它是「每页看多少条」的用户偏好;
+// currentPage 是浏览位置,记下来会让人「回来还停在第 5 页」,且数据量变化后可能越界。
+usePersistedRefs('view_yitian_analytics', { pageSize })
 const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
 watch(filtered, () => { currentPage.value = 1 })
 
@@ -221,6 +226,7 @@ defineExpose({
 
 <template>
   <div class="yt-page">
+    <PageHeader title="统计分析" />
     <YitianToolbar v-if="ready" />
 
     <el-alert v-if="store.error" :title="store.error" type="error" show-icon :closable="false" />

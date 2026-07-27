@@ -7,6 +7,7 @@ import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { ProjectPmis } from '@/types/analysis'
+import PageHeader from '@/components/PageHeader.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
@@ -111,13 +112,17 @@ function onExport() {
 
 <template>
   <div class="pov-tab">
+    <PageHeader title="回款项目">
+      <template #actions>
+        <button class="pov-btn" data-test="pay-projects-export" @click="onExport">导出Excel</button>
+      </template>
+    </PageHeader>
     <div class="pov-bar">
       <el-input v-model="kw" size="small" placeholder="编号/名称" style="width: 160px" clearable />
       <TagFilterSelect v-model="selectedTags" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
         @toggle="prefs.toggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
-      <button class="pov-btn" data-test="pay-projects-export" @click="onExport">导出Excel</button>
     </div>
     <div class="pov-scroll">
       <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable external-sort sticky-header

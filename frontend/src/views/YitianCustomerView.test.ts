@@ -4,6 +4,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ElementPlus from 'element-plus'
 import type { YitianData } from '@/types/yitian'
+import { ALL_PAGE_LINKS } from '@/nav'
+
+/** 页头标题取自 nav.ts 而非字面量:侧栏/tab 改了名而页头没跟,这条断言就红
+ *  (防「tab 叫客户支持分析、页头叫客户分析」这种同页两个说法)。 */
+const navLabel = (to: string) => ALL_PAGE_LINKS.find((l) => l.to === to)!.label
 
 const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
@@ -100,6 +105,12 @@ describe('YitianCustomerView', () => {
     await flushPromises()
     expect(w.text()).toContain('跨 BG 支持')
     expect(w.text()).not.toContain('跨 BG 支持（')
+  })
+
+  it('渲染页头标题「客户支持分析」,与 tab label 逐字一致', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe(navLabel('/yitian/customer'))
   })
 
 })

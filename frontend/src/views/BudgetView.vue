@@ -20,6 +20,7 @@ import SummaryCard from '@/components/budget/SummaryCard.vue'
 import SalesOrderCard from '@/components/budget/SalesOrderCard.vue'
 import EstimateDrawer from '@/components/budget/EstimateDrawer.vue'
 import RateConfigDrawer from '@/components/budget/RateConfigDrawer.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const cfgStore = useBudgetConfigStore()
 const store = useBudgetStore()
@@ -158,7 +159,7 @@ defineExpose({ validate, save, onExport, onRestore, onNew, drawerOpen, rateCfgOp
     <template v-if="ready">
       <!-- 顶部操作条 -->
       <div class="bd-topbar">
-        <h2 class="bd-title">概算工具</h2>
+        <PageHeader title="概算工具" />
         <div class="bd-actions">
           <span v-if="store.dirty" class="bd-dirty">未保存</span>
           <el-button @click="drawerOpen = true">存档</el-button>
@@ -224,7 +225,9 @@ defineExpose({ validate, save, onExport, onRestore, onNew, drawerOpen, rateCfgOp
   gap: var(--gap-card);
   flex-wrap: wrap;
 }
-.bd-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); }
+/* 页头在本页与右侧操作按钮同处一行(工具页主流程按钮不搬进页头,见 spec B4.2),
+   下间距由 .bd-topbar 统一管理,故置 0 以保持标题与按钮同一基线。 */
+.bd-topbar .ph { margin-bottom: 0; }
 .bd-actions { display: flex; align-items: center; gap: var(--sp-2); }
 .bd-dirty {
   font-size: var(--fs-1);

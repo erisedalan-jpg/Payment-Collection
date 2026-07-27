@@ -15,6 +15,7 @@ import { useDataStore } from '@/stores/data'
 import { NO_TAG_VALUE } from '@/lib/tagFilter'
 import { useFilterStore } from '@/stores/filter'
 import { useProjectTagsStore } from '@/stores/projectTags'
+import { useAuthStore } from '@/stores/auth'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/lib/projectTagsApi', () => ({
@@ -164,6 +165,58 @@ describe('MilestoneView 标签筛选(仅三表)', () => {
     expect(w.findComponent(MilestoneReminderTab).props('projects').length).toBe(1)
     await w.get('[data-test="seg-plan"]').trigger('click')
     expect(w.findComponent(MilestonePlanTab).props('projects').length).toBe(1)
+  })
+})
+
+describe('MilestoneView 页头与视图状态持久化', () => {
+  function login() {
+    useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] }
+  }
+
+  it('渲染页头标题', () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    expect(w.find('.ph-title').text()).toBe('里程碑管理')
+  })
+
+  it('粒度/明细 tab/标签持久化:改选 → 卸载 → 重新挂载后仍是该值;modal 状态不进存档', async () => {
+    login()
+    seed()
+    const w1 = mount(MilestoneView, opts)
+    ;(w1.vm as any).faGran = 'month'
+    ;(w1.vm as any).detailTab = 'plan'
+    ;(w1.vm as any).selectedTags = ['重点']
+    ;(w1.vm as any).statusOpen = true   // modal 状态:改了也不该进存档
+    await w1.vm.$nextTick()
+    w1.unmount()
+
+    const keys = Object.keys(JSON.parse(localStorage.getItem('s:view_milestone') ?? '{}'))
+    expect(keys).toContain('faGran')    // 存档非空,下面四条否定断言才有意义
+    for (const banned of ['drillOpen', 'drillRows', 'statusOpen', 'statusRows']) {
+      expect(keys).not.toContain(banned)
+    }
+
+    const w2 = mount(MilestoneView, opts)
+    expect((w2.vm as any).faGran).toBe('month')
+    expect((w2.vm as any).detailTab).toBe('plan')
+    expect((w2.vm as any).selectedTags).toEqual(['重点'])
+  })
+
+  it('faYear/nodeYear(ref<number|null> 初值 null)能从存档恢复,且年份存档压过「默认当年」', async () => {
+    // typeof null === 'object':护栏若不先放行 null,存档里的 number 会被判为类型不符而静默丢弃。
+    // nodeYear 另有一条 immediate watch 默认设当年(2026),存档是用户显式选择,必须压过它。
+    login()
+    seed()
+    const w1 = mount(MilestoneView, opts)
+    expect((w1.vm as any).faYear).toBe(null)
+    ;(w1.vm as any).faYear = 2025
+    ;(w1.vm as any).nodeYear = 2025
+    await w1.vm.$nextTick()
+    w1.unmount()
+
+    const w2 = mount(MilestoneView, opts)
+    expect((w2.vm as any).faYear).toBe(2025)
+    expect((w2.vm as any).nodeYear).toBe(2025)
   })
 })
 

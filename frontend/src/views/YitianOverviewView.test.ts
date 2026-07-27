@@ -4,6 +4,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import ElementPlus from 'element-plus'
 import type { YitianData } from '@/types/yitian'
+import { ALL_PAGE_LINKS } from '@/nav'
+
+/** 页头标题取自 nav.ts 而非字面量:侧栏改了名而页头没跟,这条断言就红
+ *  (防「侧栏叫工时总览、页头叫倚天总览」这种同页两个说法)。 */
+const navLabel = (to: string) => ALL_PAGE_LINKS.find((l) => l.to === to)!.label
 
 const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
@@ -213,6 +218,12 @@ describe('YitianOverviewView', () => {
     const w = mountView()
     await flushPromises()
     expect(w.find('.dt-clickable-row').exists()).toBe(true)
+  })
+
+  it('渲染页头标题「工时总览」,与侧栏 label 逐字一致', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe(navLabel('/yitian'))
   })
 
   it('组织表「明细」入口跳 /yitian/detail 带 dL4', async () => {

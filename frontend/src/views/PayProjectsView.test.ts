@@ -8,6 +8,7 @@ import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import DataTable from '@/components/DataTable.vue'
+import { ALL_PAGE_LINKS } from '@/nav'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -38,6 +39,14 @@ function seed() {
 const opts = { global: { plugins: [ElementPlus] } }
 
 describe('PayProjectsView', () => {
+  it('渲染页头标题(与 nav.ts 的 label 逐字一致)', async () => {
+    seed()
+    const w = mount(PayProjectsView, opts)
+    await flushPromises()
+    // 与 nav.ts 比对而非各写各的字面量:否则会出现「侧栏叫回款项目、页头叫项目回款明细」
+    expect(w.find('.ph-title').text()).toBe(ALL_PAGE_LINKS.find((l) => l.to === '/payment/projects')!.label)
+  })
+
   it('渲染项目明细行，部门汇总不再出现', async () => {
     seed()
     const w = mount(PayProjectsView, opts)

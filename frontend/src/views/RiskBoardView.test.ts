@@ -6,8 +6,12 @@ import ElementPlus from 'element-plus'
 import RiskBoardView from './RiskBoardView.vue'
 import DataTable from '@/components/DataTable.vue'
 import { useDataStore } from '@/stores/data'
+import { useAuthStore } from '@/stores/auth'
 
-beforeEach(() => setActivePinia(createPinia()))
+beforeEach(() => {
+  setActivePinia(createPinia())
+  localStorage.clear()   // 视图状态持久化会写 localStorage,逐条清空避免用例间串档
+})
 
 const rec = (lvl: string, status: string) => ({ 风险等级: lvl, 风险状态: status })
 
@@ -90,5 +94,59 @@ describe('RiskBoardView', () => {
     await w.find('.rv-rank-table .el-table__row').trigger('click')
     await flushPromises()
     expect((w.vm as any).drillOpen).toBe(true)
+  })
+})
+
+describe('RiskBoardView 页头与视图状态持久化', () => {
+  function login() {
+    useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] }
+  }
+
+  it('渲染页头标题', () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    expect(w.find('.ph-title').text()).toBe('风险看板')
+  })
+
+  it('维度/指标/图表类型/等级筛选/透视行列维持久化:改选 → 卸载 → 重新挂载后仍是该值', async () => {
+    login()
+    seed()
+    const w1 = mount(RiskBoardView, opts)
+    ;(w1.vm as any).dimKey = 'orgL4'
+    ;(w1.vm as any).metricKey = 'contractAmount'
+    ;(w1.vm as any).chartTypes = ['bar', 'pie']
+    ;(w1.vm as any).levelFilter = ['高', '中']
+    ;(w1.vm as any).rowDims = ['industry']
+    ;(w1.vm as any).ovMetric = 'openRiskSum'
+    await w1.vm.$nextTick()
+    w1.unmount()
+
+    const w2 = mount(RiskBoardView, opts)
+    expect((w2.vm as any).dimKey).toBe('orgL4')
+    expect((w2.vm as any).metricKey).toBe('contractAmount')
+    expect((w2.vm as any).chartTypes).toEqual(['bar', 'pie'])
+    expect((w2.vm as any).levelFilter).toEqual(['高', '中'])
+    expect((w2.vm as any).rowDims).toEqual(['industry'])
+    expect((w2.vm as any).ovMetric).toBe('openRiskSum')
+  })
+
+  it('下钻 modal 状态不进存档(否则重进页面会弹空 modal)', async () => {
+    login()
+    seed()
+    const w1 = mount(RiskBoardView, opts)
+    await w1.find('.rv-rank-table .el-table__row').trigger('click')
+    ;(w1.vm as any).dimKey = 'orgL4'   // 改一个受监听的状态,确保这一轮确实落了盘
+    await flushPromises()
+    expect((w1.vm as any).drillOpen).toBe(true)
+    w1.unmount()
+
+    const keys = Object.keys(JSON.parse(localStorage.getItem('s:view_risk') ?? '{}'))
+    expect(keys).toContain('dimKey')   // 存档非空,下面三条否定断言才有意义
+    for (const banned of ['drillOpen', 'drillTitle', 'drillRows']) {
+      expect(keys).not.toContain(banned)
+    }
+
+    const w2 = mount(RiskBoardView, opts)
+    expect((w2.vm as any).drillOpen).toBe(false)
   })
 })

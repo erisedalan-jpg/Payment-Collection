@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useDataStore } from '@/stores/data'
+import PageHeader from '@/components/PageHeader.vue'
 import DashMetrics from '@/components/DashMetrics.vue'
 import PaymentL4Table from '@/components/PaymentL4Table.vue'
 import NoStageProjectsTable from '@/components/NoStageProjectsTable.vue'
@@ -13,6 +14,7 @@ onMounted(() => {
 
 <template>
   <div class="dashboard">
+    <PageHeader title="回款总览" />
     <p v-if="data.loading" class="dash-hint">加载中…</p>
     <p v-else-if="data.error" class="dash-hint error">数据加载失败：{{ data.error }}</p>
     <template v-else-if="data.data">

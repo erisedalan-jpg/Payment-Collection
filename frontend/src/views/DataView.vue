@@ -16,6 +16,7 @@ import MaintenanceCard from '@/components/MaintenanceCard.vue'
 import LanxinConfigCard from '@/components/LanxinConfigCard.vue'
 import LanxinPushDrawer from '@/components/LanxinPushDrawer.vue'
 import LanxinInboxCard from '@/components/LanxinInboxCard.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const data = useDataStore()
@@ -66,9 +67,7 @@ defineExpose({
 
 <template>
   <div class="data-view">
-    <div class="dv-top">
-      <h2 class="dv-title">数据管理</h2>
-    </div>
+    <PageHeader title="数据管理" />
 
     <DataStatusBar :last-update="lastUpdate" :last-pmis="lastPmis" :agent-online="agentOnline"
       :cookie-status="cookieStatus" :yitian-status="yitianStatus" />
@@ -152,8 +151,6 @@ defineExpose({
 @import '@/styles/dataview.css';
 
 .data-view { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--gap-card); }
-.dv-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2); }
-.dv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
 
 /* 主操作:更新看板,提为显眼主操作区(色调+更粗边框,不引入新色号) */
 .dv-primary {

@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import PageHeader from '@/components/PageHeader.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
@@ -94,7 +95,11 @@ defineExpose({ rows, scoped, filtered, paged, summary, onlyIssues, visibleColumn
 
 <template>
   <div class="yd-view">
-    <h2 class="yd-title">工时明细</h2>
+    <PageHeader title="工时明细">
+      <template #actions>
+        <el-button size="small" @click="onExport">导出</el-button>
+      </template>
+    </PageHeader>
     <YitianToolbar v-if="ready" />
 
     <el-alert v-if="store.error" :title="store.error" type="error" show-icon :closable="false" />
@@ -113,7 +118,6 @@ defineExpose({ rows, scoped, filtered, paged, summary, onlyIssues, visibleColumn
         <el-switch v-model="onlyIssues" active-text="仅看异常" size="small" />
         <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
           @toggle="onToggle" @move-up="prefs.moveUp" @move-down="prefs.moveDown" @reset="prefs.reset" />
-        <el-button size="small" @click="onExport">导出</el-button>
         <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left:auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
       </div>
 
@@ -147,7 +151,6 @@ defineExpose({ rows, scoped, filtered, paged, summary, onlyIssues, visibleColumn
 
 <style scoped>
 .yd-view { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
-.yd-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
 .yd-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }
 .yd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-stack); }
 .yd-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-stack); font-size: var(--fs-2); color: var(--sub); }

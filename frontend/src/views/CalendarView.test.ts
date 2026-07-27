@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import CalendarView from './CalendarView.vue'
 import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
+import { useAuthStore } from '@/stores/auth'
+import { ALL_PAGE_LINKS } from '@/nav'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -33,6 +36,14 @@ function seed() {
   } as any
 }
 
+/** 存档按账号隔离(userScopedKey),持久化用例须先登录,存档键才是确定的 's:view_calendar'。 */
+function login(account = 's') {
+  useAuthStore().user = {
+    account, displayName: account, isSuper: true, allowedPages: ['*'], allowedL4: [],
+  } as any
+}
+const mountView = () => mount(CalendarView, { global: { plugins: [ElementPlus] } })
+
 describe('CalendarView', () => {
   it('渲染标题/仪表卡/筛选条/网格', () => {
     seed()
@@ -60,5 +71,29 @@ describe('CalendarView', () => {
     // 断言随点击的绝对月份,不依赖当前系统月(旧测试点冷格、实测默认当前月,跨月界会 flaky)。
     await w.findAll('.cyh-cell')[1].trigger('click')
     expect(w.findComponent({ name: 'CalGrid' }).props('month')).toBe(1)
+  })
+
+  it('渲染页头标题(与 nav.ts 的 label 逐字一致)', () => {
+    seed()
+    const w = mountView()
+    // 与 nav.ts 比对而非各写各的字面量:否则会出现「tab 条叫回款日历、页头叫日历视图」
+    expect(w.find('.ph-title').text()).toBe(ALL_PAGE_LINKS.find((l) => l.to === '/payment/calendar')!.label)
+  })
+
+  it('视图选择持久化:切议程列表 → 卸载 → 重新挂载后仍是议程列表', async () => {
+    login()
+    seed()
+    const w1 = mountView()
+    // 走真实交互路径(点视图选项卡)而非直接给 vm 赋值,避免赋值静默无效导致的假绿
+    await w1.get('[data-test="seg-agenda"]').trigger('click')
+    expect((w1.vm as any).view).toBe('agenda')
+    await nextTick()                           // 等 watch 落盘
+    expect(JSON.parse(localStorage.getItem('s:view_calendar')!)).toEqual({ view: 'agenda' })
+    w1.unmount()
+
+    const w2 = mountView()
+    await flushPromises()
+    expect((w2.vm as any).view).toBe('agenda')
+    expect(w2.find('.cag').exists()).toBe(true)
   })
 })

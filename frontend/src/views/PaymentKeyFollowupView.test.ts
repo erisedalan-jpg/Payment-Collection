@@ -149,6 +149,32 @@ describe('PaymentKeyFollowupView', () => {
     expect(w.findAll('.el-table__body-wrapper tbody tr').length).toBeLessThanOrEqual(50)
   }, 20000) // 渲染满页(51行)重表,并行争用下放宽超时
 
+  // V4.4.8 页头 + 超管操作按钮归位（权限回归：v-if="auth.isSuper" 必须原样跟着按钮搬进 #actions）
+  it('V4.4.8 渲染页头标题', async () => {
+    const w = await mountAs(true)
+    expect(w.find('.ph-title').text()).toBe('回款重点跟进')
+  })
+  it('V4.4.8 超管在页头看到 范围设置/归档（留存跟进）/导出；列设置仍留在筛选行', async () => {
+    const w = await mountAs(true)
+    const actions = w.find('.ph-actions')
+    expect(actions.exists()).toBe(true)
+    expect(actions.text()).toContain('范围设置')
+    expect(actions.text()).toContain('归档（留存跟进）')
+    expect(actions.text()).toContain('导出')
+    expect(actions.findAll('button').length).toBe(3)
+    expect(actions.text()).not.toContain('列设置')            // 列设置不在本期搬迁名单内
+    expect(w.find('.toolbar').text()).toContain('列设置')     // 仍在原位
+  })
+  it('V4.4.8 非超管账号页头不出现 范围设置/归档/导出 按钮', async () => {
+    const w = await mountAs(false)
+    const actions = w.find('.ph-actions')
+    expect(actions.exists()).toBe(true)          // 页头本身仍在，只是无按钮（区别于「页头没渲染」的假绿）
+    expect(actions.text()).not.toContain('范围设置')
+    expect(actions.text()).not.toContain('归档（留存跟进）')
+    expect(actions.text()).not.toContain('导出')
+    expect(actions.findAll('button').length).toBe(0)
+  })
+
   it('渲染超管配置的自定义列表头', async () => {
     const fc = useFollowupColumnsStore()
     fc.configs = { temp: [], risk: [], opportunity: [],

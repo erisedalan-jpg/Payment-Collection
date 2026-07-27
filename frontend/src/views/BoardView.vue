@@ -15,6 +15,8 @@ import {
 import { filterProjects, rateColorPmis } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio, pct } from '@/lib/format'
 import { buildRankingOption, valueKindForPie, type ValueKind } from '@/lib/chartOptions'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
+import PageHeader from '@/components/PageHeader.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
@@ -40,18 +42,29 @@ const MODE_OPTS = [
   { value: 'pivot', label: '透视' },
 ]
 
-const rawDim = typeof route.query.dim === 'string' ? route.query.dim : ''
-const aliasDim = rawDim === 'orgL4' ? 'dept' : rawDim
-const initDim = DIMENSIONS.some((d) => d.key === aliasDim) ? aliasDim : 'dept'
-
+// 视图状态三层优先级:① 默认值 → ② localStorage 存档 → ③ URL 的 ?dim=(见 usePersistedRefs)
 const mode = ref('single')
-const dimKey = ref(initDim)
+const dimKey = ref('dept')                    // ① 默认值(原 initDim 的兜底值)
 const secondDim = ref('')
 const metricKey = ref<(typeof METRICS)[number]['key']>('contractSum')
-const rowDims = ref<string[]>([initDim])
+const rowDims = ref<string[]>(['dept'])
 const colDims = ref<string[]>([])
-
 const sortKey = ref<PayBoardSortKey>('projectCount')
+// 图表类型多选（单维排名模式）；available 始终含 bar/line/pie（contractSum 是金额）
+const chartTypes = ref<string[]>(['bar'])
+
+// ② localStorage 覆盖默认值
+usePersistedRefs('view_board', { mode, dimKey, secondDim, metricKey, rowDims, colDims, sortKey, chartTypes })
+
+// ③ URL 最高优先:goBoard 带 ?dim= 是显式跳转意图,必须压过上次的选择
+const rawDim = typeof route.query.dim === 'string' ? route.query.dim : ''
+const aliasDim = rawDim === 'orgL4' ? 'dept' : rawDim      // 既有别名映射,保留
+if (aliasDim && DIMENSIONS.some((d) => d.key === aliasDim)) {
+  dimKey.value = aliasDim
+  // 原 rowDims 初值就是 initDim,改造后须在此同步 —— 漏了会让带 ?dim= 进入时行维度与主维度不一致
+  rowDims.value = [aliasDim]
+}
+
 const SORT_OPTS = PAY_BOARD_SORTS.map((s) => ({ value: s.key, label: s.label }))
 
 const boardRows = computed(() =>
@@ -91,9 +104,6 @@ const tableColumns = computed<DataColumn[]>(() => [
   { key: 'rate', label: '完成率', sortable: true, num: true },
   { key: 'delayedNodeSum', label: '延期节点', sortable: true, num: true },
 ])
-
-// 图表类型多选（单维排名模式）；available 始终含 bar/line/pie（contractSum 是金额）
-const chartTypes = ref<string[]>(['bar'])
 
 // 柱/折/饼：按当前排序键降序 Top15
 const chartTop = computed(() => sortedGroups.value.slice(0, 15))
@@ -179,11 +189,12 @@ function onPivotCellClick({ rowKey, colKey }: { rowKey: string; colKey: string }
   const g = pivot.value?.index[rowKey]?.[colKey]
   if (g) openDrill(g)
 }
-defineExpose({ drillOpen, dimKey, activeChart, pieRenderable })
+defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
 </script>
 
 <template>
   <div class="board-view">
+    <PageHeader title="回款多维分析" />
     <p v-if="!data.data" class="bv-hint">暂无数据，请先在数据管理中同步/导入。</p>
     <template v-else>
       <div class="bv-toolbar">

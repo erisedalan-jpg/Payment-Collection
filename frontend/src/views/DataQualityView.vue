@@ -4,6 +4,7 @@ import { useDataStore } from '@/stores/data'
 import { buildHealthReport, type AlertGroup } from '@/lib/governance'
 import { exportRows } from '@/lib/exportXlsx'
 import DataTable from '@/components/DataTable.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
@@ -25,7 +26,7 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
 
 <template>
   <div class="gov-view">
-    <h2 class="gov-title">数据治理</h2>
+    <PageHeader title="数据治理" />
     <div v-if="!loaded" class="gov-empty">数据加载中或加载失败,请确认后端服务在运行。</div>
     <template v-else-if="report">
       <div class="gov-banner" :class="report.verdict" data-test="banner">
@@ -77,7 +78,6 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
 
 <style scoped>
 .gov-view { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--gap-section); }
-.gov-title { font-size: var(--fs-5); font-weight: 700; margin: 0; color: var(--txt); }
 .gov-empty { padding: var(--sp-6); text-align: center; color: var(--mut); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .gov-banner { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); padding: var(--card-pad); border-radius: var(--r-lg); border: 1px solid var(--line); flex-wrap: wrap; }
 .gov-banner.green { background: var(--ok-bg); }

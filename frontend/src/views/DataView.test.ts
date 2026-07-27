@@ -270,3 +270,10 @@ describe('DataView 倚天合规规则卡', () => {
     expect(w.text()).toContain('合规规则配置')
   })
 })
+
+describe('V4.4.8 页头', () => {
+  it('渲染页头标题', async () => {
+    const w = await mountView()
+    expect(w.find('.ph-title').text()).toBe('数据管理')
+  })
+})

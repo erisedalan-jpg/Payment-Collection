@@ -117,3 +117,11 @@ describe('DataQualityView', () => {
     expect(w.text()).toContain('数据加载中或加载失败')
   })
 })
+
+describe('V4.4.8 页头', () => {
+  it('渲染页头标题', () => {
+    seed()
+    const w = mountView()
+    expect(w.find('.ph-title').text()).toBe('数据治理')
+  })
+})

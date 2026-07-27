@@ -6,11 +6,13 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import InsightView from './InsightView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
+import { useAuthStore } from '@/stores/auth'
 import { NO_TAG_VALUE } from '@/lib/tagFilter'
 
 let router: Router
 beforeEach(() => {
   setActivePinia(createPinia())
+  localStorage.clear()   // 视图状态持久化会写 localStorage,逐条清空避免用例间串档
   // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
   useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
   router = createRouter({
@@ -120,5 +122,50 @@ describe('InsightView', () => {
     ds.data = { meta: {}, dashboard: {}, summary: {}, rawNodes: [], displayColumns: {}, followupRecords: {}, projects: [], projectPmis: {}, events: [] } as any
     const w = await mountView()
     expect(w.text()).toContain('暂无项目主域数据')
+  })
+})
+
+describe('InsightView 页头与视图状态持久化', () => {
+  function login() {
+    useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] }
+  }
+
+  it('渲染页头标题', async () => {
+    seed()
+    const w = await mountView()
+    expect(w.find('.ph-title').text()).toBe('项目分析')
+  })
+
+  it('维度与图表类型持久化:改选 → 卸载 → 重新挂载后仍是该值', async () => {
+    login()
+    seed()
+    const w1 = await mountView()
+    ;(w1.vm as any).dimKey = 'health'
+    ;(w1.vm as any).chartTypes = ['bar', 'line']
+    await flushPromises()   // 等 watch 落盘
+    w1.unmount()
+
+    const w2 = await mountView()
+    expect((w2.vm as any).dimKey).toBe('health')
+    expect((w2.vm as any).chartTypes).toEqual(['bar', 'line'])
+  })
+
+  it('下钻 modal 状态不进存档(否则重进页面会弹空 modal)', async () => {
+    login()
+    seed()
+    const w1 = await mountView()
+    ;(w1.vm as any).drillOpen = true
+    ;(w1.vm as any).dimKey = 'health'   // 改一个受监听的状态,确保这一轮确实落了盘
+    await flushPromises()
+    w1.unmount()
+
+    const keys = Object.keys(JSON.parse(localStorage.getItem('s:view_insight') ?? '{}'))
+    expect(keys).toContain('dimKey')    // 存档非空,下面三条否定断言才有意义
+    expect(keys).not.toContain('drillOpen')
+    expect(keys).not.toContain('drillTitle')
+    expect(keys).not.toContain('drillGroup')
+
+    const w2 = await mountView()
+    expect((w2.vm as any).drillOpen).toBe(false)
   })
 })

@@ -73,3 +73,20 @@ describe('ActivityView', () => {
     expect(w.text()).toContain('首次同步，暂无变化记录')
   })
 })
+
+describe('V4.4.8 页头', () => {
+  it('渲染页头标题', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe('项目动态')
+  })
+
+  it('「导出表格」已从筛选行移入页头 #actions', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-actions .av-export').exists()).toBe(true)
+    expect(w.find('.av-toolbar .av-export').exists()).toBe(false)
+  })
+})

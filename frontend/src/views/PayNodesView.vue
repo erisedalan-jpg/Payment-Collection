@@ -9,6 +9,7 @@ import { useFilterStore } from '@/stores/filter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import PageHeader from '@/components/PageHeader.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
@@ -90,6 +91,11 @@ function onExport() {
 
 <template>
   <div class="nodes-tab">
+    <PageHeader title="回款节点">
+      <template #actions>
+        <button class="pv-btn" data-test="pay-nodes-export" @click="onExport">导出Excel</button>
+      </template>
+    </PageHeader>
     <section class="nsum u-num">
       <div class="ns"><span class="ns-l">节点总数</span><span class="ns-v">{{ sum.total }}</span></div>
       <div class="ns"><span class="ns-l">已回款</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></div>
@@ -100,7 +106,6 @@ function onExport() {
     <div class="pv-bar">
       <TagFilterSelect v-model="selectedTags" />
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
-      <button class="pv-btn" data-test="pay-nodes-export" @click="onExport">导出Excel</button>
     </div>
     <div class="pv-scroll">
       <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable external-sort sticky-header

@@ -10,6 +10,7 @@ import {
 } from '@/lib/opportunityBoard'
 import { L4_OPTIONS } from '@/lib/opportunityColumns'
 import ChartBox from '@/charts/ChartBox.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const opps = useOpportunitiesStore()
 const scopedOpportunities = useScopedOpportunities()
@@ -89,6 +90,7 @@ const aiAmountPie = computed(() => {
 
 <template>
   <div class="ob-view">
+    <PageHeader title="商机看板" />
     <!-- 顶部 KPI -->
     <div class="ob-cards">
       <div v-for="c in topCards" :key="c.k" class="ob-card">

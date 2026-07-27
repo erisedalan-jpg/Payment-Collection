@@ -19,6 +19,8 @@ import {
   type CalFilters,
 } from '@/lib/calendar'
 import { fmtWan } from '@/lib/format'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
+import PageHeader from '@/components/PageHeader.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import CalYearHeat from '@/components/CalYearHeat.vue'
 import CalGrid from '@/components/CalGrid.vue'
@@ -73,6 +75,8 @@ const upcoming = computed(() => calUpcoming(filtered.value, calFilters.value, ne
 const listTitle = computed(() => (state.selectedDate ? `${state.selectedDate} 回款节点` : '当月/次月回款节点'))
 
 const view = ref('grid')
+// 视图切换(网格/议程列表)按账号持久化 —— 切走再切回仍是上次选的视图
+usePersistedRefs('view_calendar', { view })
 const VIEW_OPTS = [
   { value: 'grid', label: '网格' },
   { value: 'agenda', label: '议程列表' },
@@ -116,11 +120,12 @@ function clearFilters() {
   state.filterOrgL4 = ''
   state.filterPM = ''
 }
+defineExpose({ view })
 </script>
 
 <template>
   <div class="cal-view">
-    <h2 class="cal-title">回款日历</h2>
+    <PageHeader title="回款日历" />
 
     <div class="cal-dash">
       <div v-for="c in DASH" :key="c.label" class="cd-card">
@@ -190,7 +195,6 @@ function clearFilters() {
 
 <style scoped>
 .cal-view { padding: var(--sp-4); }
-.cal-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-4); }
 .cal-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
 .cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-4) var(--sp-3); text-align: center; }
 .cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }

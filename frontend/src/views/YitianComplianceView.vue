@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -9,6 +10,7 @@ import ChartBox from '@/charts/ChartBox.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import { useYitianStore } from '@/stores/yitian'
 import { useScopedYitian } from '@/composables/useScopedData'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -82,6 +84,9 @@ const filtered = computed(() => applyColumnFilters(allDetailRows.value, cf.table
 const FILTERABLE = new Set(['date', 'empName', 'l4', 'type', 'hours', 'customer', 'workOrder', 'okText'])
 const pageSize = ref(50)
 const currentPage = ref(1)
+// 只持久化 pageSize:它是「每页看多少条」的用户偏好;
+// currentPage 是浏览位置,记下来会让人「回来还停在第 5 页」,且数据量变化后可能越界。
+usePersistedRefs('view_yitian_compliance', { pageSize })
 const paged = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
 watch(filtered, () => { currentPage.value = 1 })
 
@@ -200,11 +205,12 @@ function onExport() {
   )
 }
 
-defineExpose({ filtered, paged, codeDist, codeBarChartOption, complianceRatio, complianceRingColor, goDetailIssue })
+defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOption, complianceRatio, complianceRingColor, goDetailIssue })
 </script>
 
 <template>
   <div class="yt-page">
+    <PageHeader title="合规检查" />
     <YitianToolbar v-if="ready" />
 
     <el-alert v-if="store.error" :title="store.error" type="error" show-icon :closable="false" />

@@ -4,6 +4,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import type { YitianData } from '@/types/yitian'
+import { ALL_PAGE_LINKS } from '@/nav'
+
+/** 页头标题取自 nav.ts 而非字面量:侧栏改了名而页头没跟,这条断言就红
+ *  (防「侧栏叫工时明细、页头叫倚天明细」这种同页两个说法)。 */
+const navLabel = (to: string) => ALL_PAGE_LINKS.find((l) => l.to === to)!.label
 
 const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
@@ -95,6 +100,20 @@ describe('YitianDetailView', () => {
     const w = mountView()
     await flushPromises()
     expect(w.find('.yd-view').exists()).toBe(true)
+  })
+
+  it('渲染页头标题「工时明细」,与侧栏 label 逐字一致', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe(navLabel('/yitian/detail'))
+  })
+
+  it('导出按钮归位到页头右侧,不再留在筛选行(.yd-bar)', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-actions').text()).toContain('导出')
+    // .yd-bar 只剩筛选/选列控件:导出若忘了从这里删掉,页面上会出现两个导出按钮
+    expect(w.find('.yd-bar').text()).not.toContain('导出')
   })
 
   it('下钻落地:dL4+dOnly → 设 cf.l4 + onlyIssues,并清下钻键(保留其它)', async () => {

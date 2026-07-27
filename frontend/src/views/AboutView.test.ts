@@ -20,4 +20,9 @@ describe('AboutView', () => {
     expect(w.text()).not.toContain('数据来源')
     expect(w.text()).toContain('健康度规则')   // S1:健康度定义入关于页
   })
+
+  it('渲染页头标题', () => {
+    const w = mount(AboutView)
+    expect(w.find('.ph-title').text()).toBe('关于产品')
+  })
 })

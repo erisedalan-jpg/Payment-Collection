@@ -14,6 +14,7 @@ import { fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
 import ColumnPicker from '@/components/ColumnPicker.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 
 defineOptions({ name: 'ClosedProjectsView' })
@@ -75,7 +76,7 @@ function onRow(row: Record<string, any>) { router.push(`/closed-project/${row.pr
 
 <template>
   <div class="closed-view">
-    <h2 class="cv-title">已关闭项目</h2>
+    <PageHeader title="已关闭项目" />
     <div class="toolbar">
       <el-input v-model="search" size="small" placeholder="搜索 项目名/编号/客户/经理" clearable style="width: 230px" />
       <ColumnPicker :columns="pickerColumns" :visible-keys="prefs.visibleKeys.value"
@@ -103,7 +104,6 @@ function onRow(row: Record<string, any>) { router.push(`/closed-project/${row.pr
 
 <style scoped>
 .closed-view { padding: var(--sp-4); }
-.cv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .cv-empty { color: var(--mut); padding: var(--sp-7) 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
 .cv-scroll { overflow-x: auto; }

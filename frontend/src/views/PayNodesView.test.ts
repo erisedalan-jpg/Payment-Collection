@@ -8,6 +8,7 @@ import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import PayNodesView from './PayNodesView.vue'
 import DataTable from '@/components/DataTable.vue'
+import { ALL_PAGE_LINKS } from '@/nav'
 
 function seed() {
   const data = useDataStore()
@@ -30,6 +31,14 @@ describe('PayNodesView', () => {
     useFilterStore().setPreset('all')
     // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
     useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
+  })
+
+  it('渲染页头标题(与 nav.ts 的 label 逐字一致)', async () => {
+    seed()
+    const w = mount(PayNodesView, opts)
+    await flushPromises()
+    // 与 nav.ts 比对而非各写各的字面量:否则会出现「侧栏叫回款节点、页头叫节点清单」
+    expect(w.find('.ph-title').text()).toBe(ALL_PAGE_LINKS.find((l) => l.to === '/payment/nodes')!.label)
   })
 
   it('渲染节点行 + 5 卡汇总(总数/已回款/延期/待回款/计划回款Σ) + 状态徽章', async () => {

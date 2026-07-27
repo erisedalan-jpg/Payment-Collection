@@ -7,6 +7,7 @@ import ProjectsView from './ProjectsView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { useAuthStore } from '@/stores/auth'
 import * as followupApiModule from '@/lib/followupApi'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { PROJECT_DOMAIN_COLUMNS } from '@/lib/projectList'
@@ -168,7 +169,7 @@ describe('ProjectsView', () => {
     expect((w.vm as any).fuOpen).toBe(true)
   })
 
-  it('toolbar 有导出按钮，点击后 exOpen 为 true', async () => {
+  it('页头有导出按钮，点击后 exOpen 为 true', async () => {
     seed()
     vi.spyOn(followupApiModule.followupApi, 'all').mockResolvedValue({ records: [], total: 0 } as any)
     const w = mount(ProjectsView, {
@@ -440,5 +441,32 @@ describe('V4.4.4 关闭时间列接入', () => {
     const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
     for (const c of PROJECT_DOMAIN_COLUMNS) expect(keys.has(c.key)).toBe(true)
     expect(keys.has('action')).toBe(true)
+  })
+})
+
+describe('V4.4.8 页头', () => {
+  it('渲染页头标题', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe('在建项目')
+  })
+
+  it('导出按钮已从筛选行移入页头 #actions', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-actions .pv-export-btn').exists()).toBe(true)
+    expect(w.find('.toolbar .pv-export-btn').exists()).toBe(false)
+  })
+
+  it('普通账号也能看到导出按钮 —— 本页导出是全员可见,搬进页头后不得顺手加 v-if', async () => {
+    // 与跟进表的「超管专属导出」形成对照:同一个按钮位置,权限条件必须各按各的原样保留。
+    seed()
+    const auth = useAuthStore()
+    auth.user = { account: 'normal', displayName: '普通管理员', isSuper: false, allowedPages: ['projects'], allowedL4: [] } as any
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.ph-actions .pv-export-btn').exists()).toBe(true)
   })
 })

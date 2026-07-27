@@ -49,6 +49,15 @@ describe('ClosedProjectsView', () => {
     expect(w.text()).toContain('暂无已关闭项目数据')
   })
 
+  it('渲染页头标题', async () => {
+    const ds = useDataStore()
+    ds.data = { closedProjects: [sampleRow] } as any
+    const router = makeRouter(); router.push('/projects/closed'); await router.isReady()
+    const w = mount(ClosedProjectsView, { global: { plugins: [ElementPlus, router] } })
+    await flushPromises()
+    expect(w.find('.ph-title').text()).toBe('已关闭项目')
+  })
+
   it('默认列集:显示项目状态,隐藏签约单位', async () => {
     const ds = useDataStore()
     ds.data = { closedProjects: [sampleRow] } as any

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { APP_VERSION, RELEASE_DATE } from '@/version'
+import PageHeader from '@/components/PageHeader.vue'
 
 const SECTIONS = [
   { title: '项目域', items: [
@@ -29,6 +30,7 @@ const SECTIONS = [
 
 <template>
   <div class="about-view">
+    <PageHeader title="关于产品" />
     <div class="about-head">
       <div class="about-name">项目管理平台</div>
       <div class="about-ver">Version {{ APP_VERSION }}</div>

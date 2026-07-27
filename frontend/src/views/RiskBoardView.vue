@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
+import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import {
   buildRiskRows, riskSummary, groupRisk, riskPivot,
@@ -16,6 +17,7 @@ import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import RiskDrillModal from '@/components/RiskDrillModal.vue'
 import DimPicker from '@/components/DimPicker.vue'
 import PivotTable from '@/components/PivotTable.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -112,6 +114,10 @@ const OVERVIEW_METRIC_OPTS = RISK_METRICS.map((m) => ({ value: m.key, label: m.l
 const rowDims = ref<string[]>(['orgL4'])
 const colDims = ref<string[]>(['riskLevel'])
 const ovMetric = ref<RiskMetricKey>('projectCount')
+
+// 视图状态按账号持久化(离开页面/刷新后回到上次的视角);下钻 modal 的开关与载荷绝不进存档
+usePersistedRefs('view_risk', { dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovMetric })
+
 const ovMetricDef = computed(() => RISK_METRICS.find((m) => m.key === ovMetric.value)!)
 const pivot = computed(() => riskPivot(rows.value, rowDims.value, colDims.value, ovMetric.value))
 function fmtPivot(v: number): string {
@@ -122,11 +128,13 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
   const g = pivot.value.index[p.rowKey]?.[p.colKey]
   if (g) openDrill(`${p.rowKey}${p.colKey ? ' / ' + p.colKey : ''}`, g.rows)
 }
+
+defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovMetric, drillOpen })
 </script>
 
 <template>
   <div class="risk-view">
-    <h2 class="rv-title">风险看板</h2>
+    <PageHeader title="风险看板" />
 
     <div v-if="!rows.length" class="rv-empty">暂无项目主域数据——请在「数据管理」提供 PMIS 与组织架构文件后点「更新数据」。</div>
 
@@ -172,7 +180,6 @@ function onPivotCell(p: { rowKey: string; colKey: string }) {
 
 <style scoped>
 .risk-view { padding: var(--sp-4); }
-.rv-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .rv-h3 { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: var(--sp-5) 0 var(--sp-3); }
 .rv-cards { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
 .rv-card { flex: 1 1 200px; min-width: 180px; background: var(--card); border: 1px solid var(--line);

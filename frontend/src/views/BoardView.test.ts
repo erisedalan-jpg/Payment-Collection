@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -6,6 +7,8 @@ import BoardView from './BoardView.vue'
 import DataTable from '@/components/DataTable.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import { useDataStore } from '@/stores/data'
+import { useAuthStore } from '@/stores/auth'
+import { ALL_PAGE_LINKS } from '@/nav'
 
 let routeQuery: Record<string, string> = {}
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: routeQuery }) }))
@@ -51,6 +54,18 @@ function seed() {
 }
 
 const opts = { global: { plugins: [ElementPlus], stubs: { BoardDrilldownModal: true } } }
+
+/** 存档按账号隔离(userScopedKey),持久化用例须先登录,存档键才是确定的 's:view_board'。 */
+function login(account = 's') {
+  useAuthStore().user = {
+    account, displayName: account, isSuper: true, allowedPages: ['*'], allowedL4: [],
+  } as any
+}
+/** 挂载辅助:seed + mount,供「卸载 → 重新挂载」的持久化往返用例复用。 */
+function mountView() {
+  seed()
+  return mount(BoardView, opts)
+}
 
 describe('BoardView', () => {
   it('默认单维模式：排名表为 DataTable，含两组(北京/上海)', () => {
@@ -149,5 +164,69 @@ describe('BoardView', () => {
     const rows = w.findComponent(DataTable).props('rows') as Array<Record<string, any>>
     expect(rows.some((r) => r.key === '北京')).toBe(true) // dept 分组
     expect((w.vm as any).dimKey).toBe('dept') // orgL4 别名解析为 dept
+  })
+
+  it('渲染页头标题(与 nav.ts 的 label 逐字一致)', async () => {
+    login()
+    const w = mountView()
+    await flushPromises()
+    // 与 nav.ts 比对而非各写各的字面量:否则会出现「侧栏叫回款多维分析、页头叫回款看板」
+    expect(w.find('.ph-title').text()).toBe(ALL_PAGE_LINKS.find((l) => l.to === '/payment/board')!.label)
+  })
+
+  it('维度选择持久化:改 dimKey → 卸载 → 重新挂载后仍是该值', async () => {
+    login()
+    const w1 = mountView()
+    await flushPromises()
+    // 走真实交互路径(点维度选项卡)而非直接给 vm 赋值,避免赋值静默无效导致的假绿
+    await w1.get('[data-test="seg-industry"]').trigger('click')
+    expect((w1.vm as any).dimKey).toBe('industry')
+    await nextTick()                           // 等 watch 落盘
+    w1.unmount()
+
+    const w2 = mountView()
+    await flushPromises()
+    expect((w2.vm as any).dimKey).toBe('industry')
+  })
+
+  it('URL 的 ?dim= 压过 localStorage 存档', async () => {
+    // 存档 industry,URL 带 dim=dept → 取 dept(显式跳转意图 > 上次选择)
+    login()
+    localStorage.setItem('s:view_board', JSON.stringify({ dimKey: 'industry' }))
+    routeQuery = { dim: 'dept' }
+    const w = mountView()
+    await flushPromises()
+    expect((w.vm as any).dimKey).toBe('dept')
+  })
+
+  it('带 ?dim= 进入时行维度跟随主维度(rowDims 与 dimKey 同步)', async () => {
+    // 原 rowDims 初值就是 initDim;改造后若漏了 URL 分支里的同步,透视模式的行维度会与主维度打架
+    login()
+    localStorage.setItem('s:view_board', JSON.stringify({ dimKey: 'dept', rowDims: ['dept'] }))
+    routeQuery = { dim: 'industry' }
+    const w = mountView()
+    await flushPromises()
+    expect((w.vm as any).dimKey).toBe('industry')
+    expect((w.vm as any).rowDims).toEqual(['industry'])
+  })
+
+  it('八个视图状态全部入档,modal 状态 drillOpen 不入档(否则重进页面会弹空 modal)', async () => {
+    login()
+    const w1 = mountView()
+    await flushPromises()
+    await w1.get('[data-test="seg-industry"]').trigger('click')   // 先动一个被持久化的状态,触发落盘
+    const dt = w1.findComponent(DataTable)
+    await dt.vm.$emit('row-click', (dt.props('rows') as Array<Record<string, any>>)[0])
+    expect((w1.vm as any).drillOpen).toBe(true)   // 先证明下钻确实打开了,否则下面的断言恒真
+    await nextTick()
+    w1.unmount()
+
+    const saved = JSON.parse(localStorage.getItem('s:view_board') ?? '{}')
+    expect(Object.keys(saved).sort()).toEqual(
+      ['chartTypes', 'colDims', 'dimKey', 'metricKey', 'mode', 'rowDims', 'secondDim', 'sortKey'])
+
+    const w2 = mountView()
+    await flushPromises()
+    expect((w2.vm as any).drillOpen).toBe(false)
   })
 })

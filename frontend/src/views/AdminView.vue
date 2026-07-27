@@ -10,6 +10,7 @@ import {
   type AdminAccount, type RosterEntry,
 } from '@/lib/admin'
 import AuditLogTab from '@/components/AuditLogTab.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const activeTab = ref('accounts')
 const store = useDataStore()
@@ -204,7 +205,7 @@ defineExpose({
     <el-tab-pane label="账号管理" name="accounts">
   <div class="admin-view">
     <div class="admin-head">
-      <h2 class="admin-title">账号管理</h2>
+      <PageHeader title="账号管理" />
       <el-button type="primary" data-test="admin-create" @click="openCreate">新建账号</el-button>
     </div>
 
@@ -312,7 +313,9 @@ defineExpose({
 <style scoped>
 .admin-view { padding: var(--sp-5); }
 .admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-4); }
-.admin-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); margin: 0; }
+/* 「新建账号」按本期判据留在原地(见 plan Task 7 对照表),故页头与它同处一行,
+   下间距由 .admin-head 统一管理,置 0 以保持标题与按钮同一基线。 */
+.admin-head .ph { margin-bottom: 0; }
 .admin-table { margin-top: var(--sp-3); }
 .admin-select { width: 100%; }
 .role-tag { display: inline-block; padding: 2px var(--sp-2); border-radius: var(--r-sm); font-size: var(--fs-1); }
