@@ -153,11 +153,34 @@ async function reload() {
   }
 }
 
+const copySource = ref('')
+
+/** 复制源:只列普通管理员。
+ *  承重:排除超管 —— 超管记录是 allowedPages:['*'] + allowedL4:['*'],
+ *  复制它等于一键造出全权限的准超管。要全权限必须手动勾,保持为显式动作。 */
+const copyOptions = computed(() =>
+  accounts.value.filter((a) => !a.isSuper)
+    .map((a) => ({ value: a.account, label: `${a.displayName}（${a.account}）` })))
+
+/** 复制权限四件套。不复制账号名/密码/显示名 —— 身份必须重新填。 */
+function applyCopy(account: string) {
+  const src = accounts.value.find((a) => a.account === account)
+  if (!src) return
+  form.allowedPages = [...src.allowedPages]
+  form.allowedL4 = [...src.allowedL4]
+  form.allowedStaff = [...(src.allowedStaff ?? [])]
+  form.overrides = Object.entries(src.pageScopes ?? {}).map(([pk, v]) => ({
+    target: pk, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])],
+  }))
+  if (form.overrides.length) advancedOpen.value = true
+}
+
 function openCreate() {
   editing.value = false
   Object.assign(form, blankForm())
   dialogVisible.value = true
   advancedOpen.value = false
+  copySource.value = ''
 }
 
 function openEdit(row: AdminAccount) {
@@ -228,6 +251,7 @@ defineExpose({
   dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster,
   NAV_GROUPS, toggleGroup, groupChecked, togglePage, groupIndeterminate, addOverride, removeOverride,
   advancedOpen, overrideTargets, emptyScopePages, accounts,
+  copySource, copyOptions, applyCopy,
 })
 </script>
 
@@ -280,6 +304,14 @@ defineExpose({
 
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑账号' : '新建账号'" width="640px">
       <el-form label-width="92px">
+        <el-form-item v-if="!editing" label="复制权限">
+          <el-select v-model="copySource" filterable clearable class="admin-select"
+            data-test="admin-copy" placeholder="从现有账号复制（可选）"
+            @change="(v:string)=> v && applyCopy(v)">
+            <el-option v-for="o in copyOptions" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+          <span class="admin-hint">复制页面权限与可见范围，不复制密码</span>
+        </el-form-item>
         <el-form-item label="账号">
           <el-input v-model="form.account" :disabled="editing" placeholder="字母/数字/_-." />
         </el-form-item>
@@ -377,7 +409,7 @@ defineExpose({
 .admin-pgroup-h { font-weight: 700; }
 .admin-pgroup-items { display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); padding-left: var(--sp-4); }
 .admin-adv-h { display: block; width: 100%; text-align: left; background: none; border: 0;
-  font-family: inherit; margin: var(--sp-3) 0 var(--sp-2); color: var(--accent);
+  padding: 0; font-family: inherit; margin: var(--sp-3) 0 var(--sp-2); color: var(--accent);
   cursor: pointer; font-size: var(--fs-2); }
 .admin-adv-h:hover { background: var(--hover-tint); }
 .admin-adv { padding-left: var(--sp-2); border-left: var(--sp-0) solid var(--line); }

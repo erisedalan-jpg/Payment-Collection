@@ -261,6 +261,58 @@ describe('AdminView', () => {
     // 上面三条 vm 层测试全绿,只有这条会红。
     expect(wrapper.findAll('.el-checkbox').length).toBeGreaterThanOrEqual(30)
   })
+
+  it('复制源下拉排除超管(防一键造出全权限准超管)', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    expect(vm.copyOptions.map((o: any) => o.value)).toEqual(['liu'])   // boss 是超管,不在列
+  })
+
+  it('复制填充权限四件套,但不填账号/密码/显示名', async () => {
+    vi.mocked(adminApi.listAccounts).mockResolvedValue([
+      { account: 'src', displayName: '源', isSuper: false, allowedPages: ['projects', 'yitian'],
+        allowedL4: ['北京'], allowedStaff: ['E001'],
+        pageScopes: { projects: { l4: ['D1'], staff: [] } }, mustChangePassword: false },
+    ])
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.applyCopy('src')
+    expect(vm.form.allowedPages).toEqual(['projects', 'yitian'])
+    expect(vm.form.allowedL4).toEqual(['北京'])
+    expect(vm.form.allowedStaff).toEqual(['E001'])
+    expect(vm.form.overrides).toEqual([{ target: 'projects', l4: ['D1'], staff: [] }])
+    expect(vm.form.account).toBe('')          // 不复制身份
+    expect(vm.form.password).toBe('')         // 绝不复制密码
+    expect(vm.form.displayName).toBe('')
+    expect(vm.advancedOpen).toBe(true)        // 有例外 → 展开
+  })
+
+  it('复制是深拷贝:改新表单不影响源账号对象', async () => {
+    vi.mocked(adminApi.listAccounts).mockResolvedValue([
+      { account: 'src', displayName: '源', isSuper: false, allowedPages: ['projects'],
+        allowedL4: ['北京'], allowedStaff: [], pageScopes: {}, mustChangePassword: false },
+    ])
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.applyCopy('src')
+    vm.togglePage('yitian', true)
+    expect(vm.accounts[0].allowedPages).toEqual(['projects'])
+  })
+
+  it('编辑模式不渲染复制下拉', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openEdit({ account: 'liu', displayName: '老刘', isSuper: false,
+      allowedPages: ['projects'], allowedL4: ['北京'], allowedStaff: [] })
+    await flushPromises()
+    expect(wrapper.find('[data-test="admin-copy"]').exists()).toBe(false)
+  })
 })
 
 describe('V4.4.8 页头', () => {
