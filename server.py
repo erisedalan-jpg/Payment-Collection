@@ -4075,6 +4075,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
             return
         account = data.get('account', '')
+        if data.get('domainScopes'):
+            logger.warning('收到已废弃的 domainScopes 字段(V4.5.2 已删除),忽略')
         self._audit_target = str(account)
         _changed = []
         if data.get('displayName') is not None:
