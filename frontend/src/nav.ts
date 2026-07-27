@@ -93,7 +93,7 @@ export const NAV_SECTIONS: NavSection[] = [
 ]
 
 /** section 内全部可授权页面:一级 NavLink + 容器入口展开后的 tab 页。
- *  承重点 ①:PAGE_OPTIONS / auth.firstAllowedPath / AdminView.NAV_GROUPS / AdminView.OVERRIDE_TARGETS
+ *  承重点 ①:PAGE_OPTIONS / auth.firstAllowedPath / AdminView.NAV_GROUPS / AdminView.overrideTargets
  *  四处必须用它派生,漏一处该页就静默失去授权或数据范围配置能力。 */
 export function sectionPageLinks(s: NavSection): NavLink[] {
   return s.items.flatMap((i) => (isTabEntry(i) ? TAB_GROUPS[i.group] : [i]))
