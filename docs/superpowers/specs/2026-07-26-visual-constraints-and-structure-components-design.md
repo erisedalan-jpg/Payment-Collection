@@ -47,7 +47,9 @@ grill 阶段我判断「四条约束合谋压低信息密度」（`--fs-base` �
 
 > 约束（令牌层）管的是「用什么值」，管不了「谁来拼装」。
 
-证据 —— **「卡片」在 24 个页面里被自己写了 44 遍**，且彼此并不一致：
+> **数字订正（写 plan 时精确分类逮到）**：本节初稿写「卡片被写了 44 遍」，该数字来自 `grep -c "background: var(--card)"`，**把按钮、输入框、chip、空态全混进来了**。按「同时具备 background + border + border-radius」精确分类后的真实构成见 §3.2 订正表：卡片容器 **24 个**，另有此前完全未统计到的**自写按钮 11 处**。结论方向不变（令牌统一、结构未组件化），但各类的数量与优先级按订正后为准。
+
+证据 —— **「卡片」在多个页面里被各自写了 24 遍**，且彼此并不一致：
 
 | 属性 | 实际用了几种 | 规范怎么说 |
 |---|---|---|
@@ -76,17 +78,50 @@ grill 阶段我判断「四条约束合谋压低信息密度」（`--fs-base` �
 
 ### 3.2 结构组件化
 
+按「同时具备 background + border + border-radius」精确分类后的真实构成（**订正表**）：
+
 | 组件 | 替换处数 | 现状 |
 |---|---|---|
-| `AppCard`（新建） | 44 | 无组件，24 页各写 |
-| `AppEmpty`（新建） | 13 | 无组件。`cv-empty`/`cd-empty`/`gov-empty` 几乎一字不差 |
+| `AppCard`（新建） | **24** | 无组件。含 `av-card` `bv-card` `cd-card`×2 `dash-card` `iv-card` `mv-card` `ov-acard` `gov-src` `ob-chart` `pd-aside` `pd-metric` `tq` `ns` `dm-card` `mg-card` 等 |
+| `AppEmpty`（新建） | **9** | 无组件。`cv-empty`/`cd-empty`/`gov-empty`/`iv-empty`/`mv-empty`/`pv-empty` 几乎一字不差，另含 `cd-404`/`pd-404` 两个 404 态 |
+| `AppButton`（新建） | **11** | **此前完全未统计到的一类**。`av-export` `cd-btn` `pv-btn` `pov-btn` `frf-btn` `mdt-btn` `mpt-btn` `mrt-btn` `nsp-btn` `fr-hist-btn` `lv-eye-btn` —— **清一色 `--r-sm` + `padding: var(--sp-1) var(--sp-3)`，同构度全场最高** |
 | `AppPager`（新建） | 11 | 无组件。`cv-pager`/`pn-pager`/`pov-pager` **完全一字不差** |
 | `SectionTitle`（新建） | 10 | 无组件，且字重不一致（见 E 类） |
 | `StatusBadge`（**推广既有**） | 32 | 组件已存在且设计良好（5 种 tone、全走状态色令牌），**只被 2 个页面使用** |
 
+**关于 `AppButton`**：本仓已全面使用 Element Plus 的 `el-button`，这 11 处是绕过 EP 自写的原生 `<button>`。它们同构度最高（11 处样式几乎逐字相同），但**是否该抽成组件、还是直接改用 `el-button` 需要判断** —— 后者能彻底消除这类自写，但会改变按钮的交互态（EP 自带 hover/active/disabled 一整套）。**本期采用抽 `AppButton` 而非改用 `el-button`**：改用 EP 等于把 11 处的视觉与交互一次性换掉，超出「视觉零变化」的承诺；抽组件则可保持现状取值不变。
+
+**登录页专属件不动**：`lv-form` / `lv-input` / `cpw-form` / `cpw-input` 属全屏页专属设计（与 V4.4.8 豁免全屏页同理），不纳入。
+
 `StatusBadge` 一条要特别说明：**它不需要重写**。5 种 tone（ok/warn/danger/urgent/mut）覆盖了全部状态语义，`--r-full` 圆角、`--fs-1` 字号都符合规范。32 处自写 badge/tag/chip 里绝大多数可直接换成它。**这是可发现性问题，不是设计问题** —— 与 §1.1 的字号开关同源。
 
 **明确不抽的**：提示条 `banner`/`alert`（24 处）。`gov-banner` 是横向 flex 布局、`gov-alert` 是内容容器，**结构本就不同**，硬抽会得到一个靠 props 分裂成两种形态的组件。YAGNI。
+
+### 3.2.1 范围三次订正后的最终数字，与 2a 的再拆分
+
+用 Python 多行解析全量扫 `frontend/src/**/*.vue`（前两次的单行正则分别漏了**多行 CSS 规则**与 **`components/` 目录**，故 44 → 24+11 → 102 三次数字不同，以本次为准）：
+
+| 类别 | 处数 |
+|---|---|
+| 卡片容器 | **59** |
+| 自写按钮 | 14（其中 `lv-eye-btn` 属登录页，豁免 → 实际 13） |
+| chip / 小标记 | 11 |
+| 空态 / 404 | 10 |
+| 分页 | 16 |
+| 输入 / 编辑器 | 6 |
+| 登录页表单（豁免） | 2 |
+
+加上卡内小标题 10、徽章推广 32，**总计 130+ 处**，涉及 80+ 文件 —— 参照 1a 改约 20 文件、1b 改 67 文件，这明显超出单个 Z 级版本的合理体量，也超出一次 workflow 能可靠验证的范围。
+
+**故 2a 再拆三个版本**：
+
+| | 内容 | 处数 | 定位 |
+|---|---|---|---|
+| **2a-1（V4.4.9，本 plan）** | 约束修订 6 条 + `AppEmpty`(10) + `AppPager`(16) + `AppButton`(13) | ~39 | 同构度最高（三个 pager 一字不差），几乎零判断，**用于先验证「抽组件 + 全站替换 + 契约测试」这套手法** |
+| **2a-2** | `AppCard`(59，含概算工具 7 处 `.bd-card` 合并) | 59 | 最大头，需逐处判断归哪个变体，复杂度最高，放到有经验之后 |
+| **2a-3** | `SectionTitle`(10) + `StatusBadge` 推广(32) + chip(11) | 53 | 依赖 2a-1 定下的约束 |
+
+**一个特殊情况供 2a-2 参考**：`.bd-card` 在概算工具的 7 个子组件里各写一遍（`ProductSection`/`ServiceSection`/`PmSection`/`SummaryCard`/`RatioCard`/`SalesOrderCard`/`RateReferenceCard`）—— 同类名、同样式，复制 7 次。
 
 ### 3.3 承重设计：先定规格，再抽组件
 
