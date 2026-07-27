@@ -1,10 +1,14 @@
-export type PageKey =
-  | 'overview' | 'projects' | 'projects-closed' | 'activity'
-  | 'insight' | 'insight-milestone' | 'insight-costdetail' | 'insight-risk' | 'insight-board' | 'insight-calendar' | 'opportunities-board'
-  | 'payment' | 'payment-projects' | 'payment-nodes'
-  | 'projects-key' | 'opportunities-progress' | 'temp-followup' | 'opportunity-followup' | 'risk-followup' | 'payment-key'
-  | 'yitian' | 'yitian-detail' | 'yitian-compliance' | 'yitian-analytics' | 'yitian-trend' | 'yitian-customer'
-  | 'data' | 'governance' | 'budget' | 'about'
+/** 全部可授权页面 key —— 运行时单一来源。PageKey 由其派生,契约测试据此校验 nav 覆盖完整。 */
+export const PAGE_KEYS = [
+  'overview', 'projects', 'projects-closed', 'activity',
+  'insight', 'insight-milestone', 'insight-costdetail', 'insight-risk', 'insight-board', 'insight-calendar', 'opportunities-board',
+  'payment', 'payment-projects', 'payment-nodes',
+  'projects-key', 'opportunities-progress', 'temp-followup', 'opportunity-followup', 'risk-followup', 'payment-key',
+  'yitian', 'yitian-detail', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer',
+  'data', 'governance', 'budget', 'about',
+] as const
+
+export type PageKey = typeof PAGE_KEYS[number]
 
 /** allowedPages 含 '*' 或该 key → 可访问(isSuper 由调用方先判)。 */
 export function canAccess(allowedPages: string[], key: PageKey): boolean {
