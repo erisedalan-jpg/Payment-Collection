@@ -4632,9 +4632,11 @@ def main():
 
     # 首次启动：账号种子（仅文件不存在时生成两个超管）
     auth.seed_default_accounts()
-    _migrated = auth.migrate_accounts_file()          # V4.5.2 域层物化迁移(幂等,无域覆盖时空操作)
-    if _migrated:
-        logger.info(f"账号权限迁移:{_migrated} 个账号的 domainScopes 已物化进 pageScopes")
+    _changed, _materialized, _unmaterialized = auth.migrate_accounts_file()   # V4.5.2 域层物化迁移(幂等,无域覆盖时空操作)
+    if _changed:
+        logger.info(f"账号权限迁移:{_changed} 个账号已清理 domainScopes 字段(其中 {_materialized} 个账号的域范围已物化进 pageScopes)")
+    if _unmaterialized:
+        logger.warning(f"账号权限迁移:{_unmaterialized} 个账号的域范围未能落地到任何页面(该域下无可访问页),范围已退回默认,请复核这些账号的可见范围")
     # 首次启动创建桌面快捷方式
     _create_desktop_shortcut()
     

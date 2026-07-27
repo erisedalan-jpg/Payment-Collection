@@ -115,8 +115,8 @@ def test_data_scoped_by_staff_pm(tmp_path, monkeypatch):
         srv.shutdown(); srv.server_close()
 
 
-def test_data_project_domain_override(tmp_path, monkeypatch):
-    # 默认全部(*),但 project 域覆盖为仅 D1 → /data 仅 D1(证明域覆盖压过默认 *)
+def test_data_scoped_by_default_range(tmp_path, monkeypatch):
+    # 默认范围(allowedL4)收窄为仅 D1(两层模型下已无域覆盖这一跳,pageScopes 显式为空)→ /data 仅 D1
     monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(tmp_path / "accounts.json"))
     auth._sessions.clear()
     salt = "s"

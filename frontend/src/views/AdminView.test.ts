@@ -188,6 +188,17 @@ describe('AdminView', () => {
     expect(vm.emptyScopePages).not.toContain('概算工具')   // 无数据域,不该被拦
   })
 
+  it('空范围提示:商机页只看 l4,allowedStaff 非空不掩盖漏报(商机域从不消费 staff)', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.form.allowedPages = ['opportunities-progress']
+    vm.form.allowedL4 = []
+    vm.form.allowedStaff = ['E001']   // 若误按 l4||staff 判空,这里会被当作「范围非空」而漏报
+    expect(vm.emptyScopePages).toContain('商机清单')
+  })
+
   it('组级选页:勾选一组写入该组全部 pageKey', async () => {
     const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
     await flushPromises()
@@ -267,6 +278,18 @@ describe('AdminView', () => {
     await flushPromises()
     const vm = wrapper.vm as any
     expect(vm.copyOptions.map((o: any) => o.value)).toEqual(['liu'])   // boss 是超管,不在列
+  })
+
+  it('applyCopy 对超管账号是 no-op(承重兜底的直接断言,原只有 copyOptions 过滤的间接证据)', async () => {
+    // fixture 里 boss 是超管;copyOptions 已排除它,但 applyCopy 内部本身也须兜底——
+    // 万一未来有调用点绕过下拉直接传超管账号名,这里必须仍然拒绝写入。
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.applyCopy('boss')
+    expect(vm.form.allowedPages).toEqual([])
+    expect(vm.form.allowedL4).toEqual([])
   })
 
   it('复制填充权限四件套,但不填账号/密码/显示名', async () => {

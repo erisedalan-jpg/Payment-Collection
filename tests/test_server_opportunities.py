@@ -27,7 +27,7 @@ def _req(port, method, path, cookie, body=None):
     return status, data
 
 
-def test_opportunities_scoped_by_domain(tmp_path, monkeypatch):
+def test_opportunities_scoped_by_default_range(tmp_path, monkeypatch):
     monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(tmp_path / "accounts.json"))
     auth._sessions.clear()
     salt = "s"

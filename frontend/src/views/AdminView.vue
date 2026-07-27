@@ -40,7 +40,10 @@ function targetIsOpp(key: string): boolean {
 }
 
 /** 已勾选、有数据域、但生效范围为空的页(按 页级例外 ?? 默认 解析)。仅提示,不阻断。
- *  必须按 PAGE_DOMAINS 判定 —— data/budget/about 无数据域,拦它们会重蹈「配不出来」。 */
+ *  必须按 PAGE_DOMAINS 判定 —— data/budget/about 无数据域,拦它们会重蹈「配不出来」。
+ *  商机域判空只看 l4、不看 staff —— 商机域从不消费 staff(后端 filter_for_account 与前端
+ *  narrowOpportunities 都只按 l4 过滤),若仍按 l4&&staff 判空,allowedL4:[] 但 allowedStaff
+ *  非空的账号会被误判「范围非空」而漏报(实际商机一行都看不到)。 */
 const emptyScopePages = computed(() => {
   const star = form.allowedPages.includes('*')
   const ovs = new Map(form.overrides.filter((o) => o.target).map((o) => [o.target, o]))
@@ -50,7 +53,7 @@ const emptyScopePages = computed(() => {
       const o = ovs.get(l.key)
       const l4 = o ? o.l4 : form.allowedL4
       const staff = o ? o.staff : form.allowedStaff
-      return !l4.length && !staff.length
+      return targetIsOpp(l.key) ? !l4.length : (!l4.length && !staff.length)
     })
     .map((l) => l.label)
 })

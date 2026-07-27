@@ -264,12 +264,25 @@ def migrate_domain_scopes(accounts: dict) -> tuple:
     """把 domainScopes 物化进 pageScopes 后删除该字段(V4.5.2 两层收敛)。
     返回 (新 accounts, 改动账号数)。幂等;不改入参。
 
-    为什么必须物化而非直接忽略:域覆盖的典型用途是【收窄】(默认 ['*']、某域限某 L4)。
+    为什么要物化而非直接忽略:域覆盖的典型用途是【收窄】(默认 ['*']、某域限某 L4)。
     若代码删了域分支而数据里仍躺着非空 domainScopes,该域会回退到【更宽的默认】——
-    服务端将下发越权数据,即权限放大。物化把域层语义无损翻译到优先级更高的页层,
-    杜绝这个窗口。生产虽全空,但备份回滚/其它部署副本/lts 变体都可能带非空数据进来。
+    服务端将下发越权数据,即权限放大。物化把域层语义搬到优先级更高的页层,堵住这条路径。
+    生产虽全空,但备份回滚/其它部署副本/lts 变体都可能带非空数据进来。
 
-    物化目标是最高优先级层,因此升级后的数据拿回旧版程序跑行为也一致(双向兼容)。"""
+    ⚠ 已知缺口(终审对拍矩阵实测发现,记 PROGRESS backlog L-35,只覆盖主路径、非全部场景):
+    下方只把域范围写进【该账号能访问的页】(`if not (star or pk in pages): continue`)。
+    若某账号在该域**一页都进不去**(该域全部页都不在 allowedPages 内,或 allowedPages 本身
+    为空),迁移对该域什么都不写;而 domain_union_scope 在 page_keys 为空时会【绕过
+    pageScopes 直接回退默认范围】——旧三层模型这条分支取的是 domainScopes[domain],
+    两层模型下新代码取的是 allowedL4/allowedStaff。故「该域至少一页可访问」这条主路径下,
+    迁移前后逐页/并集解析结果严格相同;但「零可访问页」这条支线下,迁移后的范围可能比
+    原域覆盖更宽(domainScopes 典型用于收窄,回退默认即变宽)。生产 20 个账号 domainScopes
+    全空,此缺口线上零影响;真要堵住须改 domain_union_scope 空 page_keys 分支的语义
+    (会改变现网行为),须单独立项 + 冒烟,本次不做(本函数的迁移逻辑与 domain_union_scope
+    均未改动)。
+
+    物化目标是最高优先级层,因此升级后的数据拿回旧版程序跑行为在主路径下也一致
+    (双向兼容,限主路径,上述缺口场景不在此列)。"""
     import config
     users = accounts.get('users', {})
     new_users: dict = {}
@@ -302,20 +315,44 @@ def migrate_domain_scopes(accounts: dict) -> tuple:
     return out, changed
 
 
-def migrate_accounts_file() -> int:
-    """读 accounts.json → 迁移 → 有改动则先备份再写回。返回改动账号数。
+def migrate_accounts_file() -> tuple:
+    """读 accounts.json → 迁移 → 有改动则先备份再写回。
+    返回 (changed, materialized, unmaterialized) 三元组:
+    - changed:字段被删除的账号数(原记录带 domainScopes 键即计入,含空字典/超管等
+      未触发物化的情形)。**绝大多数只是删了个空字段、什么都没物化**,不能当「域范围
+      已生效」的证据汇报。
+    - materialized:非超管且 domainScopes 非空的账号中,迁移后 pageScopes 条目数
+      确实比迁移前多的账号数(域范围真的写进了 pageScopes)。
+    - unmaterialized:非超管且 domainScopes 非空的账号中,迁移后 pageScopes 条目数
+      未增加的账号数——域范围一条都没能落地(典型原因见 migrate_domain_scopes
+      文档「已知缺口」:该域零可访问页时无处可落,PROGRESS backlog L-35)。
     备份名 accounts.json.bak-YYYYMMDD,同日重复运行不覆盖已有备份。"""
     with _accounts_mutate_lock:
         data = load_accounts()
         out, changed = migrate_domain_scopes(data)
+        materialized = 0
+        unmaterialized = 0
+
+        def _ps_count(rec: dict) -> int:
+            ps = rec.get('pageScopes')
+            return len(ps) if isinstance(ps, dict) else 0
+
         if changed:
+            for acc, rec in data.get('users', {}).items():
+                ds = rec.get('domainScopes')
+                if rec.get('isSuper') or not (isinstance(ds, dict) and ds):
+                    continue
+                if _ps_count(out['users'][acc]) > _ps_count(rec):
+                    materialized += 1
+                else:
+                    unmaterialized += 1
             import shutil
             stamp = time.strftime('%Y%m%d')
             bak = f'{ACCOUNTS_FILE}.bak-{stamp}'
             if os.path.exists(ACCOUNTS_FILE) and not os.path.exists(bak):
                 shutil.copy2(ACCOUNTS_FILE, bak)
             save_accounts(out)
-        return changed
+        return changed, materialized, unmaterialized
 
 
 def create_account(accounts: dict, account: str, password: str, display_name: str,

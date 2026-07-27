@@ -1,3 +1,4 @@
+import time
 import auth
 import config
 
@@ -75,3 +76,83 @@ def test_migrate_super_only_drops_field():
     out, _ = auth.migrate_domain_scopes(a)
     assert "domainScopes" not in out["users"]["boss"]
     assert out["users"]["boss"]["pageScopes"] == {}       # 超管短路,不物化
+
+
+# -- migrate_accounts_file(IO 包装):本分支唯一会改写生产 accounts.json 的代码路径,每次
+# 服务启动都跑,以下补齐落盘行为(备份/幂等/no-op)的测试覆盖 --
+
+def _account_with_domain_scope(pages: list) -> dict:
+    """单账号 fixture:非超管、project 域有一条非空覆盖,allowedPages 由调用方指定
+    (决定该域是否至少有一页可访问,即是否触发 migrate_domain_scopes 的「账号进不去的页不落」分支)。"""
+    salt = "s"
+    return {"version": 1, "users": {"u": {
+        "salt": salt, "hash": auth.hash_password("p", salt), "isSuper": False,
+        "displayName": "u", "allowedPages": pages, "allowedL4": ["*"], "allowedStaff": [],
+        "domainScopes": {"project": {"l4": ["D1"], "staff": []}}, "pageScopes": {}}}}
+
+
+def test_migrate_accounts_file_backs_up_and_rewrites_when_domain_scope_present(tmp_path, monkeypatch):
+    f = tmp_path / "accounts.json"
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(f))
+    auth.save_accounts(_account_with_domain_scope(["projects"]))
+    changed, materialized, unmaterialized = auth.migrate_accounts_file()
+    assert (changed, materialized, unmaterialized) == (1, 1, 0)
+    stamp = time.strftime("%Y%m%d")
+    bak = tmp_path / f"accounts.json.bak-{stamp}"
+    assert bak.exists()
+    assert "domainScopes" in bak.read_text(encoding="utf-8")   # 备份是迁移前的原始快照
+    rec = auth.load_accounts()["users"]["u"]
+    assert "domainScopes" not in rec                            # 正文确实被改写
+    assert rec["pageScopes"]["projects"] == {"l4": ["D1"], "staff": []}
+
+
+def test_migrate_accounts_file_does_not_overwrite_existing_same_day_backup(tmp_path, monkeypatch):
+    f = tmp_path / "accounts.json"
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(f))
+    auth.save_accounts(_account_with_domain_scope(["projects"]))
+    stamp = time.strftime("%Y%m%d")
+    bak = tmp_path / f"accounts.json.bak-{stamp}"
+    bak.write_text("PRESERVE_ME", encoding="utf-8")             # 假装当日已有一份备份
+    auth.migrate_accounts_file()
+    assert bak.read_text(encoding="utf-8") == "PRESERVE_ME"      # 已存在的当日备份不被覆盖
+    assert "domainScopes" not in auth.load_accounts()["users"]["u"]  # 但正文照常被改写
+
+
+def test_migrate_accounts_file_second_run_is_idempotent_no_new_backup(tmp_path, monkeypatch):
+    f = tmp_path / "accounts.json"
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(f))
+    auth.save_accounts(_account_with_domain_scope(["projects"]))
+    auth.migrate_accounts_file()
+    backups_once = list(tmp_path.glob("accounts.json.bak-*"))
+    assert len(backups_once) == 1
+    changed2, materialized2, unmaterialized2 = auth.migrate_accounts_file()
+    assert (changed2, materialized2, unmaterialized2) == (0, 0, 0)   # 二次运行:字段已删,无改动
+    assert list(tmp_path.glob("accounts.json.bak-*")) == backups_once  # 未新增备份
+
+
+def test_migrate_accounts_file_no_domain_scopes_field_is_pure_noop(tmp_path, monkeypatch):
+    f = tmp_path / "accounts.json"
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(f))
+    auth.save_accounts({"version": 1, "users": {"u": {
+        "salt": "s", "hash": auth.hash_password("p", "s"), "isSuper": False,
+        "displayName": "u", "allowedPages": ["projects"], "allowedL4": ["*"], "allowedStaff": [],
+        "pageScopes": {}}}})
+    before = f.read_bytes()
+    changed, materialized, unmaterialized = auth.migrate_accounts_file()
+    assert (changed, materialized, unmaterialized) == (0, 0, 0)
+    assert f.read_bytes() == before                              # 文件字节未变,未被重写
+    assert list(tmp_path.glob("accounts.json.bak-*")) == []       # 未建任何备份
+
+
+def test_migrate_accounts_file_zero_accessible_pages_is_known_gap_recorded_not_fixed(tmp_path, monkeypatch):
+    """记录性测试(非期望行为的断言,而是钉住已知缺口不被误当作已修复):
+    账号有 project 域覆盖,但 allowedPages 为空 —— 该域一页都进不去,域范围无处物化。
+    见 auth.migrate_domain_scopes 文档「已知缺口」与 PROGRESS backlog L-35:
+    domain_union_scope 的空 page_keys 分支会回退默认范围、可能比原域覆盖更宽,
+    本次修复只做「如实报告」(unmaterialized 计数 + server.py 启动 warning),不改这条行为。"""
+    f = tmp_path / "accounts.json"
+    monkeypatch.setattr(auth, "ACCOUNTS_FILE", str(f))
+    auth.save_accounts(_account_with_domain_scope([]))   # allowedPages=[] → 锁定账号,该域零可访问页
+    changed, materialized, unmaterialized = auth.migrate_accounts_file()
+    assert (changed, materialized, unmaterialized) == (1, 0, 1)
+    assert auth.load_accounts()["users"]["u"]["pageScopes"] == {}   # 域范围确实一条都没落地
