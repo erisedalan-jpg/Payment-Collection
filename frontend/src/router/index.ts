@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { PageKey } from '@/lib/pageAccess'
+import type { TabGroupId } from '@/nav'
 import { useAuthStore } from '@/stores/auth'
 import { trackNavigation } from '@/lib/viewReturn'
 import LoginView from '@/views/LoginView.vue'
@@ -45,6 +46,8 @@ declare module 'vue-router' {
     fullscreen?: boolean
     pageKey?: PageKey
     requiresSuper?: boolean
+    /** 属于哪个 tab 组;有值则 AppLayout 渲染 PageTabs。无值的页面不渲染 tab 条。 */
+    tabGroup?: TabGroupId
   }
 }
 
@@ -58,15 +61,16 @@ export const router = createRouter({
     { path: '/projects/closed', name: 'closed-projects', component: ClosedProjectsView, meta: { title: '已关闭项目', hideFilter: true, pageKey: 'projects-closed' } },
     { path: '/closed-project/:id', name: 'closed-project-detail', component: ClosedProjectDetailView, meta: { title: '已关闭项目详情', hideFilter: true, pageKey: 'projects-closed' } },
     { path: '/activity', name: 'activity', component: ActivityView, meta: { title: '项目动态', hideFilter: true, pageKey: 'activity' } },
-    { path: '/insight', name: 'insight', component: InsightView, meta: { title: '项目分析', hideFilter: true, pageKey: 'insight' } },
-    // 项目分析子页(V1.16.0):milestone/costdetail 新建,board/calendar 迁自回款子域。
+    { path: '/insight', name: 'insight', component: InsightView, meta: { title: '项目分析', hideFilter: true, pageKey: 'insight', tabGroup: 'project-analysis' } },
+    // 项目分析子页(V1.16.0):milestone/costdetail 新建。V4.4.7:board/calendar 迁回回款域。
     // 均为精确路径,勿引入 /insight/:param 通配,否则会遮蔽 /insight 的 InsightView。
-    { path: '/insight/milestone', name: 'insight-milestone', component: MilestoneView, meta: { title: '里程碑管理', hideFilter: true, pageKey: 'insight-milestone' } },
-    { path: '/insight/costdetail', name: 'insight-costdetail', component: CostDetailView, meta: { title: '成本分析', hideFilter: true, pageKey: 'insight-costdetail' } },
-    { path: '/insight/risk', name: 'insight-risk', component: RiskBoardView, meta: { title: '风险看板', hideFilter: true, pageKey: 'insight-risk' } },
+    { path: '/insight/milestone', name: 'insight-milestone', component: MilestoneView, meta: { title: '里程碑管理', hideFilter: true, pageKey: 'insight-milestone', tabGroup: 'project-analysis' } },
+    { path: '/insight/costdetail', name: 'insight-costdetail', component: CostDetailView, meta: { title: '成本分析', hideFilter: true, pageKey: 'insight-costdetail', tabGroup: 'project-analysis' } },
+    { path: '/insight/risk', name: 'insight-risk', component: RiskBoardView, meta: { title: '风险看板', hideFilter: true, pageKey: 'insight-risk', tabGroup: 'project-analysis' } },
     { path: '/opportunities/board', name: 'opportunities-board', component: OpportunitiesBoardView, meta: { title: '商机看板', hideFilter: true, pageKey: 'opportunities-board' } },
-    { path: '/insight/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析', pageKey: 'insight-board' } },
-    { path: '/insight/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历', pageKey: 'insight-calendar' } },
+    // V4.4.7:回款多维分析/回款日历迁回回款域(name 保持不变,避免影响 keep-alive 与既有 name 断言)
+    { path: '/payment/board', name: 'pay-board', component: BoardView, meta: { title: '回款多维分析', pageKey: 'insight-board', tabGroup: 'payment-analysis' } },
+    { path: '/payment/calendar', name: 'calendar', component: CalendarView, meta: { title: '回款日历', pageKey: 'insight-calendar', tabGroup: 'payment-analysis' } },
     { path: '/projects/key', name: 'projects-key', component: KeyProjectsView, meta: { title: '重点项目进展', hideFilter: true, pageKey: 'projects-key' } },
     { path: '/opportunities', name: 'opportunities', component: OpportunitiesView, meta: { title: '商机清单', hideFilter: true, pageKey: 'opportunities-progress' } },
     { path: '/opportunities/key', name: 'opportunity-followup', component: OpportunityFollowupView, meta: { title: '重点商机跟进', hideFilter: true, pageKey: 'opportunity-followup' } },
@@ -79,9 +83,11 @@ export const router = createRouter({
     { path: '/payment/projects', name: 'pay-projects', component: PayProjectsView, meta: { title: '回款项目', pageKey: 'payment-projects' } },
     { path: '/payment/nodes', name: 'pay-nodes', component: PayNodesView, meta: { title: '回款节点', pageKey: 'payment-nodes' } },
     { path: '/payment/key', name: 'payment-key', component: PaymentKeyFollowupView, meta: { title: '回款重点跟进', hideFilter: true, pageKey: 'payment-key' } },
-    // 兼容旧深链:board/calendar 迁至 /insight 后,旧路径单跳 redirect 到新规范路径(保 query;board 依赖 ?dim=)
-    { path: '/payment/board', redirect: (to) => ({ path: '/insight/board', query: to.query }) },
-    { path: '/calendar', redirect: (to) => ({ path: '/insight/calendar', query: to.query }) },
+    // 兼容旧深链:board/calendar 曾于 V1.16.0 迁入 /insight,V4.4.7 迁回回款域;
+    // 旧路径单跳 redirect 到新规范路径(保 query;board 依赖 ?dim=)
+    { path: '/insight/board', redirect: (to) => ({ path: '/payment/board', query: to.query }) },
+    { path: '/insight/calendar', redirect: (to) => ({ path: '/payment/calendar', query: to.query }) },
+    { path: '/calendar', redirect: (to) => ({ path: '/payment/calendar', query: to.query }) },
     // 兼容旧深链:/payment/plan、/payment/risk、/ledger 三页已删(P1 回款域重构),统一 redirect 到 /payment
     { path: '/payment/plan', redirect: '/payment' },
     { path: '/payment/risk', redirect: '/payment' },
@@ -90,17 +96,17 @@ export const router = createRouter({
       path: '/panalysis/:tab?',
       redirect: (to) => {
         const t = String(to.params.tab || 'board')
-        if (t === 'board') return { path: '/insight/board', query: to.query }
+        if (t === 'board') return { path: '/payment/board', query: to.query }
         if (t === 'nodes' || t === 'projects') return { path: '/payment/' + t, query: to.query }
         return { path: '/payment', query: to.query }
       },
     },
-    { path: '/board', redirect: (to) => ({ path: '/insight/board', query: to.query }) },
+    { path: '/board', redirect: (to) => ({ path: '/payment/board', query: to.query }) },
     {
       path: '/analysis/:tab',
       redirect: (to) => {
         const t = String(to.params.tab)
-        if (t === 'board') return { path: '/insight/board', query: to.query }
+        if (t === 'board') return { path: '/payment/board', query: to.query }
         if (t === 'nodes' || t === 'projects') return { path: '/payment/' + t, query: to.query }
         return { path: '/payment', query: to.query }
       },
@@ -109,10 +115,10 @@ export const router = createRouter({
     // 倚天工时域(V3.0.0):hideFilter —— 本域用自己的 YitianToolbar,不吃全站 FilterBar
     { path: '/yitian', name: 'yitian', component: YitianOverviewView, meta: { title: '倚天工时总览', hideFilter: true, pageKey: 'yitian' } },
     { path: '/yitian/detail', name: 'yitian-detail', component: YitianDetailView, meta: { title: '工时明细', hideFilter: true, pageKey: 'yitian-detail' } },
-    { path: '/yitian/compliance', name: 'yitian-compliance', component: YitianComplianceView, meta: { title: '工时合规检查', hideFilter: true, pageKey: 'yitian-compliance' } },
-    { path: '/yitian/analytics', name: 'yitian-analytics', component: YitianAnalyticsView, meta: { title: '工时统计分析', hideFilter: true, pageKey: 'yitian-analytics' } },
-    { path: '/yitian/trend', name: 'yitian-trend', component: YitianTrendView, meta: { title: '工时趋势分析', hideFilter: true, pageKey: 'yitian-trend' } },
-    { path: '/yitian/customer', name: 'yitian-customer', component: YitianCustomerView, meta: { title: '客户支持分析', hideFilter: true, pageKey: 'yitian-customer' } },
+    { path: '/yitian/compliance', name: 'yitian-compliance', component: YitianComplianceView, meta: { title: '工时合规检查', hideFilter: true, pageKey: 'yitian-compliance', tabGroup: 'yitian-analysis' } },
+    { path: '/yitian/analytics', name: 'yitian-analytics', component: YitianAnalyticsView, meta: { title: '工时统计分析', hideFilter: true, pageKey: 'yitian-analytics', tabGroup: 'yitian-analysis' } },
+    { path: '/yitian/trend', name: 'yitian-trend', component: YitianTrendView, meta: { title: '工时趋势分析', hideFilter: true, pageKey: 'yitian-trend', tabGroup: 'yitian-analysis' } },
+    { path: '/yitian/customer', name: 'yitian-customer', component: YitianCustomerView, meta: { title: '客户支持分析', hideFilter: true, pageKey: 'yitian-customer', tabGroup: 'yitian-analysis' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true, pageKey: 'data' } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true, pageKey: 'governance' } },
     { path: '/budget', name: 'budget', component: BudgetView, meta: { title: '概算工具', hideFilter: true, pageKey: 'budget' } },

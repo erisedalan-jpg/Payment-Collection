@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authenticate, fetchMe as apiFetchMe, logoutApi, changePassword as apiChangePassword, type AuthUser, type AuthResult } from '@/lib/auth'
 import { canAccess as pageCanAccess, type PageKey } from '@/lib/pageAccess'
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
+import { ALL_PAGE_LINKS } from '@/nav'
 import { useDataStore } from './data'
 import { useProjectProgressStore } from './projectProgress'
 import { useOpportunitiesStore } from './opportunities'
@@ -75,8 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
   function firstAllowedPath(): string {
     if (!user.value) return '/login'
     if (user.value.isSuper) return '/'
-    const all = [...PROJECT_LINKS, ...ANALYSIS_LINKS, ...KEY_FOLLOWUP_LINKS, ...PAYMENT_LINKS, ...YITIAN_LINKS, ...TOOL_LINKS]
-    const hit = all.find((l) => canAccess(l.key))
+    const hit = ALL_PAGE_LINKS.find((l) => canAccess(l.key))
     return hit ? hit.to : '/login'
   }
   return { user, isLoggedIn, isSuper, mustChangePassword, login, fetchMe, logout, changePassword, ensureReady, canAccess, firstAllowedPath }

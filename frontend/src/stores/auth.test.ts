@@ -117,6 +117,18 @@ describe('stores/auth', () => {
     expect(r.ok).toBe(false)
     expect(s.mustChangePassword).toBe(true)
   })
+  it('firstAllowedPath:仅授予 tab 页(成本分析)的账号,落地到该 tab 页而非 /login', () => {
+    // 承重点 ①:旧实现只遍历侧栏 LINKS,分析页收进 tab 后会遍历不到 → 返回 /login。
+    const s = useAuthStore()
+    s.user = { account: 'u1', displayName: 'u1', isSuper: false, allowedPages: ['insight-costdetail'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/insight/costdetail')
+  })
+
+  it('firstAllowedPath:仅授予工时趋势的账号,落地到 /yitian/trend', () => {
+    const s = useAuthStore()
+    s.user = { account: 'u2', displayName: 'u2', isSuper: false, allowedPages: ['yitian-trend'], allowedL4: [] }
+    expect(s.firstAllowedPath()).toBe('/yitian/trend')
+  })
 })
 
 describe('stores/auth 访问控制', () => {

@@ -133,7 +133,22 @@ describe('AdminView', () => {
     await flushPromises()
     const vm = wrapper.vm as any
     vm.openCreate()
-    vm.toggleGroup('PAYMENT', true)
+    // V4.4.7:组 key 由大写常量(PAYMENT)改为 NAV_SECTIONS 的 section id(payment),与侧栏同源。
+    vm.toggleGroup('payment', true)
     expect(vm.form.allowedPages).toEqual(expect.arrayContaining(['payment', 'payment-projects', 'payment-nodes']))
+  })
+
+  it('组级选页:勾选「项目」组连带写入 4 个 tab 页(承重点① —— 展开容器入口)', async () => {
+    // sectionPageLinks 把「项目分析」容器入口展开成其下 4 个 tab 页;
+    // 若 NAV_GROUPS 改回按侧栏 NavLink 派生,这 4 页会在配置界面整个消失、无法勾选。
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.toggleGroup('project', true)
+    expect(vm.form.allowedPages).toEqual(expect.arrayContaining([
+      'overview', 'projects', 'projects-closed', 'activity',
+      'insight', 'insight-milestone', 'insight-costdetail', 'insight-risk',
+    ]))
   })
 })

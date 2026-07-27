@@ -3,29 +3,40 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
+import { NAV_SECTIONS, TAB_GROUPS, isTabEntry, type NavItem, type NavLink } from '@/nav'
 
 const ui = useUiStore()
 const auth = useAuthStore()
 const route = useRoute()
-const projectLinks = computed(() => PROJECT_LINKS.filter((l) => auth.canAccess(l.key)))
-const analysisLinks = computed(() => ANALYSIS_LINKS.filter((l) => auth.canAccess(l.key)))
-const keyFollowupLinks = computed(() => KEY_FOLLOWUP_LINKS.filter((l) => auth.canAccess(l.key)))
-const paymentLinks = computed(() => PAYMENT_LINKS.filter((l) => auth.canAccess(l.key)))
-const yitianLinks = computed(() => YITIAN_LINKS.filter((l) => auth.canAccess(l.key)))
-const toolLinks = computed(() => TOOL_LINKS.filter((l) => auth.canAccess(l.key)))
 
+/** 一级项 → 可渲染的链接;不可访问则 null(整项不渲染)。
+ *  tab 容器入口的 to 按权限动态求值 —— 指向该组第一个可见 tab,而非硬编码首项。 */
+function resolveItem(item: NavItem): NavLink | null {
+  if (!isTabEntry(item)) return auth.canAccess(item.key) ? item : null
+  const hit = TAB_GROUPS[item.group].find((t) => auth.canAccess(t.key))
+  return hit ? { label: item.label, to: hit.to, key: hit.key } : null
+}
+
+/** 按权限过滤后的分组;组内无任何可见项则整组不渲染。 */
+const sections = computed(() =>
+  NAV_SECTIONS
+    .map((s) => ({ id: s.id, label: s.label, links: s.items.map(resolveItem).filter((l): l is NavLink => l !== null) }))
+    .filter((s) => s.links.length > 0))
+
+/** 当前路径所属 section —— 从 nav 常量反查,取代 V4.4.7 前的 8 行 if-else 特判。
+ *  精确匹配优先:/projects/key 必须归重点跟进,不能被 /projects 的前缀规则抢走。
+ *  前缀匹配按 to 长度降序,长路径优先。都不中则归 project(项目详情等 /project/:id 走此兜底)。 */
 const activeSectionKey = computed(() => {
   const p = route.path
-  if (p.startsWith('/projects/key')) return 'keyfollowup'
-  if (p.startsWith('/opportunities/key')) return 'keyfollowup'
-  if (p.startsWith('/opportunities/board')) return 'analysis'
-  if (p.startsWith('/insight')) return 'analysis'
-  if (p.startsWith('/payment')) return 'payment'
-  if (p.startsWith('/yitian')) return 'yitian'
-  if (p.startsWith('/data') || p.startsWith('/governance') || p.startsWith('/about')) return 'tools'
   if (p.startsWith('/admin')) return 'admin'
-  return 'project'
+  const entries = NAV_SECTIONS.flatMap((s) =>
+    s.items.flatMap((i) => (isTabEntry(i) ? TAB_GROUPS[i.group].map((t) => t.to) : [i.to]))
+      .map((to) => ({ section: s.id, to })))
+  const exact = entries.find((e) => e.to === p)
+  if (exact) return exact.section
+  const pref = [...entries].sort((a, b) => b.to.length - a.to.length)
+    .find((e) => e.to !== '/' && p.startsWith(e.to + '/'))
+  return pref ? pref.section : 'project'
 })
 function expanded(key: string): boolean {
   const v = ui.sectionExpanded[key]
@@ -39,62 +50,12 @@ function onToggle(key: string) {
 <template>
   <aside class="sidebar u-hairline-r" :class="{ collapsed: ui.sidebarCollapsed }">
     <nav class="sidebar-nav">
-      <div v-if="projectLinks.length" class="section" :class="{ collapsed: !expanded('project') }">
-        <button type="button" class="section-label" @click="onToggle('project')">
-          <span class="section-caret">{{ expanded('project') ? '▾' : '▸' }}</span>项目
+      <div v-for="s in sections" :key="s.id" class="section" :class="{ collapsed: !expanded(s.id) }">
+        <button type="button" class="section-label" @click="onToggle(s.id)">
+          <span class="section-caret">{{ expanded(s.id) ? '▾' : '▸' }}</span>{{ s.label }}
         </button>
-        <div v-show="expanded('project')" class="section-links">
-          <RouterLink v-for="link in projectLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
-      <div v-if="analysisLinks.length" class="section" :class="{ collapsed: !expanded('analysis') }">
-        <button type="button" class="section-label" @click="onToggle('analysis')">
-          <span class="section-caret">{{ expanded('analysis') ? '▾' : '▸' }}</span>项目分析
-        </button>
-        <div v-show="expanded('analysis')" class="section-links">
-          <RouterLink v-for="link in analysisLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
-      <div v-if="keyFollowupLinks.length" class="section" :class="{ collapsed: !expanded('keyfollowup') }">
-        <button type="button" class="section-label" @click="onToggle('keyfollowup')">
-          <span class="section-caret">{{ expanded('keyfollowup') ? '▾' : '▸' }}</span>重点跟进
-        </button>
-        <div v-show="expanded('keyfollowup')" class="section-links">
-          <RouterLink v-for="link in keyFollowupLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
-      <div v-if="paymentLinks.length" class="section" :class="{ collapsed: !expanded('payment') }">
-        <button type="button" class="section-label" @click="onToggle('payment')">
-          <span class="section-caret">{{ expanded('payment') ? '▾' : '▸' }}</span>回款<span class="section-tag">重点子域</span>
-        </button>
-        <div v-show="expanded('payment')" class="section-links">
-          <RouterLink v-for="link in paymentLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
-      <div v-if="yitianLinks.length" class="section" :class="{ collapsed: !expanded('yitian') }">
-        <button type="button" class="section-label" @click="onToggle('yitian')">
-          <span class="section-caret">{{ expanded('yitian') ? '▾' : '▸' }}</span>倚天工时
-        </button>
-        <div v-show="expanded('yitian')" class="section-links">
-          <RouterLink v-for="link in yitianLinks" :key="link.to" :to="link.to"
-            class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
-        </div>
-      </div>
-
-      <div v-if="toolLinks.length" class="section" :class="{ collapsed: !expanded('tools') }">
-        <button type="button" class="section-label" @click="onToggle('tools')">
-          <span class="section-caret">{{ expanded('tools') ? '▾' : '▸' }}</span>工具
-        </button>
-        <div v-show="expanded('tools')" class="section-links">
-          <RouterLink v-for="link in toolLinks" :key="link.to" :to="link.to"
+        <div v-show="expanded(s.id)" class="section-links">
+          <RouterLink v-for="link in s.links" :key="link.to" :to="link.to"
             class="nav-sub" active-class="active">{{ link.label }}</RouterLink>
         </div>
       </div>
@@ -126,7 +87,7 @@ function onToggle(key: string) {
 .section-caret { display: inline-block; width: 12px; margin-right: var(--sp-2); color: var(--mut); font-size: var(--fs-1); }
 .group-label { font-size: var(--fs-1); color: var(--sub); padding: var(--sp-2) var(--sp-4) 2px; }
 /* 全部分区子项统一为二级缩进样式(.nav-sub):字号 --fs-1、左缩进 30px,
-   六个分区(项目/项目分析/重点跟进/回款/工具/系统管理)子项对齐一致。 */
+   七个分区(项目/回款/商机/倚天工时/重点跟进/工具/系统管理)子项对齐一致。 */
 .nav-sub { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4) var(--sp-2) 30px;
   font-size: var(--fs-1); color: var(--txt); text-decoration: none;
   transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
@@ -138,6 +99,5 @@ function onToggle(key: string) {
 .sidebar-toggle { width: 16px; border: none; border-right: 1px solid var(--line);
   background: var(--card2); color: var(--sub); cursor: pointer; font-size: var(--fs-1); padding: 0; }
 .sidebar-toggle:hover { background: var(--bg); color: var(--accent); }
-.section-tag { margin-left: var(--sp-2); font-weight: 400; font-size: var(--fs-1); color: var(--mut); }
 .nav-sub2 { padding-left: 42px; }
 </style>

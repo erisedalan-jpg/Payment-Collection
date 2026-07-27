@@ -3,7 +3,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { PAGE_OPTIONS } from '@/lib/pageAccess'
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
+import { NAV_SECTIONS, sectionPageLinks } from '@/nav'
 import { PAGE_DOMAINS } from '@/lib/pageScope'
 import {
   listAccounts, createAccount, updateAccount, deleteAccount, listRoster,
@@ -18,20 +18,17 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const editing = ref(false) // true=编辑(account 只读),false=新建
 
-const NAV_GROUPS = [
-  { key: 'PROJECT', label: '项目', links: PROJECT_LINKS },
-  { key: 'ANALYSIS', label: '分析', links: ANALYSIS_LINKS },
-  { key: 'KEY_FOLLOWUP', label: '跟进', links: KEY_FOLLOWUP_LINKS },
-  { key: 'PAYMENT', label: '回款', links: PAYMENT_LINKS },
-  { key: 'YITIAN', label: '工时', links: YITIAN_LINKS },
-  { key: 'TOOL', label: '工具', links: TOOL_LINKS },
-] as const
-// 覆盖目标下拉:域 + 有数据域的页
+// 组级选页:分组与侧栏同源;sectionPageLinks 会把 tab 容器入口展开成其下 tab 页,
+// 否则 10 个分析页在本配置界面里整个消失、无法勾选。
+const NAV_GROUPS = NAV_SECTIONS.map((s) => ({ key: s.id, label: s.label, links: sectionPageLinks(s) }))
+
+// 覆盖目标下拉:域 + 有数据域的页。
+// 保持既有语义 —— 排除工具组(governance 虽在 PAGE_DOMAINS 中,但历来不出现在此下拉,本期不改变)。
 const OVERRIDE_TARGETS = [
   { value: 'domain:project', label: '域·项目&回款' },
   { value: 'domain:yitian', label: '域·工时' },
   { value: 'domain:opportunity', label: '域·商机' },
-  ...[...PROJECT_LINKS, ...ANALYSIS_LINKS, ...KEY_FOLLOWUP_LINKS, ...PAYMENT_LINKS, ...YITIAN_LINKS]
+  ...NAV_SECTIONS.filter((s) => s.id !== 'tools').flatMap(sectionPageLinks)
     .filter((l) => PAGE_DOMAINS[l.key]).map((l) => ({ value: `page:${l.key}`, label: `页·${l.label}` })),
 ]
 function targetIsOpp(t: string): boolean {

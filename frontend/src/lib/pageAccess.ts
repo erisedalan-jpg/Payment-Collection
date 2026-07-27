@@ -15,13 +15,11 @@ export function canAccess(allowedPages: string[], key: PageKey): boolean {
   return allowedPages.includes('*') || allowedPages.includes(key)
 }
 
-import { PROJECT_LINKS, ANALYSIS_LINKS, KEY_FOLLOWUP_LINKS, PAYMENT_LINKS, YITIAN_LINKS, TOOL_LINKS } from '@/nav'
+import { ALL_PAGE_LINKS } from '@/nav'
 
-/** 建/编辑账号表单的"可访问页面"选项单一来源:'*' 全部 + 27 个 PageKey(取 nav 标签)。 */
+/** 建/编辑账号表单的「可访问页面」选项单一来源:'*' 全部 + 30 个 PageKey(取 nav 标签)。
+ *  ALL_PAGE_LINKS 已含 tab 页,勿改回按侧栏 LINKS 派生 —— 那会让 10 个分析页无法授权。 */
 export const PAGE_OPTIONS: { key: string; label: string }[] = [
   { key: '*', label: '全部页面' },
-  ...[...PROJECT_LINKS, ...ANALYSIS_LINKS, ...KEY_FOLLOWUP_LINKS, ...PAYMENT_LINKS, ...YITIAN_LINKS, ...TOOL_LINKS].map((l) => ({
-    key: l.key,
-    label: l.label,
-  })),
+  ...ALL_PAGE_LINKS.map((l) => ({ key: l.key, label: l.label })),
 ]

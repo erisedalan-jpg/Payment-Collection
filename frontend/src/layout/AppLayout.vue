@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import FilterBar from './FilterBar.vue'
+import PageTabs from '@/components/PageTabs.vue'
 import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
 import { useAuthStore } from '@/stores/auth'
 import { KEEPALIVE_COMPONENTS, viewKey } from '@/lib/viewReturn'
@@ -23,6 +24,7 @@ const includeList = KEEPALIVE_COMPONENTS as unknown as string[]
     <div class="app-body">
       <AppSidebar />
       <main class="app-main">
+        <PageTabs v-if="route.meta?.tabGroup" :group="route.meta.tabGroup" />
         <FilterBar v-if="showFilter" />
         <router-view v-slot="{ Component, route: r }">
           <!-- max=2:菜单进入 bump token 后旧实例=永不可复用死缓存;返回判定仅单一 armed 槽,

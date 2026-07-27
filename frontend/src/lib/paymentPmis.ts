@@ -124,7 +124,7 @@ export function projectPaymentRows(
       end,
     )
 
-    // 已回款/完成率恒全时口径(全站统一口径 Σ流水全加÷合同，与 /insight/board、项目详情页一致)：
+    // 已回款/完成率恒全时口径(全站统一口径 Σ流水全加÷合同，与 /payment/board、项目详情页一致)：
     // 分子=Σ全时流水(actualInRange(records,'','')，不随所选日期区间过滤；无流水表退化 payment.actualTotal)；分母=合同。
     // 计划回款(expectedTotal)/延期(delayedCount)/未收(remainingTotal)/节点计数(rp.*)仍随日期区间。
     const actualAll = round2(
