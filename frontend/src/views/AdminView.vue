@@ -23,19 +23,37 @@ const editing = ref(false) // true=编辑(account 只读),false=新建
 // 否则 10 个分析页在本配置界面里整个消失、无法勾选。
 const NAV_GROUPS = NAV_SECTIONS.map((s) => ({ key: s.id, label: s.label, links: sectionPageLinks(s) }))
 
-// 覆盖目标下拉:域 + 有数据域的页。
-// 保持既有语义 —— 排除工具组(governance 虽在 PAGE_DOMAINS 中,但历来不出现在此下拉,本期不改变)。
-const OVERRIDE_TARGETS = [
-  { value: 'domain:project', label: '域·项目&回款' },
-  { value: 'domain:yitian', label: '域·工时' },
-  { value: 'domain:opportunity', label: '域·商机' },
-  ...NAV_SECTIONS.filter((s) => s.id !== 'tools').flatMap(sectionPageLinks)
-    .filter((l) => PAGE_DOMAINS[l.key]).map((l) => ({ value: `page:${l.key}`, label: `页·${l.label}` })),
-]
-function targetIsOpp(t: string): boolean {
-  if (t.startsWith('domain:')) return t === 'domain:opportunity'
-  return PAGE_DOMAINS[t.slice(5)] === 'opportunity'
+const advancedOpen = ref(false)
+
+/** 例外目标:该账号已勾选(或 '*')∩ 有数据域 ∩ 非 governance(沿既有语义排除)。
+ *  给没勾的页配范围本是无意义配置,顺手堵死;配「只看成本分析」的账号这里只有 1 项。 */
+const overrideTargets = computed(() => {
+  const all = NAV_GROUPS.flatMap((g) => g.links)
+  const star = form.allowedPages.includes('*')
+  return all
+    .filter((l) => (star || form.allowedPages.includes(l.key)))
+    .filter((l) => PAGE_DOMAINS[l.key] && l.key !== 'governance')
+    .map((l) => ({ value: l.key, label: l.label }))
+})
+function targetIsOpp(key: string): boolean {
+  return PAGE_DOMAINS[key] === 'opportunity'
 }
+
+/** 已勾选、有数据域、但生效范围为空的页(按 页级例外 ?? 默认 解析)。仅提示,不阻断。
+ *  必须按 PAGE_DOMAINS 判定 —— data/budget/about 无数据域,拦它们会重蹈「配不出来」。 */
+const emptyScopePages = computed(() => {
+  const star = form.allowedPages.includes('*')
+  const ovs = new Map(form.overrides.filter((o) => o.target).map((o) => [o.target, o]))
+  return NAV_GROUPS.flatMap((g) => g.links)
+    .filter((l) => (star || form.allowedPages.includes(l.key)) && PAGE_DOMAINS[l.key])
+    .filter((l) => {
+      const o = ovs.get(l.key)
+      const l4 = o ? o.l4 : form.allowedL4
+      const staff = o ? o.staff : form.allowedStaff
+      return !l4.length && !staff.length
+    })
+    .map((l) => l.label)
+})
 
 const blankForm = () => ({
   account: '', password: '', displayName: '',
@@ -78,7 +96,7 @@ function scopeLabel(row: AdminAccount): string {
   const l4 = row.allowedL4.includes('*') ? '全部' : (row.allowedL4.join('、') || '')
   const staff = staffLabels(row.allowedStaff)
   const base = [l4, staff].filter(Boolean).join('；') || '—'
-  const n = Object.keys(row.domainScopes ?? {}).length + Object.keys(row.pageScopes ?? {}).length
+  const n = Object.keys(row.pageScopes ?? {}).length
   return n > 0 ? `${base}　＋${n} 覆盖` : base
 }
 
@@ -108,16 +126,15 @@ function groupChecked(groupKey: string): boolean {
 }
 function addOverride() { form.overrides.push({ target: '', l4: [], staff: [] }) }
 function removeOverride(i: number) { form.overrides.splice(i, 1) }
-function buildScopes(): { domainScopes: Record<string, { l4: string[]; staff: string[] }>; pageScopes: Record<string, { l4: string[]; staff: string[] }> } {
-  const domainScopes: Record<string, { l4: string[]; staff: string[] }> = {}
+function buildScopes(): { pageScopes: Record<string, { l4: string[]; staff: string[] }> } {
+  const star = form.allowedPages.includes('*')
   const pageScopes: Record<string, { l4: string[]; staff: string[] }> = {}
   for (const o of form.overrides) {
     if (!o.target) continue
-    const staff = targetIsOpp(o.target) ? [] : o.staff
-    if (o.target.startsWith('domain:')) domainScopes[o.target.slice(7)] = { l4: o.l4, staff }
-    else pageScopes[o.target.slice(5)] = { l4: o.l4, staff }
+    if (!star && !form.allowedPages.includes(o.target)) continue   // 孤儿:该页已不可访问
+    pageScopes[o.target] = { l4: o.l4, staff: targetIsOpp(o.target) ? [] : o.staff }
   }
-  return { domainScopes, pageScopes }
+  return { pageScopes }
 }
 
 async function reload() {
@@ -140,6 +157,7 @@ function openCreate() {
   editing.value = false
   Object.assign(form, blankForm())
   dialogVisible.value = true
+  advancedOpen.value = false
 }
 
 function openEdit(row: AdminAccount) {
@@ -150,10 +168,10 @@ function openEdit(row: AdminAccount) {
     allowedPages: [...row.allowedPages], allowedL4: [...row.allowedL4],
     allowedStaff: [...(row.allowedStaff ?? [])],
   })
-  const ovs: { target: string; l4: string[]; staff: string[] }[] = []
-  for (const [dom, v] of Object.entries(row.domainScopes ?? {})) ovs.push({ target: `domain:${dom}`, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])] })
-  for (const [pk, v] of Object.entries(row.pageScopes ?? {})) ovs.push({ target: `page:${pk}`, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])] })
-  form.overrides = ovs
+  form.overrides = Object.entries(row.pageScopes ?? {}).map(([pk, v]) => ({
+    target: pk, l4: [...(v.l4 ?? [])], staff: [...(v.staff ?? [])],
+  }))
+  advancedOpen.value = form.overrides.length > 0
   dialogVisible.value = true
 }
 
@@ -208,7 +226,8 @@ function pageLabels(keys: string[]): string {
 onMounted(reload)
 defineExpose({
   dialogVisible, editing, form, openCreate, openEdit, submitForm, onDelete, reload, staffOptions, roster,
-  NAV_GROUPS, OVERRIDE_TARGETS, toggleGroup, groupChecked, togglePage, groupIndeterminate, addOverride, removeOverride,
+  NAV_GROUPS, toggleGroup, groupChecked, togglePage, groupIndeterminate, addOverride, removeOverride,
+  advancedOpen, overrideTargets, emptyScopePages, accounts,
 })
 </script>
 
@@ -288,34 +307,42 @@ defineExpose({
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="默认可见 L4">
+        <el-form-item label="可见 L4">
           <el-select v-model="form.allowedL4" multiple filterable class="admin-select" placeholder="选择可见 L4 组织">
             <el-option label="全部 L4" value="*" />
             <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
           </el-select>
         </el-form-item>
-        <el-form-item label="默认可见员工">
+        <el-form-item label="额外放行员工">
           <el-select v-model="form.allowedStaff" multiple filterable class="admin-select"
             placeholder="按姓名选择员工(实际存工号)">
             <el-option v-for="o in staffOptions" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
           <span class="admin-hint">按姓名选择;实际按工号隔离。空=不额外放行个人</span>
         </el-form-item>
-        <el-divider content-position="left">范围覆盖（可选，只加例外；页 &gt; 域 &gt; 默认）</el-divider>
-        <el-form-item v-for="(o,i) in form.overrides" :key="i" label="覆盖">
-          <el-select v-model="o.target" filterable class="admin-select" placeholder="选目标(域/页)">
-            <el-option v-for="t in OVERRIDE_TARGETS" :key="t.value" :label="t.label" :value="t.value" />
-          </el-select>
-          <el-select v-model="o.l4" multiple filterable class="admin-select" placeholder="L4">
-            <el-option label="全部 L4" value="*" />
-            <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
-          </el-select>
-          <el-select v-if="!targetIsOpp(o.target)" v-model="o.staff" multiple filterable class="admin-select" placeholder="员工(按姓名)">
-            <el-option v-for="op in staffOptions" :key="op.value" :label="op.label" :value="op.value" />
-          </el-select>
-          <el-button link type="danger" @click="removeOverride(i)">删除</el-button>
-        </el-form-item>
-        <el-button link type="primary" @click="addOverride">+ 添加覆盖</el-button>
+        <div class="admin-adv-h" @click="advancedOpen = !advancedOpen">
+          {{ advancedOpen ? '▾' : '▸' }} 高级 · 个别页面单设范围
+        </div>
+        <div v-show="advancedOpen" class="admin-adv">
+          <el-form-item v-for="(o,i) in form.overrides" :key="i" label="例外">
+            <el-select v-model="o.target" filterable class="admin-select" placeholder="选页面">
+              <el-option v-for="t in overrideTargets" :key="t.value" :label="t.label" :value="t.value" />
+            </el-select>
+            <el-select v-model="o.l4" multiple filterable class="admin-select" placeholder="L4">
+              <el-option label="全部 L4" value="*" />
+              <el-option v-for="l4 in l4Options" :key="l4" :label="l4" :value="l4" />
+            </el-select>
+            <el-select v-if="!targetIsOpp(o.target)" v-model="o.staff" multiple filterable
+              class="admin-select" placeholder="员工(按姓名)">
+              <el-option v-for="op in staffOptions" :key="op.value" :label="op.label" :value="op.value" />
+            </el-select>
+            <el-button link type="danger" @click="removeOverride(i)">删除</el-button>
+          </el-form-item>
+          <el-button link type="primary" @click="addOverride">+ 添加例外</el-button>
+        </div>
+        <div v-if="emptyScopePages.length" class="admin-warn">
+          已勾选的「{{ emptyScopePages.slice(0, 3).join('、') }}」{{ emptyScopePages.length > 3 ? ` 等 ${emptyScopePages.length} 页` : '' }}生效范围为空，该账号能进入页面但看不到任何数据。
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -349,4 +376,8 @@ defineExpose({
 .admin-pgroup { margin-top: var(--sp-2); }
 .admin-pgroup-h { font-weight: 700; }
 .admin-pgroup-items { display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); padding-left: var(--sp-4); }
+.admin-adv-h { margin: var(--sp-3) 0 var(--sp-2); color: var(--accent); cursor: pointer; font-size: var(--fs-2); }
+.admin-adv { padding-left: var(--sp-2); border-left: 2px solid var(--line); }
+.admin-warn { margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+  background: var(--warn-bg); color: var(--warn-text); font-size: var(--fs-1); }
 </style>

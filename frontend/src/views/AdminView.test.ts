@@ -108,7 +108,7 @@ describe('AdminView', () => {
     )
   })
 
-  it('覆盖列表:域目标写 domainScopes、页目标写 pageScopes(商机 staff 空)', async () => {
+  it('例外只写 pageScopes(商机 staff 恒空),不再有域目标', async () => {
     vi.mocked(adminApi.createAccount).mockResolvedValue()
     const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
     await flushPromises()
@@ -117,15 +117,75 @@ describe('AdminView', () => {
     vm.form.account = 'pp'; vm.form.password = 'pw12345'; vm.form.displayName = 'P'
     vm.form.allowedPages = ['*']; vm.form.allowedL4 = ['*']
     vm.form.overrides = [
-      { target: 'domain:yitian', l4: ['Dy'], staff: ['E1'] },
-      { target: 'page:temp-followup', l4: ['Dp'], staff: [] },
-      { target: 'page:opportunities-progress', l4: ['Do'], staff: ['E9'] },
+      { target: 'temp-followup', l4: ['Dp'], staff: [] },
+      { target: 'opportunities-progress', l4: ['Do'], staff: ['E9'] },
     ]
     await vm.submitForm(); await flushPromises()
     const p = vi.mocked(adminApi.createAccount).mock.calls[0][0] as any
-    expect(p.domainScopes).toEqual({ yitian: { l4: ['Dy'], staff: ['E1'] } })
+    expect(p.domainScopes).toBeUndefined()
     expect(p.pageScopes['temp-followup']).toEqual({ l4: ['Dp'], staff: [] })
-    expect(p.pageScopes['opportunities-progress']).toEqual({ l4: ['Do'], staff: [] })  // 商机 staff 空
+    expect(p.pageScopes['opportunities-progress']).toEqual({ l4: ['Do'], staff: [] })
+  })
+
+  it('例外目标下拉只列已勾选、有数据域、非 governance 的页', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.form.allowedPages = ['insight-costdetail', 'budget', 'governance']
+    const vals = vm.overrideTargets.map((t: any) => t.value)
+    expect(vals).toEqual(['insight-costdetail'])   // budget 无数据域;governance 沿既有语义排除
+  })
+
+  it('孤儿例外在提交时被丢弃(取消勾选该页后)', async () => {
+    vi.mocked(adminApi.createAccount).mockResolvedValue()
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.form.account = 'o'; vm.form.password = 'pw12345'; vm.form.displayName = 'O'
+    vm.form.allowedPages = ['projects']
+    vm.form.overrides = [
+      { target: 'projects', l4: ['D1'], staff: [] },
+      { target: 'temp-followup', l4: ['D2'], staff: [] },   // 未勾选 → 孤儿
+    ]
+    await vm.submitForm(); await flushPromises()
+    const p = vi.mocked(adminApi.createAccount).mock.calls[0][0] as any
+    expect(Object.keys(p.pageScopes)).toEqual(['projects'])
+  })
+
+  it('编辑存量账号:pageScopes 非空则高级区强制展开', async () => {
+    // 直接给 openEdit 传字面量,不经 accounts —— 若写成 `vm.accounts?.[0] ?? {兜底对象}`,
+    // accounts 没加载时会退到兜底对象、测试照样绿,等于什么都没验证。
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    expect(vm.advancedOpen).toBe(false)          // 新建默认折叠
+    vm.openEdit({
+      account: 'x', displayName: 'X', isSuper: false, allowedPages: ['projects'],
+      allowedL4: ['北京'], allowedStaff: [], pageScopes: { projects: { l4: ['D1'], staff: [] } },
+    })
+    expect(vm.advancedOpen).toBe(true)           // 有存量例外 → 展开
+    expect(vm.form.overrides).toEqual([{ target: 'projects', l4: ['D1'], staff: [] }])
+
+    vm.openEdit({                                 // 反向:无例外 → 保持折叠
+      account: 'y', displayName: 'Y', isSuper: false, allowedPages: ['projects'],
+      allowedL4: ['北京'], allowedStaff: [], pageScopes: {},
+    })
+    expect(vm.advancedOpen).toBe(false)
+  })
+
+  it('空范围提示:已勾有数据域的页但范围为空 → 列出该页', async () => {
+    const wrapper = mount(AdminView, { global: { plugins: [ElementPlus], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openCreate()
+    vm.form.allowedPages = ['projects', 'budget']
+    vm.form.allowedL4 = []
+    vm.form.allowedStaff = []
+    expect(vm.emptyScopePages).toContain('在建项目')
+    expect(vm.emptyScopePages).not.toContain('概算工具')   // 无数据域,不该被拦
   })
 
   it('组级选页:勾选一组写入该组全部 pageKey', async () => {
@@ -196,7 +256,7 @@ describe('AdminView', () => {
     const vm = wrapper.vm as any
     vm.openCreate()
     await flushPromises()
-    // 30 个页面 + 7 个组标题 + 1 个「全部页面」= 38;断言下界防「只渲染组标题」的回退。
+    // 30 个页面 + 6 个组标题 + 1 个「全部页面」= 37;断言下界防「只渲染组标题」的回退。
     // 这条专防「函数写了但模板没接线」—— 光有 togglePage 而模板仍只渲染 7 个组标题时,
     // 上面三条 vm 层测试全绿,只有这条会红。
     expect(wrapper.findAll('.el-checkbox').length).toBeGreaterThanOrEqual(30)
