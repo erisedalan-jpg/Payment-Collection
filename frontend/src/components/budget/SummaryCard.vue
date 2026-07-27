@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { fmtYuan } from '@/lib/format'
+import AppCard from '@/components/AppCard.vue'
 
 /** 费用汇总：人工成本六个分项（人天 × 成本单价 = 金额）+ 直接成本 = 总成本（未含税），
  *  再 ×(1 + 毛利率) = 销售下单金额（含税）。
@@ -39,7 +40,7 @@ defineExpose({ lines, totalDays })
 </script>
 
 <template>
-  <section class="bd-card">
+  <AppCard variant="default" class="bd-card">
     <div class="sc-head">
       <h3 class="bd-card-title">费用汇总</h3>
       <div class="sc-hero">
@@ -100,20 +101,12 @@ defineExpose({ lines, totalDays })
       <!-- ★毛利率现在也会牵动成本比例（修正前它只影响下单金额），老用户会以为切档位不动比例 -->
       <span class="sc-hint">毛利率会影响成本比例</span>
     </div>
-  </section>
+  </AppCard>
 </template>
 
 <style scoped>
-.bd-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-stack);
-}
+/* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
+.bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
 .bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .sc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .sc-hero { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-1); }

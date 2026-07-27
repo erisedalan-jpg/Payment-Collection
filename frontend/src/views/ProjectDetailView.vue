@@ -16,6 +16,7 @@ import EventTimeline from '@/components/EventTimeline.vue'
 import MilestoneTable from '@/components/MilestoneTable.vue'
 import ProfitTree from '@/components/ProfitTree.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const route = useRoute()
 const data = useDataStore()
@@ -320,10 +321,10 @@ const originInfo = computed(() => [
           </div>
 
           <div class="pd-metrics">
-            <div v-for="it in metrics" :key="it.k" class="pd-metric">
+            <AppCard v-for="it in metrics" :key="it.k" variant="flat" class="pd-metric">
               <div class="pd-metric-v u-num">{{ it.v }}</div>
               <div class="pd-metric-k">{{ it.k }}</div>
-            </div>
+            </AppCard>
           </div>
 
           <section class="pd-team">
@@ -429,10 +430,10 @@ const originInfo = computed(() => [
             </template>
           </section>
         </div>
-        <aside class="pd-aside">
+        <AppCard variant="flat" class="pd-aside">
           <div class="pd-aside-title">项目动态</div>
           <EventTimeline :events="myEvents" empty-text="暂无该项目动态" />
-        </aside>
+        </AppCard>
       </div>
     </template>
   </div>
@@ -456,7 +457,8 @@ const originInfo = computed(() => [
 .pd-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4); font-size: var(--fs-2); color: var(--sub); margin-bottom: var(--sp-3); }
 .pd-meta b { color: var(--txt); }
 .pd-metrics { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
-.pd-metric { flex: 1; min-width: 120px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); }
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.pd-metric { flex: 1; min-width: 120px; }
 .pd-metric-v { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }
 .pd-metric-k { font-size: var(--fs-1); color: var(--mut); margin-top: 2px; }
 .pd-tabs { display: flex; gap: var(--sp-1); border-bottom: 1px solid var(--line); margin-bottom: var(--sp-3); }
@@ -471,7 +473,6 @@ const originInfo = computed(() => [
 .pd-chip-v { color: var(--txt); font-weight: 600; }
 .pd-note { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-3); }
 .pd-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--sp-4); align-items: start; }
-.pd-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); }
 .pd-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 @media (max-width: 1200px) { .pd-body { grid-template-columns: 1fr; } }
 .pd-tags { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0 var(--gap-section); }

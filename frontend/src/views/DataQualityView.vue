@@ -6,6 +6,7 @@ import { exportRows } from '@/lib/exportXlsx'
 import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const data = useDataStore()
 onMounted(() => { if (!data.data) data.load() })
@@ -42,7 +43,7 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
       </div>
 
       <div class="gov-srcs">
-        <div v-for="src in report.sources" :key="src.key" class="gov-src" :class="{ off: !src.provided }" :data-test="`src-${src.key}`">
+        <AppCard v-for="src in report.sources" :key="src.key" variant="raised" class="gov-src" :class="{ off: !src.provided }" :data-test="`src-${src.key}`">
           <div class="gov-src-head">
             <span class="gov-src-name">{{ src.label }}</span>
             <span class="gov-src-badge" :class="{ on: src.provided }">{{ src.provided ? '已提供' : '未提供' }}</span>
@@ -50,7 +51,7 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
           <div class="gov-src-main u-num">{{ src.main }}</div>
           <div class="gov-src-mlabel">{{ src.mainLabel }}</div>
           <div v-for="(sub, i) in src.subs" :key="i" class="gov-src-sub u-num">{{ sub }}</div>
-        </div>
+        </AppCard>
       </div>
 
       <h3 class="gov-h">告警 <span class="gov-h-hint">按严重度排序,0 条置灰</span></h3>
@@ -95,7 +96,7 @@ const SEV_TXT: Record<string, string> = { high: '高', mid: '中', low: '低' }
 .gov-banner-sub { font-size: var(--fs-1); color: var(--sub); margin-top: 2px; }
 .gov-banner-meta { font-size: var(--fs-1); color: var(--sub); }
 .gov-srcs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--gap-card); }
-.gov-src { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); box-shadow: var(--shadow-1); }
+/* 源卡外观已归位到 AppCard(raised);.gov-src 类名保留:置灰修饰符与测试钩子都靠它 */
 .gov-src.off { opacity: var(--disabled-opacity); }
 .gov-src-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); gap: var(--sp-2); }
 .gov-src-name { font-size: var(--fs-2); font-weight: 600; color: var(--sub); }

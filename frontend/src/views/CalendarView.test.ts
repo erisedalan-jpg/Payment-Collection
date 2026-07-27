@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { nextTick } from 'vue'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -95,5 +97,25 @@ describe('CalendarView', () => {
     await flushPromises()
     expect((w2.vm as any).view).toBe('agenda')
     expect(w2.find('.cag').exists()).toBe(true)
+  })
+
+  it('V4.5.0 仪表五卡改用 AppCard(inset),.cd-card 只留 text-align', () => {
+    seed()
+    const w = mountView()
+    const cards = w.findAll('.cd-card')
+    expect(cards).toHaveLength(5)
+    for (const c of cards) {
+      // 本页 .cd-card 归 inset —— CostDetailView 有同名类但归 flat,变体不可按类名硬套
+      expect(c.classes()).toContain('ac--inset')
+      expect(c.classes()).not.toContain('ac--flat')
+      expect(c.classes()).not.toContain('ac--default')
+      expect(c.classes()).not.toContain('ac--raised')
+    }
+    const src = readFileSync(resolve(__dirname, 'CalendarView.vue'), 'utf-8')
+    const cd = src.match(/^\.cd-card\s*\{([^}]*)\}/m)![1]
+    for (const p of ['background', 'border', 'padding']) {
+      expect(cd, `.cd-card 不应再自写 ${p}`).not.toContain(p)
+    }
+    expect(cd).toContain('text-align: center')   // AppCard 不接管的文本对齐必须留下
   })
 })

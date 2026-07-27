@@ -26,6 +26,7 @@ import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
+import AppCard from '@/components/AppCard.vue'
 import { tagMatch } from '@/lib/tagFilter'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
@@ -254,9 +255,9 @@ defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltere
     <template v-else>
       <MetricGrid :items="kpiItems" @item-click="onKpiClick" />
 
-      <div v-if="!ready" class="mv-defer"><el-skeleton :rows="10" animated /></div>
+      <AppCard v-if="!ready" variant="flat" class="mv-defer"><el-skeleton :rows="10" animated /></AppCard>
       <template v-else>
-      <div class="mv-card">
+      <AppCard variant="flat" class="mv-card">
         <div class="mv-card-h">
           项目终验完成情况
           <span class="mv-card-tools">
@@ -270,15 +271,15 @@ defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltere
           <ChartBox :option="faCountOption" height="240px" />
           <ChartBox :option="faAmountOption" height="240px" />
         </div>
-      </div>
+      </AppCard>
 
       <div class="mv-grid2">
-        <div class="mv-card"><div class="mv-card-h">里程碑到期提醒</div><ChartBox :option="reminderOption" height="300px" /></div>
-        <div class="mv-card"><div class="mv-card-h">部门异常项目分布(Top15)</div><ChartBox :option="deptAbnormalOption" height="300px" /></div>
-        <div class="mv-card"><div class="mv-card-h">部门里程碑合规率</div><ChartBox :option="complianceOption" height="300px" /></div>
+        <AppCard variant="flat" class="mv-card"><div class="mv-card-h">里程碑到期提醒</div><ChartBox :option="reminderOption" height="300px" /></AppCard>
+        <AppCard variant="flat" class="mv-card"><div class="mv-card-h">部门异常项目分布(Top15)</div><ChartBox :option="deptAbnormalOption" height="300px" /></AppCard>
+        <AppCard variant="flat" class="mv-card"><div class="mv-card-h">部门里程碑合规率</div><ChartBox :option="complianceOption" height="300px" /></AppCard>
       </div>
 
-      <div class="mv-card">
+      <AppCard variant="flat" class="mv-card">
         <div class="mv-card-h">
           关键里程碑节点分布
           <span class="mv-card-tools">
@@ -288,7 +289,7 @@ defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltere
           </span>
         </div>
         <ChartBox :option="nodeDistOption" height="280px" @datapoint-click="onNodeClick" />
-      </div>
+      </AppCard>
 
       <MilestoneDrillModal v-model="drillOpen" :title="drillTitle" :rows="drillRows" />
       <MilestoneStatusModal v-model="statusOpen" :title="statusTitle" :rows="statusRows" />
@@ -312,11 +313,12 @@ defineExpose({ faGran, faYear, onNodeClick, nodeYear, detailTab, mps, mpsFiltere
 .mv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .mv-ex-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .mv-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--gap-card); }
-.mv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.mv-card { margin-bottom: var(--sp-3); }
 .mv-card-h { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
 .mv-card-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .mv-grid2-half { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-card); }
-.mv-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
+.mv-defer { min-height: 360px; }
 .mv-detail { margin-top: var(--sp-4); }
 .mv-detail-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 </style>

@@ -77,6 +77,15 @@ describe('RatioCard', () => {
     expect(mount(RatioCard, opts).text()).toContain('3%')
     expect(mount(RatioCard, opts).text()).toContain('15%')
   })
+
+  // 卡片外观(圆角/内边距/底色/阴影/描边)统一由 AppCard 提供,组件不再自写。
+  // 断言到具体变体 —— 只断言「有 .ac」的话,变体改错也照绿。
+  it('卡片容器接入 AppCard(default)', () => {
+    setup(40, 100)
+    const card = mount(RatioCard, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
 })
 
 describe('SummaryCard', () => {
@@ -95,6 +104,13 @@ describe('SummaryCard', () => {
     expect(s.result?.salesAmount).toBeCloseTo(21200, 6)
     expect(s.result?.costRatio).toBeCloseTo(2.12, 6)  // 比例也跟着变
     expect(w.text()).toContain('毛利率')
+  })
+
+  it('卡片容器接入 AppCard(default)', () => {
+    setup(10, 100)
+    const card = mount(SummaryCard, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
   })
 })
 
@@ -125,6 +141,13 @@ describe('CrmCard', () => {
     await (w.vm as any).restore()
     expect((w.vm as any).editing).toBe(false)
   })
+
+  it('卡片容器接入 AppCard(default)', () => {
+    setup(3, 100)
+    const card = mount(CrmCard, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
 })
 
 describe('SalesOrderCard', () => {
@@ -133,5 +156,12 @@ describe('SalesOrderCard', () => {
     const w = mount(SalesOrderCard, opts)
     expect(w.text()).toContain('JY-CPJF-OTHER-PM')
     expect(w.text()).toContain('合计')
+  })
+
+  it('卡片容器接入 AppCard(default)', () => {
+    setup(10, 100)
+    const card = mount(SalesOrderCard, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
   })
 })

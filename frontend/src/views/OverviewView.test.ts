@@ -6,6 +6,7 @@ import OverviewView from './OverviewView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useFilterStore } from '@/stores/filter'
+import { useAuthStore } from '@/stores/auth'
 
 vi.mock('@/lib/portalApi', () => ({
   getPortalConfig: vi.fn(async () => ({ version: 1, groups: [], items: [] })),
@@ -182,6 +183,24 @@ describe('OverviewView', () => {
     expect(w.findAll('.tq-item').length).toBeGreaterThanOrEqual(1)
     // seed() 未设置 periodCompare → 本期变化数字条不应渲染
     expect(w.find('.ov-digest').exists()).toBe(false)
+  })
+
+  it('V4.5.0 卡片改用 AppCard:体检带 default,异常卡与右栏 raised(同页跨两变体,最易归错)', async () => {
+    seed()
+    const w = await mountView()
+    expect(w.find('.ov-band').classes()).toContain('ac--default')
+    // 先证明确有异常卡,否则下面的 every 在空集上恒真
+    const acards = w.findAll('.ov-acard')
+    expect(acards.length).toBeGreaterThan(0)
+    expect(acards.every((c) => c.classes().includes('ac--raised'))).toBe(true)
+    expect(w.find('.ov-aside').classes()).toContain('ac--raised')
+  })
+
+  it('V4.5.0 门户卡改用 AppCard(default 变体) —— 无快捷入口时超管仍渲染该卡', async () => {
+    seed()
+    useAuthStore().user = { account: 's', displayName: 's', isSuper: true, allowedPages: ['*'], allowedL4: [] } as any
+    const w = await mountView()
+    expect(w.find('.ov-portal').classes()).toContain('ac--default')
   })
 })
 

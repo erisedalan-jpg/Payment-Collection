@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import MilestoneReminderTab from './MilestoneReminderTab.vue'
@@ -92,5 +94,21 @@ describe('MilestoneReminderTab 表格栈', () => {
     expect(w.find('.ap').exists()).toBe(true)
     expect(w.find('.ap-total').text()).toContain('共')
     expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([20, 50, 80, 100])
+  })
+  it('V4.5.0 汇总四卡改用 AppCard(flat),自写 .mrt-card 已删净', () => {
+    const w = mountTab()
+    // 限定在 .mrt-stats 内,避免与页内其它可能的 AppCard 混淆
+    const cards = w.findAll('.mrt-stats > .ac--flat')
+    expect(cards).toHaveLength(4)
+    expect(cards[0].text()).toContain('到期节点总数')
+    expect(cards[3].text()).toContain('逾期未完成')
+    for (const c of cards) {
+      expect(c.classes()).not.toContain('ac--default')
+      expect(c.classes()).not.toContain('ac--raised')
+      expect(c.classes()).not.toContain('ac--inset')
+    }
+    const src = readFileSync(resolve(__dirname, 'MilestoneReminderTab.vue'), 'utf-8')
+    expect(/^\.mrt-card\s*[,{]/m.test(src), '.mrt-card 自写卡片规则复活了').toBe(false)
+    expect(src).not.toContain('class="mrt-card"')
   })
 })

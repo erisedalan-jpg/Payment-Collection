@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartBox from '@/charts/ChartBox.vue'
@@ -176,10 +177,10 @@ defineExpose({ series })
     <el-skeleton v-else-if="store.loading && !ready" :rows="6" animated />
 
     <div v-if="ready" class="yt-grid">
-      <section v-for="c in charts" :key="c.title" class="yt-card">
+      <AppCard v-for="c in charts" :key="c.title" variant="default">
         <h3 class="yt-h">{{ c.title }}</h3>
         <ChartBox :option="c.option" height="280px" v-on="c.drill ? { 'datapoint-click': onTrendClick } : {}" />
-      </section>
+      </AppCard>
     </div>
   </div>
 </template>
@@ -187,12 +188,5 @@ defineExpose({ series })
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--gap-card); }
-.yt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-}
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 </style>

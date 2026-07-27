@@ -17,6 +17,7 @@ import { fmtWan, fmtRatio, pct } from '@/lib/format'
 import { buildRankingOption, valueKindForPie, type ValueKind } from '@/lib/chartOptions'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import ChartTypeSelector from '@/components/ChartTypeSelector.vue'
@@ -252,17 +253,18 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
       <!-- 单维 -->
       <template v-if="mode === 'single'">
         <div class="bv-charts-row">
-          <section
+          <AppCard
             v-for="type in chartTypes"
             :key="type"
+            variant="default"
             class="bv-card bv-chart-item"
           >
             <h3 class="bv-title">{{ activeChart.label }}排名（Top {{ chartTop.length }}）</h3>
             <ChartBox v-if="type !== 'pie' || pieRenderable" :option="chartOptionForType(type)" height="320px" />
             <div v-else class="bv-empty">完成率为比率，不宜用饼图（请改用柱状/折线）</div>
-          </section>
+          </AppCard>
         </div>
-        <section class="bv-card">
+        <AppCard variant="default" class="bv-card">
           <h3 class="bv-title">分组排名（点击行下钻该组项目）</h3>
           <DataTable :columns="tableColumns" :rows="sortedGroups" clickable @row-click="(r) => openDrill(r as PayBoardGroup)">
             <template #cell-rate="{ value }">
@@ -272,16 +274,16 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
               <span class="u-num" :class="{ 'bv-danger': value > 0 }">{{ value }}</span>
             </template>
           </DataTable>
-        </section>
+        </AppCard>
       </template>
 
       <!-- 交叉 -->
       <template v-else-if="mode === 'cross'">
-        <section v-if="crossChartOption" class="bv-card">
+        <AppCard v-if="crossChartOption" variant="default" class="bv-card">
           <h3 class="bv-title">{{ METRIC_BY_KEY[metricKey].label }} 交叉堆叠（行 Top 15）</h3>
           <ChartBox :option="crossChartOption" height="320px" />
-        </section>
-        <section class="bv-card">
+        </AppCard>
+        <AppCard variant="default" class="bv-card">
           <h3 class="bv-title">交叉矩阵（点击单元格下钻）</h3>
           <BoardMatrix
             v-if="matrix"
@@ -292,16 +294,16 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
             @cell-click="onCellClick"
           />
           <div v-else class="bv-empty">请选择次维度</div>
-        </section>
+        </AppCard>
       </template>
 
       <!-- 透视 -->
       <template v-else>
-        <section class="bv-card">
+        <AppCard variant="default" class="bv-card">
           <h3 class="bv-title">透视表 · {{ METRIC_BY_KEY[metricKey].label }}（点击单元格下钻）</h3>
           <PivotTable v-if="pivot" :pivot="pivot" :format="metricFormat" @cell-click="onPivotCellClick" />
           <div v-else class="bv-empty">请选择至少一个行维度</div>
-        </section>
+        </AppCard>
       </template>
 
       <BoardDrilldownModal
@@ -320,8 +322,12 @@ defineExpose({ drillOpen, dimKey, rowDims, activeChart, pieRenderable })
 .bv-ctl { display: flex; align-items: center; gap: var(--sp-2); }
 .bv-ctl-label { font-size: var(--fs-1); color: var(--mut); }
 .bv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
-.bv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-4); margin-bottom: var(--sp-3); }
-.bv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
+/* 卡片外观已归位到 AppCard(default);此处只剩布局属性,复合 .ac 写法沿用
+   V4.4.9 的 .ab.frf-primary 先例 —— 父组件给子组件根节点加样式须同时带两边的类,
+   否则与 AppCard 自身规则同特异性、靠打包顺序决胜负。 */
+.ac.bv-card { margin-bottom: var(--sp-3); }
+/* 图表卡在 .bv-charts-row 里横排,不要底边距 —— 与上一条同特异性,靠书写顺序压过 */
+.ac.bv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
 .bv-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-3); }
 .bv-danger { color: var(--danger); font-weight: 700; }
 .bv-empty { color: var(--mut); padding: var(--sp-4); text-align: center; }

@@ -26,3 +26,16 @@ describe('OpportunitiesBoardView', () => {
     expect(w.find('.ph-title').text()).toBe('商机看板')
   })
 })
+
+describe('V4.5.0 AppCard', () => {
+  it('6 张 KPI 卡与 13 张图表卡改用 AppCard(flat)', async () => {
+    const w = mount(OpportunitiesBoardView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const kpi = w.findAll('.ob-card')
+    expect(kpi).toHaveLength(6)          // 顶部 4 + 底部 AI 2
+    expect(kpi.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+    const charts = w.findAll('.ob-chart')
+    expect(charts).toHaveLength(13)
+    expect(charts.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+  })
+})

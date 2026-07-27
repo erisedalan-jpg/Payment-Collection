@@ -230,3 +230,17 @@ describe('BoardView', () => {
     expect((w2.vm as any).drillOpen).toBe(false)
   })
 })
+
+describe('V4.5.0 AppCard', () => {
+  it('卡片容器改用 AppCard(default 变体),布局属性仍留在 .bv-card / .bv-chart-item', async () => {
+    seed()
+    const w = mount(BoardView, opts)
+    await flushPromises()
+    // 单维模式:1 张图表卡 + 1 张排名表卡。先钉住条数,否则下面的 every 在空集上恒真
+    const cards = w.findAll('.bv-card')
+    expect(cards).toHaveLength(2)
+    expect(cards.every((c) => c.classes().includes('ac--default'))).toBe(true)
+    // AppCard 只接管卡片外观,横排图表卡的 flex 布局类与它并存
+    expect(w.find('.bv-chart-item').classes()).toContain('ac')
+  })
+})

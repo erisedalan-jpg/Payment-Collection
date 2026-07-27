@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { RATIO_STATUS } from '@/lib/budget/status'
+import AppCard from '@/components/AppCard.vue'
 import type { RatioStatus } from '@/lib/budget/types'
 
 /** 成本比例 = 销售下单金额（含税）÷ 项目金额。
@@ -39,7 +40,7 @@ defineExpose({ status, ratioText, needExplain, explainMissing })
 </script>
 
 <template>
-  <section class="bd-card">
+  <AppCard variant="default" class="bd-card">
     <div class="rc-head">
       <h3 class="bd-card-title">成本比例</h3>
       <span class="rc-range u-num">建议范围 {{ cfg.ratio.min }}% ~ {{ cfg.ratio.max }}%</span>
@@ -67,20 +68,12 @@ defineExpose({ status, ratioText, needExplain, explainMissing })
       />
       <p v-if="explainMissing" class="rc-err">比例不在建议范围内，异常说明必填。</p>
     </div>
-  </section>
+  </AppCard>
 </template>
 
 <style scoped>
-.bd-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-stack);
-}
+/* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
+.bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
 .bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .rc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .rc-range { font-size: var(--fs-1); color: var(--mut); line-height: var(--lh-dense); }

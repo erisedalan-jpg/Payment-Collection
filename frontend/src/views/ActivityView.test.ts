@@ -90,3 +90,22 @@ describe('V4.4.8 页头', () => {
     expect(w.find('.av-toolbar .av-export').exists()).toBe(false)
   })
 })
+
+describe('V4.5.0 AppCard', () => {
+  it('周期对比块为 flat 变体、块内 6 张小卡为 inset 变体', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.av-compare').classes()).toContain('ac--flat')
+    const cards = w.findAll('.av-card')
+    expect(cards).toHaveLength(6)
+    expect(cards.every((c) => c.classes().includes('ac--inset'))).toBe(true)
+  })
+
+  it('「导出表格」属非目标,未被套成 AppCard', async () => {
+    seed()
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.av-export').classes()).not.toContain('ac')
+  })
+})

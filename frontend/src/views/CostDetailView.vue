@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
@@ -28,6 +28,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
 import AppPager from '@/components/AppPager.vue'
 import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import { useColumnPrefs } from '@/lib/useColumnPrefs'
 import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
@@ -143,7 +144,8 @@ const NUMERIC_KEYS = new Set(['amount', 'totalBudget', 'actualCost', 'remaining'
 const TONE: Record<string, string> = { 未超支: 'ok', 超支不足5k: 'warn', 超支大于5k: 'danger', 未获取原项目预算: 'mut' }
 const DELIVERY_TONE: Record<string, string> = { 未超支: 'ok', 交付预算超支: 'warn', 交付外包超支: 'warn', 原厂外包均超支: 'danger', 未获取原项目预算: 'mut' }
 
-const detailCardRef = ref<HTMLElement | null>(null)
+// 明细卡已换成 AppCard 组件,模板 ref 拿到的是组件实例而非 DOM;取元素用 $el(AppCard 单根 div)
+const detailCardRef = ref<ComponentPublicInstance | null>(null)
 const fKw = ref('')
 const selectedTags = ref<string[]>([])
 
@@ -154,11 +156,11 @@ const kpiFilter = ref<KpiFilter>('all')
 function onKpiClick(i: number) {
   const f = KPI_FILTER[i]
   kpiFilter.value = (i === 0 || kpiFilter.value === f) ? 'all' : f
-  detailCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  ;(detailCardRef.value?.$el as HTMLElement | undefined)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // 视图状态按账号持久化(本页已 keep-alive,但 project-analysis 组有 4 个 tab 而 max=2,轮换必被淘汰)。
-// detailCardRef 是 DOM 引用(HTMLElement 无法序列化)、currentPage 是浏览位置,两者绝不进存档。
+// detailCardRef 是组件实例引用(无法序列化)、currentPage 是浏览位置,两者绝不进存档。
 usePersistedRefs('view_costdetail', { fKw, selectedTags, kpiFilter })
 
 // 列头多选筛选 → 标签筛选(含无标签) → 关键词搜索 → KPI 就地筛选 → 默认按 L4 升序(标题"按 L4 组织排序")
@@ -203,11 +205,11 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 
     <template v-else>
       <MetricGrid :items="kpiItems" :col-min="'160px'" @item-click="onKpiClick" />
-      <div v-if="!ready" class="cd-defer"><el-skeleton :rows="8" animated /></div>
+      <AppCard v-if="!ready" variant="flat" class="cd-defer"><el-skeleton :rows="8" animated /></AppCard>
       <template v-else>
       <div class="cd-grid2">
-        <div class="cd-card"><div class="cd-card-h">超支项目分布</div><ChartBox :option="distOption" height="420px" /></div>
-        <div class="cd-card">
+        <AppCard variant="flat" class="cd-card"><div class="cd-card-h">超支项目分布</div><ChartBox :option="distOption" height="420px" /></AppCard>
+        <AppCard variant="flat" class="cd-card">
           <div class="cd-card-h cd-card-h--row">
             <span>L4 部门成本情况汇总</span>
             <ColumnPicker :columns="l4PickerColumns" :visible-keys="l4Prefs.visibleKeys.value"
@@ -215,9 +217,9 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
           </div>
           <DataTable :columns="l4VisibleColumns" :rows="l4Rows" :show-count="false" :default-sort="l4Sort.defaultSort.value" @sort-change="l4Sort.onSortChange">
           <template #cell-over5kRatio="{ row, value }"><span class="u-num" :class="row.over5k > 0 ? 'cd-red' : 'cd-green'">{{ value }}%</span></template>
-        </DataTable></div>
+        </DataTable></AppCard>
       </div>
-      <div class="cd-card" ref="detailCardRef">
+      <AppCard variant="flat" class="cd-card" ref="detailCardRef">
         <div class="cd-card-h">项目成本明细</div>
         <div class="cd-bar">
           <el-input v-model="fKw" size="small" placeholder="编号/名称" style="width: 160px" clearable />
@@ -245,7 +247,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
           </DataTable>
         </div>
         <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="sorted.length" :sizes="[20, 50, 100]" />
-      </div>
+      </AppCard>
       </template>
     </template>
   </div>
@@ -254,13 +256,14 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
 <style scoped>
 .cd-view { padding: var(--sp-4); }
 .cd-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--gap-card); }
-.cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.cd-card { margin-bottom: var(--sp-3); }
 .cd-card-h { font-size: var(--fs-2); font-weight: 600; color: var(--txt); margin-bottom: var(--sp-2); }
 .cd-card-h--row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .cd-th { display: inline-flex; align-items: center; }
 .cd-red { color: var(--danger-text); font-weight: 600; }
 .cd-green { color: var(--ok-text); }
-.cd-defer { padding: var(--sp-4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); min-height: 360px; }
+.cd-defer { min-height: 360px; }
 .cd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .cd-scroll { overflow-x: auto; }
 .cd-link { color: var(--accent); cursor: pointer; }

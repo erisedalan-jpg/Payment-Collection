@@ -24,6 +24,7 @@ import InsightDrillModal from '@/components/InsightDrillModal.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -190,13 +191,14 @@ defineExpose({ selectedTags, mode, dimKey, chartTypes, drillOpen })
           <ChartTypeSelector v-model="chartTypes" :available="availableChartTypes" />
         </div>
         <div class="iv-charts-row">
-          <div
+          <AppCard
             v-for="(opt, idx) in rankingChartOptions"
             :key="chartTypes[idx]"
-            class="iv-card iv-chart-item"
+            variant="flat"
+            class="iv-chart-item"
           >
             <ChartBox :option="opt" height="300px" />
-          </div>
+          </AppCard>
         </div>
         <DataTable :columns="RANK_COLS" :rows="groups" clickable @row-click="onRankRow" />
       </template>
@@ -226,7 +228,7 @@ defineExpose({ selectedTags, mode, dimKey, chartTypes, drillOpen })
 .iv-dims-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .iv-rank-controls { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .iv-charts-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
-.iv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
-.iv-chart-item { flex: 1 1 400px; min-width: 300px; margin-bottom: 0; }
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.iv-chart-item { flex: 1 1 400px; min-width: 300px; }
 .iv-hint { font-size: var(--fs-2); color: var(--mut); padding: var(--sp-5) 0; text-align: center; }
 </style>

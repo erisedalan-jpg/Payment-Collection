@@ -21,6 +21,7 @@ import {
 import { fmtWan } from '@/lib/format'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import SegToggle from '@/components/SegToggle.vue'
 import CalYearHeat from '@/components/CalYearHeat.vue'
 import CalGrid from '@/components/CalGrid.vue'
@@ -128,10 +129,10 @@ defineExpose({ view })
     <PageHeader title="回款日历" />
 
     <div class="cal-dash">
-      <div v-for="c in DASH" :key="c.label" class="cd-card">
+      <AppCard v-for="c in DASH" :key="c.label" variant="inset" class="cd-card">
         <div class="cd-label">{{ c.label }}</div>
         <div class="cd-val u-num" :class="c.cls">{{ c.value }}</div>
-      </div>
+      </AppCard>
     </div>
 
     <div class="cal-filterbar">
@@ -196,7 +197,9 @@ defineExpose({ view })
 <style scoped>
 .cal-view { padding: var(--sp-4); }
 .cal-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
-.cd-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-4) var(--sp-3); text-align: center; }
+/* 卡片外观已交给 AppCard(inset,底色 --card2);原 padding: --sp-4 --sp-3 随本次
+   归位到 inset 的 --sp-2 --sp-3。这里只保留 AppCard 不接管的文本对齐。 */
+.cd-card { text-align: center; }
 .cd-label { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
 .cd-val { font-size: var(--fs-5); font-weight: 700; color: var(--txt); }
 .cd-val.danger { color: var(--danger-text); }

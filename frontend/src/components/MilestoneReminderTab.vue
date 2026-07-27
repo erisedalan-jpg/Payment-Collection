@@ -15,6 +15,7 @@ import ColumnFilter from './ColumnFilter.vue'
 import ColumnPicker from './ColumnPicker.vue'
 import AppButton from './AppButton.vue'
 import AppPager from './AppPager.vue'
+import AppCard from './AppCard.vue'
 
 const props = defineProps<{ projects: MilestoneProject[]; now: Date }>()
 const router = useRouter()
@@ -106,10 +107,10 @@ defineExpose({ rangeModel, filtered })
       <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" style="margin-left: auto" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
     </div>
     <div class="mrt-stats">
-      <div class="mrt-card"><div class="mrt-k">到期节点总数</div><div class="mrt-v u-num">{{ stat.total }}</div></div>
-      <div class="mrt-card"><div class="mrt-k">已完成</div><div class="mrt-v u-num">{{ stat.done }}</div></div>
-      <div class="mrt-card"><div class="mrt-k">未完成</div><div class="mrt-v u-num">{{ stat.undone }}</div></div>
-      <div class="mrt-card"><div class="mrt-k">逾期未完成</div><div class="mrt-v mrt-v-danger u-num">{{ stat.overdue }}</div></div>
+      <AppCard variant="flat"><div class="mrt-k">到期节点总数</div><div class="mrt-v u-num">{{ stat.total }}</div></AppCard>
+      <AppCard variant="flat"><div class="mrt-k">已完成</div><div class="mrt-v u-num">{{ stat.done }}</div></AppCard>
+      <AppCard variant="flat"><div class="mrt-k">未完成</div><div class="mrt-v u-num">{{ stat.undone }}</div></AppCard>
+      <AppCard variant="flat"><div class="mrt-k">逾期未完成</div><div class="mrt-v mrt-v-danger u-num">{{ stat.overdue }}</div></AppCard>
     </div>
     <div class="mrt-scroll">
       <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable sticky-header :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
@@ -131,7 +132,6 @@ defineExpose({ rangeModel, filtered })
 <style scoped>
 .mrt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .mrt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--gap-card); margin-bottom: var(--sp-3); }
-.mrt-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); }
 .mrt-k { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--sp-1); }
 .mrt-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight); }
 .mrt-v-danger { color: var(--danger); }

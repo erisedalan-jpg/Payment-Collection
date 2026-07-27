@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { setActivePinia, createPinia } from 'pinia'
 import DashMetrics from './DashMetrics.vue'
 import { useDataStore } from '@/stores/data'
@@ -130,5 +132,31 @@ describe('DashMetrics', () => {
     expect(paidCard).toBeTruthy()
     expect(paidCard!.attributes('role')).toBeUndefined()
     expect(paidCard!.attributes('tabindex')).toBeUndefined()
+  })
+
+  it('V4.5.0 六张卡改用 AppCard(flat),全站仅存的硬写 padding 卡片已消除', () => {
+    const ds = useDataStore()
+    ds.data = {
+      meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 }, dashboard: {}, summary: {},
+      rawNodes: [], displayColumns: {}, followupRecords: {},
+      projects: [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 2000000 } }],
+      projectPmis: {},
+      paymentNodes: { P1: [] },
+      paymentRecords: {},
+    } as any
+    const w = mount(DashMetrics)
+    const cards = w.findAll('.dm-card')
+    expect(cards).toHaveLength(6)
+    for (const c of cards) {
+      expect(c.classes()).toContain('ac--flat')
+      // 变体必须唯一 —— 同时挂上第二个变体等于两套外观打架,且圆角/阴影按加载顺序随机胜出
+      expect(c.classes()).not.toContain('ac--default')
+      expect(c.classes()).not.toContain('ac--raised')
+      expect(c.classes()).not.toContain('ac--inset')
+    }
+    const src = readFileSync(resolve(__dirname, 'DashMetrics.vue'), 'utf-8')
+    // 原 `padding: 12px 14px` 是全站唯一一处硬写 padding 的卡片,归位后不得复活
+    expect(src).not.toMatch(/padding:\s*12px\s+14px/)
+    expect(/^\.dm-card\s*[,{]/m.test(src), '.dm-card 自写卡片外观规则复活了').toBe(false)
   })
 })

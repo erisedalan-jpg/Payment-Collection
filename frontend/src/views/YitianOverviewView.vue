@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -166,20 +167,20 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
     <template v-if="ready">
       <div class="yt-kpi-row">
         <MetricGrid :items="metrics" col-min="180px" class="yt-kpi-grid" @item-click="onKpiClick" />
-        <div class="yt-ring-card u-lift u-focus-ring" tabindex="0" role="button"
+        <AppCard variant="flat" class="yt-ring-card u-lift u-focus-ring" tabindex="0" role="button"
           @click="goCompliance" @keydown.enter.prevent="goCompliance" @keydown.space.prevent="goCompliance">
           <RatioRing :ratio="complianceRatio" label="合规率" :size="96" :color="complianceRingColor" />
           <div class="yt-ring-sub u-num">问题 {{ complianceIssueCount }} 条</div>
-        </div>
+        </AppCard>
       </div>
 
       <div class="yt-grid">
-        <section class="yt-card">
+        <AppCard variant="default">
           <h3 class="yt-h">工时类型占比</h3>
           <ChartBox :option="typeOption" height="300px" />
-        </section>
+        </AppCard>
 
-        <section class="yt-card">
+        <AppCard variant="default">
           <h3 class="yt-h">L4 组织工时</h3>
           <ChartBox :option="orgBarChartOption" :height="orgBarHeight" @datapoint-click="onOrgBarClick" />
           <h3 class="yt-h yt-h--sub">分层汇总</h3>
@@ -189,7 +190,7 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
               <el-link type="primary" :underline="false" @click.stop="goDetailL4(row)">明细</el-link>
             </template>
           </DataTable>
-        </section>
+        </AppCard>
       </div>
     </template>
   </div>
@@ -200,6 +201,7 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
 .yt-kpi-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: var(--gap-card); }
 @media (max-width: 768px) { .yt-kpi-row { grid-template-columns: 1fr; } }
 .yt-kpi-grid { min-width: 0; }
+/* 卡片外观(底色/描边/圆角/内边距)已交给 AppCard(flat),这里只留布局与交互属性 */
 .yt-ring-card {
   display: flex;
   flex-direction: column;
@@ -207,22 +209,11 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
   justify-content: center;
   gap: var(--sp-2);
   min-width: 180px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: var(--card-pad);
   cursor: pointer;
 }
 .yt-ring-sub { font-size: var(--fs-1); color: var(--mut); }
 .yt-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(480px, 2fr); gap: var(--gap-card); }
 @media (max-width: 1200px) { .yt-grid { grid-template-columns: 1fr; } }
-.yt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-}
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 .yt-h--sub { margin-top: var(--gap-card); }
 </style>

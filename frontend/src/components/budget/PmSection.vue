@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
 import { fmtYuan } from '@/lib/format'
+import AppCard from '@/components/AppCard.vue'
 import type { PmPhaseRow } from '@/lib/budget/types'
 
 const store = useBudgetStore()
@@ -40,72 +41,71 @@ defineExpose({ pmCost1, pmCost2, techCost1, techCost2, pmTotalCost })
 </script>
 
 <template>
-  <el-collapse v-model="active" class="bd-card pm-card">
-    <el-collapse-item name="pm">
-      <template #title>
-        <span class="bd-card-title">项目经理</span>
-        <span class="pm-note">阶段只是分组标签，没有系数、没有工时基线</span>
-      </template>
+  <AppCard variant="default">
+    <el-collapse v-model="active" class="pm-card">
+      <el-collapse-item name="pm">
+        <template #title>
+          <span class="bd-card-title">项目经理</span>
+          <span class="pm-note">阶段只是分组标签，没有系数、没有工时基线</span>
+        </template>
 
-      <div class="pm-body">
-        <div v-for="(ph, idx) in store.form.pmPhases" :key="idx" class="pm-phase">
-          <span class="pm-phase-name">{{ ph.name }}</span>
-          <div class="pm-row">
-            <div class="pm-field">
-              <label class="pm-label">PM 一类（人天）</label>
-              <el-input-number v-model="ph.pm1" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
+        <div class="pm-body">
+          <div v-for="(ph, idx) in store.form.pmPhases" :key="idx" class="pm-phase">
+            <span class="pm-phase-name">{{ ph.name }}</span>
+            <div class="pm-row">
+              <div class="pm-field">
+                <label class="pm-label">PM 一类（人天）</label>
+                <el-input-number v-model="ph.pm1" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
+              </div>
+              <div class="pm-field">
+                <label class="pm-label">PM 二类（人天）</label>
+                <el-input-number v-model="ph.pm2" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
+              </div>
+              <div class="pm-field">
+                <label class="pm-label">技服一类（人天）</label>
+                <el-input-number v-model="ph.tech1" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
+              </div>
+              <div class="pm-field">
+                <label class="pm-label">技服二类（人天）</label>
+                <el-input-number v-model="ph.tech2" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
+              </div>
             </div>
-            <div class="pm-field">
-              <label class="pm-label">PM 二类（人天）</label>
-              <el-input-number v-model="ph.pm2" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
-            </div>
-            <div class="pm-field">
-              <label class="pm-label">技服一类（人天）</label>
-              <el-input-number v-model="ph.tech1" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
-            </div>
-            <div class="pm-field">
-              <label class="pm-label">技服二类（人天）</label>
-              <el-input-number v-model="ph.tech2" class="u-num pm-num" :min="0" :controls="false" @change="touch" />
-            </div>
+            <el-input v-model="ph.note" type="textarea" :rows="2" placeholder="工作内容" @input="touch" />
           </div>
-          <el-input v-model="ph.note" type="textarea" :rows="2" placeholder="工作内容" @input="touch" />
-        </div>
 
-        <div class="pm-sum">
-          <h4 class="pm-sum-h">小结（按成本单价计）</h4>
-          <table class="pm-table">
-            <thead>
-              <tr><th>类别</th><th>人天合计</th><th>成本单价</th><th>成本</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in summary" :key="s.label">
-                <td>{{ s.label }}</td>
-                <td class="u-num">{{ s.days }}</td>
-                <td class="u-num">{{ s.price }}</td>
-                <td class="u-num">{{ fmtYuan(s.cost) }}</td>
-              </tr>
-              <tr class="pm-total">
-                <td>合计</td>
-                <td class="u-num">{{ pmDays1 + pmDays2 + techDays1 + techDays2 }}</td>
-                <td>—</td>
-                <td class="u-num">{{ fmtYuan(pmTotalCost) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="pm-sum">
+            <h4 class="pm-sum-h">小结（按成本单价计）</h4>
+            <table class="pm-table">
+              <thead>
+                <tr><th>类别</th><th>人天合计</th><th>成本单价</th><th>成本</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in summary" :key="s.label">
+                  <td>{{ s.label }}</td>
+                  <td class="u-num">{{ s.days }}</td>
+                  <td class="u-num">{{ s.price }}</td>
+                  <td class="u-num">{{ fmtYuan(s.cost) }}</td>
+                </tr>
+                <tr class="pm-total">
+                  <td>合计</td>
+                  <td class="u-num">{{ pmDays1 + pmDays2 + techDays1 + techDays2 }}</td>
+                  <td>—</td>
+                  <td class="u-num">{{ fmtYuan(pmTotalCost) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </el-collapse-item>
-  </el-collapse>
+      </el-collapse-item>
+    </el-collapse>
+  </AppCard>
 </template>
 
 <style scoped>
-.bd-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-}
+/* 卡片外观(圆角/内边距/底色/阴影/描边)已交给外层 AppCard(default)。
+   原先 .bd-card 的 border 简写顺带覆盖掉了 el-collapse 自带的上下边框;
+   改为 AppCard 包裹后须显式清零,否则卡内会多出两条横线。 */
+.pm-card { border-top: 0; border-bottom: 0; }
 .pm-card :deep(.el-collapse-item__header),
 .pm-card :deep(.el-collapse-item__wrap) {
   background: transparent;

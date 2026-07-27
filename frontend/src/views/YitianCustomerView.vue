@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -172,7 +173,7 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
     <el-skeleton v-else-if="store.loading && !ready" :rows="6" animated />
 
     <template v-if="ready">
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">TOP1000 大客户支持</h3>
         <p class="yt-note">仅统计项目类 / 售前类 / 售后类工时；客户数按客户去重。</p>
         <div v-if="!topRowsRaw.length" class="yt-empty">无数据</div>
@@ -183,9 +184,9 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
             <el-link type="primary" :underline="false" @click.stop="goDetailL4(row)">明细</el-link>
           </template>
         </DataTable>
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">跨 BG 支持</h3>
         <p class="yt-note">仅统计项目类 / 售前类工时；本 BG 按销售 L2 组织判定。</p>
         <MetricGrid :items="bgMetrics" col-min="200px" />
@@ -194,14 +195,14 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
           <div v-if="!bgByL4Rows.length" class="yt-empty">无数据</div>
           <ChartBox v-else :option="bgByL4ChartOption" :height="bgByL4Height" @datapoint-click="onL4BarClick" />
         </div>
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">TOP 客户排行</h3>
         <p class="yt-note">按客户汇总工时（不限工时类型，只看挂了客户的记录），取前 10。</p>
         <div v-if="!topCustList.length" class="yt-empty">无数据</div>
         <ChartBox v-else :option="topCustChartOption" :height="topCustHeight" />
-      </section>
+      </AppCard>
     </template>
   </div>
 </template>
@@ -209,13 +210,6 @@ defineExpose({ topRows, bg, topCustList, bgByL4Rows, goAnalyticsL4, onL4BarClick
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--gap-card); }
-.yt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-}
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }
 .yt-note { font-size: var(--fs-1); color: var(--mut); margin-bottom: var(--gap-stack); }
 .yt-empty { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-3) 0; }

@@ -114,6 +114,15 @@ describe('PayNodesView', () => {
     expect(w.find('.ap-total').text()).toContain('共 2 条')
   })
 
+  it('5 卡汇总改用 AppCard(flat),布局属性仍留在 .ns', async () => {
+    seed()
+    const w = mount(PayNodesView, opts)
+    await flushPromises()
+    const cards = w.findAll('.ns')
+    expect(cards).toHaveLength(5)
+    expect(cards.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+  })
+
   it('行点击触发 pd.open', async () => {
     seed()
     const w = mount(PayNodesView, opts)

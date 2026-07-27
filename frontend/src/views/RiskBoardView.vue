@@ -19,6 +19,7 @@ import DimPicker from '@/components/DimPicker.vue'
 import PivotTable from '@/components/PivotTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -141,11 +142,11 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
 
     <template v-else>
       <div class="rv-cards">
-        <div v-for="c in cards" :key="c.k" class="rv-card">
+        <AppCard v-for="c in cards" :key="c.k" variant="flat" class="rv-card">
           <div class="rv-card-k">{{ c.k }}</div>
           <div class="rv-card-main u-num" :class="'rv-main-' + c.tone">{{ c.main }}</div>
           <div class="rv-card-sub u-num">{{ c.sub }}</div>
-        </div>
+        </AppCard>
       </div>
 
       <h3 class="rv-h3">风险统计分析</h3>
@@ -183,8 +184,8 @@ defineExpose({ dimKey, metricKey, chartTypes, levelFilter, rowDims, colDims, ovM
 .risk-view { padding: var(--sp-4); }
 .rv-h3 { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: var(--sp-5) 0 var(--sp-3); }
 .rv-cards { display: flex; flex-wrap: wrap; gap: var(--gap-card); margin-bottom: var(--sp-3); }
-.rv-card { flex: 1 1 200px; min-width: 180px; background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--r-md); padding: var(--card-pad); display: flex; flex-direction: column; gap: var(--gap-stack); }
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.rv-card { flex: 1 1 200px; min-width: 180px; display: flex; flex-direction: column; gap: var(--gap-stack); }
 .rv-card-k { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .rv-card-main { font-size: var(--fs-5); font-weight: 700; color: var(--txt); line-height: var(--lh-tight); }
 .rv-card-sub { font-size: var(--fs-2); color: var(--mut); }

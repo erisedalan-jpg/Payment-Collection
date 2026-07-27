@@ -2,6 +2,7 @@
 import { nextTick, ref } from 'vue'
 import type { InputInstance } from 'element-plus'
 import { useBudgetStore } from '@/stores/budget'
+import AppCard from '@/components/AppCard.vue'
 
 /** CRM 审批建议：这段文字是要整段复制进 CRM 走审批的，所以默认以**只读原文**呈现
  *  （所见即所贴，换行不被输入框裁掉），点「编辑」或点正文才切到 textarea 手改。
@@ -37,7 +38,7 @@ defineExpose({ editing, startEdit, restore })
 </script>
 
 <template>
-  <section class="bd-card">
+  <AppCard variant="default" class="bd-card">
     <div class="crm-head">
       <h3 class="bd-card-title">CRM 审批建议</h3>
       <div class="crm-ops">
@@ -66,20 +67,12 @@ defineExpose({ editing, startEdit, restore })
     <pre v-else class="crm-text" @click="startEdit">{{ store.form.crmText }}</pre>
 
     <p class="crm-hint">整段复制进 CRM 走审批。手改后不再随表单自动更新，可点「恢复自动生成」取回自动版本。</p>
-  </section>
+  </AppCard>
 </template>
 
 <style scoped>
-.bd-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-stack);
-}
+/* 卡片外观(圆角/内边距/底色/阴影/描边)已交给 AppCard(default),此处只留布局属性 */
+.bd-card { display: flex; flex-direction: column; gap: var(--gap-stack); }
 .bd-card-title { font-size: var(--fs-4); font-weight: 700; color: var(--txt); line-height: var(--lh-dense); }
 .crm-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-card); flex-wrap: wrap; }
 .crm-ops { display: flex; align-items: center; gap: var(--sp-2); }

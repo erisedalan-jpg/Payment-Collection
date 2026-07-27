@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { TodoBucket, TodoQueueResult } from '@/lib/todoQueue'
 import SegToggle from '@/components/SegToggle.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const props = defineProps<{ result: TodoQueueResult; windowDays: 7 | 30 }>()
 const emit = defineEmits<{ 'update:windowDays': [7 | 30] }>()
@@ -32,7 +33,7 @@ const winStr = computed({
 </script>
 
 <template>
-  <div class="tq">
+  <AppCard variant="raised">
     <div class="tq-head">
       <span class="tq-title">待办 / 临期</span>
       <SegToggle v-model="winStr" :options="WINDOW_OPTS" />
@@ -58,11 +59,11 @@ const winStr = computed({
       </RouterLink>
     </div>
     <div v-else class="tq-empty">暂无待办</div>
-  </div>
+  </AppCard>
 </template>
 
 <style scoped>
-.tq { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); box-shadow: var(--shadow-1); }
+/* 外层卡片(--r-md + 阴影)已交给 AppCard(raised),本文件不再自写 .tq。 */
 .tq-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .tq-title { font-size: var(--fs-2); font-weight: 700; color: var(--txt); }
 .tq-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); margin-bottom: var(--sp-3); }

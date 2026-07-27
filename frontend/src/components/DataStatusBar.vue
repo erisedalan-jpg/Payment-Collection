@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppCard from './AppCard.vue'
+
 defineProps<{
   lastUpdate: string
   lastPmis: string
@@ -9,7 +11,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="dsb">
+  <AppCard variant="raised" class="dsb">
     <div class="dsb-item">
       <span class="dsb-label">上次处理</span>
       <span class="dsb-val u-num">{{ lastUpdate }}</span>
@@ -31,20 +33,18 @@ defineProps<{
       <span class="dsb-label">倚天 cookie</span>
       <span class="dsb-val" :class="{ mut: !yitianStatus.sessionPreview }" data-test="dsb-yitian">{{ yitianStatus.sessionPreview ? '已存 · ' + (yitianStatus.updatedAt || '-') : '-' }}</span>
     </div>
-  </div>
+  </AppCard>
 </template>
 
 <style scoped>
+/* 卡片外观(底/描边/圆角/阴影/内边距)已交给 AppCard(raised),
+   原 padding: --sp-3 --sp-4 随本次归位到 --card-pad;
+   这里只保留 AppCard 不接管的布局属性。 */
 .dsb {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2) var(--sp-5);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-1);
-  padding: var(--sp-3) var(--sp-4);
 }
 .dsb-item { display: flex; align-items: baseline; gap: var(--sp-2); }
 .dsb-label { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }

@@ -9,6 +9,7 @@ import { exportRows } from '@/lib/exportXlsx'
 import SegToggle from '@/components/SegToggle.vue'
 import EventTimeline from '@/components/EventTimeline.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
@@ -141,20 +142,20 @@ function doExportEvents() {
       </template>
     </PageHeader>
 
-    <div class="av-compare">
+    <AppCard variant="flat" class="av-compare">
       <div class="av-compare-head">
         <span class="av-compare-label">周期对比</span>
         <SegToggle v-model="baseline" :options="BASELINES" />
         <span v-if="entry" class="av-base-date">对比 {{ entry.baseDate }}</span>
       </div>
       <div v-if="entry" class="av-cards">
-        <div v-for="c in compareCards" :key="c.k" class="av-card">
+        <AppCard v-for="c in compareCards" :key="c.k" variant="inset" class="av-card">
           <div class="av-card-v u-num">{{ c.v }}</div>
           <div class="av-card-k">{{ c.k }}</div>
-        </div>
+        </AppCard>
       </div>
       <div v-else class="av-insufficient">快照不足，该基线暂无对比数据。</div>
-    </div>
+    </AppCard>
 
     <div class="av-toolbar">
       <SegToggle v-model="filters.domain" :options="DOMAINS" />
@@ -198,12 +199,13 @@ function doExportEvents() {
 
 <style scoped>
 .activity-view { padding: var(--sp-4); }
-.av-compare { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
+/* 卡片外观已收归 AppCard(flat / inset);此处只留布局属性 */
+.av-compare { margin-bottom: var(--sp-4); }
 .av-compare-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .av-compare-label { font-weight: 700; font-size: var(--fs-2); color: var(--txt); }
 .av-base-date { font-size: var(--fs-1); color: var(--mut); }
 .av-cards { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
-.av-card { flex: 1; min-width: 110px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); }
+.av-card { flex: 1; min-width: 110px; }
 .av-card-v { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }
 .av-card-k { font-size: var(--fs-1); color: var(--mut); margin-top: 2px; }
 .av-insufficient { color: var(--mut); font-size: var(--fs-2); padding: var(--sp-2) 0; opacity: var(--disabled-opacity); }

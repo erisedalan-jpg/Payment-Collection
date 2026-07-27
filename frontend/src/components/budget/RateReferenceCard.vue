@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
+import AppCard from '@/components/AppCard.vue'
 
 /** 费率速查:只读,全部由 store.effectiveConfig 渲染。
  *  原工具在 HTML 里另抄了一份静态费率表,与 JS 常量成了两份真相源(且 PM 那两格抄的是销售价) —— 这里只有一个源。 */
@@ -39,93 +40,92 @@ defineExpose({ laborRows, hotelRows, materialRows })
 </script>
 
 <template>
-  <el-collapse class="bd-card rr-card">
-    <el-collapse-item name="rr">
-      <template #title>
-        <span class="bd-card-title">费率速查</span>
-        <span class="rr-note">只读 · 取自当前生效的费率配置（改费率去「费率配置」）</span>
-      </template>
+  <AppCard variant="default">
+    <el-collapse class="rr-card">
+      <el-collapse-item name="rr">
+        <template #title>
+          <span class="bd-card-title">费率速查</span>
+          <span class="rr-note">只读 · 取自当前生效的费率配置（改费率去「费率配置」）</span>
+        </template>
 
-      <div class="rr-grid">
-        <div class="rr-block">
-          <h4 class="rr-h">人天成本单价（元/人天）</h4>
-          <table class="rr-table">
-            <thead>
-              <tr><th>角色</th><th>一类城市</th><th>二类城市</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in laborRows" :key="r.name">
-                <td>{{ r.name }}</td>
-                <td class="u-num">{{ r.c1 }}</td>
-                <td class="u-num">{{ r.c2 }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="rr-grid">
+          <div class="rr-block">
+            <h4 class="rr-h">人天成本单价（元/人天）</h4>
+            <table class="rr-table">
+              <thead>
+                <tr><th>角色</th><th>一类城市</th><th>二类城市</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in laborRows" :key="r.name">
+                  <td>{{ r.name }}</td>
+                  <td class="u-num">{{ r.c1 }}</td>
+                  <td class="u-num">{{ r.c2 }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="rr-block">
-          <h4 class="rr-h">销售物料单价（元/人天）</h4>
-          <table class="rr-table">
-            <thead>
-              <tr><th>物料编码</th><th>物料名称</th><th>销售单价</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="m in materialRows" :key="m.key">
-                <td class="u-num">{{ m.code }}</td>
-                <td>{{ m.name }}</td>
-                <td class="u-num">{{ m.price }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div class="rr-block">
+            <h4 class="rr-h">销售物料单价（元/人天）</h4>
+            <table class="rr-table">
+              <thead>
+                <tr><th>物料编码</th><th>物料名称</th><th>销售单价</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in materialRows" :key="m.key">
+                  <td class="u-num">{{ m.code }}</td>
+                  <td>{{ m.name }}</td>
+                  <td class="u-num">{{ m.price }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="rr-block">
-          <h4 class="rr-h">住宿标准</h4>
-          <table class="rr-table">
-            <thead>
-              <tr><th>类别</th><th>标准</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="h in hotelRows" :key="h.name">
-                <td>{{ h.name }}</td>
-                <td class="u-num">{{ h.price }} {{ h.unit }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div class="rr-block">
+            <h4 class="rr-h">住宿标准</h4>
+            <table class="rr-table">
+              <thead>
+                <tr><th>类别</th><th>标准</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in hotelRows" :key="h.name">
+                  <td>{{ h.name }}</td>
+                  <td class="u-num">{{ h.price }} {{ h.unit }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="rr-block">
-          <h4 class="rr-h">差补标准与汇率</h4>
-          <table class="rr-table">
-            <tbody>
-              <tr>
-                <td>差补（境内）</td>
-                <td class="u-num">{{ cfg.allowance.dom }} 元/天</td>
-              </tr>
-              <tr>
-                <td>差补（境外）</td>
-                <td class="u-num">{{ cfg.allowance.intl }} 美金/天</td>
-              </tr>
-              <tr>
-                <td>汇率（美金 → 人民币）</td>
-                <td class="u-num">{{ cfg.fx }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="rr-block">
+            <h4 class="rr-h">差补标准与汇率</h4>
+            <table class="rr-table">
+              <tbody>
+                <tr>
+                  <td>差补（境内）</td>
+                  <td class="u-num">{{ cfg.allowance.dom }} 元/天</td>
+                </tr>
+                <tr>
+                  <td>差补（境外）</td>
+                  <td class="u-num">{{ cfg.allowance.intl }} 美金/天</td>
+                </tr>
+                <tr>
+                  <td>汇率（美金 → 人民币）</td>
+                  <td class="u-num">{{ cfg.fx }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </el-collapse-item>
-  </el-collapse>
+      </el-collapse-item>
+    </el-collapse>
+  </AppCard>
 </template>
 
 <style scoped>
-.bd-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-}
+/* 卡片外观(圆角/内边距/底色/阴影/描边)已交给外层 AppCard(default)。
+   原先 .bd-card 的 border 简写顺带覆盖掉了 el-collapse 自带的上下边框;
+   改为 AppCard 包裹后须显式清零,否则卡内会多出两条横线。 */
+.rr-card { border-top: 0; border-bottom: 0; }
 /* 折叠头/体自带的边框与底色交给卡片本身,避免出现第三层边界 */
 .rr-card :deep(.el-collapse-item__header),
 .rr-card :deep(.el-collapse-item__wrap) {

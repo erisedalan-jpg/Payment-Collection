@@ -19,6 +19,7 @@ vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianAnalyticsView from './YitianAnalyticsView.vue'
 import AppPager from '@/components/AppPager.vue'
+import AppCard from '@/components/AppCard.vue'
 
 // 两天工作日 → 基础 16h。张三 20h(加班) 李四 8h(欠填) 王五 零记录(完全未填)
 const DATA = {
@@ -121,6 +122,16 @@ describe('YitianAnalyticsView', () => {
     const w = mountView()
     await flushPromises()
     expect(w.find('.yt-page').exists()).toBe(true)
+  })
+
+  it('8 处卡片容器全部接入 AppCard(default)', async () => {
+    const w = mountView()
+    await flushPromises()
+    const cards = w.findAllComponents(AppCard)
+    // 只数本页自己的卡(以 h3.yt-h 为标记):子组件内部也可能用 AppCard,按总数断言会被它们带偏
+    const main = cards.filter((c) => c.find('h3.yt-h').exists())
+    expect(main).toHaveLength(8)
+    expect(main.every((c) => c.props('variant') === 'default')).toBe(true)
   })
 
   it('员工明细表 8 列全带列头筛选图标', async () => {

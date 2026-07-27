@@ -18,6 +18,7 @@ vi.mock('@/charts/ChartBox.vue', () => ({
 }))
 
 import YitianTrendView from './YitianTrendView.vue'
+import AppCard from '@/components/AppCard.vue'
 import { useYitianViewStore } from '@/stores/yitianView'
 
 // 6/1~6/4 全工作日;张三 6/1 8h(合规) 6/5 8h(问题)。calc 口径下 6/5 属下一个计算周
@@ -90,6 +91,16 @@ describe('YitianTrendView', () => {
     const w = mount(YitianTrendView, { global: { plugins: [ElementPlus, makeRouter()] } })
     await flushPromises()
     expect(w.find('.yt-page').exists()).toBe(true)
+  })
+
+  it('6 张趋势卡全部接入 AppCard(default)', async () => {
+    const w = mount(YitianTrendView, { global: { plugins: [ElementPlus, makeRouter()] } })
+    await flushPromises()
+    const cards = w.findAllComponents(AppCard)
+    // 只数本页自己的卡(以 h3.yt-h 为标记):子组件内部也可能用 AppCard,按总数断言会被它们带偏
+    const main = cards.filter((c) => c.find('h3.yt-h').exists())
+    expect(main).toHaveLength(6)
+    expect(main.every((c) => c.props('variant') === 'default')).toBe(true)
   })
 
   it('渲染页头标题「趋势分析」,与 tab label 逐字一致', async () => {

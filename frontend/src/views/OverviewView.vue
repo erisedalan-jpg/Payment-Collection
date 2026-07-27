@@ -21,6 +21,7 @@ import { buildMilestoneProjects } from '@/lib/milestoneAnalytics'
 import { isAnomalous } from '@/lib/anomaly'
 import PortalLaunchpad from '@/components/PortalLaunchpad.vue'
 import AppEmpty from '@/components/AppEmpty.vue'
+import AppCard from '@/components/AppCard.vue'
 import { usePortalStore } from '@/stores/portal'
 import { buildSections } from '@/lib/portal'
 import { useAuthStore } from '@/stores/auth'
@@ -161,7 +162,7 @@ defineExpose({ baseProjects })
 <template>
   <div class="overview-view">
     <!-- 快捷入口 / 门户 -->
-    <section v-if="portalSections.length || auth.isSuper" class="ov-portal">
+    <AppCard v-if="portalSections.length || auth.isSuper" variant="default" class="ov-portal">
       <div class="ov-portal-head">
         <span class="ov-portal-title">快捷入口</span>
         <button v-if="portalSections.length" class="ov-portal-toggle" @click="togglePortal">
@@ -173,10 +174,10 @@ defineExpose({ baseProjects })
         <PortalLaunchpad v-show="!portalCollapsed" :sections="portalSections" />
       </template>
       <div v-else-if="auth.isSuper" class="ov-portal-empty">还没有快捷入口，去数据管理页配置 →</div>
-    </section>
+    </AppCard>
 
     <!-- 体检带 -->
-    <section class="ov-band">
+    <AppCard variant="default" class="ov-band">
       <div class="ov-band-health">
         <div class="ov-band-head">
           <span class="ov-band-title">项目健康度</span>
@@ -204,13 +205,13 @@ defineExpose({ baseProjects })
           </RouterLink>
         </div>
       </div>
-    </section>
+    </AppCard>
 
     <div class="ov-lower">
       <section class="ov-anomaly">
         <div class="ov-anomaly-title">需要处理的异常</div>
         <div v-if="anomalyCards.length" class="ov-anomaly-grid">
-          <div v-for="c in anomalyCards" :key="c.category" class="ov-acard" :class="`ov-acard--${c.tone}`">
+          <AppCard v-for="c in anomalyCards" :key="c.category" variant="raised" class="ov-acard" :class="`ov-acard--${c.tone}`">
             <div class="ov-acard-head">
               <span class="ov-acard-name">{{ c.category }}</span>
               <span class="ov-acard-count u-num" :class="`ov-acard-count--${c.tone}`">{{ c.count }}</span>
@@ -226,7 +227,7 @@ defineExpose({ baseProjects })
                 查看全部 {{ c.count }} 个 →
               </RouterLink>
             </div>
-          </div>
+          </AppCard>
         </div>
         <AppEmpty v-else variant="plain">暂无需要处理的异常</AppEmpty>
       </section>
@@ -235,7 +236,7 @@ defineExpose({ baseProjects })
         <TodoQueue :result="todoResult" v-model:window-days="todoWindow" />
       </section>
 
-      <aside class="ov-aside">
+      <AppCard variant="raised" class="ov-aside">
         <div class="ov-aside-title">项目动态</div>
         <div v-if="digest" class="ov-digest">
           <span v-for="d in digest" :key="d.k" class="ov-digest-i">
@@ -251,7 +252,7 @@ defineExpose({ baseProjects })
         </div>
         <EventTimeline :events="shownEvents" empty-text="暂无要紧动态" />
         <RouterLink class="ov-more" to="/activity">查看全部 →</RouterLink>
-      </aside>
+      </AppCard>
     </div>
   </div>
 </template>
@@ -259,12 +260,10 @@ defineExpose({ baseProjects })
 <style scoped>
 .overview-view { padding: var(--sp-4); }
 
-/* 体检带 */
+/* 体检带 —— 卡片外观已归位到 AppCard(default),此处只留布局属性 */
 .ov-band {
   display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: var(--sp-5); background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--r-lg); padding: var(--card-pad); box-shadow: var(--shadow-1);
-  margin-bottom: var(--gap-section);
+  gap: var(--sp-5); margin-bottom: var(--gap-section);
 }
 .ov-band-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); flex-wrap: wrap; }
 .ov-band-title { font-size: var(--fs-2); font-weight: 700; color: var(--txt); }
@@ -285,7 +284,10 @@ defineExpose({ baseProjects })
 /* 异常分诊 */
 .ov-anomaly-title { font-size: var(--fs-2); font-weight: 700; color: var(--txt); margin-bottom: var(--sp-3); }
 .ov-anomaly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--gap-card); }
-.ov-acard { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); padding-left: calc(var(--card-pad) + var(--sp-1)); box-shadow: var(--shadow-1); overflow: hidden; }
+/* 卡片外观已归位到 AppCard(raised);左内边距要给 ::before 的 4px 色条让位,
+   与 AppCard 的 padding 简写正面冲突,故用 .ac.ov-acard 复合选择器提高特异性
+   (沿用 V4.4.9 的 .ab.frf-primary 先例),不靠打包顺序碰运气。 */
+.ac.ov-acard { position: relative; padding-left: calc(var(--card-pad) + var(--sp-1)); overflow: hidden; }
 .ov-acard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .ov-acard--danger::before { background: var(--danger); }
 .ov-acard--warn::before { background: var(--warn); }
@@ -304,8 +306,8 @@ defineExpose({ baseProjects })
 .ov-acard-item-detail { color: var(--sub); white-space: nowrap; }
 .ov-acard-all { font-size: var(--fs-1); color: var(--accent); text-decoration: none; margin-top: var(--sp-1); }
 
-/* 右栏动态 */
-.ov-aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); box-shadow: var(--shadow-1); }
+/* 右栏动态 —— 卡片外观全数归位到 AppCard(raised),内边距按变体统一为 --card-pad;
+   .ov-aside 保留类名仅作定位钩子(同 V4.4.9 的 .rtc-cancel)。 */
 .ov-aside-title { font-weight: 700; font-size: var(--fs-2); color: var(--txt); margin-bottom: var(--sp-2); }
 .ov-more { font-size: var(--fs-1); color: var(--accent); text-decoration: none; font-weight: 600; }
 .ov-digest { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0; margin-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
@@ -323,12 +325,10 @@ defineExpose({ baseProjects })
   .ov-band-pay { flex-direction: column; align-items: stretch; }
 }
 
-/* 快捷入口 / 门户 */
+/* 快捷入口 / 门户 —— 卡片外观已归位到 AppCard(default),此处只留布局属性 */
 .ov-portal {
   display: flex; flex-direction: column; gap: var(--sp-2);
-  padding: var(--card-pad); background: var(--card);
-  border: 1px solid var(--line); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-1); margin-bottom: var(--gap-card);
+  margin-bottom: var(--gap-card);
 }
 .ov-portal-head { display: flex; align-items: center; gap: var(--sp-2); }
 .ov-portal-title { font-size: var(--fs-3); font-weight: 700; color: var(--txt); }

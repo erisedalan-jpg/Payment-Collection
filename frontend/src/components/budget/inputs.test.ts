@@ -7,6 +7,8 @@ import ProductSection from './ProductSection.vue'
 import DirectCostSection from './DirectCostSection.vue'
 import RateReferenceCard from './RateReferenceCard.vue'
 import PmSection from './PmSection.vue'
+import BasicInfoCard from './BasicInfoCard.vue'
+import ServiceSection from './ServiceSection.vue'
 import type { BudgetConfig } from '@/lib/budget/types'
 
 const CFG = {
@@ -93,6 +95,14 @@ describe('ProductSection', () => {
     s.form.products[0].std.tech1 = 2
     expect(s.result?.prodTechCost).toBe(2 * 1300)
   })
+
+  // 卡片外观(圆角/内边距/底色/阴影/描边)统一由 AppCard 提供,组件不再自写。
+  // 断言到具体变体 —— 只断言「有 .ac」的话,变体改错也照绿。
+  it('卡片容器接入 AppCard(default)', () => {
+    const card = mount(ProductSection, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
 })
 
 describe('PmSection', () => {
@@ -139,6 +149,12 @@ describe('PmSection', () => {
     expect(s.form.pmPhases[1].pm1).toBe(5)
     expect(s.result?.pmDays1).toBe(8)                   // 两行都被计入,没有互相覆盖
   })
+
+  it('卡片容器接入 AppCard(default)', () => {
+    const card = mount(PmSection, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
 })
 
 describe('DirectCostSection', () => {
@@ -160,6 +176,12 @@ describe('DirectCostSection', () => {
     expect(html).toContain('150')       // 境内差补
     expect(html).toContain('6.8')       // 汇率
   })
+
+  it('卡片容器接入 AppCard(default)', () => {
+    const card = mount(DirectCostSection, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
 })
 
 describe('RateReferenceCard', () => {
@@ -171,5 +193,29 @@ describe('RateReferenceCard', () => {
     expect(html).toContain('1300')      // 技服一类
     expect(html).toContain('2400')      // PM 销售单价
     expect(html).toContain('6.8')       // 汇率
+  })
+
+  it('卡片容器接入 AppCard(default)', () => {
+    const card = mount(RateReferenceCard, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
+})
+
+describe('BasicInfoCard', () => {
+  beforeEach(setup)
+  it('卡片容器接入 AppCard(default)', () => {
+    const card = mount(BasicInfoCard, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
+  })
+})
+
+describe('ServiceSection', () => {
+  beforeEach(setup)
+  it('卡片容器接入 AppCard(default)', () => {
+    const card = mount(ServiceSection, opts).find('.ac')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--default')
   })
 })

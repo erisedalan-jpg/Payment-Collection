@@ -321,3 +321,23 @@ describe('CostDetailView 页头与视图状态持久化', () => {
     expect(keys).not.toContain('currentPage')
   })
 })
+
+describe('V4.5.0 AppCard', () => {
+  it('三处内容块改用 AppCard(flat)', () => {
+    seed()
+    const w = mount(CostDetailView, opts)
+    const cards = w.findAll('.cd-card')
+    expect(cards).toHaveLength(3)
+    expect(cards.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+  })
+
+  it('KPI 点击仍能滚到明细卡(模板 ref 换成组件实例后须走 $el,否则静默失效)', async () => {
+    const spy = vi.fn()
+    ;(Element.prototype as any).scrollIntoView = spy
+    seed()
+    const w = mount(CostDetailView, opts)
+    ;(w.vm as any).onKpiClick(2)
+    await w.vm.$nextTick()
+    expect(spy).toHaveBeenCalled()
+  })
+})

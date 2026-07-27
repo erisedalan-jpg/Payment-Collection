@@ -80,6 +80,51 @@ describe('V4.4.8 页头与视图状态全局守卫', () => {
     }
   })
 
+  it('V4.5.0 AppCard 已广泛接入,且 16 处非目标未被误套', () => {
+    const comps = resolve(viewsDir, '../components')
+    const dirs = [viewsDir, comps, resolve(comps, 'budget')]
+    const users = dirs.flatMap((d) => {
+      try {
+        return readdirSync(d).filter((f) => f.endsWith('.vue'))
+          .filter((f) => readFileSync(resolve(d, f), 'utf-8').includes('<AppCard'))
+      } catch { return [] }
+    }).length
+    expect(users, 'AppCard 接入数下降,可能有人改回自写卡片').toBeGreaterThanOrEqual(30)
+
+    // 非目标必须仍是自写样式 —— 它们满足「background+border+radius」但语义上不是内容容器
+    // (交互控件/按钮/列表项/表单内部件/登录页表单),套 AppCard 是错的。
+    const KEEP: [string, string, string][] = [
+      [comps, 'SegToggle.vue', 'seg'], [comps, 'ChartTypeSelector.vue', 'cts'],
+      [comps, 'ProjectDetailDrawer.vue', 'pd-cell'], [comps, 'FollowupRecords.vue', 'fr-record'],
+      [comps, 'TodoQueue.vue', 'tq-count'], [viewsDir, 'ActivityView.vue', 'av-export'],
+      [viewsDir, 'RiskBoardView.vue', 'rv-chart-item'],
+      [viewsDir, 'LoginView.vue', 'lv-form'], [viewsDir, 'ChangePasswordView.vue', 'cpw-form'],
+    ]
+    for (const [d, f, cls] of KEEP) {
+      expect(new RegExp(`^\\.${cls}\\s*[,{]`, 'm').test(readFileSync(resolve(d, f), 'utf-8')),
+        `${f} 的 .${cls} 属非目标,不应被 AppCard 取代`).toBe(true)
+    }
+
+    // 本期迁移掉的卡片类【不得再含外观属性】。注意判据不是「类名消失」——
+    // 按迁移铁律③,带 flex/min-width 等布局属性的卡片类要保留下来与 AppCard 并存
+    // (如 <AppCard variant="flat" class="rv-card">),此时类名仍在但只剩布局。
+    // 按「文件:类名」精确配对,避免同名类混淆(CalendarView.cd-card 归 inset
+    // 而 CostDetailView.cd-card 归 flat)。
+    const NO_SKIN: [string, string, string][] = [
+      [viewsDir, 'BoardView.vue', 'bv-card'], [viewsDir, 'InsightView.vue', 'iv-card'],
+      [viewsDir, 'RiskBoardView.vue', 'rv-card'], [viewsDir, 'OverviewView.vue', 'ov-acard'],
+      [comps, 'MetricGrid.vue', 'mg-card'],
+    ]
+    for (const [d, f, cls] of NO_SKIN) {
+      const m = readFileSync(resolve(d, f), 'utf-8').match(new RegExp(`^\\.${cls}\\s*\\{([^}]*)\\}`, 'm'))
+      if (!m) continue                       // 类整条删除也是合格结果
+      const body = m[1]
+      for (const skin of ['background', 'border-radius', 'box-shadow']) {
+        expect(body.includes(skin), `${f} 的 .${cls} 仍带 ${skin},外观未收归 AppCard`).toBe(false)
+      }
+    }
+  })
+
   it('页面组件里不得出现 hideFilter(它是 router meta,不属于 view)', () => {
     for (const f of allViews()) {
       expect(read(f), `${f} 不应引用 hideFilter`).not.toContain('hideFilter')

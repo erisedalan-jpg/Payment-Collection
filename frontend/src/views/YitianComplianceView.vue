@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
@@ -220,12 +221,12 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
     <template v-if="ready">
       <div class="yt-kpi-row">
         <MetricGrid :items="healthMetrics" col-min="180px" class="yt-kpi-grid" />
-        <div class="yt-ring-card">
+        <AppCard variant="flat" class="yt-ring-card">
           <RatioRing :ratio="complianceRatio" label="合规率" :size="140" :color="complianceRingColor" />
-        </div>
+        </AppCard>
       </div>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <div class="yt-head">
           <h3 class="yt-h">问题分布</h3>
           <div class="yt-actions">
@@ -234,21 +235,21 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
         </div>
         <div v-if="!codeDist.length" class="yt-empty">本区间无合规问题</div>
         <ChartBox v-else :option="codeBarChartOption" :height="codeBarHeight" @datapoint-click="onCodeBarClick" />
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">问题按 L4 组织分布</h3>
         <div v-if="!l4Dist.length" class="yt-empty">本区间无合规问题</div>
         <ChartBox v-else :option="l4BarChartOption" :height="l4BarHeight" @datapoint-click="onL4BarClick" />
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">问题码 × L4 热力图</h3>
         <div v-if="!heatmap.codes.length" class="yt-empty">本区间无合规问题</div>
         <ChartBox v-else :option="heatmapChartOption" :height="heatmapHeight" @datapoint-click="onHeatmapClick" />
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <div class="yt-head">
           <h3 class="yt-h">问题明细</h3>
           <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
@@ -262,7 +263,7 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
           </template>
         </DataTable>
         <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
-      </section>
+      </AppCard>
     </template>
   </div>
 </template>
@@ -272,6 +273,7 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
 .yt-kpi-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: var(--gap-card); }
 @media (max-width: 768px) { .yt-kpi-row { grid-template-columns: 1fr; } }
 .yt-kpi-grid { min-width: 0; }
+/* 卡片外观(底色/描边/圆角/内边距)已交给 AppCard(flat),这里只留布局属性 */
 .yt-ring-card {
   display: flex;
   flex-direction: column;
@@ -279,17 +281,6 @@ defineExpose({ filtered, paged, pageSize, currentPage, codeDist, codeBarChartOpt
   justify-content: center;
   gap: var(--sp-2);
   min-width: 200px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: var(--card-pad);
-}
-.yt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
 }
 .yt-head { display: flex; justify-content: space-between; align-items: center; gap: var(--gap-stack); flex-wrap: wrap; }
 .yt-actions { display: flex; gap: var(--gap-stack); align-items: center; }

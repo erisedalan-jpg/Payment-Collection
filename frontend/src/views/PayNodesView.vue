@@ -15,6 +15,7 @@ import ColumnFilter from '@/components/ColumnFilter.vue'
 import TagFilterSelect from '@/components/TagFilterSelect.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppPager from '@/components/AppPager.vue'
+import AppCard from '@/components/AppCard.vue'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import { paymentNodeRows, nodeSummary, filterProjects } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
@@ -99,11 +100,11 @@ function onExport() {
       </template>
     </PageHeader>
     <section class="nsum u-num">
-      <div class="ns"><span class="ns-l">节点总数</span><span class="ns-v">{{ sum.total }}</span></div>
-      <div class="ns"><span class="ns-l">已回款</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></div>
-      <div class="ns"><span class="ns-l">延期</span><span class="ns-v" style="color:var(--danger-text)">{{ sum.delayed }}</span></div>
-      <div class="ns"><span class="ns-l">待回款</span><span class="ns-v" style="color:var(--warn-text)">{{ sum.pending }}</span></div>
-      <div class="ns"><span class="ns-l">计划回款Σ(万)</span><span class="ns-v">{{ fmtWan(sum.expectedTotal) }}</span></div>
+      <AppCard variant="flat" class="ns"><span class="ns-l">节点总数</span><span class="ns-v">{{ sum.total }}</span></AppCard>
+      <AppCard variant="flat" class="ns"><span class="ns-l">已回款</span><span class="ns-v" style="color:var(--ok-text)">{{ sum.reached }}</span></AppCard>
+      <AppCard variant="flat" class="ns"><span class="ns-l">延期</span><span class="ns-v" style="color:var(--danger-text)">{{ sum.delayed }}</span></AppCard>
+      <AppCard variant="flat" class="ns"><span class="ns-l">待回款</span><span class="ns-v" style="color:var(--warn-text)">{{ sum.pending }}</span></AppCard>
+      <AppCard variant="flat" class="ns"><span class="ns-l">计划回款Σ(万)</span><span class="ns-v">{{ fmtWan(sum.expectedTotal) }}</span></AppCard>
     </section>
     <div class="pv-bar">
       <TagFilterSelect v-model="selectedTags" />
@@ -126,7 +127,8 @@ function onExport() {
 
 <style scoped>
 .nsum { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--gap-card); margin-bottom: var(--gap-section); }
-.ns { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); display: flex; flex-direction: column; gap: var(--sp-1); }
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.ns { display: flex; flex-direction: column; gap: var(--sp-1); }
 .ns-l { font-size: var(--fs-1); color: var(--mut); }
 .ns-v { font-size: var(--fs-5); font-weight: 700; color: var(--txt); }
 .pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }

@@ -11,6 +11,7 @@ import {
 import { L4_OPTIONS } from '@/lib/opportunityColumns'
 import ChartBox from '@/charts/ChartBox.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 
 const opps = useOpportunitiesStore()
 const scopedOpportunities = useScopedOpportunities()
@@ -93,48 +94,48 @@ const aiAmountPie = computed(() => {
     <PageHeader title="商机看板" />
     <!-- 顶部 KPI -->
     <div class="ob-cards">
-      <div v-for="c in topCards" :key="c.k" class="ob-card">
+      <AppCard v-for="c in topCards" :key="c.k" variant="flat" class="ob-card">
         <div class="ob-card-k">{{ c.k }}</div>
         <div class="ob-card-main u-num">{{ c.main }}</div>
         <div class="ob-card-sub">{{ c.sub }}</div>
-      </div>
+      </AppCard>
     </div>
 
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">商机覆盖产品</h3><ChartBox :option="productCoverOption" height="320px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">商机覆盖产品</h3><ChartBox :option="productCoverOption" height="320px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">商机主观预测</h3><ChartBox :option="forecastPie" height="320px" /></div>
-      <div class="ob-chart"><h3 class="ob-h3">商机阶段分布</h3><ChartBox :option="stagePie" height="320px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">商机主观预测</h3><ChartBox :option="forecastPie" height="320px" /></AppCard>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">商机阶段分布</h3><ChartBox :option="stagePie" height="320px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">各团队商机金额</h3><ChartBox :option="teamAmount" height="300px" /></div>
-      <div class="ob-chart"><h3 class="ob-h3">各团队【重点】商机金额</h3><ChartBox :option="teamKeyAmount" height="300px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">各团队商机金额</h3><ChartBox :option="teamAmount" height="300px" /></AppCard>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">各团队【重点】商机金额</h3><ChartBox :option="teamKeyAmount" height="300px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">各团队商机数量</h3><ChartBox :option="teamCount" height="300px" /></div>
-      <div class="ob-chart"><h3 class="ob-h3">各团队【重点】商机数量</h3><ChartBox :option="teamKeyCount" height="300px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">各团队商机数量</h3><ChartBox :option="teamCount" height="300px" /></AppCard>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">各团队【重点】商机数量</h3><ChartBox :option="teamKeyCount" height="300px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">商机数量月变化趋势</h3><ChartBox :option="trendCountOption" height="320px" /></div>
-      <div class="ob-chart"><h3 class="ob-h3">商机金额月变化趋势</h3><ChartBox :option="trendAmountOption" height="320px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">商机数量月变化趋势</h3><ChartBox :option="trendCountOption" height="320px" /></AppCard>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">商机金额月变化趋势</h3><ChartBox :option="trendAmountOption" height="320px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">各级别客户商机数及商机金额</h3><ChartBox :option="tierOption" height="340px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">各级别客户商机数及商机金额</h3><ChartBox :option="tierOption" height="340px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">预估落单时间分布</h3><ChartBox :option="expectedOption" height="340px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">预估落单时间分布</h3><ChartBox :option="expectedOption" height="340px" /></AppCard>
     </div>
     <div class="ob-row">
-      <div class="ob-chart"><h3 class="ob-h3">AI相关商机数</h3><ChartBox :option="aiCountPie" height="320px" /></div>
-      <div class="ob-chart"><h3 class="ob-h3">AI相关商机金额</h3><ChartBox :option="aiAmountPie" height="320px" /></div>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">AI相关商机数</h3><ChartBox :option="aiCountPie" height="320px" /></AppCard>
+      <AppCard variant="flat" class="ob-chart"><h3 class="ob-h3">AI相关商机金额</h3><ChartBox :option="aiAmountPie" height="320px" /></AppCard>
     </div>
     <div class="ob-cards">
-      <div v-for="c in aiCards" :key="c.k" class="ob-card">
+      <AppCard v-for="c in aiCards" :key="c.k" variant="flat" class="ob-card">
         <div class="ob-card-k">{{ c.k }}</div>
         <div class="ob-card-main u-num">{{ c.main }}</div>
         <div class="ob-card-sub">{{ c.sub }}</div>
-      </div>
+      </AppCard>
     </div>
   </div>
 </template>
@@ -142,14 +143,12 @@ const aiAmountPie = computed(() => {
 <style scoped>
 .ob-view { display: flex; flex-direction: column; gap: var(--gap-section); }
 .ob-cards { display: flex; flex-wrap: wrap; gap: var(--gap-card); }
-.ob-card {
-  flex: 1 1 200px; min-width: 180px; background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--r-md); padding: var(--card-pad); display: flex; flex-direction: column; gap: var(--gap-stack);
-}
+/* 卡片外观已收归 AppCard(flat);此处只留布局属性 */
+.ob-card { flex: 1 1 200px; min-width: 180px; display: flex; flex-direction: column; gap: var(--gap-stack); }
 .ob-card-k { font-size: var(--fs-1); color: var(--sub); font-weight: 600; }
 .ob-card-main { font-size: var(--fs-5); font-weight: 700; color: var(--accent); }
 .ob-card-sub { font-size: var(--fs-2); color: var(--mut); }
 .ob-row { display: flex; flex-wrap: wrap; gap: var(--gap-card); }
-.ob-chart { flex: 1 1 420px; min-width: 320px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--card-pad); }
+.ob-chart { flex: 1 1 420px; min-width: 320px; }
 .ob-h3 { font-size: var(--fs-3); font-weight: 700; color: var(--txt); margin: 0 0 var(--sp-2); }
 </style>

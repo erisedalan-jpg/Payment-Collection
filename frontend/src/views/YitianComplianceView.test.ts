@@ -16,6 +16,7 @@ const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
 import YitianComplianceView from './YitianComplianceView.vue'
+import AppCard from '@/components/AppCard.vue'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -125,6 +126,20 @@ describe('YitianComplianceView', () => {
     const w = mountView()
     await flushPromises()
     expect(w.find('.yt-page').exists()).toBe(true)
+  })
+
+  it('卡片容器接入 AppCard:4 张主卡 default,合规率环卡 flat', async () => {
+    const w = mountView()
+    await flushPromises()
+    const cards = w.findAllComponents(AppCard)
+    // 只数本页自己的卡(以 h3.yt-h 为标记):MetricGrid 等子组件内部也用 AppCard,按总数断言会被它们带偏
+    const main = cards.filter((c) => c.find('h3.yt-h').exists())
+    expect(main).toHaveLength(4)
+    expect(main.every((c) => c.props('variant') === 'default')).toBe(true)
+    const ring = cards.find((c) => c.classes().includes('yt-ring-card'))
+    expect(ring, '环卡未接 AppCard').toBeTruthy()
+    // 主卡 default(带阴影)与环卡 flat(无阴影)必须是不同变体,同写成 default 则两者层次差别消失
+    expect(ring!.props('variant')).toBe('flat')
   })
 
   it('分页:每页 50 条,超出部分不进 paged', async () => {

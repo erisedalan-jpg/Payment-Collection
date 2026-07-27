@@ -280,6 +280,15 @@ describe('ProjectDetailView', () => {
     expect(empty.text()).toContain('未找到该项目')
   })
 
+  it('6 张指标卡与右栏改用 AppCard(flat)', async () => {
+    seed()
+    const w = await mountAt('/project/P-1')
+    const metrics = w.findAll('.pd-metric')
+    expect(metrics).toHaveLength(6)
+    expect(metrics.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+    expect(w.find('.pd-aside').classes()).toContain('ac--flat')
+  })
+
   it('右栏只显示本项目动态', async () => {
     seed()
     const w = await mountAt('/project/P-1')

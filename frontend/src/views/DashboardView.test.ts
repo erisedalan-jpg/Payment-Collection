@@ -92,6 +92,16 @@ describe('DashboardView', () => {
     expect(blocks[1].find('.nsp').exists()).toBe(true)
   })
 
+  it('V4.5.0 两处区块改用 AppCard(default 变体),min-width 布局属性留在 .dash-card', async () => {
+    seedData()
+    const w = mount(DashboardView, { global: { stubs } })
+    await flushPromises()
+    // 先钉住条数,否则下面的 every 在空集上恒真
+    const cards = w.findAll('.dash-card')
+    expect(cards).toHaveLength(2)
+    expect(cards.every((c) => c.classes().includes('ac--default'))).toBe(true)
+  })
+
   it('渲染加载态', () => {
     const ds = useDataStore()
     ds.loading = true

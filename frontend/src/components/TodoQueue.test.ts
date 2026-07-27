@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import TodoQueue from './TodoQueue.vue'
 import type { TodoQueueResult } from '@/lib/todoQueue'
@@ -52,5 +54,17 @@ describe('TodoQueue', () => {
   it('空队列显示空态', () => {
     const w = mount(TodoQueue, { props: { result: { items: [], counts: { '回款临期': 0, '回款已延期': 0, '里程碑': 0, '成本超支': 0 } }, windowDays: 7 }, global: { plugins: [router] } })
     expect(w.text()).toContain('暂无待办')
+  })
+
+  it('V4.5.0 外层改用 AppCard(raised),自写 .tq 已删净', () => {
+    const w = mountQ()
+    expect(w.classes()).toContain('ac')
+    expect(w.classes()).toContain('ac--raised')
+    // raised 与 flat 只差阴影、与 default 只差圆角 —— 归错变体是静默的视觉退化,故显式排除
+    expect(w.classes()).not.toContain('ac--flat')
+    expect(w.classes()).not.toContain('ac--default')
+    expect(w.classes()).not.toContain('ac--inset')
+    const src = readFileSync(resolve(__dirname, 'TodoQueue.vue'), 'utf-8')
+    expect(/^\.tq\s*[,{]/m.test(src), '.tq 自写卡片规则复活了').toBe(false)
   })
 })

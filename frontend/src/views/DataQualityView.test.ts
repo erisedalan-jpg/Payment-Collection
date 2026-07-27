@@ -79,6 +79,18 @@ describe('DataQualityView', () => {
     expect(org.text()).toContain('未提供')
   })
 
+  it('V4.5.0 九张源卡改用 AppCard(raised 变体);同页的 .gov-alert 属非目标,不得被换掉', () => {
+    seed()
+    const w = mountView()
+    const cards = w.findAll('.gov-src')
+    expect(cards).toHaveLength(9)
+    expect(cards.every((c) => c.classes().includes('ac--raised'))).toBe(true)
+    // 告警条是提示条不是卡片(spec §3.3 非目标),不应挂上 AppCard 的类
+    const alerts = w.findAll('.gov-alert')
+    expect(alerts.length).toBeGreaterThan(0)
+    expect(alerts.every((a) => !a.classes().includes('ac'))).toBe(true)
+  })
+
   it('0 条告警置灰且按钮禁用', () => {
     seed()
     const w = mountView()

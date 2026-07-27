@@ -95,6 +95,15 @@ describe('RiskBoardView', () => {
     // 卡片(顶部第一个 .rv-card-main)不变
     expect(w.find('.rv-card-main').text()).toBe(before)
   })
+  it('4 张概览卡改用 AppCard(flat);图表项 .rv-chart-item 属非目标,不套 AppCard', () => {
+    seed()
+    const w = mount(RiskBoardView, opts)
+    const cards = w.findAll('.rv-card')
+    expect(cards).toHaveLength(4)
+    expect(cards.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+    expect(w.find('.rv-chart-item').classes()).not.toContain('ac')
+  })
+
   it('点风险统计分析表行打开下钻弹窗', async () => {
     seed()
     const w = mount(RiskBoardView, opts)

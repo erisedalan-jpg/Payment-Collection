@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import AppCard from '@/components/AppCard.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ColumnFilter from '@/components/ColumnFilter.vue'
@@ -234,52 +235,52 @@ defineExpose({
     <el-skeleton v-else-if="store.loading && !ready" :rows="6" animated />
 
     <template v-if="ready">
-      <section class="yt-card">
+      <AppCard variant="default">
         <div class="yt-head">
           <h3 class="yt-h">人数结构</h3>
           <span class="yt-sub">共 {{ stats.length }} 人</span>
         </div>
         <HealthSegmentBar :segments="headcountSegments" clickable @seg-click="onSegClick" />
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">饱和度 TOP10</h3>
         <div v-if="!topStats.length" class="yt-empty">无数据</div>
         <ChartBox v-else :option="satTopChartOption" :height="satTopHeight" @datapoint-click="onEmpChartClick" />
-      </section>
+      </AppCard>
 
-      <section id="yt-diverging" class="yt-card">
+      <AppCard id="yt-diverging" variant="default">
         <h3 class="yt-h">加班 / 欠填<span class="yt-sub">（正 = 加班，负 = 欠填）</span></h3>
         <div v-if="!divergingFilledCount" class="yt-empty">无数据</div>
         <ChartBox v-else :option="divergingChartOption" :height="divergingHeight" @datapoint-click="onEmpChartClick" />
-      </section>
+      </AppCard>
 
-      <section class="yt-card">
+      <AppCard variant="default">
         <h3 class="yt-h">饱和度分布</h3>
         <div v-if="!scatterPointCount" class="yt-empty">无数据</div>
         <ChartBox v-else :option="scatterChartOption" height="420px" @datapoint-click="onEmpChartClick" />
-      </section>
+      </AppCard>
 
       <div class="yt-grid">
-        <section class="yt-card">
+        <AppCard variant="default">
           <h3 class="yt-h">饱和度 TOP10</h3>
           <DataTable :columns="shortCols" :rows="topRows" :show-count="false" />
-        </section>
+        </AppCard>
 
-        <section id="yt-unfilled" class="yt-card">
+        <AppCard id="yt-unfilled" variant="default">
           <h3 class="yt-h">未按时填写<span class="yt-sub">（有记录但工时不足）</span></h3>
           <div v-if="!unfilledRows.length" class="yt-empty">无</div>
           <DataTable v-else :columns="shortCols" :rows="unfilledRows" :show-count="false" />
-        </section>
+        </AppCard>
 
-        <section id="yt-neverfilled" class="yt-card">
+        <AppCard id="yt-neverfilled" variant="default">
           <h3 class="yt-h">完全未填<span class="yt-sub">（本区间一条记录都没有）</span></h3>
           <div v-if="!neverRows.length" class="yt-empty">无</div>
           <DataTable v-else :columns="neverCols" :rows="neverRows" :show-count="false" />
-        </section>
+        </AppCard>
       </div>
 
-      <section id="yt-emp" class="yt-card">
+      <AppCard id="yt-emp" variant="default">
         <div class="yt-head">
           <h3 class="yt-h">员工工时明细</h3>
           <el-button v-if="cf.hasFilters(TABLE_ID)" size="small" @click="cf.clearAll(TABLE_ID)">清除所有筛选</el-button>
@@ -294,7 +295,7 @@ defineExpose({
         </DataTable>
         <!-- size 必须仍绑到上面 usePersistedRefs 托管的那个 pageSize,换成新建的局部 ref 会静默丢持久化 -->
         <AppPager v-model:page="currentPage" v-model:size="pageSize" :total="filtered.length" />
-      </section>
+      </AppCard>
     </template>
   </div>
 </template>
@@ -302,13 +303,6 @@ defineExpose({
 <style scoped>
 .yt-page { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--sp-4); }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--gap-card); }
-.yt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--card-pad);
-  box-shadow: var(--shadow-1);
-}
 .yt-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--gap-stack); flex-wrap: wrap; margin-bottom: var(--gap-stack); }
 .yt-head .yt-h { margin-bottom: 0; }
 .yt-h { font-size: var(--fs-3); font-weight: 600; color: var(--txt); margin-bottom: var(--gap-stack); }

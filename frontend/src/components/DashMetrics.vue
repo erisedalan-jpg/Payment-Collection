@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useFilterStore } from '@/stores/filter'
 import { payDashSummary } from '@/lib/payDashboard'
 import { fmtWan, pct } from '@/lib/format'
+import AppCard from './AppCard.vue'
 
 const data = useDataStore()
 const filter = useFilterStore()
@@ -43,20 +44,22 @@ function onCard(action?: string) {
 
 <template>
   <div class="dash-metrics u-grid-auto">
-    <div v-for="m in metrics" :key="m.k" class="dm-card" :class="{ 'dm-card--link': m.action }"
+    <AppCard v-for="m in metrics" :key="m.k" variant="flat" class="dm-card" :class="{ 'dm-card--link': m.action }"
       :data-test="m.action === 'nodes' ? 'pay-nodes-card' : m.action === 'delayed' ? 'pay-delayed-card' : m.action === 'projects' ? 'pay-projects-card' : undefined"
       v-activate="!!m.action"
       @click="onCard(m.action)">
       <div class="dm-k">{{ m.k }}</div>
       <div class="dm-v u-num" :class="m.cls">{{ m.v }}</div>
       <span v-if="m.sub" class="dm-sub">{{ m.sub }}</span>
-    </div>
+    </AppCard>
   </div>
 </template>
 
 <style scoped>
 .dash-metrics { --col-min: 130px; }
-.dm-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
+/* 卡片外观(底/描边/圆角/内边距)已交给 AppCard(flat);此处原先硬写的内边距是全站
+   仅存的一处,随本次归位到 --card-pad。.dm-card 保留为 --link 修饰符的基类与 DOM
+   定位钩子,自身不再有样式声明。 */
 .dm-card--link { cursor: pointer; }
 .dm-card--link:hover { background: var(--hover-tint); }
 .dm-k { font-size: var(--fs-1); color: var(--mut); }

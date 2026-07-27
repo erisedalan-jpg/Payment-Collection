@@ -177,3 +177,13 @@ describe('InsightView 页头与视图状态持久化', () => {
     expect((w2.vm as any).drillOpen).toBe(false)
   })
 })
+
+describe('V4.5.0 AppCard', () => {
+  it('排名图表卡改用 AppCard(flat),布局属性仍留在 .iv-chart-item', async () => {
+    seed()
+    const w = await mountView()
+    const card = w.find('.iv-chart-item')
+    expect(card.exists()).toBe(true)
+    expect(card.classes()).toContain('ac--flat')
+  })
+})

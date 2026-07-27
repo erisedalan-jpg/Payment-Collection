@@ -18,6 +18,7 @@ vi.mock('@/charts/ChartBox.vue', () => ({
 
 import YitianCustomerView from './YitianCustomerView.vue'
 import DataTable from '@/components/DataTable.vue'
+import AppCard from '@/components/AppCard.vue'
 
 function makeRouter(): Router {
   return createRouter({
@@ -87,6 +88,16 @@ describe('YitianCustomerView', () => {
     const w = mountView()
     await flushPromises()
     expect(w.find('.yt-page').exists()).toBe(true)
+  })
+
+  it('3 处卡片容器全部接入 AppCard(default)', async () => {
+    const w = mountView()
+    await flushPromises()
+    const cards = w.findAllComponents(AppCard)
+    // 只数本页自己的卡(以 h3.yt-h 为标记):MetricGrid 等子组件内部也用 AppCard,按总数断言会被它们带偏
+    const main = cards.filter((c) => c.find('h3.yt-h').exists())
+    expect(main).toHaveLength(3)
+    expect(main.every((c) => c.props('variant') === 'default')).toBe(true)
   })
 
   it('TOP1000 标题去括号,口径说明降为表上小字,不含"未分配L4"行,含固定汇总行', async () => {

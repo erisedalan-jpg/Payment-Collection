@@ -233,6 +233,16 @@ describe('MilestoneView 页头与视图状态持久化', () => {
   })
 })
 
+describe('V4.5.0 AppCard', () => {
+  it('5 张图表卡改用 AppCard(flat)', () => {
+    seed()
+    const w = mount(MilestoneView, opts)
+    const cards = w.findAll('.mv-card')
+    expect(cards).toHaveLength(5)
+    expect(cards.every((c) => c.classes().includes('ac--flat'))).toBe(true)
+  })
+})
+
 describe('MilestoneView KPI 下钻弹窗', () => {
   it('点 KPI(严重延期)开状态弹窗,rows 仅严重延期项目', async () => {
     seed()
