@@ -72,3 +72,41 @@ def test_load_missing_or_corrupt_falls_back(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("{not json", encoding="utf-8")
     assert RC.load_config(str(bad)) == RC.default_config()
+
+
+def test_默认配置含pmTag与placeholder两节():
+    d = RC.default_config()
+    pm = d["checks"]["pmTag"]
+    assert pm["enabled"] is True
+    assert pm["workType3"] == ["项目管理", "项目验收", "文档编写与汇报"]
+    assert pm["excludeTypes"] == ["售后类"]
+    assert "担任角色" in pm["rolePrefixes"]
+    assert pm["roleKeywords"] == ["项目经理"]
+    assert d["checks"]["placeholder"]["customerWords"] == ["受影响的客户"]
+
+
+def test_pmTag可被覆盖并归一化():
+    cfg = RC.validate_config({"checks": {"pmTag": {
+        "enabled": False,
+        "workType3": [" 项目管理 ", "项目管理", "产品培训"],   # 去空白 + 去重
+        "excludeTypes": [],
+        "rolePrefixes": ["担任角色"],
+        "roleKeywords": ["项目经理", "PM"],
+    }}})
+    pm = cfg["checks"]["pmTag"]
+    assert pm["enabled"] is False
+    assert pm["workType3"] == ["项目管理", "产品培训"]
+    assert pm["excludeTypes"] == []
+    assert pm["roleKeywords"] == ["项目经理", "PM"]
+
+
+def test_pmTag缺段回落默认():
+    cfg = RC.validate_config({"checks": {"summary": {"enabled": True, "keywords": ["工作概述"]}}})
+    assert cfg["checks"]["pmTag"]["roleKeywords"] == ["项目经理"]
+    assert cfg["checks"]["placeholder"]["customerWords"] == ["受影响的客户"]
+
+
+def test_placeholder非数组报错():
+    import pytest
+    with pytest.raises(ValueError):
+        RC.validate_config({"checks": {"placeholder": {"customerWords": "受影响的客户"}}})

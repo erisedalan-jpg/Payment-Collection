@@ -46,6 +46,13 @@ def default_config() -> Dict[str, Any]:
                         "exclusiveKws": sorted(R.EXCLUSIVE_KWS)},
             "customer": {"enabled": True, "hintKeywords": _re_to_keywords(R.CUSTOMER_HINT_RE)},
             "presaleProductHint": {"enabled": True, "skipWorkTypes": sorted(R.PRESALE_SKIP_WORKTYPES)},
+            "pmTag": {"enabled": True,
+                      "workType3": list(R.PM_TAG_WORKTYPE3),
+                      "excludeTypes": list(R.PM_TAG_EXCLUDE_TYPES),
+                      "rolePrefixes": list(R.PM_TAG_ROLE_PREFIXES),
+                      "roleKeywords": list(R.PM_TAG_ROLE_KEYWORDS)},
+            "placeholder": {"enabled": True,
+                            "customerWords": list(R.PLACEHOLDER_CUSTOMERS)},
         },
     }
 
@@ -171,6 +178,29 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
             "skipWorkTypes": _norm_str_list(
                 ph.get("skipWorkTypes", d["checks"]["presaleProductHint"]["skipWorkTypes"]),
                 "presaleProductHint.skipWorkTypes")}
+
+    pm = _seg(checks_in, "pmTag")
+    if pm:
+        cur = d["checks"]["pmTag"]
+        d["checks"]["pmTag"] = {
+            "enabled": _bool(pm.get("enabled", True), "pmTag.enabled"),
+            "workType3": _norm_str_list(pm.get("workType3", cur["workType3"]), "pmTag.workType3"),
+            "excludeTypes": _norm_str_list(pm.get("excludeTypes", cur["excludeTypes"]),
+                                           "pmTag.excludeTypes"),
+            "rolePrefixes": _norm_str_list(pm.get("rolePrefixes", cur["rolePrefixes"]),
+                                           "pmTag.rolePrefixes"),
+            "roleKeywords": _norm_str_list(pm.get("roleKeywords", cur["roleKeywords"]),
+                                           "pmTag.roleKeywords"),
+        }
+
+    phd = _seg(checks_in, "placeholder")
+    if phd:
+        cur = d["checks"]["placeholder"]
+        d["checks"]["placeholder"] = {
+            "enabled": _bool(phd.get("enabled", True), "placeholder.enabled"),
+            "customerWords": _norm_str_list(phd.get("customerWords", cur["customerWords"]),
+                                            "placeholder.customerWords"),
+        }
 
     return d
 
