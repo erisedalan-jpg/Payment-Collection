@@ -89,7 +89,8 @@ def read_sheet_by_header(path: str, key_header: str) -> List[Dict[str, Any]]:
 
 
 def read_org_roster(path: str) -> List[Dict[str, str]]:
-    """组织架构表 → 花名册 list[dict]。键:id(工号,大写归一)/name/l2/l3/l31/l4/category。
+    """组织架构表 → 花名册 list[dict]。
+    键:id(工号,大写归一)/name/l2/l3/l31/l4/category/supId(直接上级工号,大写归一)/supName。
     仅收 新L3组织 == 交付实施三部 的行(同 read_org_names);工号为空的行跳过——工号是跨域连接键。"""
     rows = _read_header_sheet(path, "工号")
     if rows and any(r.get("新L3组织") for r in rows):
@@ -107,8 +108,19 @@ def read_org_roster(path: str) -> List[Dict[str, str]]:
             "l31": str(r.get("新L3-1组织") or "").strip(),
             "l4": str(r.get("新L4组织") or "").strip(),
             "category": str(r.get("员工类别") or "").strip(),
+            # 直接上级(V4.5.4):用于派生「管理干部」,取代工具里硬编码的 14 个工号。
+            "supId": str(r.get("直接上级工号") or "").strip().upper(),
+            "supName": str(r.get("直接上级姓名") or "").strip(),
         })
     return out
+
+
+def manager_ids(roster: List[Dict[str, str]]) -> set:
+    """管理干部 = 出现在「直接上级工号」列、且本身也在花名册内的工号集合。
+    在册外的上级(跨部门)不收——否则集合里会出现本域查无此人的工号。
+    组织架构表无该列时返回空集(调用方据此把「管理标签」筛选降级)。"""
+    ids = {p["id"] for p in roster}
+    return {p.get("supId", "") for p in roster if p.get("supId") and p.get("supId") in ids}
 
 
 def read_mapping(path: str) -> List[Dict[str, str]]:
@@ -143,7 +155,8 @@ def read_delivery(path: str) -> List[Dict[str, Any]]:
 
 
 def read_top1000(path: str) -> Dict[str, Dict[str, str]]:
-    """TOP1000.xlsx → {客户名称: {"level": 客户级别, "quad": 象限}}。
+    """TOP1000.xlsx → {客户名称: {"level": 客户级别, "quad": 象限, "bg": 市场BG}}。
+    象限列名兼容「象限」与「客户象限」两种写法。三个键必然存在,缺列为空串。
     复用 _read_header_sheet(找含"客户名称"表头的 sheet);缺文件/无表头 → {}(降级)。
     客户名称为空的行跳过;级别/象限 strip。"""
     rows = _read_header_sheet(path, "客户名称")
@@ -154,7 +167,10 @@ def read_top1000(path: str) -> Dict[str, Dict[str, str]]:
             continue
         out[name] = {
             "level": str(r.get("客户级别") or "").strip(),
-            "quad": str(r.get("象限") or "").strip(),
+            # 象限列名双兼容:本仓 TOP1000.xlsx 叫「象限」,别处导出叫「客户象限」。
+            # 只认一个的话,换一份表会让 quad 全部静默变空、零报错(V4.5.4 前的真实缺陷)。
+            "quad": str(r.get("象限") or r.get("客户象限") or "").strip(),
+            "bg": str(r.get("市场BG") or "").strip(),
         }
     return out
 

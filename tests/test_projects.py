@@ -367,8 +367,10 @@ class TestReadTop1000:
             ]),
         ])
         m = P.read_top1000(path)
-        assert m["辽宁省公安厅"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区"}
-        assert m["北京能源集团"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区"}
+        # bg 为 V4.5.4 新增键:本表无「市场BG」列 → 空串。保持全等断言(而非子集),
+        # 以钉死「三个键必然存在」这条契约。
+        assert m["辽宁省公安厅"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区", "bg": ""}
+        assert m["北京能源集团"] == {"level": "TOP1000大客户", "quad": "M1 战略核心区", "bg": ""}
 
     def test_skips_empty_name_rows(self, tmp_path):
         path = _make_xlsx(tmp_path, "TOP1000.xlsx", [
@@ -538,3 +540,63 @@ class TestReadSheetHeaders:
 
     def test_missing_file_returns_empty_list(self, tmp_path):
         assert P.read_sheet_headers(str(tmp_path / "不存在.xlsx"), "工时类型") == []
+
+
+def _top1000_xlsx(tmp_path, headers, rows, name="t.xlsx"):
+    """TOP1000 小表:单 sheet、首行表头。复用 _make_xlsx,避免第二份 openpyxl 直写。"""
+    return _make_xlsx(tmp_path, name,
+                      [("Sheet1", [tuple(headers)] + [tuple(r) for r in rows])])
+
+
+def test_read_top1000_象限列名兼容两种写法(tmp_path):
+    """平台这份叫「象限」,新版工具那份叫「客户象限」——两种都必须认。"""
+    p1 = _top1000_xlsx(tmp_path, ["客户名称", "客户级别", "象限", "市场BG"],
+                       [["甲公司", "TOP1000大客户", "M1 战略核心区", "市场BG3"]], "a.xlsx")
+    p2 = _top1000_xlsx(tmp_path, ["客户名称", "客户级别", "客户象限", "市场BG"],
+                       [["甲公司", "TOP1000大客户", "M1 战略核心区", "市场BG3"]], "b.xlsx")
+    for p in (p1, p2):
+        m = P.read_top1000(p)
+        assert m["甲公司"]["quad"] == "M1 战略核心区"
+        assert m["甲公司"]["bg"] == "市场BG3"
+        assert m["甲公司"]["level"] == "TOP1000大客户"
+
+
+def test_read_top1000_缺象限与BG列时三个键仍在且为空串(tmp_path):
+    """缺列必须降级为空串而非 KeyError——下游 v.get('quad') 之外还有直接下标的消费方。"""
+    p = _top1000_xlsx(tmp_path, ["客户名称", "客户级别"], [["乙公司", "TOP1000大客户"]])
+    m = P.read_top1000(p)
+    assert m["乙公司"] == {"level": "TOP1000大客户", "quad": "", "bg": ""}
+
+
+def _roster_xlsx(tmp_path, rows):
+    """组织架构小表:单 sheet、含「直接上级工号/姓名」两列。复用 _make_xlsx。"""
+    headers = ("工号", "姓名", "员工类别", "新L2组织", "新L3组织",
+               "新L3-1组织", "新L4组织", "直接上级工号", "直接上级姓名")
+    return _make_xlsx(tmp_path, "org.xlsx",
+                      [("Sheet1", [headers] + [tuple(r) for r in rows])])
+
+
+def test_read_org_roster_读出直接上级(tmp_path):
+    p = _roster_xlsx(tmp_path, [
+        ["a001", "老王", "正式", "L2", "交付实施三部", "三部一室", "一组", "a000", "老张"],
+    ])
+    r = P.read_org_roster(p)[0]
+    assert r["supId"] == "A000"      # 工号大写归一
+    assert r["supName"] == "老张"
+
+
+def test_manager_ids_只收花名册内的上级(tmp_path):
+    """上级若不在本部花名册(如跨部门上级),不计入管理干部——否则集合里会出现查无此人的工号。"""
+    p = _roster_xlsx(tmp_path, [
+        ["a000", "老张", "正式", "L2", "交付实施三部", "三部一室", "", "x999", "部门外"],
+        ["a001", "老王", "正式", "L2", "交付实施三部", "三部一室", "一组", "a000", "老张"],
+        ["a002", "小李", "正式", "L2", "交付实施三部", "三部一室", "一组", "a001", "老王"],
+    ])
+    roster = P.read_org_roster(p)
+    assert P.manager_ids(roster) == {"A000", "A001"}   # X999 在册外,不收
+
+
+def test_manager_ids_无直接上级列时返回空集():
+    """老格式组织架构表没有该列 → 降级为空集,调用方据此把管理标签筛选置灰。"""
+    roster = [{"id": "A001", "name": "老王", "supId": "", "supName": ""}]
+    assert P.manager_ids(roster) == set()
