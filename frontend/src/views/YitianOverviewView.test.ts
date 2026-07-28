@@ -18,6 +18,7 @@ vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 import YitianOverviewView from './YitianOverviewView.vue'
 import AppCard from '@/components/AppCard.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
+import YitianReadinessCard from '@/components/YitianReadinessCard.vue'
 
 // 跨页下钻断言只需路由能解析到目标路径,不依赖目标页真实实现(与其它并行任务隔离)。
 const StubPage = { template: '<div class="stub-page" />' }
@@ -38,18 +39,30 @@ function newRouter(): Router {
   })
 }
 
+// V4.5.4:meta.dataReadiness 与 entries[].tr 是契约必填。fixture 缺了它们不会红,
+// 只会让就绪度卡的 v-if 恒假、整块静默不渲染 —— 那才是最坏的假绿(接线断了却全绿)。
+const READINESS = {
+  top1000: { provided: true, rows: 139, matchedCustomers: 97, hasQuad: true, hasBg: true },
+  productCategory: { provided: true, rows: 108, coveredLines: 81, totalLines: 81 },
+  calibration: { pending: 1439, calibrated: 307, ambiguous: 931, unmatched: 201 },
+  unattributed: { rows: 478, hours: 2810 },
+  roster: { hasSupColumn: true, managers: 14 },
+}
+
 const DATA = {
   meta: { periodStart: '2026-06-01', periodEnd: '2026-06-02', generatedAt: '2026-07-12 10:00',
-          rows: 2, employees: 1, droppedRows: 0, calendarSource: 'csv', hoursPerDay: 8, thisBgL2: [] },
-  roster: [{ id: 'A1', name: '张三', l2: '交付中心', l3: '交付实施三部', l31: '服务二部', l4: '银行服务组', category: '正式员工' }],
+          rows: 2, employees: 1, droppedRows: 0, calendarSource: 'csv', hoursPerDay: 8, thisBgL2: [],
+          dataReadiness: READINESS },
+  roster: [{ id: 'A1', name: '张三', l2: '交付中心', l3: '交付实施三部', l31: '服务二部', l4: '银行服务组', category: '正式员工', isMgr: false }],
   days: [
     { d: '2026-06-01', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
     { d: '2026-06-02', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
   ],
-  dims: { types: ['项目类'], workTypes: [], customers: [], products: [], productNames: [], projectTypes: [], salesL2: [], serviceModes: [] },
+  dims: { types: ['项目类'], workTypes: [], customers: [], products: [], productNames: [], projectTypes: [], salesL2: [], serviceModes: [],
+          custQuads: [], custBgs: [], prodCats: [] },
   entries: [
-    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
-    { d: '2026-06-02', e: 'A1', t: 0, h: 10, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 2, iss: ['MISS_NEXT'] },
+    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [], tr: 4 },
+    { d: '2026-06-02', e: 'A1', t: 0, h: 10, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 2, iss: ['MISS_NEXT'], tr: 0 },
   ],
   issues: [{ i: 1, codes: ['MISS_NEXT'], msgs: ['缺少下一步工作计划'], snippet: '正文' }],
 } as unknown as YitianData
@@ -235,7 +248,9 @@ describe('YitianOverviewView', () => {
   it('3 处卡内小标题接入 SectionTitle(section 级),.yt-h 只剩布局属性', async () => {
     const w = mountView()
     await flushPromises()
-    const titles = w.findAllComponents(SectionTitle)
+    // 只数本页自己的小标题(以 .yt-h 为标记):子组件(就绪度卡)内部也用 SectionTitle,
+    // 按总数断言会被它们带偏 —— 与上面那条 AppCard 断言同一手法。
+    const titles = w.findAllComponents(SectionTitle).filter((t) => t.classes().includes('yt-h'))
     expect(titles).toHaveLength(3)
     // 卡内小节标题一律 section 级(--fs-3/700);写成 card 级会与卡片主标题混为一档
     expect(titles.every((t) => t.classes().includes('st--section'))).toBe(true)
@@ -260,6 +275,16 @@ describe('YitianOverviewView', () => {
     expect(w.find('.ph-title').text()).toBe(navLabel('/yitian'))
   })
 
+  it('就绪度卡已接线:两个 grid 都渲染出来(:data 漏传或传空则 v-if 恒假、整块静默消失)', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.findComponent(YitianReadinessCard).exists()).toBe(true)
+    expect(w.find('.rc-grid').exists(), '可转移五档 grid 未渲染').toBe(true)
+    expect(w.find('.rc-grid2').exists(), '就绪度 grid 未渲染').toBe(true)
+    expect(w.text()).toContain('可转移非原厂支持')
+    expect(w.text()).toContain('数据就绪度')
+  })
+
   it('组织表「明细」入口跳 /yitian/detail 带 dL4', async () => {
     const w = mountView()
     await flushPromises()
@@ -275,11 +300,11 @@ describe('YitianOverviewView 分层汇总:剔除未分配L4', () => {
     ...DATA,
     roster: [
       ...DATA.roster,
-      { id: 'A2', name: '李四', l2: '交付中心', l3: '交付实施三部', l31: '服务二部', l4: '', category: '正式员工' },
+      { id: 'A2', name: '李四', l2: '交付中心', l3: '交付实施三部', l31: '服务二部', l4: '', category: '正式员工', isMgr: false },
     ],
     entries: [
       ...DATA.entries,
-      { d: '2026-06-01', e: 'A2', t: 0, h: 6, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+      { d: '2026-06-01', e: 'A2', t: 0, h: 6, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [], tr: 3 },
     ],
   } as unknown as YitianData
 

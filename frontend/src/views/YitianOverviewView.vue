@@ -6,6 +6,7 @@ import AppCard from '@/components/AppCard.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import YitianToolbar from '@/components/YitianToolbar.vue'
 import MetricGrid from '@/components/MetricGrid.vue'
+import YitianReadinessCard from '@/components/YitianReadinessCard.vue'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import ChartBox from '@/charts/ChartBox.vue'
 import RatioRing from '@/components/RatioRing.vue'
@@ -174,6 +175,9 @@ defineExpose({ typeOption, typeRows, orgRows, orgSummaryMethod, orgBarChartOptio
           <div class="yt-ring-sub u-num">问题 {{ complianceIssueCount }} 条</div>
         </AppCard>
       </div>
+
+      <!-- 本期唯一的新结论:放在顶部 KPI 带之后、既有分析卡之前,先被看见 -->
+      <YitianReadinessCard :data="scopedYitian" />
 
       <div class="yt-grid">
         <AppCard variant="default">
