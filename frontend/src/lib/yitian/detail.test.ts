@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildDetailRows, filterDetailRows, detailSummary, buildDetailSheetRows,
-  ALL_COLUMNS, DEFAULT_VISIBLE, FILTERABLE,
+  ALL_COLUMNS, ALL_KEYS, DEFAULT_VISIBLE, FILTERABLE,
 } from './detail'
 import type { YitianData } from '@/types/yitian'
 
@@ -96,5 +96,60 @@ describe('列常量 + 导出', () => {
     const out = buildDetailSheetRows(rows, cols)
     expect(out[0]).toEqual({ 员工: '张三', 合规状态: '问题' })
     expect(JSON.stringify(out)).not.toContain('正文')
+  })
+})
+
+/** V4.5.4 派生字段 fixture:一条 tr=4(可转移) / ls=1(已校准) / top=true / isMgr=true 的记录。 */
+const dataWithDerived = {
+  meta: {
+    periodStart: '2026-06-01', periodEnd: '2026-06-01', generatedAt: '', rows: 1,
+    employees: 1, droppedRows: 0, calendarSource: 'csv', hoursPerDay: 8, thisBgL2: [],
+    storeRows: 1, storeStart: '2026-06-01', storeEnd: '2026-06-01',
+    dataReadiness: {
+      top1000: { provided: true, rows: 1, matchedCustomers: 1, hasQuad: true, hasBg: true },
+      productCategory: { provided: true, rows: 1, coveredLines: 1, totalLines: 1 },
+      calibration: { pending: 1, calibrated: 1, ambiguous: 0, unmatched: 0 },
+      unattributed: { rows: 0, hours: 0 },
+      roster: { hasSupColumn: true, managers: 1 },
+    },
+  },
+  roster: [
+    { id: 'A1', name: '张三', l2: 'BG1', l3: '交付实施三部', l31: '服务二部', l4: '银行服务组', category: '交付', isMgr: true },
+  ],
+  days: [{ d: '2026-06-01', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' }],
+  dims: {
+    types: ['项目类'], workTypes: [], customers: ['某客户'], products: ['NGSOC'], productNames: [],
+    projectTypes: [], salesL2: [], serviceModes: [],
+    custQuads: ['M3 潜力培育区'], custBgs: ['市场BG3'], prodCats: ['态势感知'],
+  },
+  entries: [
+    { d: '2026-06-01', e: 'A1', t: 0, h: 8, wt: null, cu: 0, pl: null, pn: null, pt: null, sm: null,
+      bg: null, wo: 'WO1', top: true, ok: 0, iss: [], ct: '本周处理 SOAR 告警策略',
+      cq: 0, cbg: 0, el: 0, ls: 1, ec: 0, ch: true, pm: false, tr: 4 },
+  ],
+  issues: [],
+} as unknown as YitianData
+
+describe('V4.5.4 派生列', () => {
+  it('派生 10 列并入明细行且值不为 undefined', () => {
+    const rows = buildDetailRows(dataWithDerived)
+    const r = rows[0]
+    for (const k of ['custClass', 'custQuad', 'custBg', 'effLine', 'lineSrcText',
+                     'prodCat', 'channelText', 'pmText', 'mgrText', 'transferText'] as const) {
+      expect(r[k], k).not.toBeUndefined()
+    }
+    expect(r.transferText).toBe('可转移非原厂')
+    expect(r.lineSrcText).toBe('已校准')
+    expect(r.custClass).toBe('TOP1000')
+  })
+
+  it('十个新列全部进 ALL_COLUMNS 且默认不可见', () => {
+    const keys = ['custClass', 'custQuad', 'custBg', 'effLine', 'lineSrcText',
+                  'prodCat', 'channelText', 'pmText', 'mgrText', 'transferText']
+    for (const k of keys) {
+      expect(ALL_KEYS, k).toContain(k)
+      expect(DEFAULT_VISIBLE, k).not.toContain(k)   // 持久化优先,新列必须默认隐藏
+      expect(FILTERABLE.has(k), k).toBe(true)
+    }
   })
 })

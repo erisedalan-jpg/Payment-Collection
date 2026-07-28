@@ -17,6 +17,23 @@ export type Thisbgl2 = string[];
 export type Storerows = number;
 export type Storestart = string | null;
 export type Storeend = string | null;
+export type Provided = boolean;
+export type Rows1 = number;
+export type Matchedcustomers = number;
+export type Hasquad = boolean;
+export type Hasbg = boolean;
+export type Provided1 = boolean;
+export type Rows2 = number;
+export type Coveredlines = number;
+export type Totallines = number;
+export type Pending = number;
+export type Calibrated = number;
+export type Ambiguous = number;
+export type Unmatched = number;
+export type Rows3 = number;
+export type Hours = number;
+export type Hassupcolumn = boolean;
+export type Managers = number;
 export type Id = string;
 export type Name = string;
 export type L2 = string;
@@ -24,6 +41,7 @@ export type L3 = string;
 export type L31 = string;
 export type L4 = string;
 export type Category = string;
+export type Ismgr = boolean;
 export type Roster = YitianRosterItem[];
 export type D = string;
 export type Workday = boolean;
@@ -38,6 +56,9 @@ export type Productnames = string[];
 export type Projecttypes = string[];
 export type Salesl2 = string[];
 export type Servicemodes = string[];
+export type Custquads = string[];
+export type Custbgs = string[];
+export type Prodcats = string[];
 export type D1 = string;
 export type E = string;
 export type T = number | null;
@@ -54,6 +75,14 @@ export type Top = boolean;
 export type Ok = number;
 export type Iss = string[];
 export type Ct = string;
+export type Cq = number | null;
+export type Cbg = number | null;
+export type El = number | null;
+export type Ls = number;
+export type Ec = number | null;
+export type Ch = boolean;
+export type Pm = boolean;
+export type Tr = number;
 export type Entries = YitianEntry[];
 export type I = number;
 export type Codes = string[];
@@ -83,6 +112,47 @@ export interface YitianMeta {
   storeRows: Storerows;
   storeStart: Storestart;
   storeEnd: Storeend;
+  dataReadiness: YitianReadiness;
+  [k: string]: unknown;
+}
+export interface YitianReadiness {
+  top1000: YitianReadinessTop1000;
+  productCategory: YitianReadinessProductCat;
+  calibration: YitianReadinessCalib;
+  unattributed: YitianReadinessUnattr;
+  roster: YitianReadinessRoster;
+  [k: string]: unknown;
+}
+export interface YitianReadinessTop1000 {
+  provided: Provided;
+  rows: Rows1;
+  matchedCustomers: Matchedcustomers;
+  hasQuad: Hasquad;
+  hasBg: Hasbg;
+  [k: string]: unknown;
+}
+export interface YitianReadinessProductCat {
+  provided: Provided1;
+  rows: Rows2;
+  coveredLines: Coveredlines;
+  totalLines: Totallines;
+  [k: string]: unknown;
+}
+export interface YitianReadinessCalib {
+  pending: Pending;
+  calibrated: Calibrated;
+  ambiguous: Ambiguous;
+  unmatched: Unmatched;
+  [k: string]: unknown;
+}
+export interface YitianReadinessUnattr {
+  rows: Rows3;
+  hours: Hours;
+  [k: string]: unknown;
+}
+export interface YitianReadinessRoster {
+  hasSupColumn: Hassupcolumn;
+  managers: Managers;
   [k: string]: unknown;
 }
 export interface YitianRosterItem {
@@ -93,6 +163,7 @@ export interface YitianRosterItem {
   l31: L31;
   l4: L4;
   category: Category;
+  isMgr: Ismgr;
   [k: string]: unknown;
 }
 export interface YitianDay {
@@ -111,6 +182,9 @@ export interface YitianDims {
   projectTypes: Projecttypes;
   salesL2: Salesl2;
   serviceModes: Servicemodes;
+  custQuads: Custquads;
+  custBgs: Custbgs;
+  prodCats: Prodcats;
   [k: string]: unknown;
 }
 export interface YitianEntry {
@@ -130,6 +204,14 @@ export interface YitianEntry {
   ok: Ok;
   iss: Iss;
   ct: Ct;
+  cq: Cq;
+  cbg: Cbg;
+  el: El;
+  ls: Ls;
+  ec: Ec;
+  ch: Ch;
+  pm: Pm;
+  tr: Tr;
   [k: string]: unknown;
 }
 export interface YitianIssue {

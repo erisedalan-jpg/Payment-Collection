@@ -1,6 +1,7 @@
 import type { DataColumn } from '@/components/DataTable.vue'
 import type { YitianData } from '@/types/yitian'
 import { ISSUE_LABELS } from './compliance'
+import { transferLabel, lineSrcLabel } from './derived'
 import { NO_L3, NO_L31, NO_L4 } from './metrics'
 
 export interface DetailRow {
@@ -28,6 +29,17 @@ export interface DetailRow {
   issueReason: string
   snippet: string
   content: string
+  // ── V4.5.4 派生列 ──
+  custClass: string      // TOP1000 / 非TOP1000
+  custQuad: string       // M1~M4 原值,未匹配为空
+  custBg: string
+  effLine: string        // 校准后产品线
+  lineSrcText: string    // 原始 / 已校准 / 多义未校准 / 无匹配
+  prodCat: string        // 校准后产品大类
+  channelText: string    // 是 / 空
+  pmText: string         // 是 / 空
+  mgrText: string        // 是 / 空(员工属性)
+  transferText: string   // 五档中文
 }
 
 const OK_TEXT = ['合规', '提示', '问题'] // 下标 = ok(0/1/2)
@@ -76,6 +88,17 @@ export function buildDetailRows(data: YitianData): DetailRow[] {
       issueReason,
       snippet: e.ok === 2 ? (iss?.snippet ?? '') : '', // 问题行 120 字摘要(向后兼容,问题原因 tooltip 用)
       content: e.ct ?? '',                              // 工作成果全文(V4.1.3 起下发,整列展示)
+      // ── V4.5.4 派生列 ──
+      custClass: e.top ? 'TOP1000' : '非TOP1000',
+      custQuad: dv(d.custQuads, e.cq),
+      custBg: dv(d.custBgs, e.cbg),
+      effLine: dv(d.products, e.el),
+      lineSrcText: lineSrcLabel(e.ls),
+      prodCat: dv(d.prodCats, e.ec),
+      channelText: e.ch ? '是' : '',
+      pmText: e.pm ? '是' : '',
+      mgrText: p?.isMgr ? '是' : '',
+      transferText: transferLabel(e.tr),
     }
   })
 }
@@ -141,10 +164,25 @@ export const ALL_COLUMNS: DataColumn[] = [
   { key: 'okText', label: '合规状态', width: 100 },
   { key: 'issueReason', label: '问题原因', width: 240, wrap: true },
   { key: 'content', label: '工作成果', width: 360, wrap: true },
+  // ── V4.5.4 派生列(顺序即选列面板顺序,全部默认隐藏) ──
+  { key: 'custClass', label: '客户分类', width: 110 },
+  { key: 'custQuad', label: '客户象限', width: 130 },
+  { key: 'custBg', label: '市场BG', width: 100 },
+  { key: 'effLine', label: '校准后产品线', width: 140 },
+  { key: 'lineSrcText', label: '校准状态', width: 110 },
+  { key: 'prodCat', label: '产品大类', width: 120 },
+  { key: 'channelText', label: '渠道可交付', width: 110 },
+  { key: 'pmText', label: '项目管理工时', width: 120 },
+  { key: 'mgrText', label: '管理干部', width: 100 },
+  { key: 'transferText', label: '可转移判定', width: 180 },
 ]
 export const ALL_KEYS: string[] = ALL_COLUMNS.map((c) => c.key)
+// 新列一律不进 DEFAULT_VISIBLE:useColumnPrefs 持久化优先,加默认列对老用户不生效(V4.0.1 已吃过这个亏)。
 export const DEFAULT_VISIBLE: string[] = ['date', 'empName', 'l4', 'type', 'hours', 'customer', 'workOrder', 'okText', 'issueReason', 'content']
-export const FILTERABLE = new Set(['l4', 'l2', 'l3', 'l31', 'category', 'type', 'workType3', 'projectType', 'serviceMode', 'salesL2', 'top', 'okText', 'customer', 'empName'])
+export const FILTERABLE = new Set(['l4', 'l2', 'l3', 'l31', 'category', 'type', 'workType3',
+  'projectType', 'serviceMode', 'salesL2', 'top', 'okText', 'customer', 'empName',
+  'custClass', 'custQuad', 'custBg', 'effLine', 'lineSrcText', 'prodCat',
+  'channelText', 'pmText', 'mgrText', 'transferText'])
 
 /** 导出行:按传入的可见列,用中文列名作键;走 formatter(如 top→是/空);不含 snippet 正文。 */
 export function buildDetailSheetRows(rows: DetailRow[], cols: DataColumn[]): Record<string, unknown>[] {
