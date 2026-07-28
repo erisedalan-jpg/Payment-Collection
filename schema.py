@@ -338,6 +338,48 @@ class AnalysisData(_Base):
 
 # ── 倚天工时域(V3.0.0):与 AnalysisData 并列的第二个根模型,独立产物 data/yitian_data.json ──
 
+# ── 源表解析就绪度(V4.5.4):把此前的静默降级变成可见指标 ──
+
+class YitianReadinessTop1000(_Base):
+    provided: bool                   # 文件是否存在
+    rows: int                        # 解析出的客户数
+    matchedCustomers: int            # 工时表客户中匹配上清单的个数
+    hasQuad: bool                    # 象限列是否解析到值(全空且 rows>0 → False)
+    hasBg: bool                      # 市场BG 列同上
+
+
+class YitianReadinessProductCat(_Base):
+    provided: bool
+    rows: int                        # 映射条数
+    coveredLines: int                # 工时表产品线中被覆盖的个数
+    totalLines: int                  # 工时表产品线总数
+
+
+class YitianReadinessCalib(_Base):
+    pending: int                     # 待校准行数(产品线为空/其他 且客户类)
+    calibrated: int
+    ambiguous: int
+    unmatched: int
+
+
+class YitianReadinessUnattr(_Base):
+    rows: int
+    hours: float
+
+
+class YitianReadinessRoster(_Base):
+    hasSupColumn: bool               # 组织架构表是否有「直接上级工号」列
+    managers: int                    # 派生出的管理干部人数
+
+
+class YitianReadiness(_Base):
+    top1000: YitianReadinessTop1000
+    productCategory: YitianReadinessProductCat
+    calibration: YitianReadinessCalib
+    unattributed: YitianReadinessUnattr
+    roster: YitianReadinessRoster
+
+
 class YitianMeta(_Base):
     periodStart: Optional[str]      # 可空(无数据行时为 None),但键必须出现
     periodEnd: Optional[str]        # 同上
@@ -351,6 +393,8 @@ class YitianMeta(_Base):
     storeRows: int                   # 累积库总行数(供 /data 展示"累积了多久")
     storeStart: Optional[str]        # 累积库覆盖区间起(可空,但键必须出现)
     storeEnd: Optional[str]          # 累积库覆盖区间止(同上)
+    dataReadiness: YitianReadiness   # 源表解析就绪度(V4.5.4),/data 与总览卡消费
+    # 必填、非 Optional:它是本期护栏的载体,缺它等于护栏没接上,必须硬失败而非静默默认。
 
 
 class YitianRosterItem(_Base):
@@ -361,6 +405,7 @@ class YitianRosterItem(_Base):
     l31: str
     l4: str
     category: str
+    isMgr: bool                      # 管理干部(由「直接上级工号」派生,V4.5.4)
 
 
 class YitianDay(_Base):
@@ -379,6 +424,9 @@ class YitianDims(_Base):
     projectTypes: List[str]
     salesL2: List[str]
     serviceModes: List[str]
+    custQuads: List[str]             # 客户象限(V4.5.4)
+    custBgs: List[str]               # 市场BG(V4.5.4)
+    prodCats: List[str]              # 校准后产品大类(V4.5.4)
 
 
 class YitianEntry(_Base):
@@ -398,6 +446,15 @@ class YitianEntry(_Base):
     ok: int                          # 0 合规 / 1 合规(提示) / 2 问题
     iss: List[str]                   # 问题码
     ct: str                          # 工作成果全文（V4.1.3 起下发供明细页整列展示；此前按隐私裁列、仅问题行带 120 字摘要，用户 2026-07-21 授权开放全文）
+    # ── V4.5.4 派生字段 ──
+    cq: Optional[int]                # → dims.custQuads 客户象限(可空)
+    cbg: Optional[int]               # → dims.custBgs 市场BG(可空)
+    el: Optional[int]                # → dims.products 校准后产品线(复用产品线码表,可空)
+    ls: int                          # 校准状态 0 raw / 1 calibrated / 2 ambiguous / 3 unmatched
+    ec: Optional[int]                # → dims.prodCats 校准后产品大类(可空)
+    ch: bool                         # 渠道商可交付
+    pm: bool                         # 项目管理工时
+    tr: int                          # 可转移五档 0 不可归属 /1 M1M2 /2 项目管理 /3 非渠道 /4 可转移
 
 
 class YitianIssue(_Base):
