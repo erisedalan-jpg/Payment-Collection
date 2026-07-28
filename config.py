@@ -68,6 +68,7 @@ ORG_FILE = "组织架构.xlsx"
 MAPPING_FILE = "A.xlsx"
 TOP1000_FILE = "TOP1000.xlsx"           # CRM 大客户清单(客户名称→级别/象限)
 TOP1000_LEVEL = "TOP1000大客户"          # top1000 判定级别
+PRODUCT_CATEGORY_FILE = "产品分类.xlsx"   # 产品线→产品大类/是否渠道商可交付(倚天域,V4.5.4)
 DELIVERY_FILE = "delivery_analysis.csv"
 DELIVERY_FILE_LEGACY = "delivery_analysis.xlsx"  # csv 缺失时回退(R 批次过渡)
 
@@ -85,7 +86,7 @@ INPUT_SUBDIR_MAP = {
 # 上传白名单含 legacy:R 批次过渡期 csv/xlsx 两式 delivery 均可上传(读侧 read_delivery 同款回退)
 INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGACY,
                       PAYMENT_RECORDS_FILE, PROFIT_DIRECT_FILE, PROFIT_BRIDGE_FILE, BUDGET_FILE,
-                      COLLECTION_STAGES_FILE, TOP1000_FILE,
+                      COLLECTION_STAGES_FILE, TOP1000_FILE, PRODUCT_CATEGORY_FILE,
                       YITIAN_TIMESHEET_FILE, YITIAN_HOLIDAYS_FILE]
 DEPT_L3 = "交付实施三部"
 PRESALE_PREFIX = "售前服务"
