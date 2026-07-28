@@ -143,7 +143,10 @@ oppoboard.pdf
 demo.html
 CostBudgetEstimate.html
 nul
-yitian-analyze/
-yitian/
-yitian-new/
-项目数据运营工具/
+# 必须带前导 / 锚定仓库根:不带锚点的 `yitian/` 会匹配任意深度的同名目录,
+# 把 frontend/src/lib/yitian/ 也一并忽略掉(V4.5.4 实际踩过:derived.ts 被静默拒收,
+# 而引用它的 detail.ts 已提交 → 提交树在全新 clone 上构建必失败)。
+/yitian-analyze/
+/yitian/
+/yitian-new/
+/项目数据运营工具/
