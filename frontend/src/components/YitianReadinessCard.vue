@@ -3,12 +3,10 @@ import { computed } from 'vue'
 import AppCard from './AppCard.vue'
 import SectionTitle from './SectionTitle.vue'
 import MetricGrid from './MetricGrid.vue'
-import { TRANSFER_LABELS } from '@/lib/yitian/derived'
+import { transferBuckets } from '@/lib/yitian/derived'
 import type { YitianData } from '@/types/yitian'
 
 const props = defineProps<{ data: YitianData | null }>()
-
-const CUSTOMER_TYPES = ['项目类', '售前类', '售后类']
 
 const rd = computed(() => props.data?.meta?.dataReadiness ?? null)
 
@@ -40,21 +38,19 @@ const readiness = computed(() => {
   ]
 })
 
-/** 可转移五档按工时聚合(仅客户类工时,与后端判定口径一致)。 */
+/** 可转移五档按工时聚合(仅客户类工时,与后端判定口径一致)。
+ *  聚合口径下沉到 derived.transferBuckets,与客户与产品分析页共用一份实现;
+ *  本处只保留呈现逻辑(主值取整、比例、状态色),口径与呈现均与重构前逐字等价。 */
 const transfer = computed(() => {
   const d = props.data
   if (!d) return []
-  const acc = [0, 0, 0, 0, 0]
-  for (const e of d.entries) {
-    const t = e.t === null || e.t === undefined ? '' : (d.dims.types[e.t] ?? '')
-    if (!CUSTOMER_TYPES.includes(t)) continue
-    acc[e.tr] = (acc[e.tr] ?? 0) + e.h
-  }
-  const tot = acc.reduce((a, b) => a + b, 0)
-  return acc.map((h, i) => ({
-    k: TRANSFER_LABELS[i],
-    v: String(Math.round(h)),
-    sub: tot ? `${Math.round((h / tot) * 100)}%` : '-',
+  const buckets = transferBuckets(d, d.entries)
+  const tot = buckets.reduce((s, b) => s + b.hours, 0)
+  return buckets.map((b, i) => ({
+    k: b.label,
+    v: String(Math.round(b.hours)),
+    // 分母为 0 才显 "-";分母有值、分子为 0 显 "0%" —— 两者不是一回事
+    sub: tot ? `${Math.round(b.pct * 100)}%` : '-',
     cls: i === 4 ? 'ok' : i === 0 ? 'warn' : '',
   }))
 })
