@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api/client'
 import { fetchYitianCookie } from '@/lib/cookieAgent'
 import { useInputFiles } from '@/composables/useInputFiles'
 import { useFileStatus } from '@/composables/useFileStatus'
 import { YITIAN_FILE_NAMES } from '@/lib/uploadDispatch'
+import { useYitianStore } from '@/stores/yitian'
 
 defineProps<{ yitianStatus: { sessionPreview: string; updatedAt: string } }>()
 const emit = defineEmits<{
@@ -14,6 +15,11 @@ const emit = defineEmits<{
 const { upload: inputsUpload } = useInputFiles()
 const { files: fileStatus, load: loadFileStatus } = useFileStatus()
 const ftime = (name: string) => fileStatus.value[name] || '-'
+
+// TOP1000 / 产品分类两张源表的解析状态(V4.5.4)。倚天数据未加载时为 null,整块不渲染
+// —— 列缺失要显式告警,而不是让客户象限/产品大类静默全空(TOP1000 此前零可观测性)。
+const yStore = useYitianStore()
+const rd = computed(() => yStore.data?.meta?.dataReadiness ?? null)
 
 const yitianInput = ref<HTMLInputElement | null>(null)
 const yitianUploadMsg = ref('')
@@ -76,6 +82,25 @@ defineExpose({ reload: loadFileStatus, onFetchYitianCookie })
         <span class="dv-ftime2 u-num">{{ ftime(name) }}</span>
       </div>
     </div>
+    <div v-if="rd" class="ysc-rd">
+      <div class="ysc-rd-row">
+        <span>TOP1000.xlsx</span>
+        <span v-if="!rd.top1000.provided" class="ysc-warn">未提供</span>
+        <span v-else>
+          {{ rd.top1000.rows }} 家 · 匹配 {{ rd.top1000.matchedCustomers }}
+          <span v-if="!rd.top1000.hasQuad" class="ysc-warn">· 未找到象限列</span>
+          <span v-if="!rd.top1000.hasBg" class="ysc-warn">· 未找到市场BG列</span>
+        </span>
+      </div>
+      <div class="ysc-rd-row">
+        <span>产品分类.xlsx</span>
+        <span v-if="!rd.productCategory.provided" class="ysc-warn">未提供</span>
+        <span v-else>
+          {{ rd.productCategory.rows }} 条 · 覆盖产品线
+          {{ rd.productCategory.coveredLines }}/{{ rd.productCategory.totalLines }}
+        </span>
+      </div>
+    </div>
     <div class="dv-row dv-actions">
       <input ref="yitianInput" type="file" accept=".xlsx,.csv" multiple class="dv-file" />
       <button class="dv-btn" data-test="btn-upload-yitian" @click="onUploadYitian">上传倚天文件</button>
@@ -104,6 +129,12 @@ defineExpose({ reload: loadFileStatus, onFetchYitianCookie })
 
 <style scoped>
 @import '@/styles/dataview.css';
+
+/* 本卡特有:两张源表解析状态。横向内边距与 .dv-fgrid 对齐,否则贴到卡边框上 */
+.ysc-rd { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-2); padding: 0 var(--sp-4); }
+.ysc-rd-row { display: flex; justify-content: space-between; gap: var(--sp-2);
+              font-size: var(--fs-1); color: var(--sub); }
+.ysc-warn { color: var(--warn-text); }
 
 /* 本卡特有:holidays.csv 格式说明排版 */
 .dv-fmt { padding: var(--sp-1) var(--sp-4) var(--sp-2); line-height: var(--lh-base); }

@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import YitianSourceCard from './YitianSourceCard.vue'
 import * as cookieAgent from '@/lib/cookieAgent'
+import { useYitianStore } from '@/stores/yitian'
 
 // jsdom 未实现 File.prototype.arrayBuffer;上传测试会经 onUploadYitian 走真实
 // inputsUpload(内部靠 arrayBuffer 读文件内容再 POST)。沿用 MainDomainSourceCard.test.ts 同款 polyfill。
@@ -112,5 +113,47 @@ describe('YitianSourceCard', () => {
     expect(msgEl.text()).toContain('已上传 0 个倚天文件')
     expect(msgEl.text()).toContain('失败 1 个（服务端未接收,请重试）')
     expect(msgEl.classes()).toContain('warn')
+  })
+
+  const READINESS = {
+    top1000: { provided: true, rows: 139, matchedCustomers: 97, hasQuad: true, hasBg: true },
+    productCategory: { provided: true, rows: 108, coveredLines: 81, totalLines: 81 },
+    calibration: { pending: 0, calibrated: 0, ambiguous: 0, unmatched: 0 },
+    unattributed: { rows: 0, hours: 0 },
+    roster: { hasSupColumn: true, managers: 14 },
+  }
+
+  /** 挂载前把就绪度塞进 store。beforeEach 已建好 pinia,这里取到的就是同一个实例。 */
+  const seedReadiness = (rd: unknown) => {
+    useYitianStore().data = { meta: { dataReadiness: rd } } as never
+  }
+
+  it('显示两张源表解析状态', async () => {
+    seedReadiness(READINESS)
+    const w = await mountCard()
+    expect(w.text()).toContain('TOP1000.xlsx')
+    expect(w.text()).toContain('139')
+    expect(w.text()).toContain('产品分类.xlsx')
+    expect(w.text()).toContain('108')
+    expect(w.text()).toContain('81/81')
+  })
+
+  it('象限列缺失时显式告警', async () => {
+    seedReadiness({ ...READINESS, top1000: { ...READINESS.top1000, hasQuad: false } })
+    const w = await mountCard()
+    expect(w.text()).toContain('未找到象限列')
+  })
+
+  it('产品分类未提供时显式告警而非显示 0 条', async () => {
+    seedReadiness({ ...READINESS,
+      productCategory: { provided: false, rows: 0, coveredLines: 0, totalLines: 81 } })
+    const w = await mountCard()
+    expect(w.text()).toContain('未提供')
+  })
+
+  it('store 无数据时不渲染就绪度区且不炸', async () => {
+    const w = await mountCard()          // 不 seed
+    expect(w.text()).not.toContain('未找到象限列')
+    expect(w.text()).toContain('工时.xlsx')   // 卡片其余部分正常
   })
 })
