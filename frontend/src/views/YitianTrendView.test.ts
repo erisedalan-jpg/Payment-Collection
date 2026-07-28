@@ -245,4 +245,32 @@ describe('YitianTrendView · 下钻(跨页,按指标分流)', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/yitian/trend')
   })
+
+  // 粒度(V4.5.6 补半年/年)。借用本 describe 的 mountAndCharts:粒度决定分桶,与上面的桶 key 下钻同源。
+  it('粒度选项含五档且顺序为 周-月-季-半年-年', async () => {
+    const { w } = await mountAndCharts()
+    const seg = w.findComponent({ name: 'SegToggle' })
+    expect(seg.exists()).toBe(true)
+    const opts = seg.props('options') as { value: string; label: string }[]
+    expect(opts.map((o) => o.value)).toEqual(['week', 'month', 'quarter', 'half', 'year'])
+    expect(opts.map((o) => o.label)).toEqual(['周', '月', '季', '半年', '年'])
+  })
+
+  it('切到半年粒度后 X 轴按 YYYY-Hn 分桶', async () => {
+    const { w, charts } = await mountAndCharts()
+    await w.findComponent({ name: 'SegToggle' }).vm.$emit('update:modelValue', 'half')
+    await flushPromises()
+    const keys = (charts[0].props('option') as { xAxis?: { data?: string[] } }).xAxis?.data ?? []
+    // 先钉死桶数:空数组会让下面的逐项断言空跑成恒真(本仓吃过这种假绿)。
+    // DATA 全落 2026 年 6 月,半年粒度下应并成 H1 一个桶(周粒度下是 CW23/CW24 两个)。
+    expect(keys).toEqual(['2026-H1'])
+    for (const k of keys) expect(k, k).toMatch(/^\d{4}-H[12]$/)
+  })
+
+  it('切到年粒度后 X 轴按 YYYY 分桶', async () => {
+    const { w, charts } = await mountAndCharts()
+    await w.findComponent({ name: 'SegToggle' }).vm.$emit('update:modelValue', 'year')
+    await flushPromises()
+    expect((charts[0].props('option') as { xAxis?: { data?: string[] } }).xAxis?.data).toEqual(['2026'])
+  })
 })

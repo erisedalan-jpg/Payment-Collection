@@ -56,6 +56,16 @@ export function quarterBuckets(days: YitianDay[], start: string, end: string): W
   return bucketBy(days, start, end, (d) => `${d.d.slice(0, 4)}-Q${Math.floor((Number(d.d.slice(5, 7)) - 1) / 3) + 1}`)
 }
 
+/** 按半年分桶(key='YYYY-Hn';1-6 月=H1,7-12 月=H2)。 */
+export function halfYearBuckets(days: YitianDay[], start: string, end: string): WeekBucket[] {
+  return bucketBy(days, start, end, (d) => `${d.d.slice(0, 4)}-H${Number(d.d.slice(5, 7)) <= 6 ? 1 : 2}`)
+}
+
+/** 按自然年分桶(key='YYYY')。累积库跨度不足一年时只会得到 1 个桶,属退化态非缺陷。 */
+export function yearBuckets(days: YitianDay[], start: string, end: string): WeekBucket[] {
+  return bucketBy(days, start, end, (d) => d.d.slice(0, 4))
+}
+
 /** 数据实际跨度。日期选择器必须钳制在此范围内——超出范围没有工作日标注,基础工时算不出来。 */
 export function dataRange(days: YitianDay[]): { start: string; end: string } {
   if (!days.length) return { start: '', end: '' }

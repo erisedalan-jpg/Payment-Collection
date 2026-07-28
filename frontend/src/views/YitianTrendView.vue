@@ -11,7 +11,7 @@ import { useYitianStore } from '@/stores/yitian'
 import { useScopedYitian } from '@/composables/useScopedData'
 import { useYitianViewStore } from '@/stores/yitianView'
 import { useYitianSettingsStore } from '@/stores/yitianSettings'
-import { weekBuckets, monthBuckets, quarterBuckets, type WeekBucket } from '@/lib/yitian/calendar'
+import { weekBuckets, monthBuckets, quarterBuckets, halfYearBuckets, yearBuckets, type WeekBucket } from '@/lib/yitian/calendar'
 import { selectEntries, empStats, complianceRate, isIncluded, unfilledList, neverFilledList } from '@/lib/yitian/metrics'
 import { buildDrillQuery } from '@/lib/yitian/drill'
 
@@ -26,23 +26,28 @@ onMounted(() => { store.load(); settings.load() })
 const ready = computed(() => !!store.data)
 
 /** 趋势粒度:局部 ref,不入 store——只影响本页分桶,不影响其他页的周口径(calc/iso 仍走 view.weekMode)。 */
-const gran = ref<'week' | 'month' | 'quarter'>('week')
+const gran = ref<'week' | 'month' | 'quarter' | 'half' | 'year'>('week')
 const GRAN_OPTS = [
   { value: 'week', label: '周' },
   { value: 'month', label: '月' },
   { value: 'quarter', label: '季' },
+  { value: 'half', label: '半年' },
+  { value: 'year', label: '年' },
 ]
 
-/** 当前粒度(周/月/季)的分桶列表——趋势图 X 轴与「桶 key → 起止日期」下钻查找的唯一同源。 */
+/** 当前粒度(周/月/季/半年/年)的分桶列表——趋势图 X 轴与「桶 key → 起止日期」下钻查找的唯一同源。 */
 const bucketsList = computed<WeekBucket[]>(() => {
   const data = store.data
   if (!data) return []
   return gran.value === 'month' ? monthBuckets(data.days, view.start, view.end)
     : gran.value === 'quarter' ? quarterBuckets(data.days, view.start, view.end)
+    : gran.value === 'half' ? halfYearBuckets(data.days, view.start, view.end)
+    : gran.value === 'year' ? yearBuckets(data.days, view.start, view.end)
     : weekBuckets(data.days, view.start, view.end, view.weekMode)
 })
 
-/** 按 gran(周/月/季)分桶,逐桶重算各指标。桶内区间 = [bucket.start, bucket.end],口径与总览页完全同源。 */
+/** 按 gran(周/月/季/半年/年)分桶,逐桶重算各指标。桶内区间 = [bucket.start, bucket.end],口径与总览页完全同源。
+ *  合规率等比率指标是【逐桶按 Σ合格÷Σ总数 重算】,不是把周值再平均——粗粒度下两者不等价(spec §5.3.4)。 */
 const series = computed(() => {
   const data = scopedYitian.value
   const empty = {

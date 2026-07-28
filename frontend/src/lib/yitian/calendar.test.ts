@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { daysInRange, workdayCount, weekKeyOf, weekBuckets, dataRange, monthBuckets, quarterBuckets } from './calendar'
+import { daysInRange, workdayCount, weekKeyOf, weekBuckets, dataRange, monthBuckets, quarterBuckets, halfYearBuckets, yearBuckets } from './calendar'
 import type { YitianDay } from '@/types/yitian'
 
 // 2026-06-01(周一) ~ 2026-06-07(周日);6/3 设为法定假(workday=false)
@@ -89,5 +89,35 @@ describe('quarterBuckets', () => {
     const b = quarterBuckets(SPAN, '', '')
     expect(b.map((x) => x.key)).toEqual(['2025-Q4', '2026-Q1', '2026-Q2'])
     expect(b[1]).toMatchObject({ key: '2026-Q1', start: '2026-01-02', end: '2026-02-16', workdays: 1 })
+  })
+})
+
+/** 半年/年分桶夹具:只关心日期落哪个桶,工作日标注统一 true(工作日计数已由上面几组用例覆盖)。 */
+function mkDays(dates: string[]): YitianDay[] {
+  return dates.map((d) => ({ d, workday: true, isoWeek: '', calcWeek: '' }))
+}
+
+describe('halfYearBuckets', () => {
+  it('1-6 月为 H1、7-12 月为 H2', () => {
+    const days = mkDays(['2026-02-02', '2026-06-30', '2026-07-01', '2026-12-31'])
+    const b = halfYearBuckets(days, '', '')
+    expect(b.map((x) => x.key)).toEqual(['2026-H1', '2026-H2'])
+    // 边界必须钉到桶内容:只断言 key 列表的话,阈值写成「<=7 月算 H1」照样两个桶、照样绿
+    expect(b[0]).toMatchObject({ start: '2026-02-02', end: '2026-06-30', workdays: 2 })
+    expect(b[1]).toMatchObject({ start: '2026-07-01', end: '2026-12-31', workdays: 2 })
+  })
+
+  it('区间过滤生效', () => {
+    const days = mkDays(['2026-02-02', '2026-07-01'])
+    expect(halfYearBuckets(days, '2026-07-01', '2026-07-01').map((x) => x.key)).toEqual(['2026-H2'])
+  })
+})
+
+describe('yearBuckets', () => {
+  it('跨年各自成桶且按起始日升序', () => {
+    const days = mkDays(['2026-08-01', '2026-03-01'])
+    expect(yearBuckets(days, '', '').map((x) => x.key)).toEqual(['2026'])
+    const days2 = mkDays(['2027-01-05', '2026-03-01'])
+    expect(yearBuckets(days2, '', '').map((x) => x.key)).toEqual(['2026', '2027'])
   })
 })
