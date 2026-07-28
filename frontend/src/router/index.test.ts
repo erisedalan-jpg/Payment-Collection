@@ -171,14 +171,19 @@ describe('router', () => {
     expect(router.currentRoute.value.path).toBe('/payment/calendar')
   })
 
-  it('10 个 tab 页各自带正确的 meta.tabGroup', () => {
+  it('12 个 tab 页各自带正确的 meta.tabGroup', () => {
+    // 手工清单,非派生 —— 新增 tab 页须同步补一行。V4.5.5 加 /yitian/customer-product 时
+    // 漏补(标题仍写 10、实际只列 10 条),V4.5.6 一并补齐,使本清单与 nav.test.ts 的
+    // 「tab 组共 12 页」对齐;两处对不上即说明路由与 TAB_GROUPS 有一侧漏登记。
     const cases: [string, string][] = [
       ['/insight', 'project-analysis'], ['/insight/milestone', 'project-analysis'],
       ['/insight/costdetail', 'project-analysis'], ['/insight/risk', 'project-analysis'],
       ['/payment/board', 'payment-analysis'], ['/payment/calendar', 'payment-analysis'],
       ['/yitian/compliance', 'yitian-analysis'], ['/yitian/analytics', 'yitian-analysis'],
       ['/yitian/trend', 'yitian-analysis'], ['/yitian/customer', 'yitian-analysis'],
+      ['/yitian/customer-product', 'yitian-analysis'], ['/yitian/governance', 'yitian-analysis'],
     ]
+    expect(cases.length, '清单规模与 TAB_GROUPS 总数脱节').toBe(12)
     for (const [path, group] of cases) {
       expect(router.resolve(path).meta.tabGroup).toBe(group)
     }

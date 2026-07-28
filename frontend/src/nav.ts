@@ -48,6 +48,7 @@ export const TAB_GROUPS: Record<TabGroupId, NavLink[]> = {
     { label: '趋势分析', to: '/yitian/trend', key: 'yitian-trend' },
     { label: '客户支持分析', to: '/yitian/customer', key: 'yitian-customer' },
     { label: '客户与产品分析', to: '/yitian/customer-product', key: 'yitian-customer-product' },
+    { label: '工时治理监控', to: '/yitian/governance', key: 'yitian-governance' },
   ],
 }
 
@@ -100,5 +101,5 @@ export function sectionPageLinks(s: NavSection): NavLink[] {
   return s.items.flatMap((i) => (isTabEntry(i) ? TAB_GROUPS[i.group] : [i]))
 }
 
-/** 全部可授权页面(31 个),上述四处消费方的唯一来源。 */
+/** 全部可授权页面(32 个),上述四处消费方的唯一来源。 */
 export const ALL_PAGE_LINKS: NavLink[] = NAV_SECTIONS.flatMap(sectionPageLinks)

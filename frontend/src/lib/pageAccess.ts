@@ -4,7 +4,7 @@ export const PAGE_KEYS = [
   'insight', 'insight-milestone', 'insight-costdetail', 'insight-risk', 'insight-board', 'insight-calendar', 'opportunities-board',
   'payment', 'payment-projects', 'payment-nodes',
   'projects-key', 'opportunities-progress', 'temp-followup', 'opportunity-followup', 'risk-followup', 'payment-key',
-  'yitian', 'yitian-detail', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer', 'yitian-customer-product',
+  'yitian', 'yitian-detail', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer', 'yitian-customer-product', 'yitian-governance',
   'data', 'governance', 'budget', 'about',
 ] as const
 
@@ -17,7 +17,7 @@ export function canAccess(allowedPages: string[], key: PageKey): boolean {
 
 import { ALL_PAGE_LINKS } from '@/nav'
 
-/** 建/编辑账号表单的「可访问页面」选项单一来源:'*' 全部 + 31 个 PageKey(取 nav 标签)。
+/** 建/编辑账号表单的「可访问页面」选项单一来源:'*' 全部 + 32 个 PageKey(取 nav 标签)。
  *  ALL_PAGE_LINKS 已含 tab 页,勿改回按侧栏 LINKS 派生 —— 那会让 10 个分析页无法授权。 */
 export const PAGE_OPTIONS: { key: string; label: string }[] = [
   { key: '*', label: '全部页面' },

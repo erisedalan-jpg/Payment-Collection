@@ -39,8 +39,8 @@ describe('nav links', () => {
 })
 
 describe('倚天 pageKey', () => {
-  it('六个倚天页面都能被单独授权', () => {
-    const keys = ['yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer', 'yitian-customer-product'] as const
+  it('七个倚天页面都能被单独授权', () => {
+    const keys = ['yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer', 'yitian-customer-product', 'yitian-governance'] as const
     for (const k of keys) {
       expect(canAccess([k], k)).toBe(true)
       expect(canAccess(['overview'], k)).toBe(false)
@@ -48,9 +48,9 @@ describe('倚天 pageKey', () => {
     }
   })
 
-  it('PAGE_OPTIONS 含倚天六页(账号管理表单能勾到)', () => {
+  it('PAGE_OPTIONS 含倚天七页(账号管理表单能勾到)', () => {
     const keys = PAGE_OPTIONS.map((o) => o.key)
-    for (const k of ['yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer', 'yitian-customer-product']) {
+    for (const k of ['yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer', 'yitian-customer-product', 'yitian-governance']) {
       expect(keys).toContain(k)
     }
   })
@@ -60,7 +60,7 @@ it('PAGE_OPTIONS 含概算工具(账号管理里必须能勾选,否则谁都授�
   expect(PAGE_OPTIONS.some((o) => o.key === 'budget' && o.label === '概算工具')).toBe(true)
 })
 
-it('PAGE_OPTIONS 覆盖全部 31 个 PageKey(含 11 个 tab 页),否则超管无法为其授权', () => {
+it('PAGE_OPTIONS 覆盖全部 32 个 PageKey(含 12 个 tab 页),否则超管无法为其授权', () => {
   const keys = PAGE_OPTIONS.filter((o) => o.key !== '*').map((o) => o.key).sort()
   expect(keys).toEqual([...PAGE_KEYS].sort())
 })

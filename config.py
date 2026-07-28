@@ -120,6 +120,7 @@ PAGE_DOMAINS = {
     'yitian': 'yitian', 'yitian-detail': 'yitian', 'yitian-compliance': 'yitian',
     'yitian-analytics': 'yitian', 'yitian-trend': 'yitian', 'yitian-customer': 'yitian',
     'yitian-customer-product': 'yitian',
+    'yitian-governance': 'yitian',
     'opportunities-progress': 'opportunity', 'opportunities-board': 'opportunity',
     'opportunity-followup': 'opportunity',
 }
