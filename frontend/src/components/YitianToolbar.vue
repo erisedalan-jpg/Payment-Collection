@@ -17,6 +17,23 @@ const l4Options = computed(() => {
   return [...set].sort()
 })
 
+/** 产品大类选项:取自数据码表,按 dims.prodCats 原序(后端已按业务顺序排,「其他」末位)。
+ *  绝不写死清单——写死会在数据换档(产品分类.xlsx 增删大类)时静默错位。 */
+const prodCatOptions = computed(() => store.data?.dims.prodCats ?? [])
+/** 工时类型选项:同样取自数据码表。 */
+const typeOptions = computed(() => store.data?.dims.types ?? [])
+
+const MGR_OPTIONS = [
+  { value: 'all', label: '全部' },
+  { value: 'only', label: '仅管理干部' },
+  { value: 'exclude', label: '排除管理干部' },
+] as const
+const DISPLAY_OPTIONS = [
+  { value: 'hours', label: '只显示工时' },
+  { value: 'pct', label: '只显示比例' },
+  { value: 'both', label: '工时和比例' },
+] as const
+
 const isFallback = computed(() => store.data?.meta.calendarSource === 'fallback')
 
 /** 数据跨度外的日期禁选——没有工作日标注就算不出基础工时。 */
@@ -65,6 +82,26 @@ defineExpose({ l4Options, disabledDate })
         <el-option v-for="o in l4Options" :key="o" :label="o" :value="o" />
       </el-select>
 
+      <el-select v-model="view.prodCats" multiple collapse-tags collapse-tags-tooltip clearable
+        placeholder="产品大类(全部)" size="small" class="yt-sel" data-test="yt-prodcat">
+        <el-option v-for="c in prodCatOptions" :key="c" :label="c" :value="c" />
+      </el-select>
+
+      <el-select v-model="view.types" multiple collapse-tags collapse-tags-tooltip clearable
+        placeholder="工时类型(全部)" size="small" class="yt-sel" data-test="yt-type">
+        <el-option v-for="t in typeOptions" :key="t" :label="t" :value="t" />
+      </el-select>
+
+      <el-select v-model="view.mgrMode" size="small" class="yt-sel yt-sel--sm" data-test="yt-mgr">
+        <el-option v-for="o in MGR_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+      </el-select>
+
+      <el-radio-group v-model="view.displayMode" size="small" data-test="yt-display">
+        <el-radio-button v-for="o in DISPLAY_OPTIONS" :key="o.value" :value="o.value">
+          {{ o.label }}
+        </el-radio-button>
+      </el-radio-group>
+
       <span class="yt-hint u-num">数据跨度 {{ range.start || '-' }} ~ {{ range.end || '-' }}</span>
     </div>
 
@@ -79,6 +116,8 @@ defineExpose({ l4Options, disabledDate })
 .yt-row { display: flex; flex-wrap: wrap; gap: var(--gap-stack); align-items: center; }
 .yt-date { width: 260px; }
 .yt-l4 { min-width: 180px; max-width: 240px; }
+.yt-sel { min-width: 180px; max-width: 240px; }
+.yt-sel--sm { min-width: 140px; max-width: 160px; }
 .yt-hint { color: var(--mut); font-size: var(--fs-1); }
 .yt-warn {
   margin-top: var(--gap-stack);

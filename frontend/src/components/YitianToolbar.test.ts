@@ -80,6 +80,27 @@ describe('YitianToolbar', () => {
     expect(fn(new Date(2026, 5, 1))).toBe(false)
     expect(fn(new Date(2026, 5, 5))).toBe(false)   // periodEnd 同理不被禁选
   })
+
+  it('四个新筛选控件都渲染出来(V4.5.5)', () => {
+    const w = mountBar(DATA)
+    for (const t of ['yt-prodcat', 'yt-type', 'yt-mgr', 'yt-display']) {
+      expect(w.find(`[data-test="${t}"]`).exists(), t).toBe(true)
+    }
+  })
+
+  it('产品大类/工时类型选项取自 dims 码表而非写死(V4.5.5)', () => {
+    const w = mountBar({
+      ...DATA,
+      dims: { ...DATA.dims, prodCats: ['甲类', '乙类'], types: ['项目类', '售前类'] },
+    } as unknown as YitianData)
+    // 写死清单会在数据换档(产品分类.xlsx 增删大类)时静默错位,故断言必须打到实际渲染出的选项上
+    const cats = w.findComponent('[data-test="yt-prodcat"]')
+      .findAllComponents({ name: 'ElOption' }).map((o) => o.props('value'))
+    expect(cats).toEqual(['甲类', '乙类'])
+    const types = w.findComponent('[data-test="yt-type"]')
+      .findAllComponents({ name: 'ElOption' }).map((o) => o.props('value'))
+    expect(types).toEqual(['项目类', '售前类'])
+  })
 })
 
 describe('YitianToolbar · 时区无关回归(模拟 UTC+8 环境)', () => {
