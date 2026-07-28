@@ -7,7 +7,7 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import OverviewView from './OverviewView.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useAuthStore } from '@/stores/auth'
 
 vi.mock('@/lib/portalApi', () => ({
@@ -238,7 +238,7 @@ describe('OverviewView 标签排除', () => {
   it('开启排除后被排除项目不进 baseProjects', async () => {
     seedSmall()
     const tags = useProjectTagsStore(); tags.assignments = { P2: ['排除标签'] } as any
-    const filter = useFilterStore(); filter.setExclude(true, ['排除标签'])
+    const filter = useExcludeStore(); filter.setExclude(true, ['排除标签'])
     await router.push('/'); await router.isReady()
     const w = mount(OverviewView, { global: { plugins: [router] } })
     await flushPromises()
@@ -249,7 +249,7 @@ describe('OverviewView 标签排除', () => {
   it('关闭排除时回到全量', async () => {
     seedSmall()
     const tags = useProjectTagsStore(); tags.assignments = { P2: ['排除标签'] } as any
-    const filter = useFilterStore(); filter.setExclude(false, ['排除标签'])
+    const filter = useExcludeStore(); filter.setExclude(false, ['排除标签'])
     await router.push('/'); await router.isReady()
     const w = mount(OverviewView, { global: { plugins: [router] } })
     await flushPromises()

@@ -7,14 +7,14 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import CalendarView from './CalendarView.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 import { useAuthStore } from '@/stores/auth'
 import { ALL_PAGE_LINKS } from '@/nav'
 
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
-  useFilterStore().setPreset('all')
+  usePaymentFilterStore().setPreset('all')
 })
 
 function seed() {

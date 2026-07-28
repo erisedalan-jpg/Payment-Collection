@@ -2,20 +2,22 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { payDashSummary } from '@/lib/payDashboard'
 import { fmtWan, pct } from '@/lib/format'
 import AppCard from './AppCard.vue'
 
 const data = useDataStore()
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 const router = useRouter()
 
 const summary = computed(() =>
   payDashSummary(
     filter.filteredPayNodes,
     data.data?.projects ?? [],
-    { excludeActive: filter.excludeOn, excludedIds: filter.excludedIds, viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM },
+    { excludeActive: exclude.excludeOn, excludedIds: exclude.excludedIds, viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM },
     filter.payRecordsAll,
     data.data?.paymentNodes,
     filter.dateStart,

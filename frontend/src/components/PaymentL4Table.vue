@@ -1,22 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { projectPaymentRows, summaryByDim, filterProjects, l4SummaryRow } from '@/lib/paymentPmis'
 import { fmtWan, fmtRatio } from '@/lib/format'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 
 const data = useDataStore()
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 
 const rows = computed(() => {
   const opts = {
     viewMode: filter.viewMode,
     viewL4: filter.viewL4,
     viewPM: filter.viewPM,
-    excludeActive: filter.excludeOn,
-    excludedIds: filter.excludedIds,
+    excludeActive: exclude.excludeOn,
+    excludedIds: exclude.excludedIds,
   }
   const pr = projectPaymentRows(
     filterProjects(data.data?.projects ?? [], opts),

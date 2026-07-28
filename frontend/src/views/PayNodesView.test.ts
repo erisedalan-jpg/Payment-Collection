@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import PayNodesView from './PayNodesView.vue'
@@ -28,7 +28,7 @@ describe('PayNodesView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
     useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
   })
@@ -142,7 +142,7 @@ describe('PayNodesView', () => {
 
   it('分页:节点表只渲染一页,5卡汇总仍按区间全集(不受表格分页/筛选影响)', async () => {
     const data = useDataStore()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     data.data = {
       projects: [{ projectId: 'A', projectName: '甲', projectManager: '张三', orgL4: '组1', payment: { paymentRatio: 0.5 }, paymentPmis: { contract: 2_000_000 } }],
       paymentNodes: { A: Array.from({ length: 60 }, () => ({

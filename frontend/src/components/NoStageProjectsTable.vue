@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { noStageProjects } from '@/lib/payDashboard'
 import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from '@/components/DataTable.vue'
@@ -13,11 +14,12 @@ import { usePagedRows } from '@/lib/usePagedRows'
 
 const router = useRouter()
 const data = useDataStore()
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 
 const rows = computed(() => noStageProjects(data.data?.projects ?? [], data.data?.paymentNodes, {
   viewMode: filter.viewMode, viewL4: filter.viewL4, viewPM: filter.viewPM,
-  excludeActive: filter.excludeOn, excludedIds: filter.excludedIds,
+  excludeActive: exclude.excludeOn, excludedIds: exclude.excludedIds,
 }))
 
 const { paged, currentPage, pageSize } = usePagedRows(rows, 20)

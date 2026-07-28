@@ -6,7 +6,7 @@ import { useScopedProjects } from '@/composables/useScopedData'
 import type { Event, Project, ProjectPmis } from '@/types/analysis'
 import { computeKpis, healthSummary, paymentBand } from '@/lib/overview'
 import { paymentNodeRows } from '@/lib/paymentPmis'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 import { fmtWan } from '@/lib/format'
 import EventTimeline from '@/components/EventTimeline.vue'
 import SegToggle from '@/components/SegToggle.vue'
@@ -30,7 +30,7 @@ import { userScopedKey } from '@/lib/userScopedKey'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
-const filter = useFilterStore()
+const exclude = useExcludeStore()
 const router = useRouter()
 onMounted(() => { if (!data.data) data.load() })
 
@@ -50,7 +50,7 @@ function togglePortal() {
 
 const baseProjects = computed(() => {
   const all = (scoped.value?.projects ?? []) as Project[]
-  return filter.excludeOn ? all.filter((p) => !filter.excludedIds[p.projectId]) : all
+  return exclude.excludeOn ? all.filter((p) => !exclude.excludedIds[p.projectId]) : all
 })
 const projects = baseProjects
 const pmisMap = computed(() => (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>)
@@ -61,9 +61,7 @@ const band = computed(() => paymentBand(
   paymentNodeRows(scoped.value?.paymentNodes, projects.value, data.data?.projectPmis),
   new Date(),
   projects.value,
-  filter.payRecordsAll,
-  filter.dateStart,
-  filter.dateEnd,
+  scoped.value?.paymentRecords,
 ))
 const yearPct = computed(() => (band.value.yearExpected > 0 ? Math.min(band.value.yearActual / band.value.yearExpected, 1) : 0))
 

@@ -29,13 +29,29 @@ describe('V4.4.8 页头与视图状态全局守卫', () => {
     }
   })
 
-  it('不得新增对 useFilterStore 的引用(全局单例筛选状态属第三期)', () => {
-    // 白名单是 V4.4.8 之前就存在的 7 处既有引用,本期一行未动。
-    // 第三期才会拆掉全局单例 filterStore;在那之前新增引用会让第三期的迁移面继续扩大。
-    const BASELINE = ['BoardView.vue', 'CalendarView.vue', 'CostDetailView.vue', 'MilestoneView.vue',
-                      'OverviewView.vue', 'PayNodesView.vue', 'PayProjectsView.vue']
-    const actual = allViews().filter((f) => read(f).includes('useFilterStore')).sort()
-    expect(actual).toEqual([...BASELINE].sort())
+  it('hideFilter 页面不得引用 usePaymentFilterStore(回款域筛选不外泄)', () => {
+    // V4.4.8 那条「不得新增对 useFilterStore 的引用」的冻结基线,到 V4.5.3(第三期)到期,升级为结构守卫。
+    // 以 router/index.ts 为单一来源解析,不维护手工白名单 —— 今后新增的 hideFilter 页面自动纳入。
+    // 看得见 FilterBar 的页面才准读回款域筛选;看不见却读得到,就是「数据被筛过、用户无从察觉」
+    // (V4.5.3 修的首页「年度回款进度」即此:文案写死"年度",数值却跟着 /payment 的区间走)。
+    const routerSrc = readFileSync(resolve(viewsDir, '../router/index.ts'), 'utf-8')
+    const hidden: string[] = []
+    // 按 `{ path:` 切块 —— 每块即一条路由(单行或跨行皆可),块内同时出现 hideFilter 才算数
+    for (const block of routerSrc.split(/\{\s*path:/).slice(1)) {
+      if (!block.includes('hideFilter: true')) continue
+      const m = block.match(/component:\s*([A-Za-z0-9_]+)/)
+        ?? block.match(/import\('@\/views\/([A-Za-z0-9_]+)\.vue'\)/)
+      if (m) hidden.push(m[1])
+    }
+    // 自证:正则一旦失配会返回空数组,下面的循环空跑、"零个文件违规"恒真通过(本仓最常见的假绿形态)。
+    // 故先钉住解析结果规模 —— 当前 26 条 hideFilter 路由。
+    expect(hidden.length, 'router 解析失配:hideFilter 路由数异常').toBeGreaterThan(20)
+    for (const name of hidden) {
+      const file = `${name}.vue`
+      if (!allViews().includes(file)) continue
+      expect(read(file), `${file} 是 hideFilter 页面,不得引用 usePaymentFilterStore`)
+        .not.toContain('usePaymentFilterStore')
+    }
   })
 
   it('V4.4.9 三组件已广泛接入,且本期迁移过的旧类名未复活', () => {

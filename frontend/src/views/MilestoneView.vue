@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useSettingsStore } from '@/stores/settings'
 import type { Project, ProjectPmis, MilestoneItem } from '@/types/analysis'
@@ -36,7 +36,7 @@ useViewScrollMemory()
 
 const data = useDataStore()
 const scoped = useScopedProjects()
-const filter = useFilterStore()
+const filter = useExcludeStore()
 const projectTags = useProjectTagsStore()
 const settings = useSettingsStore()
 // 延迟渲染:点击进页先出标题/工具栏/KPI,下一两帧再挂 6 图 + 明细 tab,消除跨页点击冻结。

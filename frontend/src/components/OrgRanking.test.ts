@@ -4,12 +4,12 @@ import { setActivePinia, createPinia } from 'pinia'
 import OrgRanking from './OrgRanking.vue'
 import SectionTitle from './SectionTitle.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
 const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); usePaymentFilterStore().setPreset('all') })
 
 function seed() {
   const ds = useDataStore()

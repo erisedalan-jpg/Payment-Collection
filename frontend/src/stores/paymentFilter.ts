@@ -2,30 +2,20 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDataStore } from './data'
 import { useScopedProjects } from '@/composables/useScopedData'
-import { useProjectTagsStore } from '@/stores/projectTags'
+import { useExcludeStore } from './exclude'
 import type { ViewMode } from '@/lib/filterNodes'
-import { paymentNodeRows, filterProjects } from '@/lib/paymentPmis'
+import { paymentNodeRows } from '@/lib/paymentPmis'
 import { filterPayNodes } from '@/lib/payDashboard'
 
-const EXCLUDE_ON_KEY = 'pa_exclude_on'
-const EXCLUDE_TAGS_KEY = 'pa_exclude_tags'
-
-function loadExcludeTags(): string[] {
-  try {
-    const raw = localStorage.getItem(EXCLUDE_TAGS_KEY)
-    if (raw) {
-      const v = JSON.parse(raw)
-      if (Array.isArray(v)) return v as string[]
-    }
-  } catch {
-    /* localStorage 不可用/损坏 → 空 */
-  }
-  return []
-}
-
-export const useFilterStore = defineStore('filter', () => {
+// 回款域页面级筛选。【仅服务回款域 5 页】(/payment、/payment/{projects,nodes,board,calendar})——
+// 这 5 个也正是 router 里唯一不带 hideFilter 的路由,即唯一能看见 FilterBar 的页面。
+// 域外页面看不到 FilterBar 却能读到这里的值,就会出现「数据被筛过、用户无从察觉」的错标
+// (V4.5.3 修的首页「年度回款进度」即此)。守卫见 views/__pageHeader.test.ts。
+// 全局标签排除属另一类状态,在 stores/exclude.ts;本 store 单向依赖它,反向依赖绝不可引入。
+export const usePaymentFilterStore = defineStore('paymentFilter', () => {
   const data = useDataStore()
   const scoped = useScopedProjects()
+  const exclude = useExcludeStore()
 
   const _y = new Date().getFullYear()
   const dateStart = ref(`${_y}-01-01`)   // 默认本年度(Task 11)
@@ -62,20 +52,6 @@ export const useFilterStore = defineStore('filter', () => {
     return [...set]
   })
 
-  const projectTags = useProjectTagsStore()
-  const excludeOn = ref(localStorage.getItem(EXCLUDE_ON_KEY) === 'true')
-  const excludeTags = ref<string[]>(loadExcludeTags())
-
-  const excludedIds = computed<Record<string, boolean>>(() => {
-    if (!excludeOn.value || excludeTags.value.length === 0) return {}
-    const sel = new Set(excludeTags.value)
-    const out: Record<string, boolean> = {}
-    for (const [pid, names] of Object.entries(projectTags.effectiveAssignments)) {
-      if (names.some((n) => sel.has(n))) out[pid] = true
-    }
-    return out
-  })
-
   const payNodeRowsAll = computed(() =>
     paymentNodeRows(scoped.value?.paymentNodes, scoped.value?.projects ?? [], data.data?.projectPmis),
   )
@@ -83,16 +59,9 @@ export const useFilterStore = defineStore('filter', () => {
   const filteredPayNodes = computed(() =>
     filterPayNodes(payNodeRowsAll.value, {
       dateStart: dateStart.value, dateEnd: dateEnd.value, viewMode: viewMode.value, viewL4: viewL4.value, viewPM: viewPM.value,
-      excludeActive: excludeOn.value, excludedIds: excludedIds.value,
+      excludeActive: exclude.excludeOn, excludedIds: exclude.excludedIds,
     }),
   )
-  const filteredProjects = computed(() =>
-    filterProjects(data.data?.projects ?? [], {
-      viewMode: viewMode.value, viewL4: viewL4.value, viewPM: viewPM.value,
-      excludeActive: excludeOn.value, excludedIds: excludedIds.value,
-    }),
-  )
-
   function setViewGlobal() {
     viewMode.value = 'global'
     viewL4.value = ''
@@ -109,17 +78,9 @@ export const useFilterStore = defineStore('filter', () => {
     viewL4.value = ''
   }
 
-  function setExclude(on: boolean, tags: string[]) {
-    excludeOn.value = on
-    excludeTags.value = [...tags]
-    localStorage.setItem(EXCLUDE_ON_KEY, on ? 'true' : 'false')
-    localStorage.setItem(EXCLUDE_TAGS_KEY, JSON.stringify(tags))
-  }
-
   return {
     dateStart, dateEnd, viewMode, viewL4, viewPM,
-    l4Options, pmOptions, filteredPayNodes, filteredProjects, payRecordsAll,
+    l4Options, pmOptions, filteredPayNodes, payRecordsAll,
     setDateRange, setPreset, setViewGlobal, setViewL4, setViewPM,
-    excludeOn, excludeTags, excludedIds, setExclude,
   }
 })

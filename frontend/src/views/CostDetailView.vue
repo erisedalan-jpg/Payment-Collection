@@ -4,7 +4,7 @@ import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { usePersistedRefs } from '@/composables/usePersistedRefs'
 import { useSettingsStore } from '@/stores/settings'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
@@ -42,7 +42,7 @@ const TABLE_ID = 'cost-detail'
 const data = useDataStore()
 const scoped = useScopedProjects()
 const settings = useSettingsStore()
-const filter = useFilterStore()
+const filter = useExcludeStore()
 const cf = useCrossFilterStore()
 const projectTags = useProjectTagsStore()
 const router = useRouter()

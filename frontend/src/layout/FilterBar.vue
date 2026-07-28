@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
-const f = useFilterStore()
+const f = usePaymentFilterStore()
 
 const PRESETS = [
   { key: 'month', label: '本月' },

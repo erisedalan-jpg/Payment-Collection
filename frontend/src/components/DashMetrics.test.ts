@@ -5,12 +5,12 @@ import { resolve } from 'node:path'
 import { setActivePinia, createPinia } from 'pinia'
 import DashMetrics from './DashMetrics.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all'); push.mockReset() })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); usePaymentFilterStore().setPreset('all'); push.mockReset() })
 
 describe('DashMetrics', () => {
   it('渲染六个指标含延期数(流水口径)', () => {

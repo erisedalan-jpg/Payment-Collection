@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 
 const projectTags = useProjectTagsStore()
-const filter = useFilterStore()
+const filter = useExcludeStore()
 
 const newTag = ref('')
 function onAddTag() { const n = newTag.value.trim(); if (n) { projectTags.addTag(n); projectTags.save(); newTag.value = '' } }

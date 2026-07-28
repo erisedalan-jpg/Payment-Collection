@@ -5,7 +5,7 @@ import ElementPlus from 'element-plus'
 import PaymentL4Table from './PaymentL4Table.vue'
 import SectionTitle from './SectionTitle.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -76,7 +76,7 @@ function seed() {
 describe('PaymentL4Table', () => {
   it('渲染全部 11 列列名', async () => {
     seed()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const text = w.text()
@@ -95,7 +95,7 @@ describe('PaymentL4Table', () => {
 
   it('V4.5.1 表标题走 SectionTitle 的 card 级(原 --fs-4/600,字重归位 700)', async () => {
     seed()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const t = w.findComponent(SectionTitle)
@@ -106,7 +106,7 @@ describe('PaymentL4Table', () => {
 
   it('按 L4 组分组，两个不同 orgL4 出两行', async () => {
     seed()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     const text = w.text()
@@ -116,7 +116,7 @@ describe('PaymentL4Table', () => {
 
   it('sortable 列在列定义中标记正确（11 列全可排序）', async () => {
     seed()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     // el-table-column 携带 sortable 时会在表头渲染 .caret-wrapper 元素；
@@ -155,7 +155,7 @@ describe('PaymentL4Table', () => {
     ]
     d.paymentRecords['P3'] = { records: [{ date: '2025-06-10', amount: 500_000 }] }
 
-    const filter = useFilterStore()
+    const filter = usePaymentFilterStore()
 
     // all 区间：P3 的节点被统计进 组A
     filter.setPreset('all')
@@ -176,7 +176,7 @@ describe('PaymentL4Table', () => {
 
   it('数字列单元格含 .u-num（tabular-nums 约束）', async () => {
     seed()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     // 10 个数字列每行应有 .u-num；2 行数据 → 至少 10 个 .u-num 元素
@@ -194,7 +194,7 @@ describe('PaymentL4Table', () => {
       paymentNodes: {},
       paymentRecords: {},
     } as any
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     const w = mount(PaymentL4Table, { global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(w.text()).toContain('暂无数据')

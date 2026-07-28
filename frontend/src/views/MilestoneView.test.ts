@@ -13,7 +13,7 @@ import MilestoneReminderTab from '@/components/MilestoneReminderTab.vue'
 import MilestonePlanTab from '@/components/MilestonePlanTab.vue'
 import { useDataStore } from '@/stores/data'
 import { NO_TAG_VALUE } from '@/lib/tagFilter'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useAuthStore } from '@/stores/auth'
 
@@ -70,7 +70,7 @@ describe('MilestoneView 概览', () => {
   })
   it('剔除控件开关写 filter.setExclude', async () => {
     seed()
-    const f = useFilterStore()
+    const f = useExcludeStore()
     const spy = vi.spyOn(f, 'setExclude')
     const w = mount(MilestoneView, opts)
     await w.get('[data-test="ms-exclude-switch"] input').setValue(true)

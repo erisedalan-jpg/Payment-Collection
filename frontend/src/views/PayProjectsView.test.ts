@@ -4,7 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import PayProjectsView from './PayProjectsView.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import DataTable from '@/components/DataTable.vue'
@@ -19,7 +19,7 @@ beforeEach(() => {
 
 function seed() {
   const data = useDataStore()
-  useFilterStore().setPreset('all')
+  usePaymentFilterStore().setPreset('all')
   data.data = {
     meta: { lastUpdate: 'x', totalProjects: 1, totalPaymentNodes: 3 },
     dashboard: {}, summary: {}, rawNodes: [],
@@ -121,7 +121,7 @@ describe('PayProjectsView', () => {
 
   it('空数据不崩', async () => {
     const data = useDataStore()
-    useFilterStore().setPreset('all')
+    usePaymentFilterStore().setPreset('all')
     data.data = {
       meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
       dashboard: {}, summary: {}, rawNodes: [],
@@ -134,7 +134,7 @@ describe('PayProjectsView', () => {
   })
 
   it('分页:超过页大小只渲染一页,分页条 total=全量', async () => {
-    const data = useDataStore(); useFilterStore().setPreset('all')
+    const data = useDataStore(); usePaymentFilterStore().setPreset('all')
     data.data = {
       meta: { lastUpdate: 'x', totalProjects: 60, totalPaymentNodes: 0 },
       dashboard: {}, summary: {}, rawNodes: [],

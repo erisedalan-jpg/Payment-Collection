@@ -128,28 +128,9 @@ describe('paymentBand', () => {
     }
     // 无区间(start=end='')时 yearActual 按本年前缀过滤，与 yearExpected 年度口径对齐
     // P1 流水 2026-02-01 → 本年 ✓; P9 流水 2025-12-10 → 非本年 ✗
-    const b = paymentBand(rows, now, undefined, paymentRecords, '', '')
+    const b = paymentBand(rows, now, undefined, paymentRecords)
     expect(b.yearActual).toBe(70000)  // 仅 P1 本年流水
     expect(b.yearExpected).toBe(150000)  // 无区间，年度前缀匹配
-  })
-
-  it('传入 paymentRecords + 区间时 yearActual 仅含区间内流水', () => {
-    const now = new Date('2026-02-15T00:00:00')
-    const rows = [
-      pn({ projectId: 'P1', planDate: '2026-02-10', expectedPayment: 100000, receivedAmount: 40000, unpaidAmount: 60000, status: '部分回款' }),
-      pn({ projectId: 'P9', planDate: '2026-08-01', expectedPayment: 50000, receivedAmount: 0, unpaidAmount: 50000, status: '延期', stage: '验收款', projectName: '丙' }),
-    ]
-    const paymentRecords: Record<string, PaymentRecordsEntry> = {
-      P1: { records: [{ amount: 70000, date: '2026-02-01' } as any] },
-      P9: { records: [{ amount: 20000, date: '2025-12-10' } as any] },  // 区间外
-    }
-    // 区间 2026-01-01..2026-06-30: P1 流水在内, P9 流水在外
-    const b = paymentBand(rows, now, undefined, paymentRecords, '2026-01-01', '2026-06-30')
-    expect(b.yearActual).toBe(70000)
-    // 区间内计划节点只有 P1(2026-02-10 ∈ 区间); P9 计划日 2026-08-01 在区间外
-    expect(b.yearExpected).toBe(100000)
-    // delayedTop: P9 延期但计划日区间外，不纳入
-    expect(b.delayedTop).toHaveLength(0)
   })
 })
 
@@ -160,12 +141,12 @@ describe('paymentBand 年度已回含无阶段项目', () => {
   const paymentRecords = { P1: { records: [{ date: '2026-05-01', amount: 300000 }] } } as any
 
   it('无节点但有本年流水的项目计入 yearActual', () => {
-    const band = paymentBand(rows, now, projects, paymentRecords, '', '')
+    const band = paymentBand(rows, now, projects, paymentRecords)
     expect(band.yearActual).toBe(300000)
   })
 
   it('未传 projects 时退化为旧逻辑(节点项目去重)', () => {
-    const band = paymentBand(rows, now, undefined, paymentRecords, '', '')
+    const band = paymentBand(rows, now, undefined, paymentRecords)
     expect(band.yearActual).toBe(0) // 无 rows → 旧逻辑不计入
   })
 })

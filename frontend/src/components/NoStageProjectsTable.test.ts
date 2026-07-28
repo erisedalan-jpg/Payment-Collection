@@ -6,7 +6,7 @@ import NoStageProjectsTable from './NoStageProjectsTable.vue'
 import DataTable from './DataTable.vue'
 import AppPager from './AppPager.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
@@ -14,7 +14,7 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
-  useFilterStore().setPreset('all')
+  usePaymentFilterStore().setPreset('all')
   push.mockReset()
 })
 

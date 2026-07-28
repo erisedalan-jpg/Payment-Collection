@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useDataStore } from '@/stores/data'
 import { payOrgRanking } from '@/lib/payDashboard'
 import { filterProjects } from '@/lib/paymentPmis'
@@ -10,7 +11,8 @@ import { fmtWan, pct } from '@/lib/format'
 import SegToggle from './SegToggle.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 const data = useDataStore()
 const router = useRouter()
 const sortBy = ref('actualTotal')
@@ -24,8 +26,8 @@ const ranked = computed(() => {
     viewMode: filter.viewMode,
     viewL4: filter.viewL4,
     viewPM: filter.viewPM,
-    excludeActive: filter.excludeOn,
-    excludedIds: filter.excludedIds,
+    excludeActive: exclude.excludeOn,
+    excludedIds: exclude.excludedIds,
   })
   return payOrgRanking(
     projects,

@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -29,7 +30,8 @@ defineOptions({ name: 'PayProjectsView' })
 const TABLE_ID = 'pay-projects'
 const data = useDataStore()
 const scoped = useScopedProjects()
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 const pd = useProjectDetailStore()
 const tags = useProjectTagsStore()
 const cf = useCrossFilterStore()
@@ -47,8 +49,8 @@ const rows = computed(() =>
       viewMode: filter.viewMode,
       viewL4: filter.viewL4,
       viewPM: filter.viewPM,
-      excludeActive: filter.excludeOn,
-      excludedIds: filter.excludedIds,
+      excludeActive: exclude.excludeOn,
+      excludedIds: exclude.excludedIds,
     }),
     (data.data?.projectPmis ?? {}) as Record<string, ProjectPmis>,
     scoped.value?.paymentNodes,

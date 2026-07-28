@@ -1,7 +1,7 @@
 import type { Project, ProjectPmis, PaymentRecordsEntry, Paymentrecords } from '@/types/analysis'
 import type { PayNodeRow } from './paymentPmis'
 import { isAnomalous } from './anomaly'
-import { inRange, actualInRange } from './paymentRange'
+import { actualInRange } from './paymentRange'
 
 // 项目总览(/)的纯计算层(spec 4.1)。两套口径:KPI 用主域 projects[] 聚合;
 // 回款重点带与 /payment 同口径(全部门 isPaymentRelated 节点)——微块点击钻的就是 /payment。
@@ -91,47 +91,39 @@ function isoDate(d: Date): string {
 
 /** 回款重点带——now 注入便于测试;收款阶段节点级口径。
  * projects 可选:传入时 yearActual 改为遍历项目集(排除异常)汇总流水，
- * 共享项目集与异常排除;年度分子仍按本年(startsWith(year))过滤,与 /payment 已回款(全时)口径不同，
+ * 共享项目集与异常排除;年度分子按本年(startsWith(year))过滤,与 /payment 已回款(全时)口径不同，
  * 含无收款节点项目的流水；未传时退化到按节点项目去重的旧逻辑(向后兼容)。
- * paymentRecords/start/end 可选:传入时 yearActual=Σ流水∈[start,end]；全部(start=end='')时含空日期记录。
- * 计划侧(yearExpected/monthPending/delayedTop)按 inRange(planDate,start,end) 过滤；全部时含空计划日节点。*/
+ * V4.5.3 起【不接受日期区间】:唯一调用方 OverviewView 的文案写死「年度回款进度」,
+ * 接受区间会让标签与数据不符(用户在 /payment 设「本季」,首页显示本季数字却顶着"年度"标签)。
+ * 计划侧(yearExpected/delayedTop)固定按 planDate.startsWith(year) 过滤。*/
 export function paymentBand(
   rows: PayNodeRow[],
   now: Date,
   projects?: Project[],
   paymentRecords?: Record<string, PaymentRecordsEntry>,
-  start = '',
-  end = '',
 ): PaymentBand {
   const year = String(now.getFullYear())
   const month = isoDate(now).slice(0, 7)
   const today = isoDate(now)
   const until = isoDate(new Date(now.getTime() + 7 * 86400000))
 
-  // 计划侧区间判断：若有日期区间则用 inRange；否则退化到年度前缀匹配
-  const hasRange = !!(start || end)
-  const planInScope = (planDate: string): boolean =>
-    hasRange ? inRange(planDate, start, end) : planDate.startsWith(year)
+  // 计划侧固定按自然年度前缀匹配(不接受区间,理由见函数注释)
+  const planInScope = (planDate: string): boolean => planDate.startsWith(year)
 
   // yearActual：优先按 projects 遍历(排除异常，含无收款节点项目流水；共享项目集与异常排除，
-  // 年度分子仍按本年过滤，与 computeKpis 全时口径不同)；
+  // 年度分子按本年过滤，与 computeKpis 全时口径不同)；
   // 否则若传入 paymentRecords 则退化按节点项目去重求和；否则退化节点 receivedAmount 之和
-  // hasRange 时：流水∈[start,end]；无区间时：流水 date.startsWith(year)，与计划侧年度口径对齐
   let yearActual = 0
   if (paymentRecords && projects) {
     // 遍历项目集(排除异常)，共享项目集与异常排除(与 computeKpis 相同)：含无收款节点项目的流水；
-    // 年度分子仍按本年(startsWith(year))过滤，与 /payment 已回款(全时)口径不同
+    // 年度分子按本年(startsWith(year))过滤，与 /payment 已回款(全时)口径不同
     for (const p of projects) {
       if (isAnomalous(p)) continue
       const records = paymentRecords[p.projectId]?.records
-      if (hasRange) {
-        yearActual += actualInRange(records, start, end)
-      } else {
-        yearActual += (records ?? []).reduce(
-          (s, r) => s + (String(r.date ?? '').startsWith(year) ? Number(r.amount ?? 0) : 0),
-          0,
-        )
-      }
+      yearActual += (records ?? []).reduce(
+        (s, r) => s + (String(r.date ?? '').startsWith(year) ? Number(r.amount ?? 0) : 0),
+        0,
+      )
     }
   } else if (paymentRecords) {
     // 旧退化路径(无 projects)：按节点项目去重求和（rows 含多节点，流水应按项目级聚合）
@@ -140,15 +132,11 @@ export function paymentBand(
       if (!seen.has(n.projectId)) {
         seen.add(n.projectId)
         const records = paymentRecords[n.projectId]?.records
-        if (hasRange) {
-          yearActual += actualInRange(records, start, end)
-        } else {
-          // 无区间时只累加本年流水，与 yearExpected 年度前缀口径对齐
-          yearActual += (records ?? []).reduce(
-            (s, r) => s + (String(r.date ?? '').startsWith(year) ? Number(r.amount ?? 0) : 0),
-            0,
-          )
-        }
+        // 只累加本年流水，与 yearExpected 年度前缀口径对齐
+        yearActual += (records ?? []).reduce(
+          (s, r) => s + (String(r.date ?? '').startsWith(year) ? Number(r.amount ?? 0) : 0),
+          0,
+        )
       }
     }
   } else {

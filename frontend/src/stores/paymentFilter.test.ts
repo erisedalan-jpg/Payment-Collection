@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useFilterStore } from './filter'
+import { usePaymentFilterStore } from './paymentFilter'
 import { useDataStore } from './data'
-import { useProjectTagsStore } from '@/stores/projectTags'
 
 const SAMPLE = {
   meta: { lastUpdate: 'x', totalProjects: 0, totalPaymentNodes: 0 },
@@ -22,12 +21,12 @@ beforeEach(() => {
 function withData() {
   const ds = useDataStore()
   ds.data = SAMPLE as any
-  return useFilterStore()
+  return usePaymentFilterStore()
 }
 
-describe('filter store', () => {
+describe('paymentFilter store', () => {
   it('defaults: dateStart/dateEnd 本年度, view=global', () => {
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     const y = new Date().getFullYear()
     expect(f.dateStart).toBe(`${y}-01-01`)
     expect(f.dateEnd).toBe(`${y}-12-31`)
@@ -35,7 +34,7 @@ describe('filter store', () => {
   })
 
   it('setDateRange 写值；setDateRange 空清空', () => {
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     f.setDateRange('2026-01-01', '2026-12-31')
     expect(f.dateStart).toBe('2026-01-01')
     expect(f.dateEnd).toBe('2026-12-31')
@@ -45,7 +44,7 @@ describe('filter store', () => {
   })
 
   it('setPreset("all") 清空区间', () => {
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     f.setDateRange('2026-01-01', '2026-12-31')
     f.setPreset('all')
     expect(f.dateStart).toBe('')
@@ -53,7 +52,7 @@ describe('filter store', () => {
   })
 
   it('setPreset("year") 写本年度起止非空', () => {
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     f.setPreset('year')
     const y = new Date().getFullYear()
     expect(f.dateStart).toBe(`${y}-01-01`)
@@ -70,7 +69,7 @@ describe('filter store', () => {
       ],
       paymentNodes: {}, projectPmis: {},
     } as any
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     expect(f.l4Options.slice().sort()).toEqual(['上海一服务组', '北京服务组'])
     expect(f.pmOptions.slice().sort()).toEqual(['张三', '李四'].slice().sort())
   })
@@ -82,39 +81,9 @@ describe('filter store', () => {
       { projectId: 'P2', orgL4: '上海组', projectManager: '李' },
       { projectId: 'P3', orgL4: '北京组', projectManager: '张' },
     ], paymentNodes: {}, projectPmis: {} } as any
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     expect([...f.l4Options].sort()).toEqual(['上海组', '北京组'])
     expect([...f.pmOptions].sort()).toEqual(['张', '李'].sort())
-  })
-})
-
-describe('filter excludedIds（按标签全局排除）', () => {
-  beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
-  it('excludeOn 关 → 空；开+选标签 → 命中项目集', () => {
-    const tags = useProjectTagsStore()
-    tags.assignments = { A: ['框架合同'], B: ['BH项目'], C: ['框架合同', 'BH项目'] } as any
-    const f = useFilterStore()
-    expect(f.excludedIds).toEqual({})
-    f.setExclude(true, ['框架合同'])
-    expect(f.excludedIds).toEqual({ A: true, C: true })
-    expect(f.excludeOn).toBe(true)
-    expect(f.excludeTags).toEqual(['框架合同'])
-  })
-  it('开但未选标签 → 空（不误排除）', () => {
-    const f = useFilterStore()
-    f.setExclude(true, [])
-    expect(f.excludedIds).toEqual({})
-  })
-  it('localStorage 中 pa_exclude_tags 损坏(非合法 JSON) → 回退空数组,不抛异常', () => {
-    localStorage.setItem('pa_exclude_tags', '{not valid json')
-    expect(() => useFilterStore()).not.toThrow()
-    const f = useFilterStore()
-    expect(f.excludeTags).toEqual([])
-  })
-  it('localStorage 中 pa_exclude_tags 是合法 JSON 但非数组 → 回退空数组', () => {
-    localStorage.setItem('pa_exclude_tags', '{"a":1}')
-    const f = useFilterStore()
-    expect(f.excludeTags).toEqual([])
   })
 })
 
@@ -134,7 +103,7 @@ describe('filteredPayNodes(3B)', () => {
         P2: [{ stage: '预付款', planDate: '2026-08-01', actualDate: '', payRatio: 1, expectedPayment: 100000, receivedAmount: 0, unpaidAmount: 100000, status: '待回款' }],
       },
     } as any
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     // 默认全部：两个节点都在
     expect(f.filteredPayNodes.length).toBe(2)
     // 视角 l4 过滤

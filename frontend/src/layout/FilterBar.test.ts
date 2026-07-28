@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import FilterBar from './FilterBar.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -37,7 +37,7 @@ describe('FilterBar', () => {
 
   it('preset button "全部" calls setPreset("all") and clears range', async () => {
     seed()
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     f.setDateRange('2026-01-01', '2026-12-31')
     const wrapper = mount(FilterBar)
     const allBtn = wrapper.findAll('.fb-preset').find((b) => b.text() === '全部')
@@ -49,7 +49,7 @@ describe('FilterBar', () => {
 
   it('view select to L4 then choose dept updates store', async () => {
     seed()
-    const f = useFilterStore()
+    const f = usePaymentFilterStore()
     const wrapper = mount(FilterBar)
     await wrapper.get('[data-test="view-mode"]').setValue('l4')
     expect(f.viewMode).toBe('l4')

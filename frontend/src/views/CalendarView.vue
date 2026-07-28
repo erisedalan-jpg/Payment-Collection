@@ -2,7 +2,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { paymentNodeRows } from '@/lib/paymentPmis'
 import { inRange } from '@/lib/paymentRange'
 import {
@@ -32,7 +33,8 @@ import CalNodeTable from '@/components/CalNodeTable.vue'
 
 const data = useDataStore()
 const scoped = useScopedProjects()
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 onMounted(() => {
   if (!data.data) data.load()
 })
@@ -55,7 +57,7 @@ const calFilters = computed<CalFilters>(() => ({
 const allNodes = computed(() =>
   paymentNodeRows(scoped.value?.paymentNodes, scoped.value?.projects ?? [], scoped.value?.projectPmis))
 const baseNodes = computed(() =>
-  filter.excludeOn ? allNodes.value.filter((n) => !filter.excludedIds[n.projectId]) : allNodes.value)
+  exclude.excludeOn ? allNodes.value.filter((n) => !exclude.excludedIds[n.projectId]) : allNodes.value)
 const filtered = computed(() =>
   baseNodes.value.filter((n) => inRange(n.planDate || '', filter.dateStart, filter.dateEnd)))
 

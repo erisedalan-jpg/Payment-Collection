@@ -5,7 +5,8 @@ import { useExternalSort } from '@/lib/useExternalSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useProjectDetailStore } from '@/stores/projectDetail'
 import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
@@ -28,7 +29,8 @@ defineOptions({ name: 'PayNodesView' })
 const TABLE_ID = 'pay-nodes'
 const data = useDataStore()
 const scoped = useScopedProjects()
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
+const exclude = useExcludeStore()
 const pd = useProjectDetailStore()
 const tags = useProjectTagsStore()
 const cf = useCrossFilterStore()
@@ -42,8 +44,8 @@ const rows = computed(() => {
     viewMode: filter.viewMode,
     viewL4: filter.viewL4,
     viewPM: filter.viewPM,
-    excludeActive: filter.excludeOn,
-    excludedIds: filter.excludedIds,
+    excludeActive: exclude.excludeOn,
+    excludedIds: exclude.excludedIds,
   })
   const allNodes = paymentNodeRows(scoped.value?.paymentNodes, ps, scoped.value?.projectPmis ?? {})
   // 按计划日∈区间过滤（全部区间时 inRange 恒真）

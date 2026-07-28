@@ -9,7 +9,7 @@ import DataTable from '@/components/DataTable.vue'
 import AppPager from '@/components/AppPager.vue'
 import { useDataStore } from '@/stores/data'
 import { useProjectTagsStore } from '@/stores/projectTags'
-import { useFilterStore } from '@/stores/filter'
+import { useExcludeStore } from '@/stores/exclude'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { useAuthStore } from '@/stores/auth'
 import { NO_TAG_VALUE } from '@/lib/tagFilter'
@@ -197,7 +197,7 @@ describe('CostDetailView 标签排除', () => {
   it('开启排除后被排除项目不进 baseProjects', () => {
     seedSmall()
     const tags = useProjectTagsStore(); tags.assignments = { P2: ['排除标签'] } as any
-    useFilterStore().setExclude(true, ['排除标签'])
+    useExcludeStore().setExclude(true, ['排除标签'])
     const w = mount(CostDetailView, opts)
     expect(((w.vm as any).baseProjects as any[]).map((p) => p.projectId)).toEqual(['P1'])
   })

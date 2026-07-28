@@ -5,9 +5,9 @@ import TrendCard from './TrendCard.vue'
 import PendingBarChart from './PendingBarChart.vue'
 import SectionTitle from './SectionTitle.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); useFilterStore().setPreset('all') })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); usePaymentFilterStore().setPreset('all') })
 
 function seed() {
   const ds = useDataStore()

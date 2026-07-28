@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 import { payMonthlyTrend, payQuarterlyTrend } from '@/lib/payDashboard'
 import PendingBarChart from './PendingBarChart.vue'
 import SegToggle from './SegToggle.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 
-const filter = useFilterStore()
+const filter = usePaymentFilterStore()
 const period = ref('month')
 const PERIOD_OPTS = [
   { value: 'month', label: '月度' },

@@ -3,13 +3,13 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import DashboardView from './DashboardView.vue'
 import { useDataStore } from '@/stores/data'
-import { useFilterStore } from '@/stores/filter'
+import { usePaymentFilterStore } from '@/stores/paymentFilter'
 import { ALL_PAGE_LINKS } from '@/nav'
 
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
-  useFilterStore().setPreset('all')
+  usePaymentFilterStore().setPreset('all')
 })
 afterEach(() => vi.unstubAllGlobals())
 
