@@ -16,6 +16,17 @@ import { userScopedKey } from '@/lib/userScopedKey'
  *  (防「tab 叫统计分析、页头叫工时统计」这种同页两个说法)。 */
 const navLabel = (to: string) => ALL_PAGE_LINKS.find((l) => l.to === to)!.label
 
+/** 五类工时拆分列(V4.5.6)。值由 lib/yitian/empSplit 算出、在视图里 decorate 到行上。 */
+const SPLIT_KEYS = ['nonCustomer', 'customer', 'project', 'presale', 'postsale'] as const
+
+/** 员工工时明细表:以只有它才有的 satText 列认表(短表/完全未填表都没有该列)。 */
+function empTable(w: ReturnType<typeof mountView>) {
+  const t = w.findAllComponents({ name: 'DataTable' })
+    .find((x) => (x.props('columns') as { key: string }[]).some((c) => c.key === 'satText'))
+  expect(t, '找不到员工工时明细表').toBeTruthy()
+  return t!
+}
+
 const { getSpy } = vi.hoisted(() => ({ getSpy: vi.fn() }))
 vi.mock('@/lib/yitianApi', () => ({ getYitianData: getSpy }))
 
@@ -24,7 +35,8 @@ import AppPager from '@/components/AppPager.vue'
 import AppCard from '@/components/AppCard.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 
-// 两天工作日 → 基础 16h。张三 20h(加班) 李四 8h(欠填) 王五 零记录(完全未填)
+// 两天工作日 → 基础 16h。张三 28h(项目类 20 + 管理类 8,加班) 李四 8h(欠填) 王五 零记录(完全未填)
+// dims.types 必须含一个非客户类(管理类),否则五列拆分的 nonCustomer 恒为 0,断言证明不了拆分真生效
 const DATA = {
   meta: { periodStart: '2026-06-01', periodEnd: '2026-06-02', generatedAt: '', rows: 2,
           employees: 3, droppedRows: 0, calendarSource: 'csv', hoursPerDay: 8, thisBgL2: [] },
@@ -37,10 +49,11 @@ const DATA = {
     { d: '2026-06-01', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
     { d: '2026-06-02', workday: true, isoWeek: '2026-W23', calcWeek: '2026-CW23' },
   ],
-  dims: { types: ['项目类'], workTypes: [], customers: [], products: [], productNames: [],
+  dims: { types: ['项目类', '管理类'], workTypes: [], customers: [], products: [], productNames: [],
           projectTypes: [], salesL2: [], serviceModes: [] },
   entries: [
     { d: '2026-06-01', e: 'A1', t: 0, h: 20, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
+    { d: '2026-06-01', e: 'A1', t: 1, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
     { d: '2026-06-01', e: 'A2', t: 0, h: 8, wt: null, cu: null, pl: null, pn: null, pt: null, sm: null, bg: null, wo: '', top: false, ok: 0, iss: [] },
   ],
   issues: [],
@@ -153,10 +166,36 @@ describe('YitianAnalyticsView', () => {
     expect(rule).toContain('margin-bottom')
   })
 
-  it('员工明细表 8 列全带列头筛选图标', async () => {
+  it('员工明细表 8 个可筛选列全带列头筛选图标', async () => {
     const w = mountView()
     await flushPromises()
     expect(w.findAll('.cf-icon').length).toBe(8)
+  })
+
+  it('员工明细表列定义含五类工时拆分列(在差值之后、明细之前)', async () => {
+    const w = mountView()
+    await flushPromises()
+    const cols = (empTable(w).props('columns') as { key: string }[]).map((c) => c.key)
+    for (const k of SPLIT_KEYS) expect(cols, k).toContain(k)
+    expect(cols.indexOf('nonCustomer')).toBeGreaterThan(cols.indexOf('diffText'))
+    expect(cols.indexOf('postsale')).toBeLessThan(cols.indexOf('detailAction'))
+  })
+
+  it('员工明细行带上五类工时拆分且值不为 undefined', async () => {
+    const w = mountView()
+    await flushPromises()
+    const rows = empTable(w).props('rows') as Record<string, unknown>[]
+    expect(rows.length).toBeGreaterThan(0)
+    // 逐行都要有值:王五零记录,靠 decorate 的 `?? zero` 兜底;漏了兜底这条就红。
+    // 写 `k in row` 会恒真(赋 undefined 也算自有属性),故断言 not.toBeUndefined()
+    for (const r of rows) {
+      for (const k of SPLIT_KEYS) expect(r[k], `${String(r.name)}.${k}`).not.toBeUndefined()
+    }
+    // 值确实拆开了(不是一片 0):张三 项目类 20h + 管理类 8h
+    expect(rows.find((r) => r.name === '张三'))
+      .toMatchObject({ nonCustomer: 8, customer: 20, project: 20, presale: 0, postsale: 0 })
+    expect(rows.find((r) => r.name === '王五'))
+      .toMatchObject({ nonCustomer: 0, customer: 0, project: 0, presale: 0, postsale: 0 })
   })
 
   it('员工明细分页:60 人第1页50条/第2页10条,切换后 currentPage 复位于筛选变化时', async () => {

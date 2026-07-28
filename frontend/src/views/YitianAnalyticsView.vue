@@ -18,7 +18,8 @@ import { useCrossFilterStore } from '@/stores/crossFilter'
 import { applyColumnFilters, cfUniqueValues } from '@/lib/crossFilter'
 import { parseDrillQuery } from '@/lib/yitian/drill'
 import { buildDetailDrill } from '@/lib/yitian/detailDrill'
-import { empStats, saturationTop, unfilledList, neverFilledList, type EmpStat } from '@/lib/yitian/metrics'
+import { empStats, saturationTop, unfilledList, neverFilledList, selectEntries, type EmpStat } from '@/lib/yitian/metrics'
+import { empSplit } from '@/lib/yitian/empSplit'
 import { STATUS_LIGHT, STATUS_DARK } from '@/charts/echartsTheme'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -44,6 +45,8 @@ function pct(v: number | null): string {
 function hrs(v: number): string {
   return v.toFixed(1)
 }
+// 五类工时拆分列的格式化(与 V4.5.5 客户与产品分析页同一写法)
+const fmtH = (v: unknown) => (typeof v === 'number' ? Math.round(v).toLocaleString() : '')
 function shape(s: EmpStat) {
   return {
     ...s,
@@ -58,6 +61,17 @@ const stats = computed(() =>
   scopedYitian.value ? empStats(scopedYitian.value, view.start, view.end, view.l4s) : [])
 
 const empRows = computed(() => stats.value.map(shape))
+
+// 五类工时拆分 decorate:值必须并到行对象上,否则排序/列筛选/导出三处都读不到(V4.4.4 教训)。
+// 刻意不进 metrics.ts 的 EmpStat —— 那里承载 V4.4.5 双基准饱和度口径,三期一贯禁改。
+const empRowsWithSplit = computed(() => {
+  const d = scopedYitian.value
+  if (!d) return []
+  const m = empSplit(d, selectEntries(d, view.start, view.end, view.l4s))
+  const zero = { nonCustomer: 0, customer: 0, project: 0, presale: 0, postsale: 0 }
+  return empRows.value.map((r) => ({ ...r, ...(m.get(r.id) ?? zero) }))
+})
+
 const topStats = computed(() => saturationTop(stats.value, 10))
 const topRows = computed(() => topStats.value.map(shape))
 const unfilledRows = computed(() => unfilledList(stats.value).map(shape))
@@ -74,7 +88,9 @@ const headcountSegments = computed(() => {
 })
 
 // 员工工时明细:表头列筛选(crossFilter) → 分页
-const filtered = computed(() => applyColumnFilters(empRows.value, cf.tableFilters(TABLE_ID)))
+// 源必须是 decorate 过的 empRowsWithSplit(而不是 empRows):列筛选/排序/分页都读这条链,
+// 用未 decorate 的源会让五个拆分列在表里恒为空。
+const filtered = computed(() => applyColumnFilters(empRowsWithSplit.value, cf.tableFilters(TABLE_ID)))
 const pageSize = ref(50)
 const currentPage = ref(1)
 // 只持久化 pageSize:它是「每页看多少条」的用户偏好;
@@ -203,6 +219,11 @@ const empCols: DataColumn[] = [
   { key: 'baseText', label: '填报基准', width: 110, num: true },
   { key: 'satText', label: '饱和度', width: 100, num: true, sortable: true },
   { key: 'diffText', label: '差值', width: 100, num: true, sortable: true },
+  { key: 'nonCustomer', label: '非面向客户', width: 120, num: true, sortable: true, formatter: fmtH },
+  { key: 'customer', label: '面向客户', width: 110, num: true, sortable: true, formatter: fmtH },
+  { key: 'project', label: '项目类', width: 100, num: true, sortable: true, formatter: fmtH },
+  { key: 'presale', label: '售前类', width: 100, num: true, sortable: true, formatter: fmtH },
+  { key: 'postsale', label: '售后类', width: 100, num: true, sortable: true, formatter: fmtH },
   { key: 'detailAction', label: '明细', width: 70, fixed: 'right' },
 ]
 
