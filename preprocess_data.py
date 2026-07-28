@@ -345,6 +345,47 @@ def main():
             print("[OK] 倚天工时域: %d 行 / %d 人 / %s ~ %s / 日历源 %s → %s"
                   % (ymeta["rows"], ymeta["employees"], ymeta["periodStart"],
                      ymeta["periodEnd"], ymeta["calendarSource"], ypath))
+            # 源表解析就绪度告警(V4.5.4):此前 TOP1000 解析失败是完全静默的
+            rd = ymeta["dataReadiness"]
+            t1r = rd["top1000"]
+            if not t1r["provided"]:
+                print("  [WARN] 未提供 input/%s,客户分类/象限/市场BG 将全部为空"
+                      % config.TOP1000_FILE)
+            elif t1r["rows"] == 0:
+                # 文件在、却一行都没解析出来 —— 表头改名/格式坏,与「没放文件」是两码事,
+                # 文案必须分开,否则运维会去放一个已经在那儿的文件。
+                print("  [WARN] %s 存在但解析出 0 行(表头是否含「客户名称」?),"
+                      "客户分类/象限/市场BG 将全部为空" % config.TOP1000_FILE)
+            else:
+                if not t1r["hasQuad"]:
+                    print("  [WARN] %s 未找到「象限」或「客户象限」列,可转移判定将失真"
+                          % config.TOP1000_FILE)
+                if not t1r["hasBg"]:
+                    print("  [WARN] %s 未找到「市场BG」列" % config.TOP1000_FILE)
+            pcr = rd["productCategory"]
+            if not pcr["provided"]:
+                print("  [WARN] 未提供 input/%s,产品大类与渠道可交付判定将全部落空"
+                      % config.PRODUCT_CATEGORY_FILE)
+            elif pcr["rows"] == 0:
+                print("  [WARN] %s 存在但解析出 0 行(表头是否含「产品线」?),"
+                      "产品大类与渠道可交付判定将全部落空" % config.PRODUCT_CATEGORY_FILE)
+            elif pcr["totalLines"] and pcr["coveredLines"] / pcr["totalLines"] < 0.9:
+                print("  [WARN] %s 未覆盖 %d/%d 个产品线(覆盖率 %.0f%%)"
+                      % (config.PRODUCT_CATEGORY_FILE,
+                         pcr["totalLines"] - pcr["coveredLines"], pcr["totalLines"],
+                         pcr["coveredLines"] / pcr["totalLines"] * 100))
+            if not rd["roster"]["hasSupColumn"]:
+                print("  [WARN] 组织架构表无「直接上级工号」列,管理干部识别不可用")
+            cal = rd["calibration"]
+            if cal["pending"]:
+                print("  [INFO] 产品线校准: 待校准 %d 行,已校准 %d 行(%.0f%%),多义 %d,零命中 %d"
+                      % (cal["pending"], cal["calibrated"],
+                         cal["calibrated"] / cal["pending"] * 100,
+                         cal["ambiguous"], cal["unmatched"]))
+            ua = rd["unattributed"]
+            if ua["rows"]:
+                print("  [INFO] 客户不可归属: %d 行 / %.0f h(可转移判定的盲区)"
+                      % (ua["rows"], ua["hours"]))
             if ymeta["droppedRows"]:
                 print("  [WARN] 倚天工时 %d 行因工号不在组织架构花名册或工作日不可解析被丢弃"
                       % ymeta["droppedRows"])

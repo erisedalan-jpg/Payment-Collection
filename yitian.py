@@ -17,10 +17,13 @@ from typing import Any, Dict, List, Optional
 import config
 import yitian_calendar as CAL
 import yitian_check as CHK
+import yitian_derive as DRV
 import yitian_rules as R
 import yitian_rules_config as RCFG
 import yitian_store as STORE
-from projects import read_org_roster, read_sheet_by_header, read_sheet_headers, read_top1000
+from product_category import read_product_categories
+from projects import (manager_ids, read_org_roster, read_sheet_by_header, read_sheet_headers,
+                      read_top1000)
 
 # ── 工时.xlsx 取列白名单(全表 77 列,只读这 13 个) ──
 # 严禁读取:员工电话/员工所在省/员工所在市/员工入职省份/员工入职城市/岗位(个人隐私,不得落盘)。
@@ -172,8 +175,27 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
     kept = [r for r in rows if r["emp_id"] in roster_ids and r["date"]]
     dropped = len(rows) - len(kept)
 
-    top1000 = read_top1000(os.path.join(input_dir, config.TOP1000_FILE))
+    # 路径单独留变量:就绪度要区分「文件不存在」与「文件在但解析出 0 行」——
+    # 二者的处置完全不同(前者是没放文件,后者是表头/格式坏了),用同一句
+    # 「未提供」会给出事实错误的告警,正是本期要清偿的那类静默/误导降级。
+    top1000_path = os.path.join(input_dir, config.TOP1000_FILE)
+    pcat_path = os.path.join(input_dir, config.PRODUCT_CATEGORY_FILE)
+    top1000 = read_top1000(top1000_path)
     top_names = {n for n, v in top1000.items() if v.get("level") == config.TOP1000_LEVEL}
+    prod_cats = read_product_categories(pcat_path)
+    mgr_ids = manager_ids(roster)
+    pm_seg = rules_cfg["checks"].get("pmTag", {})
+    ph_seg = rules_cfg["checks"].get("placeholder", {})
+    line_kws = rules_cfg["checks"]["product"]["lineKeywords"]
+    checked = tuple(rules_cfg["checkedTypes"])
+    # 校准命中的是 lineKeywords 的匹配短名,产品线的规范值是全称,须解析(见 DRV.canonical_line)。
+    # 词库与产品分类表对不上的短名会导致该产品线的校准恒被留白 —— 一次性检查并告警,
+    # 不能让它静默发生(实测当前 21 条 linePatterns 全部可唯一解析,该告警应为空)。
+    line_vocab = sorted(prod_cats)
+    bad_aliases = DRV.unresolved_aliases(line_kws, line_vocab)
+    if bad_aliases:
+        print("[WARN] 产品词库有 %d 个产品线短名无法在 %s 中唯一定位,其校准结果将被留白: %s"
+              % (len(bad_aliases), config.PRODUCT_CATEGORY_FILE, "、".join(bad_aliases)))
 
     rest, work = CAL.read_holidays(
         os.path.join(input_dir, config.YITIAN_DIRNAME, config.YITIAN_HOLIDAYS_FILE))
@@ -185,8 +207,15 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
 
     peers = CHK.peer_contents(kept)
     d_type, d_wt, d_cu, d_pl, d_pn, d_pt, d_bg, d_sm = (_Dim() for _ in range(8))
+    d_quad, d_cbg, d_cat = (_Dim() for _ in range(3))
     entries: List[dict] = []
     issues: List[dict] = []
+
+    # 就绪度累计器(V4.5.4):把此前的静默降级变成可观测指标
+    calib = {"pending": 0, "calibrated": 0, "ambiguous": 0, "unmatched": 0}
+    unattr_rows = 0
+    unattr_hours = 0.0
+    seen_lines = set()
 
     for r in kept:
         # 对每一行都跑判定 —— 是否计入合规率由超管配置的 excludedTypes 决定,前端现算。
@@ -194,6 +223,36 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
         # 管理类/业务类/假期类没有必填字段规则,check_row 对它们天然返回空码。
         codes, msgs = CHK.check_row(r, peers.get(r["work_order"], ""), rules_cfg)
         ok = CHK.ok_of(codes)
+
+        # ── V4.5.4 派生字段 ──
+        cust = r["customer"]
+        t1 = top1000.get(cust) or {}
+        quad = t1.get("quad", "")
+        eff_line, line_src = DRV.calibrate_line(
+            r["product_line"], r["work_type"], r["content"], line_kws, checked, line_vocab)
+        pc = prod_cats.get(eff_line) or {}
+        eff_cat = pc.get("category", "")
+        channel = bool(pc.get("channel"))
+        is_pm = DRV.pm_tag(r["work_type"], r["work_type3"], r["content"], pm_seg)
+        unknown = DRV.is_placeholder_customer(cust, ph_seg)
+        tr = DRV.transferable(unknown, quad, is_pm, channel)
+
+        if r["product_line"].strip():
+            seen_lines.add(r["product_line"].strip())
+        if r["work_type"] in checked:
+            if line_src == DRV.LINE_SRC_CALIBRATED:
+                calib["pending"] += 1
+                calib["calibrated"] += 1
+            elif line_src == DRV.LINE_SRC_AMBIGUOUS:
+                calib["pending"] += 1
+                calib["ambiguous"] += 1
+            elif line_src == DRV.LINE_SRC_UNMATCHED:
+                calib["pending"] += 1
+                calib["unmatched"] += 1
+            if unknown:
+                unattr_rows += 1
+                unattr_hours += r["hours"]
+
         entries.append({
             "d": r["date"],
             "e": r["emp_id"],
@@ -213,6 +272,15 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
             # 工作成果全文（V4.1.3 起随明细页下发，供整列展示）。此前按隐私裁列、仅问题行
             # 带 120 字摘要(snippet)，用户 2026-07-21 授权开放全文；snippet 保留不动向后兼容。
             "ct": r["content"],
+            # ── V4.5.4 派生字段 ──
+            "cq": d_quad.idx(quad),
+            "cbg": d_cbg.idx(t1.get("bg", "")),
+            "el": d_pl.idx(eff_line),      # 复用产品线码表
+            "ls": line_src,
+            "ec": d_cat.idx(eff_cat),
+            "ch": channel,
+            "pm": is_pm,
+            "tr": tr,
         })
         if ok != 0:
             issues.append({
@@ -239,8 +307,37 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
             "storeRows": st["rows"],               # 累积库覆盖状态(供 /data 展示)
             "storeStart": st["start"],
             "storeEnd": st["end"],
+            "dataReadiness": {
+                "top1000": {
+                    # provided 看文件是否存在,rows 看解析结果 —— 两者分开才能区分
+                    # 「没放文件」与「文件在但表头坏了」,告警文案才不会说反。
+                    "provided": os.path.isfile(top1000_path),
+                    "rows": len(top1000),
+                    "matchedCustomers": len({c for c in d_cu.values if c in top1000}),
+                    # 有行但象限/BG 全空 → 判定为列缺失(静默降级的唯一可观测信号)
+                    "hasQuad": bool(top1000) and any(v.get("quad") for v in top1000.values()),
+                    "hasBg": bool(top1000) and any(v.get("bg") for v in top1000.values()),
+                },
+                "productCategory": {
+                    "provided": os.path.isfile(pcat_path),
+                    "rows": len(prod_cats),
+                    "coveredLines": len([x for x in seen_lines if x in prod_cats]),
+                    "totalLines": len(seen_lines),
+                },
+                "calibration": dict(calib),
+                "unattributed": {"rows": unattr_rows, "hours": round(unattr_hours, 2)},
+                "roster": {
+                    "hasSupColumn": any(p.get("supId") for p in roster),
+                    "managers": len(mgr_ids),
+                },
+            },
         },
-        "roster": roster,
+        # supId/supName 只用于在服务端派生 isMgr,**不下发** —— 前端只需要「是不是管理干部」
+        # 这一个布尔,没有任何消费方要上下级关系;整张 85 人的汇报链属于不必要的下发面。
+        # schema 的 _Base 是 extra="allow",原样透传不会被校验拦住,只能靠这里显式挑键。
+        # (dict 的 | 合并是 3.9+,本仓声明支持 3.8,故用 dict(推导式, kw=...) 写法)
+        "roster": [dict({k: v for k, v in p.items() if k not in ("supId", "supName")},
+                        isMgr=p["id"] in mgr_ids) for p in roster],
         "days": days,
         "dims": {
             "types": d_type.values,
@@ -251,6 +348,9 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
             "projectTypes": d_pt.values,
             "salesL2": d_bg.values,
             "serviceModes": d_sm.values,
+            "custQuads": d_quad.values,
+            "custBgs": d_cbg.values,
+            "prodCats": d_cat.values,
         },
         "entries": entries,
         "issues": issues,

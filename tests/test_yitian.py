@@ -336,3 +336,68 @@ class TestIngestAndAccumulate:
         assert Y.build_yitian_data(base, store=mem_store) is None      # 传入的空 store 生效
         # 不传 store 时仍从磁盘读,磁盘上的库并未因上面那次调用被改动
         assert Y.build_yitian_data(base)["meta"]["rows"] == 1
+
+
+# ── V4.5.4 派生字段与就绪度接线 ──
+
+def test_build接出派生字段与就绪度(tmp_path, monkeypatch):
+    """最小闭环:一条客户类工时,产品线为「其他」但正文含唯一产品关键词 → 应被校准。"""
+    import yitian as Y
+    monkeypatch.setattr(Y, "read_org_roster", lambda p: [
+        {"id": "A001", "name": "老王", "l2": "", "l3": "", "l31": "", "l4": "一组",
+         "category": "正式", "supId": "", "supName": ""},
+        {"id": "A002", "name": "老张", "l2": "", "l3": "", "l31": "", "l4": "一组",
+         "category": "正式", "supId": "A001", "supName": "老王"},
+    ])
+    monkeypatch.setattr(Y, "read_top1000", lambda p: {
+        "甲公司": {"level": "TOP1000大客户", "quad": "M3 潜力培育区", "bg": "市场BG3"}})
+    monkeypatch.setattr(Y, "read_product_categories", lambda p: {
+        "NGSOC": {"category": "态势感知", "channel": True}})
+
+    store = {"rows": [{
+        "wid": "1", "emp_id": "A002", "date": "2026-06-01", "work_type": "项目类",
+        "hours": 8.0, "content": "处理 SOAR 告警策略 担任角色：工程师", "customer": "甲公司",
+        "project_type": "", "work_type3": "安装部署", "product_line": "其他",
+        "product_name": "", "work_order": "WO1", "sales_l2": "交付中心",
+        "service_mode": "现场",
+    }]}
+    d = Y.build_yitian_data(str(tmp_path), store=store)
+    e = d["entries"][0]
+    assert d["dims"]["products"][e["el"]] == "NGSOC"       # 校准生效
+    assert e["ls"] == 1                                    # calibrated
+    assert d["dims"]["prodCats"][e["ec"]] == "态势感知"
+    assert e["ch"] is True
+    assert e["pm"] is False                                # 角色是工程师,不是项目经理
+    assert d["dims"]["custQuads"][e["cq"]] == "M3 潜力培育区"
+    assert d["dims"]["custBgs"][e["cbg"]] == "市场BG3"
+    assert e["tr"] == 4                                    # M3 + 可交付 + 非项目管理 → 可转移
+
+    r = {p["id"]: p for p in d["roster"]}
+    assert r["A001"]["isMgr"] is True                      # 有下属
+    assert r["A002"]["isMgr"] is False
+
+    rd = d["meta"]["dataReadiness"]
+    assert rd["top1000"]["hasQuad"] is True and rd["top1000"]["hasBg"] is True
+    assert rd["productCategory"]["totalLines"] >= 1
+    assert rd["calibration"]["calibrated"] == 1
+    assert rd["roster"]["managers"] == 1
+
+
+def test_产品分类缺失时降级不炸(tmp_path, monkeypatch):
+    import yitian as Y
+    monkeypatch.setattr(Y, "read_org_roster", lambda p: [
+        {"id": "A001", "name": "老王", "l2": "", "l3": "", "l31": "", "l4": "一组",
+         "category": "正式", "supId": "", "supName": ""}])
+    monkeypatch.setattr(Y, "read_top1000", lambda p: {})
+    monkeypatch.setattr(Y, "read_product_categories", lambda p: {})
+    store = {"rows": [{
+        "wid": "1", "emp_id": "A001", "date": "2026-06-01", "work_type": "项目类",
+        "hours": 8.0, "content": "巡检", "customer": "乙公司", "project_type": "",
+        "work_type3": "产品巡检", "product_line": "NGSOC", "product_name": "",
+        "work_order": "", "sales_l2": "", "service_mode": "",
+    }]}
+    d = Y.build_yitian_data(str(tmp_path), store=store)
+    e = d["entries"][0]
+    assert e["ec"] is None and e["ch"] is False
+    assert e["tr"] == 3                                    # 查不到大类 → 非渠道可交付
+    assert d["meta"]["dataReadiness"]["productCategory"]["provided"] is False
