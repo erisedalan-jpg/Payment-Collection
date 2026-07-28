@@ -401,3 +401,46 @@ def test_产品分类缺失时降级不炸(tmp_path, monkeypatch):
     assert e["ec"] is None and e["ch"] is False
     assert e["tr"] == 3                                    # 查不到大类 → 非渠道可交付
     assert d["meta"]["dataReadiness"]["productCategory"]["provided"] is False
+
+
+def test_meta_top1000Named_取自清单全量(tmp_path, monkeypatch):
+    """指名数是覆盖率的分母,必须来自 TOP1000 清单全量——只算工时里出现过的客户
+    会让分母缩成实际支持数、覆盖率恒 100%,指标彻底失效。"""
+    import yitian as Y
+    monkeypatch.setattr(Y, "read_org_roster", lambda p: [
+        {"id": "A001", "name": "老王", "l2": "", "l3": "", "l31": "", "l4": "一组",
+         "category": "正式", "supId": "", "supName": ""}])
+    monkeypatch.setattr(Y, "read_top1000", lambda p: {
+        # 甲有工时、乙丙没有 —— 三家都必须计入指名
+        "甲公司": {"level": "TOP1000大客户", "quad": "M1 战略核心区", "bg": "市场BG3"},
+        "乙公司": {"level": "TOP1000大客户", "quad": "M2 现金牛/打猎区", "bg": "市场BG3"},
+        "丙公司": {"level": "TOP1000大客户", "quad": "M4 待开拓/长尾区", "bg": "市场BG1"},
+        "丁公司": {"level": "普通客户", "quad": "", "bg": "市场BG1"},   # 非 TOP1000,不计
+        "戊公司": {"level": "TOP1000大客户", "quad": "M3 潜力培育区", "bg": ""},  # 无 BG
+    })
+    monkeypatch.setattr(Y, "read_product_categories", lambda p: {})
+    store = {"rows": [{
+        "wid": "1", "emp_id": "A001", "date": "2026-06-01", "work_type": "项目类",
+        "hours": 8.0, "content": "巡检", "customer": "甲公司", "project_type": "",
+        "work_type3": "产品巡检", "product_line": "NGSOC", "product_name": "",
+        "work_order": "", "sales_l2": "", "service_mode": "",
+    }]}
+    d = Y.build_yitian_data(str(tmp_path), store=store)
+    assert d["meta"]["top1000Named"] == {"市场BG3": 2, "市场BG1": 1, "(未标BG)": 1}
+
+
+def test_meta_top1000Named_无清单时为空字典(tmp_path, monkeypatch):
+    import yitian as Y
+    monkeypatch.setattr(Y, "read_org_roster", lambda p: [
+        {"id": "A001", "name": "老王", "l2": "", "l3": "", "l31": "", "l4": "一组",
+         "category": "正式", "supId": "", "supName": ""}])
+    monkeypatch.setattr(Y, "read_top1000", lambda p: {})
+    monkeypatch.setattr(Y, "read_product_categories", lambda p: {})
+    store = {"rows": [{
+        "wid": "1", "emp_id": "A001", "date": "2026-06-01", "work_type": "项目类",
+        "hours": 8.0, "content": "x", "customer": "", "project_type": "",
+        "work_type3": "", "product_line": "", "product_name": "",
+        "work_order": "", "sales_l2": "", "service_mode": "",
+    }]}
+    d = Y.build_yitian_data(str(tmp_path), store=store)
+    assert d["meta"]["top1000Named"] == {}

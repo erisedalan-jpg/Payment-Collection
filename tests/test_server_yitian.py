@@ -104,9 +104,14 @@ class TestYitianPageGate:
         assert S._is_protected_data_path('/data/yitian_data.json') is True
         assert S._is_protected_data_path('/data/analysis_data.json') is False
 
-    def test_page_keys_cover_five_pages(self):
-        assert set(S._YITIAN_PAGE_KEYS) == {
-            'yitian', 'yitian-compliance', 'yitian-analytics', 'yitian-trend', 'yitian-customer'}
+    def test_页键元组与倚天域页面集合一致(self):
+        """新增倚天页面忘了同步这个元组 → 该页账号进得去页面却拿不到数据(403)。
+        取代原来写死五个 key 的断言:那种写法每加一页都要手工改,而漏改正是
+        yitian-detail 当年被落下的原因。"""
+        domain_pages = set(config.DOMAIN_PAGES['yitian'])
+        # 自证断言:PAGE_DOMAINS 解析失配会得到空集,下面的相等断言就成了空对空恒真
+        assert len(domain_pages) >= 6, 'PAGE_DOMAINS 倚天域页面数异常: %r' % domain_pages
+        assert set(S._YITIAN_PAGE_KEYS) == domain_pages
 
 
 class TestYitianSettingsEndpoint:
@@ -416,3 +421,25 @@ class TestYitianStoreDestructiveEndpointsHTTP:
             assert len(st["rows"]) == 2        # 清空未落盘,磁盘累积库保持原样
         finally:
             srv.shutdown(); srv.server_close()
+
+
+def test_只勾工时明细的账号也能读倚天数据(tmp_path, monkeypatch):
+    """V4.1.0 起 yitian-detail 是独立 pageKey,但 _YITIAN_PAGE_KEYS 漏了它,
+    导致只勾「工时明细」的账号进得去页面、拿不到数据(403)。本条钉死修复。"""
+    srv, port = _start(tmp_path, monkeypatch)
+    try:
+        conn, ck = _login(port)
+        conn.request("POST", "/api/admin/accounts/create",
+                     json.dumps({"account": "det", "password": "Pw123456", "displayName": "d",
+                                 "allowedPages": ["yitian-detail"], "allowedL4": ["*"]}),
+                     {"Content-Type": "application/json", "Cookie": ck})
+        conn.getresponse().read()
+        conn2, ck2 = _login(port, "det", "Pw123456")
+        conn2.request("GET", "/api/yitian/data", headers={"Cookie": ck2})
+        r = conn2.getresponse()
+        body = r.read()
+        # 修复前这里是 403「无倚天工时页面权限」。200 或 404(本地无 yitian_data.json)
+        # 都算通过 —— 要钉的是「不再被页面权限闸拦掉」,不是数据一定存在。
+        assert r.status != 403, body[:200]
+    finally:
+        srv.shutdown(); srv.server_close()

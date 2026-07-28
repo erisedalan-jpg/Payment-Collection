@@ -182,6 +182,14 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
     pcat_path = os.path.join(input_dir, config.PRODUCT_CATEGORY_FILE)
     top1000 = read_top1000(top1000_path)
     top_names = {n for n, v in top1000.items() if v.get("level") == config.TOP1000_LEVEL}
+    # 指名客户数(B-3 覆盖率的分母):取自 TOP1000 清单【全量】,与工时数据无关。
+    # 只统计工时里出现过的客户会让分母缩成实际支持数、覆盖率恒 100%,指标失效。
+    named_by_bg: Dict[str, int] = {}
+    for _n, _v in top1000.items():
+        if _v.get("level") != config.TOP1000_LEVEL:
+            continue
+        _bg = _v.get("bg", "") or "(未标BG)"
+        named_by_bg[_bg] = named_by_bg.get(_bg, 0) + 1
     prod_cats = read_product_categories(pcat_path)
     mgr_ids = manager_ids(roster)
     pm_seg = rules_cfg["checks"].get("pmTag", {})
@@ -307,6 +315,7 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
             "storeRows": st["rows"],               # 累积库覆盖状态(供 /data 展示)
             "storeStart": st["start"],
             "storeEnd": st["end"],
+            "top1000Named": named_by_bg,   # 市场BG → 指名客户数(清单全量,B-3 覆盖率分母)
             "dataReadiness": {
                 "top1000": {
                     # provided 看文件是否存在,rows 看解析结果 —— 两者分开才能区分

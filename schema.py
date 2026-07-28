@@ -393,6 +393,7 @@ class YitianMeta(_Base):
     storeRows: int                   # 累积库总行数(供 /data 展示"累积了多久")
     storeStart: Optional[str]        # 累积库覆盖区间起(可空,但键必须出现)
     storeEnd: Optional[str]          # 累积库覆盖区间止(同上)
+    top1000Named: Dict[str, int]     # 市场BG → 指名的 TOP1000 客户数(清单全量,不随工时变)
     dataReadiness: YitianReadiness   # 源表解析就绪度(V4.5.4),/data 与总览卡消费
     # 必填、非 Optional:它是本期护栏的载体,缺它等于护栏没接上,必须硬失败而非静默默认。
 

@@ -37,6 +37,7 @@ import YitianComplianceView from '@/views/YitianComplianceView.vue'
 import YitianAnalyticsView from '@/views/YitianAnalyticsView.vue'
 import YitianTrendView from '@/views/YitianTrendView.vue'
 import YitianCustomerView from '@/views/YitianCustomerView.vue'
+import YitianCustomerProductView from '@/views/YitianCustomerProductView.vue'
 
 // 路由 meta 类型扩展:title 用于页签标题,hideFilter 控制是否隐藏 FilterBar(数据管理/治理/关于),fullscreen 控制裸渲染(无导航,供登录页等全屏视图使用)
 declare module 'vue-router' {
@@ -119,6 +120,7 @@ export const router = createRouter({
     { path: '/yitian/analytics', name: 'yitian-analytics', component: YitianAnalyticsView, meta: { title: '工时统计分析', hideFilter: true, pageKey: 'yitian-analytics', tabGroup: 'yitian-analysis' } },
     { path: '/yitian/trend', name: 'yitian-trend', component: YitianTrendView, meta: { title: '工时趋势分析', hideFilter: true, pageKey: 'yitian-trend', tabGroup: 'yitian-analysis' } },
     { path: '/yitian/customer', name: 'yitian-customer', component: YitianCustomerView, meta: { title: '客户支持分析', hideFilter: true, pageKey: 'yitian-customer', tabGroup: 'yitian-analysis' } },
+    { path: '/yitian/customer-product', name: 'yitian-customer-product', component: YitianCustomerProductView, meta: { title: '客户与产品分析', hideFilter: true, pageKey: 'yitian-customer-product', tabGroup: 'yitian-analysis' } },
     { path: '/data', name: 'data', component: DataView, meta: { title: '数据管理', hideFilter: true, pageKey: 'data' } },
     { path: '/governance', name: 'governance', component: DataQualityView, meta: { title: '数据治理', hideFilter: true, pageKey: 'governance' } },
     { path: '/budget', name: 'budget', component: BudgetView, meta: { title: '概算工具', hideFilter: true, pageKey: 'budget' } },

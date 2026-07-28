@@ -340,8 +340,10 @@ _yitian_cache = {'mtime': None, 'data': None}
 _yitian_cache_lock = threading.Lock()
 
 # 持有任一倚天页面授权即可读倚天数据(纵深防御:工时是员工级数据,未授权页面的账号连 curl 也不该拿到)
-_YITIAN_PAGE_KEYS = ('yitian', 'yitian-compliance', 'yitian-analytics',
-                     'yitian-trend', 'yitian-customer')
+# yitian-detail 曾被漏掉(V4.1.0 加明细页时未同步),后果是只勾「工时明细」的账号
+# 能进页面却拿不到数据、页面报 403。新增倚天页面时必须同步本元组。
+_YITIAN_PAGE_KEYS = ('yitian', 'yitian-detail', 'yitian-compliance', 'yitian-analytics',
+                     'yitian-trend', 'yitian-customer', 'yitian-customer-product')
 
 # ── 概算工具 /budget:费率与目录配置(超管可配) + 报价存档(按账号隔离) ──
 # 注意:这两个 path 的 GET 是全体 budget 授权账号可读、POST 才收紧到超管/owner,

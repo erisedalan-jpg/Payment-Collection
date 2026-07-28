@@ -3,7 +3,7 @@ import { PAGE_KEYS } from '@/lib/pageAccess'
 import { ALL_PAGE_LINKS, NAV_SECTIONS, TAB_GROUPS, sectionPageLinks, isTabEntry } from './nav'
 
 describe('nav 契约', () => {
-  it('ALL_PAGE_LINKS 恰好覆盖全部 30 个 PageKey,不多不少', () => {
+  it('ALL_PAGE_LINKS 恰好覆盖全部 31 个 PageKey,不多不少', () => {
     // 承重点 ①:PAGE_OPTIONS/firstAllowedPath/AdminView 两处全部从它派生。
     // 少一个 → 该页无法授权、无法设数据范围,且不报错。
     expect([...ALL_PAGE_LINKS.map((l) => l.key)].sort()).toEqual([...PAGE_KEYS].sort())
@@ -21,9 +21,9 @@ describe('nav 契约', () => {
     expect(NAV_SECTIONS.map((s) => s.id)).toEqual(['project', 'payment', 'opportunity', 'yitian', 'keyfollowup', 'tools'])
   })
 
-  it('三个 tab 组共 10 页,且每组至少 2 项(单项无 tab 意义)', () => {
+  it('三个 tab 组共 11 页,且每组至少 2 项(单项无 tab 意义)', () => {
     const groups = Object.values(TAB_GROUPS)
-    expect(groups.flat().length).toBe(10)
+    expect(groups.flat().length).toBe(11)
     for (const g of groups) expect(g.length).toBeGreaterThanOrEqual(2)
   })
 

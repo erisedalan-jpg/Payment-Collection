@@ -112,8 +112,12 @@ export interface YitianMeta {
   storeRows: Storerows;
   storeStart: Storestart;
   storeEnd: Storeend;
+  top1000Named: Top1000Named;
   dataReadiness: YitianReadiness;
   [k: string]: unknown;
+}
+export interface Top1000Named {
+  [k: string]: number;
 }
 export interface YitianReadiness {
   top1000: YitianReadinessTop1000;

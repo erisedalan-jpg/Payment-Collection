@@ -17,6 +17,8 @@ def _minimal():
             "droppedRows": 0, "calendarSource": "csv", "hoursPerDay": 8,
             "thisBgL2": ["交付中心"],
             "storeRows": 1, "storeStart": "2026-06-01", "storeEnd": "2026-06-01",
+            # V4.5.5 指名客户数(市场BG → TOP1000 清单全量计数,B-3 覆盖率分母)
+            "top1000Named": {},
             # V4.5.4 就绪度指标(必填,本期护栏的载体)
             "dataReadiness": {
                 "top1000": {"provided": True, "rows": 139, "matchedCustomers": 97,

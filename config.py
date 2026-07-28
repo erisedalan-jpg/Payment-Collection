@@ -119,6 +119,7 @@ PAGE_DOMAINS = {
     'risk-followup': 'project', 'payment-key': 'project', 'governance': 'project',
     'yitian': 'yitian', 'yitian-detail': 'yitian', 'yitian-compliance': 'yitian',
     'yitian-analytics': 'yitian', 'yitian-trend': 'yitian', 'yitian-customer': 'yitian',
+    'yitian-customer-product': 'yitian',
     'opportunities-progress': 'opportunity', 'opportunities-board': 'opportunity',
     'opportunity-followup': 'opportunity',
 }
