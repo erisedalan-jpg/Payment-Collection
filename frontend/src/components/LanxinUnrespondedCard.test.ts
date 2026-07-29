@@ -72,4 +72,29 @@ describe('LanxinUnrespondedCard', () => {
     expect(w.text()).toContain('李四')
     expect(w.text()).toContain('王五')
   })
+
+  it('状态列与涉及项目数列按行精确取值,不是页面文本碰瓷', async () => {
+    // 不能用 w.text().toContain('未响应') 判定 —— 本组件切换行的 dv-hint 里就写着
+    // 「默认只列已超时且未响应的记录」,这行静态文案恒渲染,任何 statusOf() 的实现(哪怕
+    // 判断整个写反)都不会让它消失,那种断言测不出真正的坏。改用 data-test 定位到具体单元格,
+    // 按行序逐一核对状态文字与涉及项目数,才能钉住 responded 判断取反 / projectCount 错绑两类坏实现。
+    const w = mountWithRows([
+      { sentAt: '2026-07-28 09:00:00', employId: 'A001', name: '张三', routeKey: 'project',
+        projectCount: 3, dueAt: '2026-07-29 09:00:00', overdue: true, responded: false, firstResponseAt: '' },
+      { sentAt: '2026-07-28 09:00:00', employId: 'A002', name: '李四', routeKey: 'project',
+        projectCount: 1, dueAt: '2026-07-29 09:00:00', overdue: true, responded: true,
+        firstResponseAt: '2026-07-28 10:00:00' },
+      { sentAt: '2026-07-29 08:00:00', employId: 'A003', name: '王五', routeKey: 'timesheet',
+        projectCount: 0, dueAt: '2026-07-30 08:00:00', overdue: false, responded: false, firstResponseAt: '' },
+    ])
+    await flushPromises()
+    const vm = w.vm as unknown as { filterMode: 'pending' | 'all' }
+    vm.filterMode = 'all'   // 切到全部,三行(未响应/已响应/未到期三态齐全)都要在场才能逐一核对
+    await flushPromises()
+
+    const statusCells = w.findAll('[data-test="lu-status"]')
+    const countCells = w.findAll('[data-test="lu-projcount"]')
+    expect(statusCells.map((c) => c.text())).toEqual(['未响应', '已响应', '未到期'])
+    expect(countCells.map((c) => c.text())).toEqual(['3', '1', '0'])
+  })
 })

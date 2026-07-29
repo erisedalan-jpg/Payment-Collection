@@ -297,4 +297,19 @@ describe('未响应清单 tab', () => {
     await flushPromises()
     expect(w2.text()).toContain('未响应清单')
   })
+
+  // 上面「仅超管可见」的正向断言 toContain('未响应清单') 命中的是 el-tabs 导航栏的标签文本——
+  // 那段文本不论 el-tab-pane 是否设 lazy 都恒渲染,故那条用例测不出 lazy 被误加。这里改断言
+  // 只有卡片内容真正挂载渲染才会出现的文字(人级判定说明,来自 LanxinUnrespondedCard 自身模板),
+  // 直接钉住 DataView.vue 顶部注释「绝不给 el-tab-pane 设 lazy」这条约束。
+  it('tab 内容确实渲染(不只是导航栏标签),防 lazy 回归', async () => {
+    const auth = useAuthStore()
+    ;(auth as any).user = { account: 'admin', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const w = mount(DataView, { global: { plugins: [ElementPlus], stubs: {
+      'el-switch': true, YitianRulesCard: true, YitianScopeCard: true, YitianStoreCard: true, PortalConfigCard: true,
+    } } })
+    await flushPromises()
+    // 默认落在「数据源」签,未响应清单签未激活;若被设成 lazy,其内容此刻根本不会挂载。
+    expect(w.text()).toContain('人级')
+  })
 })

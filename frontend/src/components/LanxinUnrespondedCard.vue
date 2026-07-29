@@ -67,11 +67,15 @@ defineExpose({ rows, deadlineHours, filterMode, displayRows })
       <el-table-column label="推送类型" width="110">
         <template #default="{ row }: { row: UnrespondedRow }">{{ routeLabel(row.routeKey) }}</template>
       </el-table-column>
-      <el-table-column prop="projectCount" label="涉及项目数" width="100" class-name="u-num" />
+      <el-table-column label="涉及项目数" width="100" class-name="u-num">
+        <template #default="{ row }: { row: UnrespondedRow }">
+          <span data-test="lu-projcount">{{ row.projectCount }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="dueAt" label="应反馈截止" width="160" class-name="u-num" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }: { row: UnrespondedRow }">
-          <StatusBadge :label="statusOf(row).label" :tone="statusOf(row).tone" />
+          <StatusBadge :label="statusOf(row).label" :tone="statusOf(row).tone" data-test="lu-status" />
         </template>
       </el-table-column>
       <el-table-column label="首次响应时间" width="160" class-name="u-num">
