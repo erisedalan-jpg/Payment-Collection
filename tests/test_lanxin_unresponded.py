@@ -88,3 +88,24 @@ def test_unparsable_sent_at_is_kept_not_dropped():
 
 def test_empty_store_returns_empty_list():
     assert U.compute(_store(), 24, "2026-07-29 10:00:00") == []
+
+
+def test_project_count_reflects_multiple_projects():
+    """projectCount 必须取实际项目数,不能退化成「有没有」的布尔语义。
+    夹具默认 pids=("P1",) 只测一个值——「取长度」和「取布尔」结果相同,
+    钉不住实现。本期核心就是「一人一张卡打包多个项目」(实测最多 32 个);
+    真实场景大概率是 2~3 个甚至更多。未响应清单页要显示「涉及 N 个项目」,
+    数值错算会无人察觉。"""
+    rows = U.compute(_store([_sent(pids=("P1", "P2", "P3"))]), 24, "2026-07-29 10:00:00")
+    assert rows[0]["projectCount"] == 3
+
+
+def test_project_count_covers_zero_and_multiple():
+    """工时侧推送 projectIds 是空列表(build_plan 内工时收件人恒传 []),
+    故 projectCount == 0 是真实存在的形态。同时覆盖零和非零两个值以防
+    min(len(...), 1) 这类把 2+ 都变成 1 的错误——零对它无防守力。"""
+    rows_zero = U.compute(_store([_sent(pids=())]), 24, "2026-07-29 10:00:00")
+    assert rows_zero[0]["projectCount"] == 0
+
+    rows_multi = U.compute(_store([_sent(pids=("P1", "P2"))]), 24, "2026-07-29 10:00:00")
+    assert rows_multi[0]["projectCount"] == 2
