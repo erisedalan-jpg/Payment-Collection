@@ -544,3 +544,34 @@ def test_timesheet_card_aggregates_and_sorts_multiple_issues():
     assert card["fields"][1]["key"] == "工时类型有误"            # count=2,排后面;短标签生效
     assert card["fields"][1]["value"] == "2 条"
     assert "2026-07-01" in card["bodySubTitle"]
+
+
+# ── 审查补漏(Important-1/Minor-1):与 build_project_card 对称的 bodyContent 防御测试
+#    + lastDate 格式异常加固(两者都是"行为已对/待补,缺的是钉住它的测试或护栏") ──
+
+def test_timesheet_card_body_content_never_populated():
+    """【承重】与 test_project_card_body_content_never_populated 对称 —— 本文件分组注释
+    早写着 build_timesheet_card「与 build_project_card 同构」,但那条防御测试当时没跟着
+    搬过来。bodyContent 必须留空:它在蓝信卡片里渲染在 fields 之前,「动作要求」一旦被
+    误塞进这里会跑到所有字段最上方,而不是应有的 fields 末尾。_card() 对空 content 干脆
+    不写 bodyContent 键,这里直接断言该键不存在,防止「两处都写」(既让「动作要求」留在
+    fields 末尾,又往 _card 最后一个参数塞了内容)这种疏忽蒙混过关 ——
+    test_timesheet_card_action_field_is_last 只查 fields 顺序,查不到 bodyContent
+    是否被污染。"""
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5},
+    ], "2026-07-20", "2026-07-26",
+        action_hint="请直接回复本消息反馈，24小时内未反馈将列入《未响应清单》")
+    assert "bodyContent" not in card
+
+
+def test_timesheet_card_omits_last_date_when_malformed():
+    """lastDate 若不是缺失、而是被传成非法短值(如只有年份"2026"),last[5:] 会切出空串,
+    仍会拼出"· 最近 "这种被明令禁止的半截文案 —— 光判断真值(if last)挡不住这种输入,
+    因为非空短字符串一样是真值,必须按长度判断(len(last) >= 5)。lastDate 是内部计算
+    产物、正常恒为 10 字符或缺失,这条路径风险确实低,但"宁可不显示,不显示空值"是这个
+    函数的既定策略(与 start/end 同款),不该留一条能产出被禁止输出的路径。"""
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5, "lastDate": "2026"},
+    ], "2026-07-20", "2026-07-26")
+    assert card["fields"][0]["value"] == "5 条"

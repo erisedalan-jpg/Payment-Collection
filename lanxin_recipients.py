@@ -231,7 +231,9 @@ def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
     for i in rows:
         value = "%d 条" % int(i["count"])
         last = str(i.get("lastDate") or "")
-        if last:
+        # 长度判断而非单纯真值判断:lastDate 若被传成"2026"这类不足 5 字符的非法短值,
+        # 仍是真值但 last[5:] 会切出空串,拼出"· 最近 "这种被明令禁止的半截文案。
+        if len(last) >= 5:
             value += " · 最近 %s" % last[5:]      # 'YYYY-MM-DD' → 'MM-DD',卡片上年份是噪音
         fields.append(_field(short_issue(i["label"]), value))
     if action_hint:
