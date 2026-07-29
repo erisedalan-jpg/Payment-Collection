@@ -1337,13 +1337,35 @@ def test_unresponded_path_is_super_only():
     assert '/api/lanxin/unresponded' in server._SUPER_ONLY_PATHS
 
 
-def test_unresponded_deadline_comes_from_config_not_hardcoded():
-    """【N 单一来源】端点用的小时数必须来自 cfg['reviewDeadlineHours'],
-    与卡片文案同源。两处各自默认 = 「卡上24、清单按48」。"""
-    src = inspect.getsource(server.LocalHTTPRequestHandler.handle_lanxin_unresponded_get)
-    assert 'reviewDeadlineHours' in src
-    assert '24' not in src, "不得硬编码 24,须从配置读"
+def test_unresponded_deadline_comes_from_config(tmp_path, monkeypatch):
+    """【N 单一来源】端点返回的 deadlineHours 必须来自 cfg['reviewDeadlineHours'],
+    与卡片文案同源。两处各自默认 = 「卡上写 24 小时、清单按别的算」。
+
+    这里【故意不用 inspect.getsource 查字面量】:那种源码正则断言在本仓出过事
+    (V4.5.3:解析失配 → 循环空跑 → 恒真通过)。行为断言才钉得住。
+
+    _srv 已把 server.LANXIN_CONFIG_FILE 指到 tmp_path/lanxin_config.json,
+    所以起服务【之后】往那个路径写配置即可生效(load_config 每次请求都重读)。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "lanxin_inbox.json"))
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = 72
+    (tmp_path / "lanxin_config.json").write_text(
+        json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+    try:
+        conn, cookie = _login(port)
+        conn.request("GET", "/api/lanxin/unresponded", headers={"Cookie": cookie})
+        r = conn.getresponse()
+        assert r.status == 200
+        body = json.loads(r.read())
+        assert body["deadlineHours"] == 72
+        assert body["rows"] == []          # 空收件箱 → 空清单
+    finally:
+        srv.shutdown()
+        srv.server_close()
 ```
+
+> `_srv` / `_login` / `LC` 都是 `tests/test_server_lanxin.py` **既有的**（第 16/27 行、`import lanxin_config as LC`）。默认账号 `admin` 是超管，`_login()` 无参即可。
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -1537,7 +1559,7 @@ Expected: PASS
 
 - [ ] **Step 5: 反向验证「自推导」**
 
-把 `callbackUrl` 临时改成写死的 `'http://10.248.105.95/pm/api/lanxin/callback'`，跑 `-k 自推导` → 必须 FAIL（测试环境 origin 是 `localhost`）。确认后改回。
+把 `callbackUrl` 临时改成写死的 `'http://10.248.105.95/pm/api/lanxin/callback'`，跑 `npm --prefix frontend run test:run -- src/components/LanxinConfigCard.test.ts -t "自推导"`（vitest 用 `-t` 过滤用例名，不是 pytest 的 `-k`）→ 必须 FAIL（测试环境 origin 是 localhost）。确认后改回。
 
 - [ ] **Step 6: 提交**
 
