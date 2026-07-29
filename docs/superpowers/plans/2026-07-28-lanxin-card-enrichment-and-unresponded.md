@@ -19,7 +19,7 @@
 - **N 的单一来源**：卡片文案里的小时数与未响应清单判定用的小时数，**必须都读 `cfg['reviewDeadlineHours']`**，不各自默认。
 - **蓝信 appCard 硬约束**：`bodyTitle` 必填非空；`headTitle` 单行不可含 `\n`；`fields` ≤10 对；`fields.key` ≤18 字节/6 汉字；`fields.value` ≤192 字节/64 字；`bodyContent` 渲染在 fields **之前**。
 - **不改 `build_summary_card`（上级汇总卡）**：上级要的本就是统计。它是本期回归安全网的一部分。
-- **不改 `lanxin_timestamp_fresh` 的解析逻辑**：在拿到 `lastTimestampSample` 实证前改它是猜测。
+- **`lanxin_timestamp_fresh` 现在要改了**（Task 0）：2026-07-29 生产实证蓝信发的是 **19 位纳秒**，不再是猜测。计划初稿写「不改它」的前提（没有实证）已不成立。
 - **反向验证**：每条新增的契约/护栏测试，必须临时把实现改错、确认它**真的变红**，再改回。备份用 scratchpad **绝对路径**并立刻验证存在（`$TMPDIR` 在 Git Bash 下为空）；**绝不用 `git checkout` 还原**（会抹掉未提交改动）。
 - **验证**：`bash verify.sh` 全绿才算完成。
 - **提交**：只 `git add` 本次明确改动的文件，**绝不 `git add -A`**。
@@ -34,14 +34,147 @@
 | `lanxin_recipients.py` | 新增 `build_action_hint`（三态文案）；`build_project_card` 换成按项目分行；`build_timesheet_card` 加 `lastDate` 与动作要求 | 改 |
 | `lanxin.py` | `build_plan` 增 `proj_detail_by_emp` **并行桶**（不动 `proj_by_emp`，汇总卡零影响）；接 `now` 参数 | 改 |
 | `lanxin_unresponded.py` | 未响应清单纯函数，无 IO | **新建** |
-| `server.py` | `_lanxin_rejected` 加 `lastTimestampSample`；新增 `GET /api/lanxin/unresponded`；build_plan 传 `now` | 改 |
+| `server.py` | **`lanxin_timestamp_fresh` 量纲归一到纳秒（T0）**；`_lanxin_rejected` 加 `lastTimestampSample`；新增 `GET /api/lanxin/unresponded`；build_plan 传 `now` | 改 |
 | `frontend/src/lib/lanxin/items.ts` | `PushItem` 携带 `detail` / `lastDate` | 改 |
 | `frontend/src/components/LanxinConfigCard.vue` | N 输入框 + 回调地址自显示 | 改 |
 | `frontend/src/components/LanxinUnrespondedCard.vue` | 未响应清单表格 | **新建** |
 | `frontend/src/views/DataView.vue` | 新增超管 tab | 改 |
 | `frontend/src/version.ts` | `V4.5.8` | 改 |
 
-**依赖顺序**：T1 → T7/T8；T2 → T3/T4 → T5；T6 → T7 → T9。
+**依赖顺序**：T0 独立（可最先做）；T1 → T7/T8；T2 → T3/T4 → T5；T6 → T7 → T9。
+
+---
+
+## Task 0: 修 `lanxin_timestamp_fresh` —— 蓝信发的是 19 位纳秒
+
+> **这是入站半环恒空的最后一道成因，独立于其余九个任务，建议最先做。**
+
+**Files:**
+- Modify: `server.py`（`lanxin_timestamp_fresh`，约 412 行）
+- Test: `tests/test_server_lanxin_callback.py`
+
+**Interfaces:**
+- Produces: `lanxin_timestamp_fresh(timestamp, now_epoch, skew=300) -> bool`，签名不变，只改量纲归一逻辑。
+
+### 背景（实证，不是推断）
+
+2026-07-29 修好回调地址后，生产日志打出四条被拒报文的 timestamp 原值：
+
+| timestamp 原值（19 位） | ÷1e9 得秒 | 换算 CST | 日志时刻 | 误差 |
+|---|---|---|---|---|
+| `1785296160608457348` | 1785296160 | 11:36:00 | 11:36:00 | 0s |
+| `1785296287992799110` | 1785296287 | 11:38:07 | 11:38:08 | +1s |
+| `1785296341253708528` | 1785296341 | 11:39:01 | 11:39:01 | 0s |
+| `1785296911524850583` | 1785296911 | 11:48:31 | 11:48:31 | 0s |
+
+四条逐条对上、误差 0~1 秒 → **单位是纳秒，且两端时钟正常**（不是时钟问题）。末尾 `608457348` 这类是真实亚秒精度，蓝信后端多半是 Go 的 `time.Now().UnixNano()`。
+
+现有实现 `if abs(val) >= 10**11: val //= 1000` 只除**一次**（按秒/毫秒两种量纲写的），19 位纳秒除一次只到微秒 `1785296160608457`，与 now 差 1.78e15 秒 → 每一条回调都判 stale。
+
+- [ ] **Step 1: 写失败测试**
+
+追加到 `tests/test_server_lanxin_callback.py`，紧跟在既有的 `test_timestamp_freshness_pure` **之后**（**不要改动那个既有函数** —— 它是回归安全网）：
+
+```python
+# 2026-07-29 首次入站联调实测:蓝信发的是【19 位纳秒】。四条真实报文,
+# 换算成秒后与服务器日志时刻逐条对上、误差 0~1 秒 —— 单位与时钟都是实证不是推断。
+REAL_NS_SAMPLES = [
+    ("1785296160608457348", 1785296160),
+    ("1785296287992799110", 1785296287),
+    ("1785296341253708528", 1785296341),
+    ("1785296911524850583", 1785296911),
+]
+
+
+@pytest.mark.parametrize("raw,sec", REAL_NS_SAMPLES)
+def test_timestamp_fresh_accepts_real_nanosecond_samples(raw, sec):
+    """【实证钉桩】生产真实报文。今后谁再动这个函数,都必须仍对得上它们 ——
+    蓝信文档从未记载单位,这四条是我们唯一的事实来源。"""
+    assert server.lanxin_timestamp_fresh(raw, sec) is True
+    assert server.lanxin_timestamp_fresh(raw, sec + 299) is True
+    assert server.lanxin_timestamp_fresh(raw, sec + 301) is False
+
+
+def test_timestamp_fresh_handles_all_four_magnitudes():
+    """秒(10位)/毫秒(13)/微秒(16)/纳秒(19) 四种量纲都要归一到秒。
+    实测是纳秒,但不赌它永不变 —— 逐级除比写死位数稳。"""
+    sec = 1785296160
+    for raw in ("1785296160", "1785296160608", "1785296160608457",
+                "1785296160608457348"):
+        assert server.lanxin_timestamp_fresh(raw, sec) is True
+
+
+def test_timestamp_fresh_does_not_over_divide_plain_seconds():
+    """【承重】10 位秒值不得被除。循环条件写错(比如阈值取小了)会把它除成 1785296,
+    与 now 差十几亿秒 —— 每条回调都被拒,表现与本次事故【一模一样】,极难分辨。"""
+    assert server.lanxin_timestamp_fresh("1785296160", 1785296160) is True
+    assert server.lanxin_timestamp_fresh("1785296160", 1785296160 + 301) is False
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+```bash
+python -m pytest tests/test_server_lanxin_callback.py -q -k "nanosecond or magnitudes or over_divide"
+```
+Expected: `test_timestamp_fresh_accepts_real_nanosecond_samples` 四条全 FAIL（`assert False is True`）；`all_four_magnitudes` FAIL；`over_divide` PASS（旧实现本就不会过度除）。
+
+- [ ] **Step 3: 实现**
+
+`server.py` 的 `lanxin_timestamp_fresh` 整体替换为：
+
+```python
+def lanxin_timestamp_fresh(timestamp, now_epoch, skew=LANXIN_CALLBACK_MAX_SKEW_SEC):
+    """回调 timestamp 是否落在 ±skew 秒窗口内。纯函数。
+
+    量纲归一:秒(10位)/毫秒(13)/微秒(16)/纳秒(19) 逐级除 1000 降到秒。
+
+    【2026-07-29 首次入站联调实证】蓝信实际发的是【19 位纳秒】——
+    末尾 608457348 / 992799110 这类是真实亚秒精度(后端多半是 Go 的
+    time.Now().UnixNano())。四条真实报文换算成秒后与服务器日志时刻逐条对上、
+    误差 0~1 秒:单位是纳秒、且两端时钟正常,两者都是实证。样本钉在
+    tests/test_server_lanxin_callback.py 的 REAL_NS_SAMPLES。
+
+    此前这里是 `if abs(val) >= 10**11: val //= 1000` —— 只除【一次】,
+    按「秒或毫秒」两种量纲写的。19 位纳秒除一次只到微秒(1785296160608457),
+    与 now 差 1.78e15 秒,于是【每一条】回调都被判 stale、入站半环全死,
+    而验签是通过的、日志之外没有任何界面能看出来。这是 V4.5.7 及以前
+    收件箱恒空的最后一道成因(前一道是回调地址漏了 /pm 部署前缀)。
+
+    阈值 10**11 保持不动:真实的【秒】值要到公元 5138 年才会达到它,不会被误除。
+    用 while 逐级降而不是按位数写死:蓝信文档从未记载单位,今后它改量纲也不会再炸。
+    无法解析成整数 → False:缺参/垃圾参必然验不过,不给它放行。
+    """
+    raw = str(timestamp or '').strip()
+    if not raw.lstrip('-').isdigit():
+        return False
+    val = int(raw)
+    while abs(val) >= 10 ** 11:
+        val //= 1000
+    return abs(val - now_epoch) <= skew
+```
+
+- [ ] **Step 4: 跑测试确认通过**
+
+```bash
+python -m pytest tests/test_server_lanxin_callback.py -q
+```
+Expected: 全部 PASS。**既有的 `test_timestamp_freshness_pure` 必须原样跑绿** —— 它用 `1_700_000_000`（10 位）与 `now*1000`（13 位），两者在 `while` 下的结果与 `if` 完全一致。它变红即说明改坏了。
+
+- [ ] **Step 5: 反向验证**
+
+把 `while` 改回 `if`，跑：
+
+```bash
+python -m pytest tests/test_server_lanxin_callback.py -q -k "nanosecond or magnitudes"
+```
+Expected: FAIL。确认后改回 `while`，重跑全绿。
+
+- [ ] **Step 6: 提交**
+
+```bash
+git add server.py tests/test_server_lanxin_callback.py
+git commit -m "fix(lanxin): 回调 timestamp 按纳秒归一(实测19位),此前只除一次致全部回调判 stale"
+```
 
 ---
 
@@ -1563,9 +1696,12 @@ Expected: 全绿（语法编译 + ruff + pytest + 前端 typecheck/vitest/build�
 - [ ] **Step 3: 更新 PROGRESS.md**
 
 - 「当前版本」改 V4.5.8，V4.5.7 降为「上一版本」。
-- 记录本期四项交付与**已定位但未闭环**的问题①：回调地址已修（加 `/pm`），但**事件类型订阅**（`bot_private_message`）与**公网可达性**两道关卡尚未证实，处置见 spec §8 三步表。
-- 新增 backlog 条目：`lanxin_timestamp_fresh` 的 epoch 秒假设仍未证实，待 `lastTimestampSample` 拿到实证后处置。
+- 记录**问题①的完整根因链**（三环，全部实证）：① 回调地址漏 `/pm` 前缀，请求打到同机别的系统（已由超管改蓝信后台修复，非代码）；② 公网可达性/验签/事件订阅**均已排除**（能走到 stale 就证明这三关全过）；③ timestamp 是 19 位纳秒而代码只除一次 → **本期 T0 修复**。
+- **勾销**旧 backlog：「回调 `timestamp` 单位/格式是未证实假设」—— 已实证为纳秒，样本钉在 `REAL_NS_SAMPLES`。
+- 记录**尚未验证的下一关**：解密（AES-256-CBC）与解析（两套键名）两道闸门**从未实测过**。T0 修完会第一次走到它们，上线后须实测。
 - 新增 backlog 条目：二期 V4.5.9（H5 反馈闭环）待做。
+
+> **升级手册须写明**：本期**改了 `.py`**（`server.py` / `lanxin*.py`），与 V4.5.7 的纯 dist 替换不同，**必须 `systemctl restart pmplatform`**。
 
 - [ ] **Step 4: 提交并推送**
 
@@ -1588,6 +1724,9 @@ git push origin master
 - **不改 `lanxin_timestamp_fresh` 的解析逻辑**（拿到实证前改它是猜测）
 - **不改 `build_summary_card`**（上级汇总卡，本期回归安全网）
 
+> 初稿列在这里的「不改 `lanxin_timestamp_fresh`」已移出 —— 那条的前提是「没有实证」，
+> 2026-07-29 拿到四条真实报文后前提消失，改成 Task 0。
+
 ---
 
 ## 自审记录
@@ -1596,6 +1735,7 @@ git push origin master
 
 | spec 条目 | 落到哪个 Task |
 |---|---|
+| §2.3/§2.4 根因链第三环（timestamp 纳秒） | **T0**（2026-07-29 拿到实证后追加，spec 初稿把它列为「本期不做」，前提已不成立） |
 | §4.1.1 项目卡新结构 | T3 |
 | §4.1.2 入参契约变更 | T5 |
 | §4.1.3 动作要求三态 | T2（函数）+ T5（接线） |
