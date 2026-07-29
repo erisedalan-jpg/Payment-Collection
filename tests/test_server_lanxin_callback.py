@@ -383,6 +383,41 @@ def test_timestamp_freshness_pure():
         assert server.lanxin_timestamp_fresh(bad, now) is False
 
 
+# 2026-07-29 首次入站联调实测:蓝信发的是【19 位纳秒】。四条真实报文,
+# 换算成秒后与服务器日志时刻逐条对上、误差 0~1 秒 —— 单位与时钟都是实证不是推断。
+REAL_NS_SAMPLES = [
+    ("1785296160608457348", 1785296160),
+    ("1785296287992799110", 1785296287),
+    ("1785296341253708528", 1785296341),
+    ("1785296911524850583", 1785296911),
+]
+
+
+@pytest.mark.parametrize("raw,sec", REAL_NS_SAMPLES)
+def test_timestamp_fresh_accepts_real_nanosecond_samples(raw, sec):
+    """【实证钉桩】生产真实报文。今后谁再动这个函数,都必须仍对得上它们 ——
+    蓝信文档从未记载单位,这四条是我们唯一的事实来源。"""
+    assert server.lanxin_timestamp_fresh(raw, sec) is True
+    assert server.lanxin_timestamp_fresh(raw, sec + 299) is True
+    assert server.lanxin_timestamp_fresh(raw, sec + 301) is False
+
+
+def test_timestamp_fresh_handles_all_four_magnitudes():
+    """秒(10位)/毫秒(13)/微秒(16)/纳秒(19) 四种量纲都要归一到秒。
+    实测是纳秒,但不赌它永不变 —— 逐级除比写死位数稳。"""
+    sec = 1785296160
+    for raw in ("1785296160", "1785296160608", "1785296160608457",
+                "1785296160608457348"):
+        assert server.lanxin_timestamp_fresh(raw, sec) is True
+
+
+def test_timestamp_fresh_does_not_over_divide_plain_seconds():
+    """【承重】10 位秒值不得被除。循环条件写错(比如阈值取小了)会把它除成 1785296,
+    与 now 差十几亿秒 —— 每条回调都被拒,表现与本次事故【一模一样】,极难分辨。"""
+    assert server.lanxin_timestamp_fresh("1785296160", 1785296160) is True
+    assert server.lanxin_timestamp_fresh("1785296160", 1785296160 + 301) is False
+
+
 def test_replayed_signature_is_rejected_and_writes_nothing(lanxin_srv):
     """I-2 核心:签名合法但时间戳过期 = 重放,必须在【存证之前】拦掉。
 

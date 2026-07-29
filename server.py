@@ -412,20 +412,29 @@ def lanxin_risk_key(project_id, risk_code):
 def lanxin_timestamp_fresh(timestamp, now_epoch, skew=LANXIN_CALLBACK_MAX_SKEW_SEC):
     """回调 timestamp 是否落在 ±skew 秒窗口内。纯函数。
 
-    按 epoch 秒解读;13 位一律按毫秒解释(容错,两种口径都认)。
-    【这是假设,不是文档规定】——`docs/2026-07-20-蓝信回调接口调研.md` 从未记载过这个
-    字段的单位与格式,首次联调时必须核实(见 PROGRESS.md 债务条目)。若蓝信实际发送
-    ISO8601、带小数的毫秒等任何非纯数字形态,下面的 isdigit 判断会为假,导致每一条
-    回调都被拒绝、入站半环全死;排查时看 `_lanxin_rejected['lastReason']` 是否为
-    'stale',以及日志里打出的 timestamp 原值长什么样(handle_lanxin_callback 里那行
-    warning——只打 timestamp,不打签名/密钥/报文体)。
+    量纲归一:秒(10位)/毫秒(13)/微秒(16)/纳秒(19) 逐级除 1000 降到秒。
+
+    【2026-07-29 首次入站联调实证】蓝信实际发的是【19 位纳秒】——
+    末尾 608457348 / 992799110 这类是真实亚秒精度(后端多半是 Go 的
+    time.Now().UnixNano())。四条真实报文换算成秒后与服务器日志时刻逐条对上、
+    误差 0~1 秒:单位是纳秒、且两端时钟正常,两者都是实证。样本钉在
+    tests/test_server_lanxin_callback.py 的 REAL_NS_SAMPLES。
+
+    此前这里是 `if abs(val) >= 10**11: val //= 1000` —— 只除【一次】,
+    按「秒或毫秒」两种量纲写的。19 位纳秒除一次只到微秒(1785296160608457),
+    与 now 差 1.78e15 秒,于是【每一条】回调都被判 stale、入站半环全死,
+    而验签是通过的、日志之外没有任何界面能看出来。这是 V4.5.7 及以前
+    收件箱恒空的最后一道成因(前一道是回调地址漏了 /pm 部署前缀)。
+
+    阈值 10**11 保持不动:真实的【秒】值要到公元 5138 年才会达到它,不会被误除。
+    用 while 逐级降而不是按位数写死:蓝信文档从未记载单位,今后它改量纲也不会再炸。
     无法解析成整数 → False:缺参/垃圾参必然验不过,不给它放行。
     """
     raw = str(timestamp or '').strip()
     if not raw.lstrip('-').isdigit():
         return False
     val = int(raw)
-    if abs(val) >= 10 ** 11:            # 13 位毫秒
+    while abs(val) >= 10 ** 11:
         val //= 1000
     return abs(val - now_epoch) <= skew
 
