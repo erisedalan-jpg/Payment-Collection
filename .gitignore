@@ -150,3 +150,10 @@ nul
 /yitian/
 /yitian-new/
 /项目数据运营工具/
+
+# 蓝信对接副本(他人基于 LTS-1.1.0 制作的督办系统整份复制,含 server.py/projects.py/frontend/tests)。
+# 非本平台组成部分,只读参考、绝不入库;根 conftest.py 的 collect_ignore 亦已含它。
+# 【必须带前导斜杠】仓库里有三个叫 lanxin 的目录 —— 另两个是【已跟踪】的
+# frontend/src/lib/lanxin/ 与 lts/frontend/src/lib/lanxin/。无锚点的 `lanxin/` 会三个全匹配,
+# 于是今后往前端那个目录新增文件会被 git add 静默拒收(V4.5.4 的 yitian/ 原样重演)。
+/lanxin/
