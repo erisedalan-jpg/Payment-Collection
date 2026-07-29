@@ -413,5 +413,15 @@ def test_action_hint_empty_when_no_channel():
 
 
 def test_action_hint_uses_given_hours_verbatim():
-    """N 由调用方传入,本函数不带自己的默认值 —— 默认值散落多处正是「卡上24、清单按48」的成因。"""
-    assert "72小时内" in LR.build_action_hint(72, reply_hint=True)
+    """N 由调用方传入,本函数不带自己的默认值 —— 默认值散落多处正是「卡上24、清单按48」的成因。
+    子串包含不够严格（「172小时内」也包含「72小时内」）—— 改为精确匹配整句。"""
+    assert LR.build_action_hint(72, reply_hint=True) == \
+        "请直接回复本消息反馈，72小时内未反馈将列入《未响应清单》"
+
+
+def test_action_hint_requires_explicit_hours():
+    """【承重】deadline_hours 不得有默认值。加上默认值后本条会红。
+    N 的默认值散落多处正是「卡上写 24 小时、清单按 48 小时算」这类事故的成因 ——
+    这个函数只负责按调用方给的值组文案,不替调用方决定 N 是多少。"""
+    with pytest.raises(TypeError):
+        LR.build_action_hint()
