@@ -365,6 +365,15 @@ def test_validate_rejects_non_integer_deadline():
         LC.validate_config(cfg)
 
 
+@pytest.mark.parametrize("bad", [True, False])
+def test_validate_rejects_bool_deadline(bad):
+    """True 必须被拒 —— isinstance(True, int) 为真,不显式排除就会漏过去。"""
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = bad
+    with pytest.raises(ValueError):
+        LC.validate_config(cfg)
+
+
 def test_public_config_carries_review_deadline_hours():
     """public_config 是深拷贝全量 + 抹密钥,顶层新键应自动透出;本条防将来有人改成白名单式。"""
     cfg = LC.default_config()
