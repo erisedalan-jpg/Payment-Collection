@@ -328,3 +328,45 @@ def test_save_config_empty_callback_secret_keeps_old(tmp_path):
     cfg2["credentials"]["callbackAesKey"] = ""
     saved = LC.save_config(p, cfg2)
     assert saved["credentials"]["callbackAesKey"] == "KEEPME"
+
+
+def test_default_config_has_review_deadline_hours():
+    assert LC.default_config()["reviewDeadlineHours"] == 24
+
+
+def test_validate_keeps_review_deadline_hours():
+    """validate_config 的返回是【白名单 dict】,新键不显式加进去就会被静默丢弃 ——
+    配了 48 保存后变回 24,页面上看不出任何异常。本条钉死它。"""
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = 48
+    assert LC.validate_config(cfg)["reviewDeadlineHours"] == 48
+
+
+@pytest.mark.parametrize("bad", [0, -1, 721, 1000])
+def test_validate_rejects_out_of_range_deadline(bad):
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = bad
+    with pytest.raises(ValueError):
+        LC.validate_config(cfg)
+
+
+@pytest.mark.parametrize("good", [1, 24, 720])
+def test_validate_accepts_boundary_deadline(good):
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = good
+    assert LC.validate_config(cfg)["reviewDeadlineHours"] == good
+
+
+def test_validate_rejects_non_integer_deadline():
+    """'24' 这种字符串必须拒,不许静默 int() —— 前端传错类型时要报出来。"""
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = "24"
+    with pytest.raises(ValueError):
+        LC.validate_config(cfg)
+
+
+def test_public_config_carries_review_deadline_hours():
+    """public_config 是深拷贝全量 + 抹密钥,顶层新键应自动透出;本条防将来有人改成白名单式。"""
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = 36
+    assert LC.public_config(cfg)["reviewDeadlineHours"] == 36

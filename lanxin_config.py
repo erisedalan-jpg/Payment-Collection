@@ -42,11 +42,18 @@ _ID_TYPES = ("employ_id", "mobile", "mail", "login", "external_id")
 # 默认 account:机器人能力是第二道审批,可能批不下来,应用号是安全落点。
 SEND_AS_VALUES = ("account", "bot")
 
+# 反馈时限(小时)。卡片文案「N 小时内未反馈将列入《未响应清单》」与未响应清单的判定
+# 【共用这一个值】—— 卡上写 24 小时、清单按 48 小时算,是必然会出的事故。
+DEFAULT_REVIEW_DEADLINE_HOURS = 24
+MIN_REVIEW_DEADLINE_HOURS = 1
+MAX_REVIEW_DEADLINE_HOURS = 720        # 30 天
+
 
 def default_config() -> Dict[str, Any]:
     return {
         "enabled": False,
         "sendIntervalMs": 200,
+        "reviewDeadlineHours": DEFAULT_REVIEW_DEADLINE_HOURS,
         "sendAs": "account",
         "credentials": {
             "appId": "", "appSecret": "", "orgId": "",
@@ -215,7 +222,16 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
     if send_as not in SEND_AS_VALUES:
         raise ValueError("sendAs 须为 %s 之一" % "/".join(SEND_AS_VALUES))
 
+    deadline = cfg.get("reviewDeadlineHours", DEFAULT_REVIEW_DEADLINE_HOURS)
+    # bool 是 int 的子类,True 会被当成 1 混过去 —— 显式排掉
+    if isinstance(deadline, bool) or not isinstance(deadline, int):
+        raise ValueError("reviewDeadlineHours 必须是整数")
+    if not (MIN_REVIEW_DEADLINE_HOURS <= deadline <= MAX_REVIEW_DEADLINE_HOURS):
+        raise ValueError("reviewDeadlineHours 须在 %d~%d 之间"
+                         % (MIN_REVIEW_DEADLINE_HOURS, MAX_REVIEW_DEADLINE_HOURS))
+
     return {"enabled": enabled, "sendIntervalMs": interval, "sendAs": send_as,
+            "reviewDeadlineHours": deadline,
             "credentials": cred, "routes": routes}
 
 
