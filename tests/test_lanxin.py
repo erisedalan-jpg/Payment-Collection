@@ -364,15 +364,18 @@ def test_plan_item_primary_false_still_rolls_up():
 
 
 def test_plan_primary_card_only_contains_primary_items():
-    """同一人名下,只有 primary=True 的原因进本人卡。"""
+    """同一人名下,只有 primary=True 的原因进本人卡。
+    V4.5.8:卡片改按项目分行后,原因名从 field["key"] 移到了 field["value"] 里
+    (key 变成序号)——查整张卡的渲染内容而不是单查 key,对这类字段结构变化免疫,
+    且不改变本条要保护的关切(只有 primary=True 的原因能出现在卡片上,不论出现在哪个字段)。"""
     cfg = _cfg_items(pj_items={"回款延期": (True, True, 0), "数据异常": (True, False, 0)})
     plan = LX.build_plan(
         [{"kind": "project", "projectId": "P1", "reasons": ["回款延期", "数据异常"]}],
         cfg, _TREE, _PMIS)
     card = next(r["card"] for r in plan["recipients"] if r["role"] == "primary")
-    keys = [f["key"] for f in card["fields"]]
-    assert "回款延期" in keys
-    assert "数据异常" not in keys
+    card_json = json.dumps(card, ensure_ascii=False)
+    assert "回款延期" in card_json
+    assert "数据异常" not in card_json
 
 
 def test_plan_mixed_levels_route_to_different_supervisors():
@@ -575,12 +578,16 @@ def test_build_plan_behavior_equivalence_after_migration_golden():
          "bodyTitle": "你有 2 条工时填报存在问题",
          "fields": [{"key": "缺少工作概述", "value": "2 条"}]},
         # ② 项目 primary(推本人):sorted(proj_by_emp) = A006, A007
+        # V4.5.8:卡片由「按原因分行的统计」改为「按项目分行的明细」,故 bodyTitle 与
+        # fields 随之变化。PMIS 夹具没有 projectName 键,build_plan 按 `pm.get("projectName")
+        # or pid` 回退成项目号,所以 value 里是 P1/P3 而不是中文项目名。
+        # 旧形 reasons(["回款延期"])经 _norm_reasons 归一后 detail 为空串,故不拼括号。
         {"employId": "A006", "role": "primary",
-         "bodyTitle": "你名下 1 个项目存在关注原因",
-         "fields": [{"key": "回款延期", "value": "1 个项目"}]},
+         "bodyTitle": "你名下 1 个项目需要跟进",
+         "fields": [{"key": "1", "value": "P1 · 回款延期"}]},
         {"employId": "A007", "role": "primary",
-         "bodyTitle": "你名下 1 个项目存在关注原因",
-         "fields": [{"key": "回款延期", "value": "1 个项目"}]},
+         "bodyTitle": "你名下 1 个项目需要跟进",
+         "fields": [{"key": "1", "value": "P3 · 回款延期"}]},
         # ③ 工时 supervisor:+2 于岩(A002,看耿磊磊子树合计5)先、+1 耿磊磊(A005,看张三/李四)后
         #   —— sorted(agg) 按工号字符串排序,"A002" < "A005"
         {"employId": "A002", "role": "supervisor",
@@ -757,27 +764,6 @@ def test_dispatch_sent_log_omits_failed(monkeypatch):
     assert len(out["failed"]) == 1
 
 
-# ── Task 4:卡片底部回复引导语(仅回调凭证已配置时才加) ─────────────────────
-#
-# 注:任务书给的调用示例 LR.build_timesheet_card(name, issues, reply_hint=True) 只传了
-# 2 个位置参数,但 build_timesheet_card 的 start/end 是既有的必填位置参数(Step 4 只要求
-# 新增 reply_hint,未要求给 start/end 加默认值)。为不改变既有签名的必填性,这里改为显式
-# 传 start="", end="" —— 取值仍是空串(与任务书意图一致),只是显式写出。该差异已在任务
-# 报告里注明。
-
-def test_card_has_reply_hint_when_callback_configured():
-    card = LR.build_timesheet_card("张三", [{"label": "缺少工作概述", "count": 2}], "", "",
-                                   reply_hint=True)
-    assert LR.REPLY_HINT in json.dumps(card, ensure_ascii=False)
-
-
-def test_card_omits_reply_hint_when_callback_not_configured():
-    """回调没配就不许写「请直接回复」—— 那是让人对着收不到的地方说话。"""
-    card = LR.build_timesheet_card("张三", [{"label": "缺少工作概述", "count": 2}], "", "",
-                                   reply_hint=False)
-    assert LR.REPLY_HINT not in json.dumps(card, ensure_ascii=False)
-
-
 # ── Task 4 / Step 3b:build_plan 产出 routeKey 与 projectIds(归因候选用) ─────
 
 def _build_minimal_project_plan():
@@ -812,17 +798,18 @@ def test_build_plan_timesheet_recipients_have_empty_project_ids():
     assert all(r["projectIds"] == [] for r in ts)
 
 
-def test_reply_hint_never_truncated_at_byte_limit():
+def test_action_hint_never_truncated_at_field_limit():
     """引导语是操作指引,截半了比不显示更糟 —— 用户不知道该做什么。
-    最坏情形(正文塞满 + 有未列出项目 + 引导语)下,引导语必须完整。"""
-    by_reason = {
-        "回款延期":   ["项" * 3 + "目%04d" % j for j in range(154)],
-        "里程碑滞后": ["另批目%04d" % j for j in range(30)],
-    }
-    card = LR.build_project_card("张三", by_reason, reply_hint=True)
-    content = card["bodyContent"]
-    assert len(content.encode("utf-8")) <= LR.LIMIT_BODY_CONTENT
-    assert LR.REPLY_HINT in content        # 完整,不是半截
+    新卡片把它放在 fields 末尾(旧版在 bodyContent),故上限从 3000 字节的正文
+    换成 192 字节/64 字的 field value。取 N 的最大合法值 720(三位数,最长)
+    + 塞满 8 行明细的最坏情形,断言它一字不缺。"""
+    hint = LR.build_action_hint(720, reply_hint=True)
+    projs = [{"name": "项" * 20 + "目%02d" % i,
+              "reasons": [{"category": "回款延期", "detail": "3 个延期节点"}]}
+             for i in range(1, 13)]
+    card = LR.build_project_card("张三", projs, action_hint=hint)
+    assert card["fields"][-1]["key"] == "动作要求"
+    assert card["fields"][-1]["value"] == hint          # 完整,不是半截
 
 
 # ── I-1 回归:reply_hint 必须由 build_plan 真正接线到四种卡片 ──────────────────
@@ -858,16 +845,22 @@ _FOUR_KIND_ITEMS = [
 ]
 
 
-def test_build_plan_adds_reply_hint_when_callback_credentials_configured():
-    """I-1 核心:凭证配齐 → build_plan 产出的【每一张】卡片都带引导语。"""
+def test_build_plan_wires_hint_to_every_card_by_role():
+    """I-1 核心不变:凭证配齐 → build_plan 产出的【每一张】卡片都有反馈指引。
+    但两类卡的指引【有意不同】:primary 是被要求 N 小时内反馈的本人,给带时限的
+    「动作要求」;summary 给上级,上级不被考核反馈时限,沿用 REPLY_HINT、本期不改。"""
     cfg = _cfg_with_callback(_all_four_card_kinds_cfg())
     plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
 
     assert len(plan["recipients"]) == 4, "夹具应同时覆盖四种卡片"
     for r in plan["recipients"]:
         card_json = json.dumps(r["card"], ensure_ascii=False)
-        assert LR.REPLY_HINT in card_json, \
-            "%s/%s 的卡片缺少回复引导语" % (r["routeKey"], r["role"])
+        if r["role"] == "primary":
+            assert "未响应清单" in card_json, \
+                "%s/primary 的卡片缺少动作要求" % r["routeKey"]
+        else:
+            assert LR.REPLY_HINT in card_json, \
+                "%s/supervisor 的卡片缺少回复引导语" % r["routeKey"]
 
 
 def test_build_plan_omits_reply_hint_when_callback_not_configured():
@@ -893,3 +886,68 @@ def test_build_plan_treats_whitespace_credentials_as_unconfigured():
     cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes="   ", token="  ")
     plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
     assert LR.REPLY_HINT not in _plan_cards_json(plan)
+
+
+# ── Task 5:build_plan 接新卡片(reasons 归一化 + 并行明细桶 + 动作要求 + now) ────
+
+
+def _pj_cfg(levels=1):
+    """项目路由 primary+汇总都开的配置。沿用既有 _cfg_items 工厂。"""
+    return _cfg_items(pj_items={"回款延期": (True, True, levels)})
+
+
+NEW_ITEM = [{"kind": "project", "projectId": "P1",
+             "reasons": [{"category": "回款延期", "detail": "3 个延期节点"}]}]
+
+
+def test_build_plan_project_card_carries_detail():
+    """前端传来的 detail 必须原样出现在卡片 value 里 —— 本期「内容增强」的实际载体。"""
+    plan = LX.build_plan(NEW_ITEM, _pj_cfg(), TREE, PMIS)
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert "回款延期(3 个延期节点)" in card["fields"][0]["value"]
+
+
+def test_build_plan_accepts_legacy_string_reasons():
+    """【兼容】旧形 ["回款延期"] 必须照常工作,detail 补空串。
+    不是为了「以后还能用」,而是【浏览器缓存窗口】:dist 与 .py 同时替换,
+    但用户浏览器里可能还留着旧 index.html,它 POST 上来就是旧形。
+    只认新形的话 r.get("category") 对字符串抛 AttributeError,那几分钟推送直接 400。"""
+    plan = LX.build_plan([{"kind": "project", "projectId": "P1", "reasons": ["回款延期"]}],
+                         _pj_cfg(), TREE, PMIS)
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert card["fields"][0]["value"].endswith(" · 回款延期")     # 无 detail 时不拼括号
+
+
+def test_build_plan_summary_card_untouched_by_detail_change():
+    """【回归安全网】汇总卡(给上级)仍按【原因计数】聚合,本期一个字不改。
+    它依赖 proj_by_emp 的 {原因: [项目名]} 形状 —— 明细走的是【并行桶】。
+    改错成「重塑 proj_by_emp」会让这条变红。"""
+    plan = LX.build_plan(NEW_ITEM, _pj_cfg(levels=1), TREE, PMIS)
+    sup = [r for r in plan["recipients"] if r["role"] == "supervisor"]
+    assert sup, "上级汇总卡必须仍然产出"
+    # 汇总卡的字段【逐字】不变 —— 这是「本期只改 primary 卡、汇总卡零改动」的证据
+    assert sup[0]["card"]["fields"][0] == {"key": "张三", "value": "1 项：回款延期 1"}
+    # detail 是本期新引入的东西,绝不能泄漏进汇总卡(它走的是并行桶,不经过 proj_by_emp)
+    assert "3 个延期节点" not in json.dumps(sup[0]["card"], ensure_ascii=False)
+
+
+def test_build_plan_passes_deadline_hours_into_card_text():
+    """【N 单一来源】卡片文案里的小时数必须来自 cfg['reviewDeadlineHours'],不是硬编码 24。"""
+    cfg = _cfg_with_callback(_pj_cfg())
+    cfg["reviewDeadlineHours"] = 72
+    plan = LX.build_plan(NEW_ITEM, cfg, TREE, PMIS)
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert card["fields"][-1]["value"] == "请直接回复本消息反馈，72小时内未反馈将列入《未响应清单》"
+
+
+def test_build_plan_no_action_field_without_callback_creds():
+    """回调凭证不全 → 无可用通道 → 卡上不出动作要求(不是出个空 value 的 field)。"""
+    plan = LX.build_plan(NEW_ITEM, _pj_cfg(), TREE, PMIS)   # _pj_cfg 不带回调凭证
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert all(f["key"] != "动作要求" for f in card["fields"])
+
+
+def test_build_plan_now_goes_to_head_title():
+    plan = LX.build_plan(NEW_ITEM, _pj_cfg(), TREE, PMIS, now="2026-07-28 09:00")
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert card["headTitle"] == "推送时间：2026-07-28 09:00"

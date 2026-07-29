@@ -14,6 +14,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 
+import lanxin_config
+
 HTTP_TIMEOUT = 15
 TOKEN_EARLY_EXPIRE = 300          # 提前 5 分钟视为过期,避免边界失败
 MAX_RECIPIENTS = 1000             # 蓝信文档:userIdList 最多 1000
@@ -155,7 +157,7 @@ def send_bot_message(cfg: Dict[str, Any], token: str, staff_ids: List[str],
 # 禁止为预览另写简化逻辑。
 
 from lanxin_recipients import (           # noqa: E402  (置于此处以免与客户端段落交叉引用)
-    build_project_card, build_summary_card, build_timesheet_card,
+    build_action_hint, build_project_card, build_summary_card, build_timesheet_card,
     resolve_project_manager, short_issue, supervisor_chain,
 )
 
@@ -258,8 +260,34 @@ def _items_of(route: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     return {i["code"]: i for i in (route.get("items") or [])}
 
 
+def _norm_reasons(raw: Any) -> List[Dict[str, str]]:
+    """事项里的 reasons 归一化成 [{"category":…, "detail":…}]。
+
+    两种形态都认:
+      新(V4.5.8+): [{"category": "回款延期", "detail": "3 个延期节点"}]
+      旧(≤V4.5.7): ["回款延期"]                     → detail 补空串
+
+    保留旧形【不是】为了「以后还能用」,而是为了【浏览器缓存窗口】:
+    升级同时替换 dist 与 .py,但用户浏览器里可能还留着旧 index.html,
+    它 POST 上来的就是旧形。只认新形的话 r.get("category") 对字符串会抛
+    AttributeError,那几分钟内的推送直接 400。
+
+    形态不认的元素【丢弃】而非报错:事项是前端算出来的展示数据,
+    一条畸形不该让整批推送失败(收件人解析仍全在后端,丢一条最多少推一个原因)。
+    """
+    out: List[Dict[str, str]] = []
+    for r in raw or []:
+        if isinstance(r, str) and r:
+            out.append({"category": r, "detail": ""})
+        elif isinstance(r, dict) and r.get("category"):
+            out.append({"category": str(r["category"]),
+                        "detail": str(r.get("detail") or "")})
+    return out
+
+
 def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
-               tree: Dict[str, Any], project_pmis: Dict[str, Any]) -> Dict[str, Any]:
+               tree: Dict[str, Any], project_pmis: Dict[str, Any],
+               now: str = "") -> Dict[str, Any]:
     """事项 → 收件计划。纯计算,不发任何网络请求。
     项目侧:projectId → 项目经理(姓名) → 工号(后端自行推导,不信任前端);工时侧:employId 直连。
     V4.0.2 起每一项(问题码/关注原因)各自配 enabled/primary/supervisorLevels。
@@ -274,6 +302,10 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     # 本桶只存【项目号】,供归入功能拿去当跟进域的 key(Task 6)。projectName 聚合过程
     # 会丢项目号(bucket.append 只存了名字),故必须另开一桶,不能从 proj_by_emp 反推。
     proj_ids_by_emp: Dict[str, List[str]] = {}
+    # 第三个与 proj_by_emp 并行的桶:存【按项目聚合的原因明细】,供新版 primary 卡组行。
+    # 【绝不重塑 proj_by_emp】—— 上级汇总卡的 proj_counts 依赖它的 {原因: [项目名]} 形状,
+    # 改形会连带砸掉汇总卡。并行桶是本文件既有范式(proj_ids_by_emp 就是这么加的)。
+    proj_detail_by_emp: Dict[str, Dict[str, List[Dict[str, str]]]] = {}
     ts_by_emp: Dict[str, List[Dict[str, Any]]] = {}
     ts_range = {"start": "", "end": ""}
     # 工时 counts 按【中文 label】聚合,而配置按【英文 code】——分桶时顺手建映射,
@@ -291,11 +323,18 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     reply_hint = bool(str(_cred.get("callbackAesKey") or "").strip()) and \
         bool(str(_cred.get("callbackSignToken") or "").strip())
 
+    # N 单一来源:cfg["reviewDeadlineHours"] —— 不能在这里另写一个字面量默认值,
+    # 否则「卡上写 24 小时、清单按另一个数算」的事故(§4 已点名)会在这里复现。
+    action_hint = build_action_hint(
+        int(cfg.get("reviewDeadlineHours") or lanxin_config.DEFAULT_REVIEW_DEADLINE_HOURS),
+        h5_url="",              # 一期无 H5;二期在此传 token URL,文案自动切态
+        reply_hint=reply_hint)
+
     for it in items:
         kind = it.get("kind")
         if kind == "project" and r_proj:
-            reasons = [x for x in (it.get("reasons") or [])
-                       if (proj_items.get(x) or {}).get("enabled")]
+            reasons = [r for r in _norm_reasons(it.get("reasons"))
+                       if (proj_items.get(r["category"]) or {}).get("enabled")]
             if not reasons:
                 continue
             pid = it.get("projectId")
@@ -310,8 +349,12 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                                    "name": str(team.get("项目经理") or ""), "reason": why})
                 continue
             bucket = proj_by_emp.setdefault(emp, {})
+            pname = str(pm.get("projectName") or pid)
             for r in reasons:
-                bucket.setdefault(r, []).append(str(pm.get("projectName") or pid))
+                bucket.setdefault(r["category"], []).append(pname)
+            proj_detail_by_emp.setdefault(emp, {}).setdefault(pname, []).extend(
+                {"category": r["category"], "detail": str(r.get("detail") or "")}
+                for r in reasons)
             ids = proj_ids_by_emp.setdefault(emp, [])
             if pid and pid not in ids:
                 ids.append(pid)
@@ -346,18 +389,24 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 "routeKey": "timesheet", "projectIds": [],
                 "card": build_timesheet_card(by_id[emp]["name"], mine,
                                              ts_range["start"], ts_range["end"],
-                                             reply_hint=reply_hint),
+                                             action_hint=action_hint, sent_at=now),
             })
     if r_proj:
         for emp in sorted(proj_by_emp):
-            mine = {r: names for r, names in proj_by_emp[emp].items()
-                    if (proj_items.get(r) or {}).get("primary")}
+            # primary 过滤语义不变:项目只要命中【任一】primary 原因就出现在卡上,
+            # 且卡上只列它的 primary 原因。
+            mine = []
+            for pname, rs in (proj_detail_by_emp.get(emp) or {}).items():
+                keep = [r for r in rs if (proj_items.get(r["category"]) or {}).get("primary")]
+                if keep:
+                    mine.append({"name": pname, "reasons": keep})
             if not mine:
                 continue
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
                 "routeKey": "project", "projectIds": list(proj_ids_by_emp.get(emp) or []),
-                "card": build_project_card(by_id[emp]["name"], mine, reply_hint=reply_hint),
+                "card": build_project_card(by_id[emp]["name"], mine,
+                                           action_hint=action_hint, sent_at=now),
             })
 
     # ② 汇总卡:按 levels 分组多次卷、再按 sup/owner/标签三层合并。

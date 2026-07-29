@@ -5,9 +5,9 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 /** 待推事项。前端只回答「哪些项目/工时行有什么异常」;「发给谁」由后端解析花名册决定
  *  —— 后端不接受前端传来的 staffId,前端出错最多是算错异常,不会推给错的人。 */
 export type PushItem =
-  | { kind: 'project'; projectId: string; reasons: string[] }
+  | { kind: 'project'; projectId: string; reasons: { category: string; detail: string }[] }
   | { kind: 'timesheet'; employId: string; start: string; end: string;
-      issues: { code: string; label: string; count: number }[] }
+      issues: { code: string; label: string; count: number; lastDate: string }[] }
 
 /** 项目关注原因 → 事项。口径复用 riskReasons(单一来源),此处只做「配置勾选」过滤。 */
 export function projectItems(
@@ -18,9 +18,11 @@ export function projectItems(
   const allow = new Set(allowedReasons)
   const out: PushItem[] = []
   for (const p of projects) {
+    // detail 是【展示串】不是标识 —— 「后端不接受前端传来的标识」约束的是
+    // 「推给谁/写到哪」的解析链(projectId → 项目经理 → 工号),那条链仍全在后端。
     const reasons = riskReasons(p, projectPmis[p.projectId])
-      .map((r) => r.category as string)
-      .filter((c) => allow.has(c))
+      .filter((r) => allow.has(r.category))
+      .map((r) => ({ category: r.category as string, detail: r.detail }))
     if (reasons.length) out.push({ kind: 'project', projectId: p.projectId, reasons })
   }
   return out
@@ -32,12 +34,17 @@ export function timesheetItems(
   rows: IssueRow[], allowedCodes: string[], start = '', end = '',
 ): PushItem[] {
   const allow = new Set(allowedCodes)
-  const byEmp = new Map<string, Map<string, number>>()
+  const byEmp = new Map<string, Map<string, { count: number; lastDate: string }>>()
   for (const r of rows) {
     for (const code of r.codes) {
       if (!allow.has(code)) continue
-      const m = byEmp.get(r.empId) ?? new Map<string, number>()
-      m.set(code, (m.get(code) ?? 0) + 1)
+      const m = byEmp.get(r.empId) ?? new Map<string, { count: number; lastDate: string }>()
+      const cur = m.get(code) ?? { count: 0, lastDate: '' }
+      cur.count += 1
+      // date 是定长 'YYYY-MM-DD' ISO 串,字典序 == 时序,可直接比大小。
+      // 必须取【最大值】而非「最后遍历到的」—— rows 的顺序不保证按日期升序。
+      if (r.date > cur.lastDate) cur.lastDate = r.date
+      m.set(code, cur)
       byEmp.set(r.empId, m)
     }
   }
@@ -48,8 +55,8 @@ export function timesheetItems(
       employId,
       start,
       end,
-      issues: [...m.entries()].map(([code, count]) => ({
-        code, label: ISSUE_LABELS[code] ?? code, count,
+      issues: [...m.entries()].map(([code, v]) => ({
+        code, label: ISSUE_LABELS[code] ?? code, count: v.count, lastDate: v.lastDate,
       })),
     }))
 }

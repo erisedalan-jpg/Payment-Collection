@@ -14,9 +14,12 @@ describe('projectItems', () => {
   })
 
   it('orgL4 缺失 → 数据异常;勾选了才产出', () => {
+    // Task 5:PushItem.reasons 由 string[] 改为 {category,detail}[](riskReasons 原样带出,
+    // 不落 tone —— 卡片文案用不到配色态)。isAnomalous 分支的 detail 固定为「服务组 L4 缺失」。
     const anomalous = [p('A', { orgL4: '' })]
     expect(projectItems(anomalous, {}, ['数据异常'])).toEqual([
-      { kind: 'project', projectId: 'A', reasons: ['数据异常'] },
+      { kind: 'project', projectId: 'A',
+        reasons: [{ category: '数据异常', detail: '服务组 L4 缺失' }] },
     ])
     // 未勾选「数据异常」→ 不产出
     expect(projectItems(anomalous, {}, ['回款延期'])).toEqual([])
@@ -99,3 +102,46 @@ describe('timesheetItems', () => {
 // ./reasonWhitelistSync.test.ts),不能在 TS 侧把同一份字面量再抄一遍 —— 那样改后端不改
 // 这里照样绿,防不住跨语言两份副本漂移。该用例需要 node:fs,与本文件其余纯函数测试
 // 分文件放置(本文件走全局 jsdom 环境,sync 检查走 node 环境,避免共享 setupFiles 冲突)。
+
+// Task 5:PushItem 新形 —— reasons 带 detail、timesheet issues 带 lastDate。
+// PROJECTS/PMIS 是本组用例专用的最小夹具(仅触发「回款延期」单条原因,与本文件顶部
+// describe 块共用的 p() 工厂分开放,避免为了迁就 detail 断言而改动既有用例的入参)。
+// 用法与 overview.test.ts/projectPivot.test.ts 相同的 as unknown as 惯例,绕开 payment
+// 全字段类型核对(riskReasons 只读 delayedCount,其余字段测试用不到)。
+const PROJECTS = [
+  { projectId: 'A', projectName: 'NA', orgL4: 'L4', payment: { delayedCount: 3 } },
+] as unknown as Project[]
+const PMIS: Record<string, ProjectPmis> = {}
+
+it('projectItems 带上 riskReasons 的 detail', () => {
+  // riskReasons 已返回 {category, detail};本期只是把 detail 一起送出去,不新增口径
+  const items = projectItems(PROJECTS, PMIS, ['回款延期'])
+  expect(items[0]).toMatchObject({
+    kind: 'project',
+    reasons: [{ category: '回款延期', detail: expect.stringContaining('延期节点') }],
+  })
+})
+
+it('timesheetItems 按问题码给出最近日期', () => {
+  const rows = [
+    { date: '2026-07-20', empId: 'A001', codes: ['MISS_SUMMARY'] },
+    { date: '2026-07-25', empId: 'A001', codes: ['MISS_SUMMARY'] },
+    { date: '2026-07-22', empId: 'A001', codes: ['MISS_SUMMARY'] },
+  ] as any
+  const [it0] = timesheetItems(rows, ['MISS_SUMMARY'], '2026-07-20', '2026-07-26')
+  // PushItem 是联合类型,TS 无法仅凭运行时数据窄化出 timesheet 分支,与本文件其余用例
+  // (见上方 'issues 带中文 label...' 等)同款显式断言。
+  const issues0 = (it0 as { issues: { code: string; count: number; lastDate: string }[] }).issues
+  expect(issues0[0]).toMatchObject({ code: 'MISS_SUMMARY', count: 3, lastDate: '2026-07-25' })
+})
+
+it('timesheetItems 的 lastDate 取最大值而非最后一行', () => {
+  // 'YYYY-MM-DD' 定长 ISO 串,字典序 == 时序;若实现写成「取最后遍历到的」,这条会红
+  const rows = [
+    { date: '2026-07-25', empId: 'A001', codes: ['MISS_SUMMARY'] },
+    { date: '2026-07-20', empId: 'A001', codes: ['MISS_SUMMARY'] },
+  ] as any
+  const [it0] = timesheetItems(rows, ['MISS_SUMMARY'], '', '')
+  const issues0 = (it0 as { issues: { lastDate: string }[] }).issues
+  expect(issues0[0].lastDate).toBe('2026-07-25')
+})
