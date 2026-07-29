@@ -458,3 +458,35 @@ def test_project_card_reason_without_detail_shows_category_only():
     """detail 为空时不拼出「回款延期()」这种残文案。"""
     card = LR.build_project_card("张三", [_proj("A", ("数据异常", ""))])
     assert card["fields"][0]["value"] == "A · 数据异常"
+
+
+# ── 终审 I-1/I-2:两条测试保护网补漏(实现行为本身已确认正确,缺的是钉住它的测试) ──
+
+def test_project_card_rest_count_stays_full_even_when_value_is_truncated():
+    """【承重】实测:29 个项目、8 展示、21 归入「其余」时,fit_field 把该行截到
+    64 字,value 里只剩 11 个项目名可见 —— 但 N 必须仍是【全量计数】21,不能退化成
+    「数一数 value 里截断后剩几个名字」(那样会得 11)。旧实现里同款场景(用大量/超长
+    名字把预算主动打满,验证计数类文案在截断压力下仍准确)靠三条测试钉住,新结构把
+    项目清单从 bodyContent 搬到「其余」字段后,这条护栏必须跟着搬,不能随旧测试一起
+    消失 —— test_project_card_never_exceeds_10_fields 用的正是这组会截断的输入,
+    但只查字段数不查内容;test_project_card_caps_detail_rows_at_8_and_counts_rest_accurately
+    只用 4 个短名字,不会触发截断,两种算法在那里结果一样,抓不出退化。
+    断言里同时钉住"确实触发了截断"(以 … 结尾),否则这条测试可能在未来某次改动后
+    悄悄退化成「没触发截断」的无效用例 —— 那正是它要防的东西。"""
+    projs = [_proj("项目%02d" % i, ("回款延期", "1 个延期节点")) for i in range(1, 30)]
+    card = LR.build_project_card("张三", projs)
+    rest = [f for f in card["fields"] if f["key"] == "其余"][0]
+    assert rest["value"].startswith("另有 21 个：")
+    assert rest["value"].endswith("…")      # 确认真的截断了,不是巧合达标
+
+
+def test_project_card_body_content_never_populated():
+    """【承重】bodyContent 必须留空 —— 它在蓝信卡片里渲染在 fields 之前,「动作要求」
+    这类字段一旦被误塞进这里会跑到所有字段最上方,而不是应有的 fields 末尾。_card()
+    对空 content 干脆不写 bodyContent 键,这里直接断言该键不存在,防止「两处都写」
+    (既让「动作要求」留在 fields 末尾,又往 _card 最后一个参数塞了内容)这种疏忽
+    蒙混过关 —— test_project_card_action_field_is_last 只查 fields 顺序,
+    查不到 bodyContent 是否被污染。"""
+    card = LR.build_project_card("张三", [_proj("A", ("回款延期", "1 个延期节点"))],
+                                 action_hint="请直接回复本消息反馈，24小时内未反馈将列入《未响应清单》")
+    assert "bodyContent" not in card
