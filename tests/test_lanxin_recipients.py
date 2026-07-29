@@ -106,54 +106,6 @@ def test_timesheet_card_fields_within_limit():
     assert "2026-07-01" in card["bodySubTitle"]
 
 
-def test_project_card_uses_reason_distribution_not_project_names_in_fields():
-    """单人最多背 49 个项目(实测) —— fields 必须按原因(≤8类)排,不能按项目名排。"""
-    by_reason = {"回款延期": ["P1", "P2", "P3"], "交付成本超支": ["P4"]}
-    card = LR.build_project_card("李四", by_reason)
-    assert len(card["fields"]) == 2
-    assert card["fields"][0]["key"] == "回款延期"
-    assert card["fields"][0]["value"] == "3 个项目"
-    assert "4 个项目" in card["bodyTitle"]      # 去重后的项目总数
-    assert "P1" in card["bodyContent"]
-
-
-def test_project_card_bodycontent_truncates_with_notice():
-    by_reason = {"回款延期": ["项目名称非常长的一个项目%d" % i for i in range(400)]}
-    card = LR.build_project_card("李四", by_reason)
-    assert len(card["bodyContent"].encode("utf-8")) <= 3000
-    assert "未列出" in card["bodyContent"]
-
-
-# ── M-3:「另有 N 个项目未列出」此前按原因逐条累加,同一项目撞两个原因会被数两次 ──
-
-def test_project_card_omitted_count_deduplicates_projects_across_reasons():
-    """两个原因各自都超预算被整行丢弃,但都命中同一个项目 —— 未列出数必须按项目去重算 1,
-    不能像旧实现 omitted += len(names) 那样按原因累加成 2。"""
-    huge_name = "占位符" * 900        # 单个项目名已远超 2940 字节预算,该行必被整行丢弃
-    by_reason = {"回款延期": [huge_name], "交付成本超支": [huge_name]}
-    card = LR.build_project_card("李四", by_reason)
-    assert "另有 1 个项目未列出" in card["bodyContent"]
-
-
-def test_project_card_omitted_excludes_names_already_shown_elsewhere():
-    """P1 同时命中「交付成本超支」(该行因陪衬项目过长被整行丢弃)和「回款延期」(该行进了正文)——
-    P1 已经在正文里出现过,不应计入「未列出」;只有完全没出现在正文里的项目才算。"""
-    huge_padding = "占位符" * 900      # 单独一个就足以把所在行挤出预算
-    by_reason = {
-        "回款延期": ["P1"],
-        "交付成本超支": ["P1", huge_padding],
-    }
-    card = LR.build_project_card("李四", by_reason)
-    assert "回款延期：P1" in card["bodyContent"]
-    assert "另有 1 个项目未列出" in card["bodyContent"]     # 只有 huge_padding 那一个,不含 P1
-
-
-def test_project_card_no_omitted_notice_when_everything_fits():
-    by_reason = {"回款延期": ["P1", "P2"], "交付成本超支": ["P3"]}
-    card = LR.build_project_card("李四", by_reason)
-    assert "未列出" not in card["bodyContent"]
-
-
 def test_summary_card_nested_shape():
     rows = [{"name": "隋文宇", "total": 14, "reasons": [("回款延期", 6), ("成本超支", 5)]},
             {"name": "于岩", "total": 9, "reasons": [("回款延期", 3)]}]
@@ -201,16 +153,6 @@ def test_short_labels_fit_18_bytes_and_are_distinct():
     # 关键:显示名必须两两不同,不能有两类撞成同一串
     shown = list(LR.REASON_SHORT_LABELS.values())
     assert len(set(shown)) == len(shown), "短标签中有撞车: %s" % shown
-
-
-def test_short_label_used_in_project_card_fields_but_not_bodycontent():
-    """短标签只用于 fields 的 key;bodyContent 里仍须全名,信息不丢。"""
-    card = LR.build_project_card("张三", {"总成本超支大于5000": ["P1"], "总成本超支小于5000": ["P2"]})
-    keys = [f["key"] for f in card["fields"]]
-    assert "超支>5千" in keys and "超支<5千" in keys
-    assert "总成本超支…" not in keys                    # 不再有截断撞车
-    assert "总成本超支大于5000：P1" in card["bodyContent"]   # 全名仍在正文
-    assert "总成本超支小于5000：P2" in card["bodyContent"]
 
 
 def test_short_label_used_in_summary_card_value():
@@ -425,3 +367,94 @@ def test_action_hint_requires_explicit_hours():
     这个函数只负责按调用方给的值组文案,不替调用方决定 N 是多少。"""
     with pytest.raises(TypeError):
         LR.build_action_hint()
+
+
+# ── Task 3:build_project_card 改为按项目分行(旧「按原因分行」结构作废) ──────────
+
+def _proj(name, *reasons):
+    """reasons: (category, detail) 元组序列"""
+    return {"name": name, "reasons": [{"category": c, "detail": d} for c, d in reasons]}
+
+
+def test_project_card_lists_each_project_with_detail():
+    card = LR.build_project_card("张三", [
+        _proj("XX智慧园区", ("回款延期", "3 个延期节点")),
+        _proj("YY数据中心", ("回款延期", "2 个延期节点"), ("风险未闭环", "2 个未关闭风险")),
+    ])
+    assert card["bodyTitle"] == "你名下 2 个项目需要跟进"
+    # 多原因的排前面
+    assert card["fields"][0] == {"key": "1", "value": "YY数据中心 · 回款延期(2 个延期节点)、风险未闭环(2 个未关闭风险)"}
+    assert card["fields"][1] == {"key": "2", "value": "XX智慧园区 · 回款延期(3 个延期节点)"}
+
+
+def test_project_card_key_is_index_not_project_name():
+    """【承重】key 必须是序号。蓝信 fields.key 上限 6 汉字/18 字节,项目名普遍超限,
+    截断后可能撞名(REASON_SHORT_LABELS 上方注释记着「总成本超支大于/小于5000」
+    截断后完全相同的实测)。项目名放 value(64 字)才放得下。"""
+    card = LR.build_project_card("张三", [
+        _proj("华南区域智慧城市综合管理平台建设项目", ("回款延期", "1 个延期节点")),
+    ])
+    assert card["fields"][0]["key"] == "1"
+    assert "华南区域智慧城市" in card["fields"][0]["value"]
+
+
+def test_project_card_caps_detail_rows_at_8_and_counts_rest_accurately():
+    """明细固定 8 行;「其余」的 N 是【全量计数】,与名字是否被截断无关。"""
+    projs = [_proj("项目%02d" % i, ("回款延期", "1 个延期节点")) for i in range(1, 13)]
+    card = LR.build_project_card("张三", projs)
+    detail = [f for f in card["fields"] if f["key"].isdigit()]
+    assert len(detail) == 8
+    rest = [f for f in card["fields"] if f["key"] == "其余"][0]
+    assert rest["value"].startswith("另有 4 个：")
+
+
+def test_project_card_row_cap_is_unconditional():
+    """明细上限恒为 8,【不因动作要求缺席而放宽到 9】——
+    条件式上限会让「同一个人、配置一变、卡片行数就变」,排查时多一个变量。"""
+    projs = [_proj("项目%02d" % i, ("回款延期", "1 个延期节点")) for i in range(1, 13)]
+    no_hint = LR.build_project_card("张三", projs, action_hint="")
+    with_hint = LR.build_project_card("张三", projs, action_hint="请直接回复本消息反馈，24小时内未反馈将列入《未响应清单》")
+    assert len([f for f in no_hint["fields"] if f["key"].isdigit()]) == 8
+    assert len([f for f in with_hint["fields"] if f["key"].isdigit()]) == 8
+
+
+def test_project_card_omits_action_field_when_hint_empty():
+    """空 action_hint → 不出这个 field(不是出一个空 value 的 field)。"""
+    card = LR.build_project_card("张三", [_proj("A", ("回款延期", "1 个延期节点"))], action_hint="")
+    assert all(f["key"] != "动作要求" for f in card["fields"])
+
+
+def test_project_card_action_field_is_last():
+    """动作要求必须在所有字段最下 —— bodyContent 渲染在 fields 之前(蓝信实测),
+    所以只能放 fields 末尾。"""
+    card = LR.build_project_card("张三", [_proj("A", ("回款延期", "1 个延期节点"))],
+                                 action_hint="请直接回复本消息反馈，24小时内未反馈将列入《未响应清单》")
+    assert card["fields"][-1]["key"] == "动作要求"
+
+
+def test_project_card_never_exceeds_10_fields():
+    """8 明细 + 其余 + 动作要求 = 恰好 10,是蓝信硬上限,永不越线。"""
+    projs = [_proj("项目%02d" % i, ("回款延期", "1 个延期节点")) for i in range(1, 30)]
+    card = LR.build_project_card("张三", projs, action_hint="x")
+    assert len(card["fields"]) == 10
+
+
+def test_project_card_head_and_title_never_empty():
+    """蓝信硬约束:bodyTitle 必填非空;headTitle 单行不可含换行。"""
+    for sent_at in ("", "2026-07-28 09:00"):
+        card = LR.build_project_card("张三", [_proj("A", ("回款延期", "1 个延期节点"))], sent_at=sent_at)
+        assert card["bodyTitle"]
+        assert card["headTitle"]
+        assert "\n" not in card["headTitle"]
+
+
+def test_project_card_sent_at_goes_to_head_title():
+    card = LR.build_project_card("张三", [_proj("A", ("回款延期", "1 个延期节点"))],
+                                 sent_at="2026-07-28 09:00")
+    assert card["headTitle"] == "推送时间：2026-07-28 09:00"
+
+
+def test_project_card_reason_without_detail_shows_category_only():
+    """detail 为空时不拼出「回款延期()」这种残文案。"""
+    card = LR.build_project_card("张三", [_proj("A", ("数据异常", ""))])
+    assert card["fields"][0]["value"] == "A · 数据异常"

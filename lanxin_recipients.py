@@ -230,46 +230,51 @@ def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
                  content)
 
 
-def build_project_card(name: str, by_reason: Dict[str, List[str]],
-                       reply_hint: bool = False) -> Dict[str, Any]:
-    """项目卡 → 项目经理本人。
-    fields 按【原因】排(共 8 类,恒 ≤10 对) —— 不能按项目名排:实测单人最多背 49 个项目。
-    具体项目名进 bodyContent(3000 字节/八行),超出显式写「另有 N 个未列出」。
-    「未列出」按项目去重计数(M-3):一个项目可能同时命中多个原因,若它已经靠某一行挤进了
-    bodyContent,就不算「未列出」——即便它在另一行(被截断丢弃的原因)里也出现过。旧实现按
-    原因逐条累加(omitted += len(names)),同一项目撞两个原因就会被数两次,曾在「单人49个
-    项目×8类原因」的实测上界下出现「标题49个、正文却说另有60个未列出」的自相矛盾。"""
-    rows = sorted(by_reason.items(), key=lambda kv: -len(kv[1]))
-    fields = [_field(short_reason(r), "%d 个项目" % len(ps)) for r, ps in rows]
-    distinct = len({p for ps in by_reason.values() for p in ps})
+PROJECT_DETAIL_ROWS = 8        # 明细行上限。8 + 「其余」+ 「动作要求」= 10,正好是蓝信 fields 硬上限
 
-    lines: List[str] = []
-    used = 0
-    shown: set = set()      # 已经写进 bodyContent 某一行的项目名
-    dropped: set = set()    # 因超预算被丢弃那一行涉及的项目名
-    # 预留「另有…」的 60 字节;引导语是循环后追加的,也必须先扣掉,
-    # 否则最坏情形会被 _card 的 fit_bytes 截成半截指令(引导语是操作指引,
-    # 截半了比不显示更糟 —— 用户不知道该做什么)。
-    reserve = 60 + (len(REPLY_HINT.encode("utf-8")) + 1 if reply_hint else 0)
-    for reason, names in rows:
-        line = "%s：%s" % (reason, "、".join(names))
-        n = len(line.encode("utf-8")) + 1
-        if used + n > LIMIT_BODY_CONTENT - reserve:
-            dropped.update(names)
-            continue
-        lines.append(line)
-        used += n
-        shown.update(names)
-    omitted = dropped - shown      # 只统计【完全没出现在正文里】的项目
-    if omitted:
-        lines.append("另有 %d 个项目未列出" % len(omitted))
-    if reply_hint:
-        lines.append(REPLY_HINT)
-    return _card("项目关注提醒",
-                 "你名下 %d 个项目存在关注原因" % distinct,
+
+def build_project_card(name: str, projects: List[Dict[str, Any]],
+                       action_hint: str = "", sent_at: str = "") -> Dict[str, Any]:
+    """项目卡 → 项目经理本人。一人一张。
+
+    projects: [{"name": 项目名, "reasons": [{"category":…, "detail":…}, …]}, …]
+
+    为什么仍是聚合卡而不是单项目单卡:实测 638 个在建项目里 324 个命中关注原因、
+    涉及 69 人,单人最多背 32 个 —— 单项目单卡会让 3 个人一次收到 20+ 张,一次就砸掉
+    功能信任。督办系统能用单卡是因为它按「计划回款日 T-15/T/T+15」触发、天然稀疏,
+    我们是存量全量扫描、天然稠密。
+
+    fields.key 用【序号】而非项目名:蓝信 key 上限 6 汉字/18 字节,项目名普遍超限,
+    截断后可能撞名(见 REASON_SHORT_LABELS 上方那条实测)。项目名放 value(64 字)。
+
+    明细行上限恒为 PROJECT_DETAIL_ROWS,【不因 action_hint 缺席而放宽】——
+    条件式上限会让「同一个人、配置一变、卡片行数就变」,排查时多一个变量。
+
+    按项目分行使每个项目恰好出现一次。旧实现按【原因】分行,同一项目命中多个原因时
+    会在多行出现,不得不用 omitted = dropped - shown 去重,否则出现「标题说 49 个、
+    正文说另有 60 个未列出」的自相矛盾(实测过)。新结构下该矛盾不可能发生,去重逻辑
+    已随之删除,不是保留。
+    """
+    rows = sorted(projects, key=lambda p: (-len(p["reasons"]), p["name"]))
+    shown, rest = rows[:PROJECT_DETAIL_ROWS], rows[PROJECT_DETAIL_ROWS:]
+
+    fields: List[Dict[str, str]] = []
+    for idx, p in enumerate(shown, 1):
+        parts = [("%s(%s)" % (r["category"], r["detail"])) if r.get("detail") else r["category"]
+                 for r in p["reasons"]]
+        fields.append(_field(str(idx), "%s · %s" % (p["name"], "、".join(parts))))
+    if rest:
+        # N 是【全量计数】,与名字列表是否被 fit_field 截断无关
+        fields.append(_field("其余", "另有 %d 个：%s"
+                             % (len(rest), "、".join(p["name"] for p in rest))))
+    if action_hint:
+        fields.append(_field("动作要求", action_hint))
+
+    return _card(("推送时间：%s" % sent_at) if sent_at else "项目关注提醒",
+                 "你名下 %d 个项目需要跟进" % len(rows),
                  "",
                  fields,
-                 "\n".join(lines))
+                 "")      # bodyContent 留空:它渲染在 fields 之前,动作要求放这儿会跑到最上面
 
 
 def build_summary_card(name: str, rows: List[Dict[str, Any]], level_label: str,
