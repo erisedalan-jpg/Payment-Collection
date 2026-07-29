@@ -180,8 +180,11 @@ def lanxin_srv(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "LANXIN_RAW_FILE", str(tmp_path / "raw.jsonl"))
     monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "inbox.json"))
     # 计数器是模块级可变字典,用例之间会串 —— 每次归零,并在退出时还原。
+    # lastTimestampSample 必须与其余四个字段一并归零,否则「重置干净」不完整 ——
+    # 上一个用例留下的样本会原样漏进下一个用例,被误当成本次产生的值。
     before = dict(server._lanxin_rejected)
-    server._lanxin_rejected.update({"count": 0, "lastAt": "", "lastFrom": "", "lastReason": ""})
+    server._lanxin_rejected.update({"count": 0, "lastAt": "", "lastFrom": "", "lastReason": "",
+                                    "lastTimestampSample": ""})
 
     cfg = lanxin_config.default_config()
     cfg["credentials"]["callbackSignToken"] = "tok-abc"
@@ -761,6 +764,9 @@ def test_rejected_records_timestamp_sample_on_stale(tmp_path, monkeypatch):
     """新鲜度拒绝时把 timestamp 【原值】记下来并经 config 接口下发 ——
     这是判断「蓝信到底发的什么格式」的唯一可见线索(PROGRESS 挂着的债:
     epoch 秒是未证实假设)。timestamp 不是密钥,可安全下发。"""
+    # 不走 lanxin_srv fixture(签名只收 tmp_path/monkeypatch),自己保存/归位 ——
+    # 同文件起真实服务的用例都靠这一手,不还原会把 'stale' 残留漏给同进程后续用例。
+    before = dict(server._lanxin_rejected)
     server._lanxin_rejected['lastTimestampSample'] = ''
     # 走一次新鲜度失败分支(沿用本文件既有的伪造报文 + 真验签的辅助方式)
     monkeypatch.setattr(server, "LANXIN_CONFIG_FILE", str(tmp_path / "lanxin_config.json"))
@@ -782,12 +788,13 @@ def test_rejected_records_timestamp_sample_on_stale(tmp_path, monkeypatch):
         status, payload = _post_callback(port, body, timestamp=ts, signature=sig)
         assert status == 200
         assert payload["errCode"] == -2
+
+        assert server._lanxin_rejected['lastReason'] == 'stale'
+        assert server._lanxin_rejected['lastTimestampSample'] == '2026-07-28T09:00:00Z'
     finally:
         srv.shutdown()
         srv.server_close()
-
-    assert server._lanxin_rejected['lastReason'] == 'stale'
-    assert server._lanxin_rejected['lastTimestampSample'] == '2026-07-28T09:00:00Z'
+        server._lanxin_rejected.update(before)
 
 
 def test_timestamp_sample_is_length_capped():
@@ -810,3 +817,19 @@ def test_config_payload_exposes_timestamp_sample_and_no_secrets(tmp_path, monkey
     assert 'lastTimestampSample' in body
     for leaked in ('SECRET_VALUE', 'AES_VALUE', 'TOKEN_VALUE'):
         assert leaked not in body
+
+
+def test_signature_reject_also_records_timestamp_sample(lanxin_srv):
+    """review Important-1:变异实测实锤过 —— 把 _record_lanxin_reject 改成只在
+    reason=='stale' 时才写 lastTimestampSample,61 条测试全绿、无一变红,证明这条
+    正确性此前没有任何测试钉住。两个拒绝分支必须共用同一条写入逻辑(无条件写),
+    不能只在 stale 分支才记:signature 分支同样要能看见「蓝信发的是什么格式」。"""
+    body = json.dumps({"dataEncrypt": _FAKE_CIPHER})
+    ts = _now_ts()
+
+    status, payload = _post_callback(lanxin_srv, body, timestamp=ts, signature="deadbeef")
+
+    assert status == 200
+    assert payload["errCode"] == -2
+    assert server._lanxin_rejected["lastReason"] == "signature"
+    assert server._lanxin_rejected["lastTimestampSample"] == ts

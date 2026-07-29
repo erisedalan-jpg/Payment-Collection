@@ -239,3 +239,62 @@ def test_unresponded_deadline_comes_from_config(tmp_path, monkeypatch):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# ── review Important-2:preview/send 必须真的把 now 接到卡片上 ──────────────
+#
+# lib 层(tests/test_lanxin.py、tests/test_lanxin_recipients.py)只证明
+# 「build_plan/build_*_card 若收到 now 会正确使用它」,从未证明 server 的 handler
+# 真的传了这个实参 —— 变异实测实锤过:删掉 handle_lanxin_preview/handle_lanxin_send
+# 里的 now= 实参,全仓 305 条蓝信测试无一变红(headTitle 静默退化成不带推送时间的
+# 通用文案)。本仓 V4.0.5/V4.5.6/V4.5.7 都在这个模式上吃过亏(定义了却没接线)。
+# 两条都直接断言响应体里的卡片 headTitle,而不是只断言"函数被调用了"。
+
+_UNRESP_TREE = {"byId": {"A006": {"name": "张三", "supId": None, "l4": "", "l31": ""}},
+                "byName": {"张三": ["A006"]}}
+_UNRESP_ITEMS = [{"kind": "timesheet", "employId": "A006",
+                  "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]}]
+
+
+def test_preview_now_reaches_card_head_title(tmp_path, monkeypatch):
+    """preview 把 plan 原样放进响应体,不用另外造捕获手段 —— 直接读 headTitle 即可。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    monkeypatch.setattr(lanxin_recipients, "read_org_tree", lambda path: _UNRESP_TREE)
+    try:
+        conn, cookie = _login(port)
+        conn.request("POST", "/api/lanxin/preview", json.dumps({"items": _UNRESP_ITEMS}),
+                     {"Content-Type": "application/json", "Cookie": cookie})
+        r = conn.getresponse()
+        assert r.status == 200
+        body = json.loads(r.read())
+        recipients = body["plan"]["recipients"]
+        assert len(recipients) == 1
+        # now= 缺省时会退化成不带推送时间的通用文案「工时填报提醒」——见 lanxin_recipients.py
+        assert recipients[0]["card"]["headTitle"].startswith("推送时间：")
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_send_now_reaches_card_head_title(tmp_path, monkeypatch):
+    """send 侧同款验证:沿用本文件既有的 mock lanxin.dispatch 范式(不碰网络),
+    但【不】mock build_plan —— 响应体里的 plan 就是 handler 真正传给 build_plan 的
+    产物,直接证明"接线"这一层,而不只是证明 build_plan 被调用过。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    LC.save_config(str(tmp_path / "lanxin_config.json"), _enabled_cfg())
+    monkeypatch.setattr(lanxin_recipients, "read_org_tree", lambda path: _UNRESP_TREE)
+    monkeypatch.setattr(lanxin, "dispatch",
+                        lambda plan, cfg: {"sent": 0, "failed": [], "msgIds": []})
+    try:
+        conn, cookie = _login(port)
+        conn.request("POST", "/api/lanxin/send", json.dumps({"items": _UNRESP_ITEMS}),
+                     {"Content-Type": "application/json", "Cookie": cookie})
+        r = conn.getresponse()
+        assert r.status == 200
+        body = json.loads(r.read())
+        recipients = body["plan"]["recipients"]
+        assert len(recipients) == 1
+        assert recipients[0]["card"]["headTitle"].startswith("推送时间：")
+    finally:
+        srv.shutdown()
+        srv.server_close()
