@@ -117,3 +117,24 @@ export async function handleLanxinInboxItem(
 export async function deleteLanxinInboxItem(itemId: string): Promise<{ success: boolean }> {
   return await api.post<{ success: boolean }>('/api/lanxin/inbox/delete', { itemId })
 }
+
+// —— 未响应清单（Task 7/9）：已推送但超过反馈时限未收到任何回复的人,「谁该催」清单 ——
+// 判定是【人级】而非项目级:一期唯一回流通道是员工直接文本回复,回复正文不含项目信息,
+// 故某人在推送后回过任意一条即整批算已响应;二期 H5 反馈带项目号后才能下钻到项目级
+// (见 lanxin_unresponded.py 模块顶部的精度边界说明)。
+export interface UnrespondedRow {
+  sentAt: string
+  employId: string
+  name: string
+  routeKey: string
+  projectCount: number
+  dueAt: string
+  overdue: boolean
+  responded: boolean
+  firstResponseAt: string
+}
+
+export async function getLanxinUnresponded():
+  Promise<{ success: boolean; rows: UnrespondedRow[]; deadlineHours: number }> {
+  return await api.get<{ success: boolean; rows: UnrespondedRow[]; deadlineHours: number }>('/api/lanxin/unresponded')
+}

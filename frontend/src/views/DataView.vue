@@ -16,6 +16,7 @@ import MaintenanceCard from '@/components/MaintenanceCard.vue'
 import LanxinConfigCard from '@/components/LanxinConfigCard.vue'
 import LanxinPushDrawer from '@/components/LanxinPushDrawer.vue'
 import LanxinInboxCard from '@/components/LanxinInboxCard.vue'
+import LanxinUnrespondedCard from '@/components/LanxinUnrespondedCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -136,6 +137,12 @@ defineExpose({
            同规格用 auth.isSuper 收起 —— 否则普通管理员打开 /data 就会看到一个恒 403 的空签。 -->
       <el-tab-pane v-if="auth.isSuper" label="蓝信回复" name="lanxinInbox">
         <LanxinInboxCard />
+      </el-tab-pane>
+
+      <!-- GET /api/lanxin/unresponded 同规格超管专属(_SUPER_ONLY_PATHS):这张表是全员推送
+           台账(谁被推了/谁没回),敏感面同「蓝信回复」签,同样按 auth.isSuper 收起。 -->
+      <el-tab-pane v-if="auth.isSuper" label="未响应清单" name="lanxinUnresponded">
+        <LanxinUnrespondedCard />
       </el-tab-pane>
 
       <el-tab-pane label="维护" name="maint">

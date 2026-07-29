@@ -277,3 +277,24 @@ describe('V4.4.8 页头', () => {
     expect(w.find('.ph-title').text()).toBe('数据管理')
   })
 })
+
+describe('未响应清单 tab', () => {
+  // 该 tab 列的是全员推送台账(谁被推了、谁没回),属敏感面。v-if="auth.isSuper" 被误删
+  // 不会有任何报错,普通管理员会直接看到全员台账 —— 反向验证见任务报告,不可跳过。
+  it('仅超管可见', async () => {
+    const auth = useAuthStore()
+    ;(auth as any).user = { account: 'admin', isSuper: false, allowedPages: ['*'], allowedL4: ['*'] }
+    const w = mount(DataView, { global: { plugins: [ElementPlus], stubs: {
+      'el-switch': true, YitianRulesCard: true, YitianScopeCard: true, YitianStoreCard: true, PortalConfigCard: true,
+    } } })
+    await flushPromises()
+    expect(w.text()).not.toContain('未响应清单')
+
+    ;(auth as any).user = { account: 'admin', isSuper: true, allowedPages: ['*'], allowedL4: ['*'] }
+    const w2 = mount(DataView, { global: { plugins: [ElementPlus], stubs: {
+      'el-switch': true, YitianRulesCard: true, YitianScopeCard: true, YitianStoreCard: true, PortalConfigCard: true,
+    } } })
+    await flushPromises()
+    expect(w2.text()).toContain('未响应清单')
+  })
+})
