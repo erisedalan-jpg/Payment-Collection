@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { PROJECT_DOMAIN_COLUMNS, BORROWABLE_KEYS } from './projectList'
 import { RISK_KEY_MAP, buildRiskRows } from './riskRows'
-import { buildTempRows } from './tempFollowup'
+import { buildTempRows, buildScopeInputs } from './tempFollowup'
 import { buildPaymentKeyRows } from './paymentKeyFollowup'
 import { buildKeyProjectRows } from './keyProjects'
 
@@ -54,5 +54,36 @@ describe('契约② 借入列在行对象上取得到值', () => {
       if (en === 'projectId') continue   // 既有例外，已在 NON_RISK_KEYS 中
       expect(en in row).toBe(false)
     }
+  })
+})
+
+// ③ 标签值可达
+// 契约②「不为 undefined」拦不住本类退化：tags 走 assignments?.[id] ?? []，忘传 assignments
+// 时值是 []（不是 undefined），②照样全绿——四页「标签」列因此空了一整个版本。
+// 故本组必须断言**内容**等于传入的 assignments，不能只断言"有这个键"。
+describe('契约③ 四页的标签列取自传入的 assignments（不传就是空列）', () => {
+  const ASSIGN = { C1: ['佳杰', 'BH项目'] }
+
+  it('/projects/key', () => {
+    const [row] = buildKeyProjectRows(P, PMIS, {}, MS, ASSIGN) as any[]
+    expect(row.tags).toEqual(['佳杰', 'BH项目'])
+  })
+  it('/projects/temp', () => {
+    const [row] = buildTempRows(P, PMIS, {}, new Set(['C1']), MS, ASSIGN) as any[]
+    expect(row.tags).toEqual(['佳杰', 'BH项目'])
+  })
+  it('/payment/key', () => {
+    const [row] = buildPaymentKeyRows(P, PMIS, {}, new Set(['C1']), MS, ASSIGN) as any[]
+    expect(row.tags).toEqual(['佳杰', 'BH项目'])
+  })
+  it('/risk（中文键「标签」）', () => {
+    const [row] = buildRiskRows(P, PMIS, {}, MS, ASSIGN) as any[]
+    expect(row['标签']).toEqual(['佳杰', 'BH项目'])
+  })
+  // ScopeBuilder 的字段目录含 tags（tempScope.ts:55「标签」enum）——范围设置里按标签
+  // 筛选走的是这条链，忘传 assignments 时条件恒不匹配、且没有任何报错。
+  it('ScopeBuilder 输入（范围设置按标签筛选）', () => {
+    const [inp] = buildScopeInputs(P, PMIS, {}, MS, ASSIGN) as any[]
+    expect(inp.proj.tags).toEqual(['佳杰', 'BH项目'])
   })
 })

@@ -79,11 +79,13 @@ export function buildKeyProjectRows(
   pmisMap: Record<string, ProjectPmis>,
   current: Record<string, ProgressRecord>,
   milestones?: Record<string, any[]>,
+  // 标签(手动 ∪ 规则 seed)。不传 → 借入的「标签」列恒空且不报错,故契约测试③按内容断言。
+  assignments?: Record<string, string[]>,
 ): KeyProjectRow[] {
   const rows = projects
     .filter((p) => isKeyProject(p, pmisMap[p.projectId]))
     .map((p) => buildProgressRowBase(p, pmisMap[p.projectId], current[p.projectId] ?? {}))
   const prMap = new Map<string, ProjectRow>(
-    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+    buildProjectRows(projects, pmisMap, assignments, milestones).map((r) => [r.projectId, r]))
   return decorateProjectDomain(rows, prMap)
 }

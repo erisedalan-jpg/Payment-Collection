@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { BORROWABLE_KEYS } from '@/lib/projectList'
 
 vi.mock('@/lib/paymentKeyFollowupApi', () => ({
@@ -60,7 +61,11 @@ async function mountAs(isSuper: boolean) {
 }
 
 describe('PaymentKeyFollowupView', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+    useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
+  })
 
   it('按范围命中只显示符合项目(P1 银行服务组),P2 不在范围', async () => {
     const w = await mountAs(true)
@@ -196,5 +201,21 @@ describe('PaymentKeyFollowupView', () => {
       expect(vis).not.toContain(k)
     }
     expect(vis).toContain('followAction')   // 自有默认列未受影响
+  })
+  // 接线回归:lib 层契约③只证明 buildPaymentKeyRows 会用 assignments,证明不了本页真的传了。
+  it('标签列取到与 /project/:id 同源的标签', async () => {
+    const pt = useProjectTagsStore()
+    pt.assignments = { P1: ['佳杰'] }
+    pt.loaded = true
+    const w = await mountAs(true)
+    const prefs = (w.vm as any).prefs
+    prefs.toggle('tags')                     // 借入列默认不可见,先打开
+    try {
+      await flushPromises()
+      expect(w.text()).toContain('佳杰')
+    } finally {
+      // useColumnPrefs 持久化到 localStorage,不还原会漏进后续用例
+      prefs.toggle('tags')
+    }
   })
 })

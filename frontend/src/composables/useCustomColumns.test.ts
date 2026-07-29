@@ -92,4 +92,40 @@ describe('V4.4.6 diff 计算列', () => {
   it('filterableKeys 不含 diff 列', () => {
     expect(makeFilterable([DIFF_COL]).has('cf-diff0001')).toBe(false)
   })
+
+  // —— 引用自定义 date 列(生产实际配法:「列设置」的候选下拉本就把自定义 date 列列进去) ——
+  // 上面四条 diff 用例的 target 全是内置键 setupDate(本就在原始行上),测不出
+  // 「diff 在【未并入自定义列值】的行上求值」这一缺陷。生产 V4.5.6 的三个 diff 列
+  // target 全指向自定义 date 列 → 一律显示 '-'。
+  const CUSTOM_DATE = { key: 'cf-date0001', label: '约定日', type: 'date' as const, clearOnArchive: false }
+
+  it('【关键】diff.target 指向自定义 date 列时也必须算出值', () => {
+    const col = {
+      key: 'cf-diff0002', label: '距约定日', type: 'diff' as const, clearOnArchive: false,
+      diff: { anchor: { kind: 'fixed' as const, date: '2026-07-28' }, target: 'cf-date0001' },
+    }
+    const cur = { P1: { 'cf-date0001': '2026-07-02' } }
+    const rows = makeDecorate([CUSTOM_DATE, col], cur)([{ projectId: 'P1' }])
+    expect((rows[0] as any)['cf-diff0002']).toBe(26)
+  })
+
+  it('【关键】diff.anchor 指向自定义 date 列时也必须算出值', () => {
+    // anchor 走 pickDate(row, anchor.key) 分支,与 target 是两段独立取值代码
+    const col = {
+      key: 'cf-diff0003', label: '约定日距立项', type: 'diff' as const, clearOnArchive: false,
+      diff: { anchor: { kind: 'column' as const, key: 'cf-date0001' }, target: 'setupDate' },
+    }
+    const cur = { P1: { 'cf-date0001': '2026-07-28' } }
+    const rows = makeDecorate([CUSTOM_DATE, col], cur)([{ projectId: 'P1', setupDate: '2026-07-02' }])
+    expect((rows[0] as any)['cf-diff0003']).toBe(26)
+  })
+
+  it('自定义 date 列无值的行 → diff 仍为 null(显 "-"),不报错', () => {
+    const col = {
+      key: 'cf-diff0004', label: '距约定日', type: 'diff' as const, clearOnArchive: false,
+      diff: { anchor: { kind: 'fixed' as const, date: '2026-07-28' }, target: 'cf-date0001' },
+    }
+    const rows = makeDecorate([CUSTOM_DATE, col], {})([{ projectId: 'P9' }])
+    expect((rows[0] as any)['cf-diff0004']).toBeNull()
+  })
 })

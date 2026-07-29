@@ -7,6 +7,7 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { BORROWABLE_KEYS } from '@/lib/projectList'
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
@@ -43,6 +44,8 @@ function seed(isSuper = true) {
 describe('TempInstancePanel', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+    useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
     pushMock.mockClear()
   })
 
@@ -107,5 +110,28 @@ describe('TempInstancePanel', () => {
       expect(vis).not.toContain(k)
     }
     expect(vis).toContain('weekProgress')   // 自有默认列未受影响
+  })
+
+  // 接线回归:lib 层契约③只证明 buildTempRows 会用 assignments,证明不了本组件真的传了。
+  // 漏传时 tags 恒 []、列渲染成空白且不报任何错 —— 生产 V4.5.6 就这样空了一版。
+  it('标签列取到与 /project/:id 同源的标签', async () => {
+    seed()
+    const pt = useProjectTagsStore()
+    pt.assignments = { P1: ['佳杰'] }
+    pt.loaded = true
+    const fc = useFollowupColumnsStore()
+    fc.configs = { temp: [], risk: [], payment_key: [], opportunity: [] } as any
+    fc.loaded = true
+    const w = mount(TempInstancePanel, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    const prefs = (w.vm as any).prefs
+    prefs.toggle('tags')                     // 借入列默认不可见,先打开
+    try {
+      await flushPromises()
+      expect(w.text()).toContain('佳杰')
+    } finally {
+      // useColumnPrefsDynamic 持久化到 localStorage,不还原会漏进后续用例
+      prefs.toggle('tags')
+    }
   })
 })

@@ -10,4 +10,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 #   `sys.path.insert(0, lts目录)` 把 lts/ 抢到 sys.path 最前 —— 于是 master tests/ 里的 `import server`
 #   会解析到 lts/server.py(已删 budget 等域)导致大批 AttributeError;同时两棵 tests/ 同名文件无 __init__.py
 #   还会触发 "import file mismatch"。忽略整个目录可一并规避这两类污染。
-collect_ignore = ["lts"]
+#
+# lanxin/ 同理:它是放在工作树里的【未跟踪】自包含副本(自带 server.py/projects.py/frontend/tests,
+# 但没有自己的 conftest.py)。根 conftest 把仓库根抢到 sys.path 最前,于是 lanxin/tests 里的
+# `import supervision_feedback` / `lanxin_resend` 等全部解析不到(那些模块在 lanxin/ 下,不在根),
+# 12 个测试模块 ImportError,verify.sh 恒红。它不是本平台的组成部分,整目录忽略。
+collect_ignore = ["lts", "lanxin"]

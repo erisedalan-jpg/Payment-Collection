@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildPaymentKeyRows, type PaymentKeyRow } from '@/lib/paymentKeyFollowup'
@@ -43,6 +44,7 @@ const data = useDataStore()
 const scoped = useScopedProjects()
 const auth = useAuthStore()
 const pk = usePaymentKeyFollowupStore()
+const projectTags = useProjectTagsStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
 const fcStore = useFollowupColumnsStore()
@@ -58,19 +60,22 @@ onMounted(() => {
   if (!data.data) data.load()
   if (!pk.loaded) pk.load()
   if (!fcStore.loaded) fcStore.load()
+  // 借入的「标签」列 + 范围设置的「标签」条件都要用（口径 = 手动 ∪ 规则 seed）
+  if (!projectTags.loaded) projectTags.load()
 })
 
 const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
 const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const scopeInputs = computed(() =>
   buildScopeInputs(projects.value, pmisMap.value,
-    (scoped.value as any)?.paymentNodes ?? {}, (scoped.value as any)?.projectMilestones ?? {}))
+    (scoped.value as any)?.paymentNodes ?? {}, (scoped.value as any)?.projectMilestones ?? {},
+    projectTags.effectiveAssignments))
 const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, pk.scope)).map((i) => i.id)))
 
 const currentRows = computed<PaymentKeyRow[]>(() =>
   custom.decorate(buildPaymentKeyRows(projects.value, pmisMap.value, pk.current, inScopeIds.value,
-    (scoped.value as any)?.projectMilestones ?? {})) as PaymentKeyRow[])
+    (scoped.value as any)?.projectMilestones ?? {}, projectTags.effectiveAssignments)) as PaymentKeyRow[])
 
 const fp = useFollowupPage(pk, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as PaymentKeyRow[])
 const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as unknown as Array<Record<string, unknown>>, 'contractWan'))

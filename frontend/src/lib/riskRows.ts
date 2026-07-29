@@ -24,9 +24,11 @@ export function buildRiskRows(
   pmisMap: Record<string, ProjectPmis>,
   current: Record<string, RiskFollowRecord>,
   milestones?: Record<string, any[]>,
+  // 标签(手动 ∪ 规则 seed)。不传 → 映射出的「标签」列恒空且不报错,故契约测试③按内容断言。
+  assignments?: Record<string, string[]>,
 ): RiskRow[] {
   const out: RiskRow[] = []
-  const prMap = new Map(buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+  const prMap = new Map(buildProjectRows(projects, pmisMap, assignments, milestones).map((r) => [r.projectId, r]))
   for (const p of projects) {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     const recs = (m.riskRecords ?? []) as Record<string, any>[]

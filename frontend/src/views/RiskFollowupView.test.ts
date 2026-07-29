@@ -8,6 +8,7 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
 import { useFollowupColumnsStore } from '@/stores/followupColumns'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { RISK_KEY_MAP } from '@/lib/riskRows'
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
@@ -56,7 +57,11 @@ function seedMany(n: number) {
 }
 
 describe('RiskFollowupView', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+    useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
+  })
   beforeEach(() => pushMock.mockClear())
   it('默认展示全部风险(含已关闭),16 默认列含跟进三列', async () => {
     seed()
@@ -259,5 +264,15 @@ describe('RiskFollowupView', () => {
       expect(vis).not.toContain(zh)
     }
     expect(vis).toContain('风险编码')   // 自有默认列未受影响
+  })
+  // 接线回归:lib 层契约③只证明 buildRiskRows 会用 assignments,证明不了本页真的传了。
+  it('标签列取到与 /project/:id 同源的标签', async () => {
+    seed()
+    const pt = useProjectTagsStore()
+    pt.assignments = { P1: ['佳杰'] }
+    pt.loaded = true
+    const w = mount(RiskFollowupView, { global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect((w.vm as any).allRows[0]['标签']).toEqual(['佳杰'])
   })
 })

@@ -9,6 +9,7 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { tempFollowupApi } from '@/lib/tempFollowupApi'
 
 // V4.0.2:store 现在要的是多实例形状 {instances: [...]}(不再是单实例 {scope,current,archives})。
@@ -72,6 +73,8 @@ describe('TempFollowupView', () => {
   // 而新增的迁移/隔离用例互相依赖 colprefs/colsort 的干净起点，故每条用例前清空。
   beforeEach(() => {
     setActivePinia(createPinia())
+    // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+    useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
     localStorage.clear()
   })
 

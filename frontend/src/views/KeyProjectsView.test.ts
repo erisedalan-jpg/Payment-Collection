@@ -8,12 +8,15 @@ import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectProgressStore } from '@/stores/projectProgress'
 import { useCrossFilterStore } from '@/stores/crossFilter'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import * as ppApi from '@/lib/projectProgressApi'
 import { BORROWABLE_KEYS } from '@/lib/projectList'
 
 let router: Router
 beforeEach(() => {
   setActivePinia(createPinia())
+  // projectTags.load 会发真实网络请求（/api/tags），测试环境 mock 掉
+  useProjectTagsStore().load = vi.fn().mockResolvedValue(undefined)
   vi.spyOn(ppApi.projectProgressApi, 'getProgress').mockResolvedValue({ success: true, current: {}, archives: [] })
   router = createRouter({ history: createMemoryHistory(), routes: [
     { path: '/projects/key', component: KeyProjectsView },
@@ -148,6 +151,23 @@ describe('KeyProjectsView', () => {
     seed(); const w = await mountView()
     const keys = new Set((w.vm as any).ALL_COLUMNS.map((c: any) => c.key))
     for (const k of BORROWABLE_KEYS) expect(keys.has(k)).toBe(true)
+  })
+  // 接线回归:lib 层契约③只证明 buildKeyProjectRows 会用 assignments,证明不了本页真的传了。
+  it('标签列取到与 /project/:id 同源的标签', async () => {
+    seed()
+    const pt = useProjectTagsStore()
+    pt.assignments = { K1: ['佳杰'] }
+    pt.loaded = true
+    const w = await mountView()
+    const prefs = (w.vm as any).prefs
+    prefs.toggle('tags')                     // 借入列默认不可见,先打开
+    try {
+      await flushPromises()
+      expect(w.text()).toContain('佳杰')
+    } finally {
+      // useColumnPrefs 持久化到 localStorage,不还原会漏进后续用例(契约④ 会因此变红)
+      prefs.toggle('tags')
+    }
   })
   // V4.4.8 页头 + 超管操作按钮归位（权限回归：v-if="auth.isSuper" 必须原样跟着按钮搬进 #actions）
   it('V4.4.8 渲染页头标题', async () => {

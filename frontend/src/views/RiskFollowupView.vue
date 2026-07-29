@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { useRiskFollowupStore } from '@/stores/riskFollowup'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildRiskRows, riskRowMatches, RISK_SCOPE_CATALOG, type RiskRow } from '@/lib/riskRows'
@@ -37,6 +38,7 @@ const data = useDataStore()
 const scoped = useScopedProjects()
 const auth = useAuthStore()
 const risk = useRiskFollowupStore()
+const projectTags = useProjectTagsStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
 const fcStore = useFollowupColumnsStore()
@@ -51,13 +53,15 @@ onMounted(() => {
   if (!data.data) data.load()
   if (!risk.loaded) risk.load()
   if (!fcStore.loaded) fcStore.load()
+  // 映射出的「标签」列要用（口径 = 手动 ∪ 规则 seed，与 /projects、/project/:id 同源）
+  if (!projectTags.loaded) projectTags.load()
 })
 
 const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
 const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const allRows = computed<RiskRow[]>(() =>
   custom.decorate(buildRiskRows(projects.value, pmisMap.value, risk.current,
-    (scoped.value as any)?.projectMilestones ?? {})) as RiskRow[])
+    (scoped.value as any)?.projectMilestones ?? {}, projectTags.effectiveAssignments)) as RiskRow[])
 const hasScope = computed(() => risk.scope.groups.some((g) => g.conditions.length))
 const scopedRows = computed<RiskRow[]>(() => hasScope.value ? allRows.value.filter((r) => riskRowMatches(r, risk.scope)) : allRows.value)
 const currentRows = computed<RiskRow[]>(() => scopedRows.value)

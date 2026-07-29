@@ -16,9 +16,11 @@ export function buildTempRows(
   current: Record<string, ProgressRecord>,
   inScopeIds: Set<string>,
   milestones?: Record<string, any[]>,
+  // 标签(手动 ∪ 规则 seed)。不传 → 借入的「标签」列恒空且不报错,故契约测试③按内容断言。
+  assignments?: Record<string, string[]>,
 ): TempRow[] {
   const prMap = new Map<string, ProjectRow>(
-    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+    buildProjectRows(projects, pmisMap, assignments, milestones).map((r) => [r.projectId, r]))
   const rows = projects
     .filter((p) => inScopeIds.has(p.projectId))
     .map((p) => {
@@ -51,9 +53,11 @@ export function buildScopeInputs(
   pmisMap: Record<string, ProjectPmis>,
   paymentNodes: Record<string, any[]> | undefined,
   milestones: Record<string, any[]> | undefined,
+  // 范围设置的字段目录含「标签」(tempScope.ts:55),不传 → 该条件恒不匹配且无任何报错。
+  assignments?: Record<string, string[]>,
 ): ScopeProjectInput[] {
   const prMap = new Map<string, ProjectRow>(
-    buildProjectRows(projects, pmisMap, undefined, milestones).map((r) => [r.projectId, r]))
+    buildProjectRows(projects, pmisMap, assignments, milestones).map((r) => [r.projectId, r]))
   const yn = (b: boolean) => (b ? '是' : '否')
   return projects.map((p) => {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>

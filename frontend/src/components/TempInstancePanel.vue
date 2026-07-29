@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildTempRows, buildScopeInputs, type TempRow } from '@/lib/tempFollowup'
@@ -37,8 +38,13 @@ const data = useDataStore()
 const scoped = useScopedProjects()
 const auth = useAuthStore()
 const temp = useTempFollowupStore()
+const projectTags = useProjectTagsStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
+// 借入的「标签」列 + 范围设置的「标签」条件都要用（口径 = 手动 ∪ 规则 seed，与 /project/:id 同源）。
+// 放在面板而非父视图:本组件是唯一消费方,且父视图按 :key=activeId 反复重建它,
+// loaded 守卫保证只发一次请求。同 ProjectTagsCard.vue 的做法。
+onMounted(() => { if (!projectTags.loaded) projectTags.load() })
 // temp.current 是 Pinia setup-store 的字段(访问时已自动解包,并非 Ref 本体);
 // useCustomColumns 需要真正的 Ref(内部读 .value),故用 computed 包一层而非直接传店内字段。
 // 自定义列配置的加载(fcStore.load())由父组件 TempFollowupView.vue 在 onMounted 里预载完成
@@ -58,13 +64,14 @@ const projects = computed(() => (scoped.value?.projects ?? []) as Project[])
 const pmisMap = computed(() => (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>)
 const scopeInputs = computed(() =>
   buildScopeInputs(projects.value, pmisMap.value,
-    (scoped.value as any)?.paymentNodes ?? {}, (scoped.value as any)?.projectMilestones ?? {}))
+    (scoped.value as any)?.paymentNodes ?? {}, (scoped.value as any)?.projectMilestones ?? {},
+    projectTags.effectiveAssignments))
 const inScopeIds = computed(() => new Set(
   scopeInputs.value.filter((i) => projectMatches(i, temp.scope)).map((i) => i.id)))
 
 const currentRows = computed<TempRow[]>(() =>
   custom.decorate(buildTempRows(projects.value, pmisMap.value, temp.current, inScopeIds.value,
-    (scoped.value as any)?.projectMilestones ?? {})) as TempRow[])
+    (scoped.value as any)?.projectMilestones ?? {}, projectTags.effectiveAssignments)) as TempRow[])
 
 const fp = useFollowupPage(temp, currentRows, (r) => applyColumnFilters(r, cf.tableFilters(TABLE_ID)) as TempRow[])
 const contractTotal = computed(() => sumDistinctContractWan(fp.filtered.value as unknown as Array<Record<string, unknown>>, 'contractWan'))

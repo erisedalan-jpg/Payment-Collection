@@ -65,9 +65,15 @@ export function useCustomColumns(tableId: FollowupTableId, opts: UseCustomColumn
           if ((k + 'EditBy') in rec) extra[k + 'EditBy'] = rec[k + 'EditBy']
         }
       }
-      // 计算列:派生自行数据,【不依赖 current】—— rec 缺失也必须算
+      // 计算列:派生自行数据,【不依赖 current】—— rec 缺失也必须算。
+      // 但必须在【已并入存储列值】的行上求值:diff 的 target/anchor 可以指向自定义 date 列
+      // (「列设置」的候选下拉本就把它们列出来),而那些值此刻只在 extra 里、尚未进 r ——
+      // 直接用 r 求值会恒 null,表现为整列显示 '-'(生产 V4.5.6 实际缺陷)。
+      // 快照在 diffs 循环之前取:diff 不能引用另一个 diff(候选下拉不含 diff 列),
+      // 故 diff 之间无先后依赖,不必逐个滚动合并。
+      const base = Object.keys(extra).length ? { ...r, ...extra } : r
       for (const c of diffs) {
-        if (c.diff) extra[c.key] = computeDiffDays(r, c.diff, today)
+        if (c.diff) extra[c.key] = computeDiffDays(base, c.diff, today)
       }
       return Object.keys(extra).length ? { ...r, ...extra } : r
     })

@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useScopedProjects } from '@/composables/useScopedData'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectProgressStore } from '@/stores/projectProgress'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import { useCrossFilterStore } from '@/stores/crossFilter'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildKeyProjectRows, type KeyProjectRow } from '@/lib/keyProjects'
@@ -36,6 +37,7 @@ const data = useDataStore()
 const scoped = useScopedProjects()
 const auth = useAuthStore()
 const progress = useProjectProgressStore()
+const projectTags = useProjectTagsStore()
 const cf = useCrossFilterStore()
 const router = useRouter()
 
@@ -45,6 +47,8 @@ cf.clearAll(TABLE_ID)
 onMounted(() => {
   if (!data.data) data.load()
   if (!progress.loaded) progress.load()
+  // 借入的「标签」列要用（口径 = 手动 ∪ 规则 seed，与 /projects、/project/:id 同源）
+  if (!projectTags.loaded) projectTags.load()
 })
 
 const currentRows = computed<KeyProjectRow[]>(() =>
@@ -53,6 +57,7 @@ const currentRows = computed<KeyProjectRow[]>(() =>
     (scoped.value?.projectPmis ?? {}) as Record<string, ProjectPmis>,
     progress.current,
     (scoped.value?.projectMilestones ?? {}) as Record<string, any[]>,
+    projectTags.effectiveAssignments,
   ),
 )
 
