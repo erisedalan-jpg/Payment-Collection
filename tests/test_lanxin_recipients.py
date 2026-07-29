@@ -392,3 +392,26 @@ def test_summary_card_value_respects_char_limit():
     v = card["fields"][0]["value"]
     assert len(v) <= LR.LIMIT_FIELD_VALUE_CHARS, "value 有 %d 字符" % len(v)
     assert len(v.encode("utf-8")) <= LR.LIMIT_FIELD_VALUE
+
+
+def test_action_hint_h5_wins():
+    """有 H5 时优先引导点卡片(二期上线后自动切到这一态,无需再改文案)。"""
+    assert LR.build_action_hint(24, h5_url="http://x/review/t", reply_hint=True) == \
+        "请点击卡片逐条反馈，24小时内未反馈将列入《未响应清单》"
+
+
+def test_action_hint_falls_back_to_reply():
+    assert LR.build_action_hint(48, h5_url="", reply_hint=True) == \
+        "请直接回复本消息反馈，48小时内未反馈将列入《未响应清单》"
+
+
+def test_action_hint_empty_when_no_channel():
+    """【承重】没有任何回流通道时必须返回空串,调用方据此【不输出】动作要求 field。
+    有通道才承诺反馈;否则卡上写「N 小时内未反馈将列入未响应清单」而人无处可反馈,
+    就是空头支票。现有 REPLY_HINT 已有同款严谨性(见其上方注释)。"""
+    assert LR.build_action_hint(24, h5_url="", reply_hint=False) == ""
+
+
+def test_action_hint_uses_given_hours_verbatim():
+    """N 由调用方传入,本函数不带自己的默认值 —— 默认值散落多处正是「卡上24、清单按48」的成因。"""
+    assert "72小时内" in LR.build_action_hint(72, reply_hint=True)

@@ -71,6 +71,27 @@ def short_issue(label: str) -> str:
     return ISSUE_SHORT_LABELS.get(label, label)
 
 
+def build_action_hint(deadline_hours: int, h5_url: str = "",
+                      reply_hint: bool = False) -> str:
+    """卡片末尾「动作要求」文案。按【实际可用的回流通道】三态生成。
+
+    返回空串 = 没有任何通道,调用方据此【不输出】动作要求 field。
+    为什么不退化成「请及时处理」之类:卡上承诺「N 小时内未反馈将列入《未响应清单》」
+    却没有任何能反馈的地方,就是空头支票。REPLY_HINT 上方注释已有同款判断
+    (「回调没配就写『请直接回复』,是让人对着收不到的地方说话」)。
+
+    deadline_hours 由调用方传入,本函数【不设默认值】—— 默认值散落多处,
+    正是「卡上写 24 小时、清单按 48 小时算」这类事故的成因。
+    """
+    if h5_url:
+        action = "请点击卡片逐条反馈"
+    elif reply_hint:
+        action = "请直接回复本消息反馈"
+    else:
+        return ""
+    return "%s，%d小时内未反馈将列入《未响应清单》" % (action, deadline_hours)
+
+
 def fit_bytes(s: str, limit: int) -> str:
     """按 UTF-8 字节截断(中文 3 字节/字)。超出时末尾加 '…'(自身 3 字节)。
     绝不切半个字符 —— 逐字符累加,放不下就停。"""
