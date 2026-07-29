@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 import { getLanxinConfigFull, saveLanxinConfig, lanxinSelftest,
-         type LanxinConfig } from '@/lib/lanxinApi'
+         type LanxinConfig, type LanxinRejectedStats } from '@/lib/lanxinApi'
 import { apiUrl } from '@/lib/baseUrl'
 
 const emit = defineEmits<{ (e: 'open-push'): void }>()
@@ -19,8 +19,14 @@ const newCallbackSignToken = ref('')
 // lastReason(Important-2)区分最近一次是验签失败还是时间戳新鲜度失败——两者共用
 // 同一个 count，不分原因超管只看到计数在涨，会去查 signToken/aesKey/nginx，
 // 而真正的原因可能是时间戳格式或两端时钟对不上。
-const rejected = ref<{ count: number; lastAt: string; lastReason?: string }>(
-  { count: 0, lastAt: '', lastReason: '' })
+// lastTimestampSample 是被拒报文的 timestamp 原值(后端已 64 字符封顶，不是密钥)：
+// 诊断走到「lastReason=stale → 看蓝信到底发的什么格式」这一格时，界面上必须能直接看到
+// 这个值——否则只剩服务器日志，而看日志既要 root 又要知道 grep 什么。
+// 类型直接复用 LanxinRejectedStats，不再手抄一份结构：手抄的那份漏了字段就是本次的缺陷成因
+// (后端产出、经接口下发，前端零消费)。
+const DEFAULT_REJECTED: LanxinRejectedStats =
+  { count: 0, lastAt: '', lastReason: '', lastTimestampSample: '' }
+const rejected = ref<LanxinRejectedStats>({ ...DEFAULT_REJECTED })
 const selftestEmp = ref('')
 const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
 
@@ -56,7 +62,7 @@ async function load() {
     // 缺这个字段是预期状态,不能让整卡因此报错或渲染异常。
     const res = await getLanxinConfigFull()
     cfg.value = res.config
-    rejected.value = res.rejected ?? { count: 0, lastAt: '', lastReason: '' }
+    rejected.value = res.rejected ?? { ...DEFAULT_REJECTED }
   } catch { /* 未登录/缺接口静默 */ }
 }
 
@@ -174,8 +180,14 @@ defineExpose({ rejected })
         <span class="dv-hint warn" data-test="lx-rejected-reason">
           {{ rejected.count }} 次回调被拒 · 最近 {{ rejected.lastAt }} ——
           {{ rejected.lastReason === 'stale'
-              ? '最近一次因时间戳超出有效窗口，多半是时间戳格式或两端时钟对不上，而非签名填错'
+              ? '最近一次因时间戳超出有效窗口，多半是两端时钟对不上或报文被重放，而非签名填错'
               : '最近一次是验签失败，通常意味着回调签名令牌填错了' }}
+          <!-- timestamp 原值：排查「蓝信到底发的什么格式」的唯一可见线索。
+               Vue 默认转义、后端已 64 字符封顶，直接渲染是安全的。 -->
+          <span v-if="rejected.lastTimestampSample" data-test="lx-rejected-ts-sample">
+            （时间戳原值 <span class="u-num">{{ rejected.lastTimestampSample }}</span>，
+            2026-07-29 联调实测蓝信发的是 19 位纳秒）
+          </span>
         </span>
       </div>
 

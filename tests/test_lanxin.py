@@ -736,16 +736,49 @@ def test_dispatch_defaults_to_account(monkeypatch):
 
 
 def test_dispatch_returns_sent_log_for_identity_lookup(monkeypatch):
-    """台账是回调反查身份的唯一依据 —— 必须带回 staffId↔employId。"""
+    """台账是回调反查身份的唯一依据 —— 必须带回 staffId↔employId。
+    全等断言【有意保留】:它同时锁住台账的完整键集,新增/漏掉任一键都会在这里变红。"""
     monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
     monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
     monkeypatch.setattr(LX, "send_message", lambda *a, **k: {"msgId": "m1"})
     plan = {"recipients": [{"employId": "A1", "name": "张三", "card": {},
-                            "projectIds": ["P1", "P2"], "routeKey": "project"}]}
+                            "projectIds": ["P1", "P2"], "routeKey": "project",
+                            "role": "primary"}]}
     out = LX.dispatch(plan, {"sendIntervalMs": 0})
     assert out["sentLog"] == [{"staffId": "sid-A1", "employId": "A1", "name": "张三",
-                               "routeKey": "project", "projectIds": ["P1", "P2"],
-                               "msgId": "m1"}]
+                               "routeKey": "project", "role": "primary",
+                               "projectIds": ["P1", "P2"], "msgId": "m1"}]
+
+
+def test_dispatch_sent_log_carries_role_for_unresponded_filter(monkeypatch):
+    """role 必须原样进台账 —— 《未响应清单》靠它把上级汇总卡的收件人排除出待催视图。
+
+    汇总卡【没有】动作要求、没有任何 N 小时反馈承诺(build_summary_card 本期零改动),
+    不带 role 的话上级会被清单当成"该催的人",超管去催得到的回答是「我这张卡没让我反馈」。
+    同一条用例顺带覆盖 role 缺失(老 plan 形态)→ 空串,不炸也不误判成 supervisor。"""
+    monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
+    monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
+    monkeypatch.setattr(LX, "send_message", lambda *a, **k: {"msgId": "m"})
+    plan = {"recipients": [
+        {"employId": "A1", "name": "张三", "card": {}, "projectIds": [],
+         "routeKey": "project", "role": "primary"},
+        {"employId": "A2", "name": "李四", "card": {}, "projectIds": [],
+         "routeKey": "project", "role": "supervisor"},
+        {"employId": "A3", "name": "王五", "card": {}, "projectIds": [],
+         "routeKey": "project"},                      # 无 role 键
+    ]}
+    out = LX.dispatch(plan, {"sendIntervalMs": 0})
+    assert [e["role"] for e in out["sentLog"]] == ["primary", "supervisor", ""]
+
+
+def test_build_plan_recipients_carry_role_so_dispatch_can_log_it(monkeypatch):
+    """接线回归:dispatch 记的 role 来自 build_plan 的 recipient。
+    只测 dispatch 会透传等于假设上游真的给了这个键 —— 这里直接跑真实 build_plan,
+    确认四种卡片的 recipient 都带 role,且值只可能是 primary/supervisor 两种。"""
+    cfg = _cfg_with_callback(_all_four_card_kinds_cfg())
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+    roles = sorted(r.get("role") for r in plan["recipients"])
+    assert roles == ["primary", "primary", "supervisor", "supervisor"]
 
 
 def test_dispatch_sent_log_omits_failed(monkeypatch):
@@ -831,6 +864,22 @@ def _plan_cards_json(plan):
     return json.dumps([r["card"] for r in plan["recipients"]], ensure_ascii=False)
 
 
+def _assert_no_feedback_prompt_anywhere(plan, note=""):
+    """凭证不全时,【四张卡一张都不许】出现反馈指引 —— 两类卡的文案不同,两者都要查。
+
+    为什么不能只查 REPLY_HINT:本期两张 primary 卡改用 build_action_hint() 产出
+    「请直接回复本消息反馈,N小时内未反馈将列入《未响应清单》」,【不含】REPLY_HINT
+    这个子串。只断言 REPLY_HINT 缺席,等于把 primary 卡整个放行 —— 变异实测实锤:
+    把 build_plan 里的 reply_hint 判定从「AES 且 签名令牌 且 非空白」削成只看 AES,
+    136 条测试零变红,而「只填了 AES 没填签名令牌」正是最容易配错的分支,
+    此时 primary 卡照样承诺「请直接回复本消息反馈」,回复却必然验签失败石沉大海。
+    「未响应清单」是 build_action_hint 唯一且必然出现的固定子串,拿它当 primary 卡的探针。
+    """
+    cards = _plan_cards_json(plan)
+    assert LR.REPLY_HINT not in cards, "汇总卡不应出现回复引导语 %s" % note
+    assert "未响应清单" not in cards, "primary 卡不应出现带时限的动作要求 %s" % note
+
+
 def _all_four_card_kinds_cfg():
     """一次同时产出四种卡片:工时 primary / 项目 primary / 工时汇总 / 项目汇总。
     supervisorLevels=1 让 A006(张三)卷到 A005(耿磊磊)。"""
@@ -864,28 +913,31 @@ def test_build_plan_wires_hint_to_every_card_by_role():
 
 
 def test_build_plan_omits_reply_hint_when_callback_not_configured():
-    """未配凭证 → 一张都不许带:引导用户回复一个收不到的地方,比不提示更糟。"""
+    """未配凭证 → 【四张卡一张都不许】带反馈指引:引导用户回复一个收不到的地方,
+    比不提示更糟。两类卡文案不同,两者都查(见 _assert_no_feedback_prompt_anywhere)。"""
     cfg = _all_four_card_kinds_cfg()          # default_config 里两个回调凭证均为空串
     plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
 
     assert len(plan["recipients"]) == 4
-    assert LR.REPLY_HINT not in _plan_cards_json(plan)
+    _assert_no_feedback_prompt_anywhere(plan)
 
 
 def test_build_plan_omits_reply_hint_when_only_one_credential_configured():
-    """只配一个 = 验签或解密必然失败,回复照样石沉大海 —— 仍不许提示。"""
+    """只配一个 = 验签或解密必然失败,回复照样石沉大海 —— 四张卡仍一张都不许提示。
+    这是最容易配错的分支:两个凭证在开发者中心是分两处申请的,漏抄一个很常见。"""
     for aes, token in (("A" * 43, ""), ("", "tok-abc")):
         cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes=aes, token=token)
         plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
-        assert LR.REPLY_HINT not in _plan_cards_json(plan), \
-            "aes=%r token=%r 时不应出现引导语" % (aes, token)
+        assert len(plan["recipients"]) == 4
+        _assert_no_feedback_prompt_anywhere(plan, "aes=%r token=%r" % (aes, token))
 
 
 def test_build_plan_treats_whitespace_credentials_as_unconfigured():
-    """全空白的凭证等同于没配 —— 它过不了验签,只会让回复石沉大海。"""
+    """全空白的凭证等同于没配 —— 它过不了验签,只会让回复石沉大海。四张卡一张都不许带。"""
     cfg = _cfg_with_callback(_all_four_card_kinds_cfg(), aes="   ", token="  ")
     plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
-    assert LR.REPLY_HINT not in _plan_cards_json(plan)
+    assert len(plan["recipients"]) == 4
+    _assert_no_feedback_prompt_anywhere(plan)
 
 
 # ── Task 5:build_plan 接新卡片(reasons 归一化 + 并行明细桶 + 动作要求 + now) ────

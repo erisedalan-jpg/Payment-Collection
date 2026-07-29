@@ -5,7 +5,8 @@ import ElementPlus from 'element-plus'
 import LanxinConfigCard from './LanxinConfigCard.vue'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 import { ALL_RISK_CATEGORIES } from '@/lib/riskReasons'
-import { getLanxinConfigFull, type LanxinConfig } from '@/lib/lanxinApi'
+import { getLanxinConfigFull, type LanxinConfig,
+         type LanxinRejectedStats } from '@/lib/lanxinApi'
 import { apiUrl } from '@/lib/baseUrl'
 
 // items 恒为完整白名单长度(后端 lanxin_config._validate_items 按白名单补齐)。
@@ -56,9 +57,11 @@ function buildCfg(override: Record<string, unknown> = {}) {
 // load() 跑完之后直接改写 defineExpose 出的 ref,而不是拼进 mockResolvedValueOnce 的响应体,
 // 是为了把「有拒绝计数时怎么展示」这条纯 UI 逻辑与「load() 怎么从响应里取值」分开单独锁定
 // (后者由下方"接口未返回 rejected 时按 0 处理"等用例覆盖)。
+// extra.rejected 用【接口自己的类型】LanxinRejectedStats,不手抄一份结构 —— 手抄的那份
+// 漏掉字段正是 lastTimestampSample「后端产出、前端零消费」的成因(review Important-1)。
 const mountCard = async (
   cfgOverride: Record<string, unknown> = {},
-  extra: { rejected?: { count: number; lastAt: string; lastReason?: string } } = {},
+  extra: { rejected?: LanxinRejectedStats } = {},
 ) => {
   // 只有真的带了 override 才多塞一次 mockResolvedValueOnce —— 否则每次调用都会往
   // vi.fn 的一次性队列里插一条,当某用例(如下方"后端若返回不完整 items")自己手动
@@ -69,8 +72,7 @@ const mountCard = async (
   const w = mount(LanxinConfigCard, { global: { plugins: [ElementPlus], stubs: { 'el-switch': true } } })
   await flushPromises()
   if (extra.rejected) {
-    ;(w.vm as unknown as { rejected: { count: number; lastAt: string; lastReason?: string } })
-      .rejected = extra.rejected
+    ;(w.vm as unknown as { rejected: LanxinRejectedStats }).rejected = extra.rejected
     await flushPromises()
   }
   return w
@@ -243,8 +245,38 @@ describe('V4.0.5 回调双向配置(发送身份/回调双凭证/回调地址/�
   it('接口未返回 rejected 时按 0 处理，不渲染拒绝行也不报错', async () => {
     const w = await mountCard()
     expect(w.find('[data-test="lx-rejected"]').exists()).toBe(false)
-    expect((w.vm as unknown as { rejected: { count: number; lastAt: string; lastReason?: string } })
-      .rejected).toEqual({ count: 0, lastAt: '', lastReason: '' })
+    expect((w.vm as unknown as { rejected: LanxinRejectedStats }).rejected)
+      .toEqual({ count: 0, lastAt: '', lastReason: '', lastTimestampSample: '' })
+  })
+
+  // ── review Important-1：lastTimestampSample 此前后端产出、经接口下发，前端零消费 ──
+  //
+  // 这个字段存在的唯一理由就是让超管在【界面上】看到「蓝信到底发的什么格式」：诊断表走到
+  // 「lastReason=stale → 看 lastTimestampSample 真容」这一格时，存证在这一步之前就被拦下
+  // 没落盘、报文体与签名按铁律不许记，只剩服务器日志——而看日志既要 root、又要知道 grep
+  // 什么。不渲染它，等于把「需要 root」换成「需要会开 devtools」，字段白加。
+
+  it('stale 拒绝时把 timestamp 原值显示出来，不必去翻服务器日志', async () => {
+    // 样本值取生产真实报文之一(19 位纳秒，见 tests/test_server_lanxin_callback.py 的
+    // REAL_NS_SAMPLES)——恰恰是这个形态当初只在日志里可见，界面上查不到。
+    const w = await mountCard({}, {
+      rejected: { count: 4, lastAt: '2026-07-29 10:00:00', lastReason: 'stale',
+                  lastTimestampSample: '1785296160608457348' },
+    })
+    const sample = w.find('[data-test="lx-rejected-ts-sample"]')
+    expect(sample.exists()).toBe(true)
+    expect(sample.text()).toContain('1785296160608457348')
+  })
+
+  it('没有 timestamp 样本时不渲染空括号', async () => {
+    // 拒绝行本身仍要显示(计数与原因是另一条线索)，只是样本那一段整段不出现——
+    // 渲染一个空的「（时间戳原值 ）」会让人以为蓝信发的是空值。
+    const w = await mountCard({}, {
+      rejected: { count: 2, lastAt: '2026-07-29 10:00:00', lastReason: 'signature',
+                  lastTimestampSample: '' },
+    })
+    expect(w.find('[data-test="lx-rejected"]').exists()).toBe(true)
+    expect(w.find('[data-test="lx-rejected-ts-sample"]').exists()).toBe(false)
   })
 
   // 之前 config 与 rejected 是两个函数、各打一次 GET /api/lanxin/config；协调者要求收回成一次

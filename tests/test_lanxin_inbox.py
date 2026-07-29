@@ -63,6 +63,20 @@ def test_candidate_projects_ignores_stale_sends():
     assert I.candidate_projects(s, "524288-aaa", days=30) == []
 
 
+def test_record_sent_keeps_role_and_defaults_it_to_empty():
+    """role 进台账 —— 《未响应清单》靠它把上级汇总卡的收件人排除出待催视图
+    (汇总卡不带任何 N 小时反馈承诺)。缺键 → 空串:V4.5.8 之前的老台账没有这个键,
+    退化成空串才不会被排除、才不会整段从清单上消失。"""
+    s = I.new_store()
+    I.record_sent(s, [
+        {"staffId": "a", "employId": "A1", "name": "张三", "routeKey": "project",
+         "role": "supervisor", "projectIds": [], "msgId": "m1"},
+        {"staffId": "b", "employId": "A2", "name": "李四", "routeKey": "project",
+         "projectIds": [], "msgId": "m2"},          # 老形态:无 role 键
+    ], NOW)
+    assert [e["role"] for e in s["sent"]] == ["supervisor", ""]
+
+
 def test_seen_dedup():
     s = I.new_store()
     assert I.is_seen(s, "e1") is False

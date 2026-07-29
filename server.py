@@ -373,9 +373,13 @@ _lanxin_inbox_lock = threading.RLock()
 LANXIN_CALLBACK_MAX_BYTES = 1024 * 1024
 # 验签未通过的请求只记数与时间,【绝不落 body】—— 否则免登录端点等于任人写盘。
 # lastReason 区分本次拒绝是 'signature'(验签失败,通常是签名令牌填错)还是
-# 'stale'(新鲜度检查失败,通常是时间戳格式/两端时钟对不上)—— 两者原因完全不同,
-# 共用同一个计数器会让超管排查时误把"格式假设错了"当成"密钥填错了"去查(见
-# lanxin_timestamp_fresh 的假设声明 + PROGRESS.md 债务条目)。
+# 'stale'(新鲜度检查失败)—— 两者原因完全不同,共用同一个计数器会让超管排查时
+# 把两件事混作一件去查。
+# 【2026-07-29 更新】timestamp 的量纲已由首次入站联调实证为 19 位纳秒,不再是假设
+# (实证与真实报文样本见 lanxin_timestamp_fresh 的 docstring 与
+# tests/test_server_lanxin_callback.py 的 REAL_NS_SAMPLES)。因此今后再出现
+# lastReason='stale',首先该怀疑的是【两端时钟漂移或报文重放】,而不是"格式又猜错了";
+# 若确实怀疑蓝信改了量纲,lastTimestampSample 存的原值就是判断依据。
 _lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": "", "lastReason": "",
                     # 被拒报文的 timestamp【原值】。不是密钥(不是签名、不是报文体、不是密钥),
                     # 可安全下发给超管 —— 这是判断「蓝信实际发的什么格式」的唯一可见线索。
@@ -3476,8 +3480,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             _lanxin_send_lock.release()
         # 记发送台账 —— 回调侧反查身份/推荐归入项目全靠它,见 _lanxin_record_sent。
+        # 时间戳格式【必须】用 lanxin_inbox.TS_FMT,不许在这里写字面量:同一函数往上
+        # 十几行 build_plan(now=...) 用的是另一种格式('%Y-%m-%d %H:%M',卡片文案用),
+        # 复制粘贴一步之遥。写错则 sentAt 全部解析失败 → 未响应清单的默认视图永远空、
+        # 台账 90 天清理失效、归入候选恒空,且全程零报错。
         _lanxin_record_sent(result.get('sentLog') or [],
-                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                            datetime.now().strftime(lanxin_inbox.TS_FMT))
         self._audit_set(target='蓝信推送发送',
                         detail='成功 %d · 失败 %d · 未解析 %d'
                                % (result['sent'], len(result['failed']),
@@ -3544,7 +3552,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(200, {"errCode": -2, "errMsg": "时间戳超出有效窗口(疑似重放)"})
             return
 
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 这个 now 会成为收件箱条目的 receivedAt 与去重表的 ts,两者都要被
+        # lanxin_inbox/_lanxin_unresponded 反解析 —— 格式必须走单一来源,不写字面量。
+        now = datetime.now().strftime(lanxin_inbox.TS_FMT)
 
         # ③ 存证。这是唯一允许让蓝信重推的失败点。
         try:
@@ -3617,7 +3627,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                     or lanxin_config.DEFAULT_REVIEW_DEADLINE_HOURS)
         with _lanxin_inbox_lock:
             store = _load_lanxin_inbox()
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # compute 会 strptime 这个 now,格式同样走单一来源(写错 → now_dt 为 None →
+        # overdue 全 False → 「仅未响应」视图永远空)。
+        now = datetime.now().strftime(lanxin_inbox.TS_FMT)
         self._send_json(200, {"success": True,
                               "rows": lanxin_unresponded.compute(store, hours, now),
                               "deadlineHours": hours})

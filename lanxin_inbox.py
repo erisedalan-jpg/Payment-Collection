@@ -21,7 +21,13 @@ STORE_VERSION = 1
 SEEN_RETENTION_DAYS = 7      # 蓝信最长重推间隔 6 小时,7 天绰绰有余
 SENT_RETENTION_DAYS = 90
 
-_TS_FMT = "%Y-%m-%d %H:%M:%S"
+# 台账/收件箱时间戳格式 —— 【单一来源,公开名】。写入端(server.py 的 handler)与解析端
+# (本模块 prune/candidate_projects、lanxin_unresponded.compute)分处三个互不相识的模块,
+# 此前各自写了一份同值字面量。这类隐式契约改坏后【全程零报错】:_parse 一律返回 None →
+# 未响应清单的 dueAt 恒空、overdue 恒 False,默认「仅未响应」视图【永远是空的】
+# (看上去像"大家都回了");同时 90 天台账清理失效、归入候选恒空。
+# 三处必须 import 本常量,不许再各写一份。
+TS_FMT = "%Y-%m-%d %H:%M:%S"
 
 
 def new_store() -> Dict[str, Any]:
@@ -43,19 +49,25 @@ def migrate(store: Any) -> Dict[str, Any]:
 
 def _parse(ts: Any) -> Optional[datetime]:
     try:
-        return datetime.strptime(str(ts), _TS_FMT)
+        return datetime.strptime(str(ts), TS_FMT)
     except (TypeError, ValueError):
         return None
 
 
 def record_sent(store: Dict[str, Any], entries: List[Dict[str, Any]], now: str) -> None:
-    """记录一批推送。sentAt 统一由调用方传入的 now 盖章,便于测试与批次一致。"""
+    """记录一批推送。sentAt 统一由调用方传入的 now 盖章,便于测试与批次一致。
+
+    role 是白名单里唯一【可能缺失】的键:V4.5.8 之前的台账没有它。缺失 → 空串,
+    未响应清单据此【不排除】该行 —— 老数据行为一字不变(宁可多列一行让人自己判断,
+    也不能因为一个新字段把历史台账整段从清单上抹掉)。
+    """
     for e in entries or []:
         store.setdefault("sent", []).append({
             "staffId": e.get("staffId") or "",
             "employId": e.get("employId") or "",
             "name": e.get("name") or "",
             "routeKey": e.get("routeKey") or "",
+            "role": e.get("role") or "",
             "projectIds": list(e.get("projectIds") or []),
             "msgId": e.get("msgId") or "",
             "sentAt": now,

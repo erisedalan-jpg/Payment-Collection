@@ -9,6 +9,7 @@ import base64
 import hashlib
 import http.client
 import json
+import logging
 import os
 import re
 import threading
@@ -833,3 +834,28 @@ def test_signature_reject_also_records_timestamp_sample(lanxin_srv):
     assert payload["errCode"] == -2
     assert server._lanxin_rejected["lastReason"] == "signature"
     assert server._lanxin_rejected["lastTimestampSample"] == ts
+
+
+def test_stale_branch_logs_the_raw_timestamp(lanxin_srv, caplog):
+    """M-2:stale 分支那行 logger.warning 此前【零测试保护】—— 删掉它 61 条测试全绿。
+
+    而它恰恰是 V4.5.8 定位「入站半环全死」根因③的【唯一证据来源】:生产日志里打出
+    19 位纳秒时间戳,才让人看出量纲不是秒。当时界面上没有样本可看、存证在这一步
+    之前就被拦下没落盘、报文体与签名按铁律不许记 —— 排查者手里只有这一行。
+    删掉它 = 把同一个坑重新挖开,且下次没有任何东西会变红。
+
+    铁律一并验:日志只准出现 timestamp 原值,【绝不能】带上签名。
+    """
+    body = json.dumps({"dataEncrypt": _FAKE_CIPHER})
+    stale = str(int(time.time()) - 86400)
+    sig = _sign("tok-abc", stale, "n1", _FAKE_CIPHER)     # 签名正确 → 必然走到 ②b 而非 ②
+
+    with caplog.at_level(logging.WARNING, logger="payment_review"):
+        status, payload = _post_callback(lanxin_srv, body, timestamp=stale, signature=sig)
+
+    assert status == 200
+    assert payload["errCode"] == -2
+    msgs = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any(stale in m for m in msgs), \
+        "stale 分支必须把 timestamp 原值打进日志,否则量纲问题无从查起;实际日志=%r" % msgs
+    assert not any(sig in m for m in msgs), "日志绝不能带签名"

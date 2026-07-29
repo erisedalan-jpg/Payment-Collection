@@ -493,6 +493,10 @@ def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
                 "employId": emp,
                 "name": r["name"],
                 "routeKey": r.get("routeKey") or "",
+                # role 决定这次推送要不要进《未响应清单》的待催视图:primary 卡带
+                # 「N 小时内未反馈将列入《未响应清单》」的动作要求,supervisor 汇总卡
+                # 【没有任何反馈时限承诺】。不记 role,上级会被清单当成"该催的人"。
+                "role": r.get("role") or "",
                 "projectIds": list(r.get("projectIds") or []),
                 "msgId": data.get("msgId") or "",
             })

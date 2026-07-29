@@ -4,12 +4,15 @@ socketserver、连接直接断开,前端只看到 Failed to fetch。本文件用
 import json
 import http.client
 import threading
+from datetime import datetime, timedelta
 
 import auth
 import config as CFG
 import lanxin
 import lanxin_config as LC
+import lanxin_inbox
 import lanxin_recipients
+import lanxin_unresponded
 import server
 
 
@@ -295,6 +298,62 @@ def test_send_now_reaches_card_head_title(tmp_path, monkeypatch):
         recipients = body["plan"]["recipients"]
         assert len(recipients) == 1
         assert recipients[0]["card"]["headTitle"].startswith("推送时间：")
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# ── review Important-4:发送台账的时间戳格式是【跨三个模块的隐式契约】 ────────
+#
+# 写入方是 handle_lanxin_send,解析方是 lanxin_inbox(prune/candidate_projects)与
+# lanxin_unresponded.compute。三处此前各写一份同值字面量、无 import 关系、无契约测试。
+# 变异实测实锤过:把 handler 里的 strftime 改成 '%Y-%m-%d %H:%M'(就是同一个函数往上
+# 十几行 build_plan(now=...) 用的那个格式,复制粘贴一步之遥),142 条测试零变红。
+# 后果全是静默的:① sentAt 全部解析失败 → dueAt='' / overdue=False → 未响应清单的
+# 默认「仅未响应」视图【永远空】,看上去像"大家都回了";② 台账 90 天清理失效;
+# ③ 归入候选恒空。全程零报错。
+#
+# 格式已收敛到 lanxin_inbox.TS_FMT 单一来源,但那解决不了「handler 里重新写死一个
+# 字面量」这一处 —— 只有端到端跑一次真实 POST /api/lanxin/send、把落盘结果喂给
+# compute,才能证明 handler 真的用了那个格式。
+
+def test_send_writes_sent_at_in_a_format_unresponded_can_parse(tmp_path, monkeypatch):
+    """端到端契约:真打 /api/lanxin/send → 读回落盘的台账 → 喂给 compute,
+    dueAt 必须【非空】、overdue 必须能算出来。
+
+    沿用本文件既有的 mock lanxin.dispatch 范式(不碰网络),但让它返回一条 sentLog,
+    这样 handler 的落盘分支才会真的跑到 —— 其余用例的 dispatch mock 都不带 sentLog,
+    落盘那一步在它们那里是死代码。
+    """
+    srv, port = _srv(tmp_path, monkeypatch)
+    monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "lanxin_inbox.json"))
+    LC.save_config(str(tmp_path / "lanxin_config.json"), _enabled_cfg())
+    monkeypatch.setattr(lanxin_recipients, "read_org_tree", lambda path: _UNRESP_TREE)
+    monkeypatch.setattr(lanxin, "dispatch", lambda plan, cfg: {
+        "sent": 1, "failed": [], "msgIds": ["m1"],
+        "sentLog": [{"staffId": "524288-aaa", "employId": "A006", "name": "张三",
+                     "routeKey": "timesheet", "role": "primary",
+                     "projectIds": [], "msgId": "m1"}]})
+    try:
+        conn, cookie = _login(port)
+        conn.request("POST", "/api/lanxin/send", json.dumps({"items": _UNRESP_ITEMS}),
+                     {"Content-Type": "application/json", "Cookie": cookie})
+        r = conn.getresponse()
+        assert r.status == 200
+        r.read()
+
+        store = server._load_lanxin_inbox()
+        assert len(store["sent"]) == 1, "handler 必须把 sentLog 落进台账"
+
+        # 用一个远未来的 now,让 overdue 必然为 True —— 这样 dueAt 与 overdue 两个
+        # 派生值都被钉住,而不只是"字段存在"。
+        far_future = (datetime.now() + timedelta(days=365)).strftime(lanxin_inbox.TS_FMT)
+        rows = lanxin_unresponded.compute(store, 24, far_future)
+        assert len(rows) == 1
+        assert rows[0]["dueAt"] != "", \
+            "sentAt 解析失败 —— handler 写入的时间戳格式与 lanxin_unresponded 对不上"
+        assert rows[0]["overdue"] is True
+        assert rows[0]["role"] == "primary", "role 必须一路从 sentLog 流到清单行"
     finally:
         srv.shutdown()
         srv.server_close()

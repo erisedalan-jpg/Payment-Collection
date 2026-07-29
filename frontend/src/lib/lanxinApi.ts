@@ -59,6 +59,11 @@ export interface LanxinRejectedStats {
   lastAt: string
   lastFrom?: string
   lastReason?: 'signature' | 'stale' | ''
+  /** 被拒报文的 timestamp【原值】(后端已 64 字符封顶)。不是密钥、不是报文体，可安全下发。
+   *  存在的唯一理由：lastReason==='stale' 时，「蓝信到底发的什么格式」在界面上无从看起——
+   *  存证在这一步之前就被拦下没落盘、报文体按铁律不许记，只剩服务器日志，而看日志既要 root
+   *  又要知道 grep 什么。不把它显示出来，等于把「需要 root」换成「需要会开 devtools」。 */
+  lastTimestampSample?: string
 }
 
 /** 完整响应:config + rejected(验签失败计数,Task 6 提供)。一次请求拿两样,
@@ -122,11 +127,16 @@ export async function deleteLanxinInboxItem(itemId: string): Promise<{ success: 
 // 判定是【人级】而非项目级:一期唯一回流通道是员工直接文本回复,回复正文不含项目信息,
 // 故某人在推送后回过任意一条即整批算已响应;二期 H5 反馈带项目号后才能下钻到项目级
 // (见 lanxin_unresponded.py 模块顶部的精度边界说明)。
+// role 决定这一行要不要出现在默认的「仅未响应」待催视图里：
+//   'primary'    本人明细卡，卡上带「N 小时内未反馈将列入《未响应清单》」的动作要求 → 该催
+//   'supervisor' 上级汇总卡，卡上【没有】动作要求、没有任何反馈时限承诺 → 只是知会，不该催
+//   ''           V4.5.8 之前的老台账没有这个键 → 不排除、不丢行（向后兼容）
 export interface UnrespondedRow {
   sentAt: string
   employId: string
   name: string
   routeKey: string
+  role: string
   projectCount: number
   dueAt: string
   overdue: boolean
