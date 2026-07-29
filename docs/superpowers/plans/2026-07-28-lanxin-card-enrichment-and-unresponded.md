@@ -1051,6 +1051,86 @@ Expected: 全部 PASS。
 全部既有语义，是本任务最强的回归安全网。任何一条变红，都不要去改测试，先回头看
 `_norm_reasons` 与并行桶是不是动到了不该动的东西。
 
+**例外：以下 3 条必须改，它们钉的是「卡片长什么样」而卡片形态本期就是要变的。**
+（Task 3 完成后 `tests/test_lanxin.py` 有 17 条红；其中 14 条是 `TypeError` —— 接线一改就自愈；
+只有这 3 条要动手改。改完 `tests/test_lanxin.py` 必须**全绿**，这是本任务的完成判据之一。）
+
+#### 例外 A：`test_build_plan_behavior_equivalence_after_migration_golden`
+
+这条 golden 逐字钉死 8 个收件人的 `bodyTitle` 与 `fields`。**只改 ② 项目 primary 那两条**，其余六条（工时 primary ×2、工时 supervisor ×2、项目 supervisor ×2）**一个字都不许动** —— 它们不变正是「本期只改 primary 项目卡、汇总卡零改动」的证据。
+
+```python
+        # ② 项目 primary(推本人):sorted(proj_by_emp) = A006, A007
+        # V4.5.8:卡片由「按原因分行的统计」改为「按项目分行的明细」,故 bodyTitle 与
+        # fields 随之变化。PMIS 夹具没有 projectName 键,build_plan 按 `pm.get("projectName")
+        # or pid` 回退成项目号,所以 value 里是 P1/P3 而不是中文项目名。
+        # 旧形 reasons(["回款延期"])经 _norm_reasons 归一后 detail 为空串,故不拼括号。
+        {"employId": "A006", "role": "primary",
+         "bodyTitle": "你名下 1 个项目需要跟进",
+         "fields": [{"key": "1", "value": "P1 · 回款延期"}]},
+        {"employId": "A007", "role": "primary",
+         "bodyTitle": "你名下 1 个项目需要跟进",
+         "fields": [{"key": "1", "value": "P3 · 回款延期"}]},
+```
+
+**绝不允许**为了让它过而放宽断言（比如删掉 `fields` 比较、改成只比 `employId`）。这条测试的价值就在于逐字段对拍；放宽它等于把本期最强的等价性证据丢掉。它的 docstring 里已经写着「断言必须反映真实情况，不能为了通过测试而放宽断言」。
+
+#### 例外 B：`test_reply_hint_never_truncated_at_byte_limit`
+
+它直接按旧签名调 `LR.build_project_card("张三", by_reason, reply_hint=True)`，且断言 `REPLY_HINT` 完整出现在 `bodyContent` 里。新卡片的 `bodyContent` 是空串、指引改走 `fields` 末尾的「动作要求」。**保住它原本的关切**（「引导语是操作指引，截半了比不显示更糟」），改写为：
+
+```python
+def test_action_hint_never_truncated_at_field_limit():
+    """引导语是操作指引,截半了比不显示更糟 —— 用户不知道该做什么。
+    新卡片把它放在 fields 末尾(旧版在 bodyContent),故上限从 3000 字节的正文
+    换成 192 字节/64 字的 field value。取 N 的最大合法值 720(三位数,最长)
+    + 塞满 8 行明细的最坏情形,断言它一字不缺。"""
+    hint = LR.build_action_hint(720, reply_hint=True)
+    projs = [{"name": "项" * 20 + "目%02d" % i,
+              "reasons": [{"category": "回款延期", "detail": "3 个延期节点"}]}
+             for i in range(1, 13)]
+    card = LR.build_project_card("张三", projs, action_hint=hint)
+    assert card["fields"][-1]["key"] == "动作要求"
+    assert card["fields"][-1]["value"] == hint          # 完整,不是半截
+```
+
+#### 例外 C：`test_build_plan_adds_reply_hint_when_callback_credentials_configured`
+
+原断言是「**每一张**卡片都带 `REPLY_HINT`」。新设计里两类卡的指引**有意不同**：
+
+| 卡片 | 收件人 | 指引 | 为什么 |
+|---|---|---|---|
+| primary（项目卡/工时卡） | 本人 | `动作要求` field，含 N 小时时限 | 他是被要求在 N 小时内反馈的人 |
+| summary（汇总卡） | 上级 | `bodyContent` 里的 `REPLY_HINT` | 上级不是被考核反馈时限的人，汇总卡本期不改 |
+
+改写为：
+
+```python
+def test_build_plan_wires_hint_to_every_card_by_role():
+    """I-1 核心不变:凭证配齐 → build_plan 产出的【每一张】卡片都有反馈指引。
+    但两类卡的指引【有意不同】:primary 是被要求 N 小时内反馈的本人,给带时限的
+    「动作要求」;summary 给上级,上级不被考核反馈时限,沿用 REPLY_HINT、本期不改。"""
+    cfg = _cfg_with_callback(_all_four_card_kinds_cfg())
+    plan = LX.build_plan(_FOUR_KIND_ITEMS, cfg, TREE, PMIS)
+
+    assert len(plan["recipients"]) == 4, "夹具应同时覆盖四种卡片"
+    for r in plan["recipients"]:
+        card_json = json.dumps(r["card"], ensure_ascii=False)
+        if r["role"] == "primary":
+            assert "未响应清单" in card_json, \
+                "%s/primary 的卡片缺少动作要求" % r["routeKey"]
+        else:
+            assert LR.REPLY_HINT in card_json, \
+                "%s/supervisor 的卡片缺少回复引导语" % r["routeKey"]
+```
+
+#### 必须原样跑绿的三条（不要动）
+
+`test_build_plan_omits_reply_hint_when_callback_not_configured`、
+`test_build_plan_omits_reply_hint_when_only_one_credential_configured`、
+`test_build_plan_treats_whitespace_credentials_as_unconfigured` ——
+它们断言的是「凭证不全时**一张都不许带**指引」。凭证不全 → `reply_hint=False` → `build_action_hint` 返回空串 → primary 卡不出动作要求 field、summary 卡不出 REPLY_HINT，三条**自然仍成立**。它们变红说明接线接错了，**不要改测试**。
+
 - [ ] **Step 7: 反向验证「汇总卡未受影响」**
 
 把 ⑥ 里的 `proj_detail_by_emp.get(emp)` 临时改成从 `proj_by_emp` 重塑（即删掉并行桶、把 `proj_by_emp` 改成按项目分组），跑：
