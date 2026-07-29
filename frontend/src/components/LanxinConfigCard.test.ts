@@ -284,16 +284,39 @@ describe('V4.5.8 反馈时限配置与回调地址自显示', () => {
     // 根因复盘:生产曾把回调地址填成 http://host/api/lanxin/callback(漏了 /pm),
     // nginx 只接管 /pm/,请求落到别的系统 → 收件箱恒空、零报错。
     // 这一行把「人工抄地址」变成「复制粘贴」。
+    //
+    // 注意:vitest 环境下 import.meta.env.BASE_URL 恒为 '/'(vite.config.ts 未覆盖),
+    // joinBase 在 base 为 '/' 时是空操作 —— 这条用例测不出「漏 /pm」这类前缀丢失,
+    // 只能证明"确实调用了 apiUrl() 而不是另一套写死逻辑"。真正演练事故场景见下一条。
     const w = await mountCard()
     const shown = w.find('[data-test="lx-callback-url"]').text()
     expect(shown).toBe(`${window.location.origin}${apiUrl('/api/lanxin/callback')}`)
     expect(shown).not.toContain('/pm/pm/')          // 前缀不得重复拼
   })
 
-  it('反馈时限输入框绑定 reviewDeadlineHours', async () => {
+  it('回调地址在 /pm 前缀部署下正确带上前缀(演练那次生产事故的真实场景)', async () => {
+    // 上一条用例在 base='/' 时测不出「漏 /pm」这类问题(写死值与推导值字符串恰好相同)。
+    // 这里显式把部署前缀 stub 成生产的真实值 '/pm/',才是真正复现那次事故:
+    // 超管当年抄的地址就是漏了这个前缀,nginx 只接管 /pm/ 段,请求才落到别的系统。
+    vi.stubEnv('BASE_URL', '/pm/')
+    try {
+      const w = await mountCard()
+      const shown = w.find('[data-test="lx-callback-url"]').text()
+      expect(shown).toBe(`${window.location.origin}/pm/api/lanxin/callback`)
+      expect(shown).toContain('/pm/api/lanxin/callback')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('反馈时限输入框绑定 reviewDeadlineHours(经控件交互驱动,不直接改 vm 状态)', async () => {
+    // 直接给 vm.cfg.reviewDeadlineHours 赋值只是改了 mock 初始值的"读出",不经过
+    // <el-input-number> 控件本身 —— 哪怕 v-model 误绑到别的字段(如 sendIntervalMs),
+    // 这种写法也测不出来。这里改成驱动控件的原生 input,证明"绑的就是这个字段"。
     const w = await mountCard()
     expect(w.find('[data-test="lx-deadline-hours"]').exists()).toBe(true)
-    expect((w.vm as any).cfg.reviewDeadlineHours).toBe(24)
+    await w.find('[data-test="lx-deadline-hours"] input').setValue('48')
+    expect((w.vm as any).cfg.reviewDeadlineHours).toBe(48)
   })
 
   it('【承重】保存时把 reviewDeadlineHours 提交给后端', async () => {
