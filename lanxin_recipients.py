@@ -214,20 +214,34 @@ def _card(head: str, title: str, subtitle: str, fields: List[Dict[str, str]],
 
 
 def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
-                         start: str, end: str, reply_hint: bool = False) -> Dict[str, Any]:
-    """工时卡 → 填报人本人。问题类型共 7 类,fields 恒 ≤10 对,永不撞线。
-    start/end 任一为空 → 不出「统计区间」这行副标题,绝不拼出半截文案(宁可不显示,不显示空区间)。
-    reply_hint=True 时在 bodyContent 追加回复引导语(仅回调凭证已配置时由调用方传 True)。"""
+                         start: str, end: str, action_hint: str = "",
+                         sent_at: str = "") -> Dict[str, Any]:
+    """工时卡 → 填报人本人。
+
+    issues 元素:{"code":…, "label":…, "count":…, "lastDate": "YYYY-MM-DD"(可选)}
+    lastDate 缺失 → 不拼「· 最近 …」,绝不拼出半截文案(与 start/end 同策略:
+    宁可不显示,不显示空值)。
+
+    问题码共 8 类 → 明细最多 8 行,加动作要求 = 9,永不触及蓝信 10 对上限
+    (_card 仍有 fields[:MAX_FIELDS] 兜底)。
+    """
     total = sum(int(i["count"]) for i in issues)
     rows = sorted(issues, key=lambda i: -int(i["count"]))
-    fields = [_field(short_issue(i["label"]), "%d 条" % int(i["count"])) for i in rows]
-    subtitle = "统计区间 %s ~ %s" % (start, end) if start and end else ""
-    content = REPLY_HINT if reply_hint else ""
-    return _card("工时填报提醒",
+    fields: List[Dict[str, str]] = []
+    for i in rows:
+        value = "%d 条" % int(i["count"])
+        last = str(i.get("lastDate") or "")
+        if last:
+            value += " · 最近 %s" % last[5:]      # 'YYYY-MM-DD' → 'MM-DD',卡片上年份是噪音
+        fields.append(_field(short_issue(i["label"]), value))
+    if action_hint:
+        fields.append(_field("动作要求", action_hint))
+
+    return _card(("推送时间：%s" % sent_at) if sent_at else "工时填报提醒",
                  "你有 %d 条工时填报存在问题" % total,
-                 subtitle,
+                 "统计区间 %s ~ %s" % (start, end) if start and end else "",
                  fields,
-                 content)
+                 "")
 
 
 PROJECT_DETAIL_ROWS = 8        # 明细行上限。8 + 「其余」+ 「动作要求」= 10,正好是蓝信 fields 硬上限

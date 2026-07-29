@@ -94,18 +94,6 @@ def test_fit_bytes_noop_when_short():
     assert LR.fit_bytes("abc", 100) == "abc"
 
 
-def test_timesheet_card_fields_within_limit():
-    issues = [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3},
-              {"code": "TYPE_MISMATCH", "label": "工时类型填报有误", "count": 2}]
-    card = LR.build_timesheet_card("张三", issues, "2026-07-01", "2026-07-15")
-    assert card["headTitle"] == "工时填报提醒"
-    assert "5 条" in card["bodyTitle"]
-    assert len(card["fields"]) == 2
-    assert card["fields"][0]["key"] == "缺少工作概述"
-    assert card["fields"][0]["value"] == "3 条"
-    assert "2026-07-01" in card["bodySubTitle"]
-
-
 def test_summary_card_nested_shape():
     rows = [{"name": "隋文宇", "total": 14, "reasons": [("回款延期", 6), ("成本超支", 5)]},
             {"name": "于岩", "total": 9, "reasons": [("回款延期", 3)]}]
@@ -201,13 +189,6 @@ def test_issue_short_labels_are_not_mangled_words():
     assert LR.ISSUE_SHORT_LABELS["售前服务类产品类别不应为「其他」"] == "售前类别有误"
 
 
-def test_timesheet_card_uses_short_issue_label_in_fields():
-    issues = [{"code": "MISS_NEXT", "label": "缺少下一步工作计划", "count": 3}]
-    card = LR.build_timesheet_card("张三", issues, "2026-07-01", "2026-07-07")
-    assert card["fields"][0]["key"] == "缺下一步计划"
-    assert "…" not in card["fields"][0]["key"]
-
-
 # ── 同款护栏也补给 REASON_WHITELIST(此前三个短标签是人肉算的字节数,没有测试锁住) ──
 
 def test_every_reason_fits_field_key_without_truncation():
@@ -215,21 +196,6 @@ def test_every_reason_fits_field_key_without_truncation():
         s = LR.short_reason(reason)
         assert len(s.encode("utf-8")) <= LR.LIMIT_FIELD_KEY, "%s → %s 仍超限" % (reason, s)
         assert LR._field(s, "1 个项目")["key"] == s, "%s 被 fit_field 截成残词" % reason
-
-
-# ── I-2:工时卡副标题恒为「统计区间  ~ 」的死代码修复 ──
-
-def test_timesheet_card_subtitle_empty_when_no_range():
-    """start/end 缺失(前端未带上或后端拿到空串)时,宁可不显示这行副标题,也不拼出半截文案。"""
-    issues = [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]
-    card = LR.build_timesheet_card("张三", issues, "", "")
-    assert card["bodySubTitle"] == ""
-
-
-def test_timesheet_card_subtitle_present_when_range_given():
-    issues = [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]
-    card = LR.build_timesheet_card("张三", issues, "2026-07-01", "2026-07-07")
-    assert card["bodySubTitle"] == "统计区间 2026-07-01 ~ 2026-07-07"
 
 
 # ── I-1:build_summary_card 的 unit/head_title/title_fmt/label_fn 通用化(供工时汇总卡复用) ──
@@ -490,3 +456,91 @@ def test_project_card_body_content_never_populated():
     card = LR.build_project_card("张三", [_proj("A", ("回款延期", "1 个延期节点"))],
                                  action_hint="请直接回复本消息反馈，24小时内未反馈将列入《未响应清单》")
     assert "bodyContent" not in card
+
+
+# ── Task 4:build_timesheet_card 加最近日期/动作要求/推送时间(与 build_project_card 同构) ──
+
+def test_timesheet_card_shows_last_date():
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5, "lastDate": "2026-07-25"},
+    ], "2026-07-20", "2026-07-26")
+    assert card["fields"][0] == {"key": "未填工作成果", "value": "5 条 · 最近 07-25"}
+
+
+def test_timesheet_card_omits_last_date_when_absent():
+    """lastDate 缺失 → 不拼出「· 最近 」这种残文案。与 start/end 同策略:
+    宁可不显示,不显示空值。"""
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5},
+    ], "2026-07-20", "2026-07-26")
+    assert card["fields"][0]["value"] == "5 条"
+
+
+def test_timesheet_card_action_field_is_last():
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5, "lastDate": "2026-07-25"},
+    ], "2026-07-20", "2026-07-26",
+        action_hint="请直接回复本消息反馈，24小时内未反馈将列入《未响应清单》")
+    assert card["fields"][-1]["key"] == "动作要求"
+
+
+def test_timesheet_card_omits_action_field_when_hint_empty():
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5},
+    ], "", "", action_hint="")
+    assert all(f["key"] != "动作要求" for f in card["fields"])
+
+
+def test_timesheet_card_keeps_short_label_mapping():
+    """回归安全网:超 18 字节的标签仍走 short_issue 短标签,本次改动不得影响它。"""
+    card = LR.build_timesheet_card("张三", [
+        {"code": "MISS_NEXT", "label": "缺少下一步工作计划", "count": 2},
+    ], "", "")
+    assert card["fields"][0]["key"] == "缺下一步计划"
+
+
+def test_timesheet_card_keeps_subtitle_rule():
+    """回归安全网:start/end 任一为空则不出副标题,绝不拼半截文案。"""
+    assert LR.build_timesheet_card("张三", [
+        {"code": "X", "label": "L", "count": 1}], "2026-07-20", "")["bodySubTitle"] == ""
+    assert LR.build_timesheet_card("张三", [
+        {"code": "X", "label": "L", "count": 1}], "2026-07-20", "2026-07-26")["bodySubTitle"] \
+        == "统计区间 2026-07-20 ~ 2026-07-26"
+
+
+def test_timesheet_card_sent_at_goes_to_head_title():
+    card = LR.build_timesheet_card("张三", [
+        {"code": "X", "label": "L", "count": 1}], "", "", sent_at="2026-07-28 09:00")
+    assert card["headTitle"] == "推送时间：2026-07-28 09:00"
+    assert "\n" not in card["headTitle"]
+
+
+# ── 终审补漏:旧用例 test_timesheet_card_fields_within_limit(Step 1 因签名换成
+#    action_hint 被删,删除本身没错)保护的三个关切,Task 4 新增的 7 条用例全是
+#    单条 issue 的夹具,没有一条继承下来 ──
+
+def test_timesheet_card_aggregates_and_sorts_multiple_issues():
+    """继承自被删的 test_timesheet_card_fields_within_limit。它验证的三个关切在单条
+    issue 的夹具下全部测不出,7 条新用例因此都没接住:
+    1) total 是多条 count 的合计(sum(...) 写错在单条夹具下 3 恒等于 3,发现不了);
+    2) fields 按 count 降序排列(单条夹具下排序是恒等操作,sorted 是否真的在起作用测不出);
+    3) sent_at 缺省时 headTitle 回退到「工时填报提醒」(7 条新用例只有
+       test_timesheet_card_sent_at_goes_to_head_title 验了"给了 sent_at"这一支,没有
+       一条验空 sent_at 的回退支)。
+    issues 刻意把 count 小的排在【前面】、count 大的排在【后面】——若实现退化成不排序
+    (直接 list(issues)),fields[0] 会变成 count=2 的那条,下面按 key/value 的断言就会
+    失败;若像旧用例那样凑巧按 count 降序传参,排序失效时输出不变,这条测试就形同虚设。
+    """
+    issues = [
+        {"code": "TYPE_MISMATCH", "label": "工时类型填报有误", "count": 2},
+        {"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 3},
+    ]
+    card = LR.build_timesheet_card("张三", issues, "2026-07-01", "2026-07-15")
+    assert card["headTitle"] == "工时填报提醒"                  # sent_at 缺省 → 回退文案
+    assert card["bodyTitle"] == "你有 5 条工时填报存在问题"      # 3+2=5,不是任一单条的 count
+    assert len(card["fields"]) == 2
+    assert card["fields"][0]["key"] == "缺少工作概述"            # count=3,排到前面(与输入顺序相反)
+    assert card["fields"][0]["value"] == "3 条"
+    assert card["fields"][1]["key"] == "工时类型有误"            # count=2,排后面;短标签生效
+    assert card["fields"][1]["value"] == "2 条"
+    assert "2026-07-01" in card["bodySubTitle"]
