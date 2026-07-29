@@ -1502,7 +1502,24 @@ it('反馈时限输入框绑定 reviewDeadlineHours', async () => {
   expect(w.find('[data-test="lx-deadline-hours"]').exists()).toBe(true)
   expect((w.vm as any).cfg.reviewDeadlineHours).toBe(24)
 })
+
+it('【承重】保存时把 reviewDeadlineHours 提交给后端', async () => {
+  // 与 Task 1 后端 validate_config 的白名单 dict 同一个故障模式:
+  // 保存载荷若漏了这个字段,超管改成 48 → 点保存 → 无任何报错 → 刷新又变回 24。
+  // 前后端任一侧漏掉都是这个表现,所以两侧都要有测试钉住。
+  const w = mount(LanxinConfigCard, { /* 同上 */ })
+  await flushPromises()
+  ;(w.vm as any).cfg.reviewDeadlineHours = 48
+  await w.find('[data-test="lx-save"]').trigger('click')   // 按钮 selector 用该组件既有的
+  await flushPromises()
+  expect(vi.mocked(saveLanxinConfig)).toHaveBeenCalledWith(
+    expect.objectContaining({ reviewDeadlineHours: 48 }))
+})
 ```
+
+> 保存按钮的 selector 与 `saveLanxinConfig` 的 mock 方式**沿用该测试文件既有的写法**；若既有测试已有「点保存并断言载荷」的用例，照它的形态写。
+
+**反向验证（本任务第三项）**：把保存载荷里的 `reviewDeadlineHours` 临时去掉 → 上面这条必须红。这条不做反向验证等于没做 —— 它防的正是「静默丢弃」，而静默丢弃的定义就是不会报错。
 
 > 挂载选项、`getLanxinConfigFull` 的 mock 方式，**沿用该测试文件里既有的写法**，不要另造一套。mock 返回的 config 需含 `reviewDeadlineHours: 24`。
 
@@ -1617,6 +1634,26 @@ it('展示后端下发的时限,不自带默认值', async () => {
   expect(w.text()).toContain('72')
 })
 ```
+
+另在 `frontend/src/views/DataView.test.ts`（若无则新建）加一条**权限面**测试：
+
+```ts
+it('未响应清单 tab 仅超管可见', async () => {
+  // 该 tab 列的是全员推送台账(谁被推了、谁没回),属敏感面。
+  // v-if="auth.isSuper" 被误删不会有任何报错,普通管理员会直接看到全员台账。
+  const auth = useAuthStore()
+  auth.isSuper = false
+  const w = mount(DataView, { /* 沿用该文件既有挂载选项 */ })
+  await flushPromises()
+  expect(w.text()).not.toContain('未响应清单')
+  auth.isSuper = true
+  const w2 = mount(DataView, { /* 同上 */ })
+  await flushPromises()
+  expect(w2.text()).toContain('未响应清单')
+})
+```
+
+> `useAuthStore` 的 `isSuper` 若是 computed 而非可写状态，改为设置其依赖的底层字段（沿用该文件或 `AppSidebar.test.ts` 里既有的超管切换写法）。**反向验证**：删掉 `v-if="auth.isSuper"` → 本条必须红。
 
 > `mountWithRows(rows, deadlineHours = 24)` 是本测试文件内的辅助，mock `getLanxinUnresponded` 返回 `{ success: true, rows, deadlineHours }`。mock 方式沿用 `LanxinInboxCard.test.ts` 的既有写法。
 
