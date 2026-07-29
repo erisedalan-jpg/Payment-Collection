@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 import { getLanxinConfigFull, saveLanxinConfig, lanxinSelftest,
          type LanxinConfig } from '@/lib/lanxinApi'
+import { apiUrl } from '@/lib/baseUrl'
 
 const emit = defineEmits<{ (e: 'open-push'): void }>()
 
@@ -23,9 +24,9 @@ const rejected = ref<{ count: number; lastAt: string; lastReason?: string }>(
 const selftestEmp = ref('')
 const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
 
-// 系统不知道自己的对外地址；但超管是从浏览器打开这个页面的，他看到的 origin
-// 就是蓝信要访问的地址(同一张内网)，故直接用 location.origin 拼。
-const callbackUrl = computed(() => `${location.origin}/api/lanxin/callback`)
+// 回调地址【绝不写死】:前缀由构建时的 vite base 决定(开发 '/' / 生产 '/pm/'),
+// 写死必然与部署漂移 —— 生产就因为人工抄地址漏了 /pm,回调静默丢了一整期。
+const callbackUrl = computed(() => window.location.origin + apiUrl('/api/lanxin/callback'))
 
 async function copyCallbackUrl() {
   await navigator.clipboard.writeText(callbackUrl.value)
@@ -136,8 +137,20 @@ defineExpose({ rejected })
         </el-radio-group>
         <span class="dv-hint">机器人须由组织管理员额外开通「机器人能力」；应用号无需额外审批</span>
       </div>
+      <div class="dv-row">
+        <span class="dv-label">反馈时限</span>
+        <el-input-number v-model="cfg.reviewDeadlineHours" :min="1" :max="720" :step="1"
+          size="small" controls-position="right" data-test="lx-deadline-hours" />
+        <span class="dv-hint">小时。卡片文案与《未响应清单》判定共用此值</span>
+      </div>
 
       <div class="dv-sub-head">回调（员工回复回流本系统，向蓝信组织管理员申请，与 AppId/AppSecret 是另外两个凭证）</div>
+      <div class="dv-row">
+        <span class="dv-label">回调地址</span>
+        <span class="lx-callback-url" data-test="lx-callback-url">{{ callbackUrl }}</span>
+        <button class="dv-btn" data-test="lx-copy-callback" @click="copyCallbackUrl">复制</button>
+        <span class="dv-hint">请原样填入蓝信开发者中心。地址按本系统实际部署前缀自动生成，不要手抄</span>
+      </div>
       <div class="dv-row">
         <span class="dv-label">回调密钥</span>
         <el-input v-model="newCallbackAesKey" size="small" type="password" show-password
@@ -155,12 +168,6 @@ defineExpose({ rejected })
         <span class="dv-hint" :class="cfg.credentials.hasCallbackSignToken ? 'ok' : 'warn'">
           {{ cfg.credentials.hasCallbackSignToken ? '已配置' : '未配置' }} · 不回显、不入日志与审计
         </span>
-      </div>
-      <div class="dv-row">
-        <span class="dv-label">回调地址</span>
-        <span class="lx-callback-url" data-test="lx-callback-url">{{ callbackUrl }}</span>
-        <button class="dv-btn" data-test="lx-copy-callback" @click="copyCallbackUrl">复制</button>
-        <span class="dv-hint">填到开发者中心「回调事件」页的「订阅事件回调地址」</span>
       </div>
       <div v-if="rejected.count > 0" class="dv-row" data-test="lx-rejected">
         <span class="dv-label">已拒绝</span>

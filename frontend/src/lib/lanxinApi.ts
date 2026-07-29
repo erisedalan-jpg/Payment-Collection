@@ -21,6 +21,8 @@ export interface LanxinConfig {
   sendIntervalMs: number
   /** 发送身份：应用号(account) | 智能机器人(bot)，默认 account。 */
   sendAs: 'account' | 'bot'
+  /** 反馈时限(小时,1~720)。卡片文案「N 小时内未反馈…」与《未响应清单》判定共用此值。 */
+  reviewDeadlineHours: number
   credentials: {
     appId: string; appSecret: string; orgId: string
     apiGateway: string; idType: string; hasSecret?: boolean

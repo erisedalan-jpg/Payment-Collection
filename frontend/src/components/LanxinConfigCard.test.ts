@@ -6,12 +6,13 @@ import LanxinConfigCard from './LanxinConfigCard.vue'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 import { ALL_RISK_CATEGORIES } from '@/lib/riskReasons'
 import { getLanxinConfigFull, type LanxinConfig } from '@/lib/lanxinApi'
+import { apiUrl } from '@/lib/baseUrl'
 
 // items 恒为完整白名单长度(后端 lanxin_config._validate_items 按白名单补齐)。
 // 只把 MISS_SUMMARY / 回款延期 设为已启用,其余 code 保持 enabled:false ——
 // 这样才能同时覆盖「已启用项渲染」与「未启用项仍渲染」两种场景。
 const CFG = {
-  enabled: false, sendIntervalMs: 200, sendAs: 'account',
+  enabled: false, sendIntervalMs: 200, sendAs: 'account', reviewDeadlineHours: 24,
   credentials: { appId: 'app-1', appSecret: '', orgId: '524288',
                  apiGateway: 'https://apigw.example.com', idType: 'employ_id', hasSecret: true,
                  callbackAesKey: '', callbackSignToken: '',
@@ -275,5 +276,36 @@ describe('V4.0.5 回调双向配置(发送身份/回调双凭证/回调地址/�
     const payload = calls[calls.length - 1][0] as LanxinConfig
     expect(payload.credentials.callbackAesKey).toBe('new-aes-key-123')
     expect(payload.credentials.callbackSignToken).toBe('new-sign-token-456')
+  })
+})
+
+describe('V4.5.8 反馈时限配置与回调地址自显示', () => {
+  it('回调地址按部署前缀自推导,不是写死值', async () => {
+    // 根因复盘:生产曾把回调地址填成 http://host/api/lanxin/callback(漏了 /pm),
+    // nginx 只接管 /pm/,请求落到别的系统 → 收件箱恒空、零报错。
+    // 这一行把「人工抄地址」变成「复制粘贴」。
+    const w = await mountCard()
+    const shown = w.find('[data-test="lx-callback-url"]').text()
+    expect(shown).toBe(`${window.location.origin}${apiUrl('/api/lanxin/callback')}`)
+    expect(shown).not.toContain('/pm/pm/')          // 前缀不得重复拼
+  })
+
+  it('反馈时限输入框绑定 reviewDeadlineHours', async () => {
+    const w = await mountCard()
+    expect(w.find('[data-test="lx-deadline-hours"]').exists()).toBe(true)
+    expect((w.vm as any).cfg.reviewDeadlineHours).toBe(24)
+  })
+
+  it('【承重】保存时把 reviewDeadlineHours 提交给后端', async () => {
+    // 与 Task 1 后端 validate_config 的白名单 dict 同一个故障模式:
+    // 保存载荷若漏了这个字段,超管改成 48 → 点保存 → 无任何报错 → 刷新又变回 24。
+    // 前后端任一侧漏掉都是这个表现,所以两侧都要有测试钉住。
+    const { saveLanxinConfig } = await import('@/lib/lanxinApi')
+    const w = await mountCard()
+    ;(w.vm as any).cfg.reviewDeadlineHours = 48
+    await w.find('[data-test="lx-save"]').trigger('click')
+    await flushPromises()
+    expect(vi.mocked(saveLanxinConfig)).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewDeadlineHours: 48 }))
   })
 })
