@@ -54,6 +54,7 @@ import lanxin_config
 import lanxin_crypto
 import lanxin_inbox
 import lanxin_recipients
+import lanxin_unresponded
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
 _PMIS_UPLOAD_NAMES = set(config.PMIS_ALL_FILENAMES)
@@ -238,6 +239,8 @@ _SUPER_ONLY_PATHS = frozenset({
     # 收件箱三个端点超管专属;/api/lanxin/callback【绝不能】进本集合 ——
     # 这个闸按 path 匹配、不分 method,进了就等于把蓝信挡在门外。
     '/api/lanxin/inbox', '/api/lanxin/inbox/handle', '/api/lanxin/inbox/delete',
+    # 未响应清单是全员推送台账(谁被推了/谁没回),敏感面同收件箱,超管专属。
+    '/api/lanxin/unresponded',
 })
 
 
@@ -373,7 +376,10 @@ LANXIN_CALLBACK_MAX_BYTES = 1024 * 1024
 # 'stale'(新鲜度检查失败,通常是时间戳格式/两端时钟对不上)—— 两者原因完全不同,
 # 共用同一个计数器会让超管排查时误把"格式假设错了"当成"密钥填错了"去查(见
 # lanxin_timestamp_fresh 的假设声明 + PROGRESS.md 债务条目)。
-_lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": "", "lastReason": ""}
+_lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": "", "lastReason": "",
+                    # 被拒报文的 timestamp【原值】。不是密钥(不是签名、不是报文体、不是密钥),
+                    # 可安全下发给超管 —— 这是判断「蓝信实际发的什么格式」的唯一可见线索。
+                    "lastTimestampSample": ""}
 
 # 存证文件的滚动归档(I-2)。参照 audit.py 的既有做法:活动文件超上限就整份挪进
 # 归档目录、只保留最近若干份。不做滚动的话这个纯 append 的 jsonl 只增不减 ——
@@ -437,6 +443,15 @@ def lanxin_timestamp_fresh(timestamp, now_epoch, skew=LANXIN_CALLBACK_MAX_SKEW_S
     while abs(val) >= 10 ** 11:
         val //= 1000
     return abs(val - now_epoch) <= skew
+
+
+def _record_lanxin_reject(reason, timestamp, from_ip):
+    """记一次回调拒绝。timestamp 原值截断存 —— 免登录入口,长度必须封顶。"""
+    _lanxin_rejected['count'] += 1
+    _lanxin_rejected['lastAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _lanxin_rejected['lastFrom'] = from_ip
+    _lanxin_rejected['lastReason'] = reason
+    _lanxin_rejected['lastTimestampSample'] = str(timestamp or '')[:64]
 
 
 def _load_lanxin_inbox():
@@ -1127,6 +1142,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_lanxin_config_get()
         elif parsed.path == '/api/lanxin/inbox':
             self.handle_lanxin_inbox_get()
+        elif parsed.path == '/api/lanxin/unresponded':
+            self.handle_lanxin_unresponded_get()
         elif parsed.path == '/api/lanxin/callback':
             # 回调只收 POST。这里显式回 405 而非落到静态文件分支,
             # 便于超管在浏览器里直接打开回调地址时看到明确提示。
@@ -3405,7 +3422,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
         try:
             plan = lanxin.build_plan(body.get('items') or [], cfg,
-                                     self._lanxin_tree(), self._lanxin_pmis())
+                                     self._lanxin_tree(), self._lanxin_pmis(),
+                                     now=datetime.now().strftime('%Y-%m-%d %H:%M'))
         except FileNotFoundError:
             self._send_json(400, _error_payload(ERR_VALIDATION,
                             "未找到 input/组织架构.xlsx，无法解析收件人"))
@@ -3440,7 +3458,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         try:
             plan = lanxin.build_plan(body.get('items') or [], cfg,
-                                     self._lanxin_tree(), self._lanxin_pmis())
+                                     self._lanxin_tree(), self._lanxin_pmis(),
+                                     now=datetime.now().strftime('%Y-%m-%d %H:%M'))
             result = lanxin.dispatch(plan, cfg)
         except lanxin.LanxinError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION,
@@ -3509,19 +3528,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         # ② 验签。未通过只记数与时间,绝不落 body。
         if not sign_token or not lanxin_crypto.verify_signature(
                 sign_token, timestamp, nonce, data_encrypt, signature):
-            _lanxin_rejected['count'] += 1
-            _lanxin_rejected['lastAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            _lanxin_rejected['lastFrom'] = audit.client_ip(self.headers, self.client_address)
-            _lanxin_rejected['lastReason'] = 'signature'
+            _record_lanxin_reject('signature', timestamp,
+                                  audit.client_ip(self.headers, self.client_address))
             self._send_json(200, {"errCode": -2, "errMsg": "签名校验失败"})
             return
 
         # ②b 新鲜度。签名合法但过期 = 重放,按验签失败同等处理:不落盘、只记数。
         if not lanxin_timestamp_fresh(timestamp, time.time()):
-            _lanxin_rejected['count'] += 1
-            _lanxin_rejected['lastAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            _lanxin_rejected['lastFrom'] = audit.client_ip(self.headers, self.client_address)
-            _lanxin_rejected['lastReason'] = 'stale'
+            _record_lanxin_reject('stale', timestamp,
+                                  audit.client_ip(self.headers, self.client_address))
             # 排查者拿不到报文体也拿不到签名(铁律),这行日志是判断"蓝信到底发的
             # 什么格式"的唯一线索——只打 timestamp 原值,绝不打签名/密钥/报文体。
             logger.warning("蓝信回调时间戳未通过新鲜度检查(疑似重放,或时间戳格式不符假设): "
@@ -3590,6 +3605,22 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True, "items": items,
                               "rejected": dict(_lanxin_rejected),
                               "received": len(store.get('items') or [])})
+
+    def handle_lanxin_unresponded_get(self):
+        """GET /api/lanxin/unresponded —— 未响应清单。超管专属(路径已在 _SUPER_ONLY_PATHS)。
+
+        小时数从 cfg['reviewDeadlineHours'] 读,与卡片文案【同源】——
+        两处各自默认就会出现「卡上写 24 小时、清单按别的算」。
+        """
+        cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
+        hours = int(cfg.get('reviewDeadlineHours')
+                    or lanxin_config.DEFAULT_REVIEW_DEADLINE_HOURS)
+        with _lanxin_inbox_lock:
+            store = _load_lanxin_inbox()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self._send_json(200, {"success": True,
+                              "rows": lanxin_unresponded.compute(store, hours, now),
+                              "deadlineHours": hours})
 
     def handle_lanxin_inbox_handle(self):
         """POST /api/lanxin/inbox/handle {itemId, domain, projectId, riskCode?, instanceId?}

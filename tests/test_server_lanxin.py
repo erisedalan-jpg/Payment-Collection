@@ -204,3 +204,38 @@ def test_send_malformed_item_returns_400_not_disconnect(tmp_path, monkeypatch):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# ── Task 7:未响应清单端点 ────────────────────────────────────────────────
+
+def test_unresponded_path_is_super_only():
+    """未响应清单含全员推送台账,必须超管专属。_SUPER_ONLY_PATHS 按【精确 path】匹配。"""
+    assert '/api/lanxin/unresponded' in server._SUPER_ONLY_PATHS
+
+
+def test_unresponded_deadline_comes_from_config(tmp_path, monkeypatch):
+    """【N 单一来源】端点返回的 deadlineHours 必须来自 cfg['reviewDeadlineHours'],
+    与卡片文案同源。两处各自默认 = 「卡上写 24 小时、清单按别的算」。
+
+    这里【故意不用 inspect.getsource 查字面量】:那种源码正则断言在本仓出过事
+    (V4.5.3:解析失配 → 循环空跑 → 恒真通过)。行为断言才钉得住。
+
+    _srv 已把 server.LANXIN_CONFIG_FILE 指到 tmp_path/lanxin_config.json,
+    所以起服务【之后】往那个路径写配置即可生效(load_config 每次请求都重读)。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "lanxin_inbox.json"))
+    cfg = LC.default_config()
+    cfg["reviewDeadlineHours"] = 72
+    (tmp_path / "lanxin_config.json").write_text(
+        json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+    try:
+        conn, cookie = _login(port)
+        conn.request("GET", "/api/lanxin/unresponded", headers={"Cookie": cookie})
+        r = conn.getresponse()
+        assert r.status == 200
+        body = json.loads(r.read())
+        assert body["deadlineHours"] == 72
+        assert body["rows"] == []          # 空收件箱 → 空清单
+    finally:
+        srv.shutdown()
+        srv.server_close()

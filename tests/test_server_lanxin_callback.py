@@ -753,3 +753,60 @@ def test_mark_handled_returns_false_for_missing_item():
     assert lanxin_inbox.mark_handled(store, "nope", {"domain": "risk"}) is False
     lanxin_inbox.add_item(store, {"id": "i1", "handled": False})
     assert lanxin_inbox.mark_handled(store, "i1", {"domain": "risk"}) is True
+
+
+# ── Task 7:_lanxin_rejected 新增 lastTimestampSample ────────────────────────
+
+def test_rejected_records_timestamp_sample_on_stale(tmp_path, monkeypatch):
+    """新鲜度拒绝时把 timestamp 【原值】记下来并经 config 接口下发 ——
+    这是判断「蓝信到底发的什么格式」的唯一可见线索(PROGRESS 挂着的债:
+    epoch 秒是未证实假设)。timestamp 不是密钥,可安全下发。"""
+    server._lanxin_rejected['lastTimestampSample'] = ''
+    # 走一次新鲜度失败分支(沿用本文件既有的伪造报文 + 真验签的辅助方式)
+    monkeypatch.setattr(server, "LANXIN_CONFIG_FILE", str(tmp_path / "lanxin_config.json"))
+    monkeypatch.setattr(server, "LANXIN_RAW_FILE", str(tmp_path / "raw.jsonl"))
+    monkeypatch.setattr(server, "LANXIN_INBOX_FILE", str(tmp_path / "inbox.json"))
+    cfg = lanxin_config.default_config()
+    cfg["credentials"]["callbackSignToken"] = "tok-abc"
+    cfg["credentials"]["callbackAesKey"] = _WRONG_AES_KEY
+    with open(server.LANXIN_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False)
+
+    srv = server.create_server(host="127.0.0.1", port=0)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        body = json.dumps({"dataEncrypt": _FAKE_CIPHER})
+        ts = "2026-07-28T09:00:00Z"              # 非纯数字格式,isdigit() 必为 False → 走 stale 分支
+        sig = _sign("tok-abc", ts, "n1", _FAKE_CIPHER)      # 用真实算法算出通得过验签的签名
+        status, payload = _post_callback(port, body, timestamp=ts, signature=sig)
+        assert status == 200
+        assert payload["errCode"] == -2
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+    assert server._lanxin_rejected['lastReason'] == 'stale'
+    assert server._lanxin_rejected['lastTimestampSample'] == '2026-07-28T09:00:00Z'
+
+
+def test_timestamp_sample_is_length_capped():
+    """超长 timestamp 不得无界存进内存 —— 免登录入口,长度必须封顶。"""
+    server._record_lanxin_reject('stale', 'x' * 500, '1.2.3.4')
+    assert len(server._lanxin_rejected['lastTimestampSample']) <= 64
+
+
+def test_config_payload_exposes_timestamp_sample_and_no_secrets(tmp_path, monkeypatch):
+    """下发含 lastTimestampSample,且【绝不含任何密钥】。
+    注意真名是 _lanxin_config_payload(带前导下划线),且它【自己读配置文件】、不收参数 ——
+    须 monkeypatch server.LANXIN_CONFIG_FILE 指到 tmp_path 下写好的配置。"""
+    p = tmp_path / 'lanxin_config.json'
+    cfg = lanxin_config.default_config()
+    cfg['credentials'].update(appSecret='SECRET_VALUE', callbackAesKey='AES_VALUE',
+                              callbackSignToken='TOKEN_VALUE')
+    p.write_text(json.dumps(cfg, ensure_ascii=False), encoding='utf-8')
+    monkeypatch.setattr(server, 'LANXIN_CONFIG_FILE', str(p))
+    body = json.dumps(server._lanxin_config_payload(), ensure_ascii=False)
+    assert 'lastTimestampSample' in body
+    for leaked in ('SECRET_VALUE', 'AES_VALUE', 'TOKEN_VALUE'):
+        assert leaked not in body
