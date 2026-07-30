@@ -1019,13 +1019,28 @@ def _post_json(port, path, obj):
     return r.status, (json.loads(body) if body else {})
 
 
+def _stub_web_root(tmp_path, monkeypatch):
+    """把 WEB_ROOT 指到 tmp_path 并放一份 review.html 替身。
+
+    为什么用替身而不读真实产物:真实的 frontend/public/review.html 由【下一个任务】
+    创建,且要经 vite build 才会出现在 WEB_ROOT(frontend/dist)下。本任务的职责是
+    【路由】—— 「/review/<token> 有没有被正确分派、有没有被 SPA 回退吃掉」,
+    与页面内容无关。用替身让这两条测试不依赖尚不存在的产物,也不依赖跑一次构建。
+    真实产物是否被 vite 拷进 dist,由下一个任务自己验。
+    """
+    (tmp_path / "review.html").write_text(
+        '<!DOCTYPE html><html><body><div id="review-root"></div></body></html>',
+        encoding="utf-8")
+    monkeypatch.setattr(server, "WEB_ROOT", str(tmp_path))
+
+
 def test_review_page_served_without_login(tmp_path, monkeypatch):
     """【承重】H5 页必须免登录。它在蓝信内置 webview 里打开,那里没有本系统会话。"""
     srv, port = _srv(tmp_path, monkeypatch)
+    _stub_web_root(tmp_path, monkeypatch)
     try:
         st, body = _get(port, "/review/anything")
         assert st == 200
-        assert b"<!DOCTYPE html" in body or b"<!doctype html" in body
         assert b"review-root" in body, "应当是 review.html 而不是 Vue SPA 的 index.html"
     finally:
         srv.shutdown(); srv.server_close()
@@ -1033,11 +1048,26 @@ def test_review_page_served_without_login(tmp_path, monkeypatch):
 
 def test_review_page_not_swallowed_by_spa_fallback(tmp_path, monkeypatch):
     """【承重】should_spa_fallback('/review/xxx') 返回 True(无 /api 前缀、末段无点),
-    不加显式分支就会吐 Vue SPA 的 index.html —— 页面能打开、但完全不是那个页面。"""
+    不加显式分支就会吐 Vue SPA 的 index.html —— 页面能打开、但完全不是那个页面,
+    且不会有任何报错。"""
     srv, port = _srv(tmp_path, monkeypatch)
+    _stub_web_root(tmp_path, monkeypatch)
     try:
         _, body = _get(port, "/review/tok")
+        assert b"review-root" in body
         assert b'id="app"' not in body, "吐的是 Vue SPA,说明被 SPA 回退吃掉了"
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_review_page_missing_file_returns_404_not_spa(tmp_path, monkeypatch):
+    """review.html 没部署时给明确 404,【不要】静默回退到 SPA ——
+    回退会让「前端没构建」这个部署事故伪装成「页面打开了但功能不对」。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    monkeypatch.setattr(server, "WEB_ROOT", str(tmp_path / "empty"))
+    try:
+        st, _body = _get(port, "/review/tok")
+        assert st == 404
     finally:
         srv.shutdown(); srv.server_close()
 
@@ -1524,23 +1554,40 @@ mkdir -p frontend/public
 13. **不使用任何 emoji**
 14. 全文简体中文
 
-- [ ] **Step 2: 手工验证页面能被服务**
+- [ ] **Step 2: 构建并确认 vite 真的把它拷进了 dist**
+
+上一个任务的路由测试用的是 `review.html` **替身**（`monkeypatch WEB_ROOT`），只验路由、不验产物。**「vite 会不会把 `public/` 下的文件拷进 `dist/`」这件事必须在这里实证**——它是本任务交付物能否被服务到的前提，而且是个**部署级**假设：若不成立，生产上 `/review/<token>` 会 404，而所有单测照样全绿。
+
+```bash
+npm --prefix frontend run build
+ls -la frontend/dist/review.html
+grep -c "review-root" frontend/dist/review.html
+```
+Expected: 文件存在；`review-root` 命中 1 次
+
+- [ ] **Step 3: 用真实产物跑一次端到端**
 
 ```bash
 python -m pytest tests/test_server_lanxin_review.py -q -k "review_page"
 ```
-Expected: 两条 PASS（此前它们因文件不存在而 FAIL）
+Expected: 三条全 PASS（它们用的是替身，与真实产物无关，此处是确认没被本任务改动影响）
 
-> 这两条测试读的是 `WEB_ROOT` 下的 `review.html`。开发环境 `WEB_ROOT` 指向 `frontend/dist`，所以**需要先构建一次**让 vite 把 `public/review.html` 拷过去：`npm --prefix frontend run build`。若不想每次都构建，测试里也可 monkeypatch `WEB_ROOT` 指向 `frontend/public` —— 二者取其一，在报告里说明选了哪个。
-
-- [ ] **Step 3: 构建并确认 vite 拷了过去**
+再手工确认真实产物能被服务（`WEB_ROOT` 开发环境指向 `frontend/dist`，上一步已构建）：
 
 ```bash
-npm --prefix frontend run build
-ls frontend/dist/review.html
-grep -c "review-root" frontend/dist/review.html
+python - <<'PY'
+import os, threading, http.client, server
+srv = server.create_server(host="127.0.0.1", port=0)
+port = srv.server_address[1]
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+c = http.client.HTTPConnection("127.0.0.1", port); c.request("GET", "/review/faketoken")
+r = c.getresponse(); body = r.read(); srv.shutdown(); srv.server_close()
+print("status", r.status, "| review-root in body:", b"review-root" in body,
+      "| is Vue SPA:", b'id="app"' in body)
+PY
 ```
-Expected: 文件存在，`review-root` 命中 1 次
+Expected: `status 200 | review-root in body: True | is Vue SPA: False`
+把这段输出贴进报告 —— 这是「真实产物确实能被服务」的唯一证据。
 
 - [ ] **Step 4: 提交**
 
