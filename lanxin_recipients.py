@@ -200,7 +200,7 @@ def _field(key: str, value: str) -> Dict[str, str]:
 
 
 def _card(head: str, title: str, subtitle: str, fields: List[Dict[str, str]],
-          content: str = "") -> Dict[str, Any]:
+          content: str = "", card_link: str = "") -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "headTitle": head,
         "bodyTitle": fit_bytes(title, LIMIT_BODY_TITLE),
@@ -210,17 +210,24 @@ def _card(head: str, title: str, subtitle: str, fields: List[Dict[str, str]],
     }
     if content:
         out["bodyContent"] = fit_bytes(content, LIMIT_BODY_CONTENT)
+    # cardLink 非空即让整卡可点(蓝信实测)。空串【不写这个键】—— 写了等于整卡
+    # 点了没反应,比不可点更糟(用户以为坏了)。
+    # 【不做任何截断】:它是 URL,截断即失效;token 约 100+ 字符,总长可轻易超过
+    # 其它字段的字节上限,套用 fit_* 会把链接切坏。
+    if card_link:
+        out["cardLink"] = card_link
     return out
 
 
 def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
                          start: str, end: str, action_hint: str = "",
-                         sent_at: str = "") -> Dict[str, Any]:
+                         sent_at: str = "", card_link: str = "") -> Dict[str, Any]:
     """工时卡 → 填报人本人。
 
     issues 元素:{"code":…, "label":…, "count":…, "lastDate": "YYYY-MM-DD"(可选)}
     lastDate 缺失 → 不拼「· 最近 …」,绝不拼出半截文案(与 start/end 同策略:
     宁可不显示,不显示空值)。
+    card_link: 整卡点击链接。非空时蓝信让整卡可点,空则卡片不可点。
 
     问题码共 8 类 → 明细最多 8 行,加动作要求 = 9,永不触及蓝信 10 对上限
     (_card 仍有 fields[:MAX_FIELDS] 兜底)。
@@ -243,17 +250,20 @@ def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
                  "你有 %d 条工时填报存在问题" % total,
                  "统计区间 %s ~ %s" % (start, end) if start and end else "",
                  fields,
-                 "")
+                 "",
+                 card_link)
 
 
 PROJECT_DETAIL_ROWS = 8        # 明细行上限。8 + 「其余」+ 「动作要求」= 10,正好是蓝信 fields 硬上限
 
 
 def build_project_card(name: str, projects: List[Dict[str, Any]],
-                       action_hint: str = "", sent_at: str = "") -> Dict[str, Any]:
+                       action_hint: str = "", sent_at: str = "",
+                       card_link: str = "") -> Dict[str, Any]:
     """项目卡 → 项目经理本人。一人一张。
 
     projects: [{"name": 项目名, "reasons": [{"category":…, "detail":…}, …]}, …]
+    card_link: 整卡点击链接。非空时蓝信让整卡可点,空则卡片不可点。
 
     为什么仍是聚合卡而不是单项目单卡:实测 638 个在建项目里 324 个命中关注原因、
     涉及 69 人,单人最多背 32 个 —— 单项目单卡会让 3 个人一次收到 20+ 张,一次就砸掉
@@ -290,7 +300,8 @@ def build_project_card(name: str, projects: List[Dict[str, Any]],
                  "你名下 %d 个项目需要跟进" % len(rows),
                  "",
                  fields,
-                 "")      # bodyContent 留空:它渲染在 fields 之前,动作要求放这儿会跑到最上面
+                 "",
+                 card_link)      # bodyContent 留空:它渲染在 fields 之前,动作要求放这儿会跑到最上面
 
 
 def build_summary_card(name: str, rows: List[Dict[str, Any]], level_label: str,
