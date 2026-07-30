@@ -15,6 +15,12 @@ export interface LanxinInboxItem {
   handled: boolean
   handledInfo: Record<string, unknown> | null
   candidateProjects: string[]
+  /** 来源。缺失 = V4.5.8 及以前的条目,一律按蓝信文本回复处理。 */
+  source?: 'h5' | 'callback'
+  /** H5 反馈自带的项目号(project 侧)。文本回复没有这个信息。 */
+  projectId?: string | null
+  /** H5 反馈自带的问题码(timesheet 侧)。 */
+  issueCode?: string | null
 }
 
 export const HANDLE_DOMAINS = [
@@ -74,4 +80,9 @@ export function riskChoices(
 /** 已归入的不可重复归入；未解析的不许往业务数据里写。 */
 export function canHandle(item: Pick<LanxinInboxItem, 'handled' | 'status'>): boolean {
   return !item.handled && item.status === 'parsed'
+}
+
+/** 来源显示名。缺 source 键 = 老条目 = 蓝信文本回复。 */
+export function sourceLabel(item: Pick<LanxinInboxItem, 'source'>): string {
+  return item.source === 'h5' ? 'H5 反馈' : '蓝信回复'
 }

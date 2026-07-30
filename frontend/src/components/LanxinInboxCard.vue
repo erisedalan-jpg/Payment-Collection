@@ -5,7 +5,7 @@ import { useDataStore } from '@/stores/data'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { getLanxinInbox, handleLanxinInboxItem, deleteLanxinInboxItem } from '@/lib/lanxinApi'
-import { HANDLE_DOMAINS, needsInstance, needsRiskCode, riskChoices, canHandle,
+import { HANDLE_DOMAINS, needsInstance, needsRiskCode, riskChoices, canHandle, sourceLabel,
          type HandleDomain, type LanxinInboxItem } from '@/lib/lanxinInbox'
 
 const data = useDataStore()
@@ -33,8 +33,10 @@ async function load() {
   }
 }
 
-/** 来源展示：三种事件类型对应私聊/群聊(+群名)/应用号；未知类型(理论上必是未解析)原样显示。 */
-function sourceLabel(item: LanxinInboxItem): string {
+/** 渠道展示：三种事件类型对应私聊/群聊(+群名)/应用号；其余(含 H5 反馈的 h5_review)原样显示 eventType。
+ *  与 lib/lanxinInbox.ts 的 sourceLabel(H5 反馈/蓝信回复二选一)是两个不同维度，不要混同——
+ *  改名 channelLabel 就是为了让两者能在同一处并列使用而不撞名。 */
+function channelLabel(item: LanxinInboxItem): string {
   if (item.eventType === 'bot_group_message') return item.groupName ? `群聊 · ${item.groupName}` : '群聊'
   if (item.eventType === 'bot_private_message') return '私聊'
   if (item.eventType === 'account_message') return '应用号'
@@ -78,7 +80,9 @@ function onScopeChange() {
 async function openHandle(item: LanxinInboxItem) {
   if (!canHandle(item)) return
   handleItem.value = item
-  handleForm.value = { domain: '', instanceId: '', projectId: item.candidateProjects[0] ?? '', riskCode: '' }
+  // H5 反馈自带项目号(project 侧,item.projectId)时优先预选它——结构化信息就不该
+  // 再丢回给人工判断；缺失(老回调条目/H5 的 timesheet 侧)则维持原有候选项目预填。
+  handleForm.value = { domain: '', instanceId: '', projectId: item.projectId || (item.candidateProjects[0] ?? ''), riskCode: '' }
   handleOpen.value = true
   // 提前把临时跟进实例列表拉起来:域下拉切到 temp 时不必再等一轮网络往返才看到实例选项。
   // 复用既有 store,不是本组件自己再起一份请求逻辑(V4.0.2 多实例化后实例列表的唯一来源)。
@@ -167,7 +171,11 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
         <template #default="{ row }: { row: LanxinInboxItem }">{{ row.employId ?? '-' }}</template>
       </el-table-column>
       <el-table-column label="来源" width="140">
-        <template #default="{ row }: { row: LanxinInboxItem }">{{ sourceLabel(row) }}</template>
+        <template #default="{ row }: { row: LanxinInboxItem }">
+          <div>{{ channelLabel(row) }}</div>
+          <!-- H5 反馈 vs 蓝信文本回复:超管要能一眼区分哪条自带项目号、可直接归入 -->
+          <div class="dv-hint" :data-test="`lx-item-source-${row.id}`">{{ sourceLabel(row) }}</div>
+        </template>
       </el-table-column>
       <el-table-column label="状态" width="200">
         <template #default="{ row }: { row: LanxinInboxItem }">

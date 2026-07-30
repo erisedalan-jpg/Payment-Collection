@@ -290,4 +290,33 @@ describe('LanxinInboxCard', () => {
     await openHandleDrawer(wrapper)
     expect(loadSpy).toHaveBeenCalled()
   })
+
+  it('H5 反馈条目带来源标识,与员工文本回复可区分', async () => {
+    // 两条通道汇流一处是设计(spec §4.5.2),但超管必须能看出哪条是结构化的 H5 反馈
+    // (自带项目号、可直接归入)、哪条是自由文本回复(要人工判断归到哪)
+    const w = await mountInbox([
+      baseItem({ id: 'h5-1', source: 'h5', projectId: 'P1', text: 'H5 来的' }),
+      baseItem({ id: 'cb-1', text: '回复来的' }),       // 既有条目没有 source 键
+    ])
+    expect(w.find('[data-test="lx-item-source-h5-1"]').text()).toContain('H5')
+    expect(w.find('[data-test="lx-item-source-cb-1"]').text()).toContain('回复')
+  })
+
+  it('【承重】H5 条目归入时预选它自带的项目号', async () => {
+    // H5 反馈天生知道是哪个项目(卡片就是按项目推的),不预选等于把结构化信息
+    // 丢回给人工判断 —— 那正是 H5 通道相对文本回复的全部优势
+    const w = await mountInbox([baseItem({ id: 'h5-1', source: 'h5', projectId: 'P7' })])
+    await openHandleDrawer(w)
+    const vm = w.vm as unknown as { handleForm: { projectId: string } }
+    expect(vm.handleForm.projectId).toBe('P7')
+  })
+
+  it('既有回调条目缺 source 键时不报错、按「回复」处理且不预选项目', async () => {
+    // 老数据向后兼容:V4.5.8 及以前的条目没有 source/projectId/issueCode 三个键
+    const w = await mountInbox([baseItem({ id: 'cb-1' })])
+    expect(w.find('[data-test="lx-item-source-cb-1"]').text()).toContain('回复')
+    await openHandleDrawer(w)
+    const vm = w.vm as unknown as { handleForm: { projectId: string } }
+    expect(vm.handleForm.projectId).toBe('')
+  })
 })
