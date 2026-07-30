@@ -307,10 +307,15 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     # 【绝不重塑 proj_by_emp】—— 上级汇总卡的 proj_counts 依赖它的 {原因: [项目名]} 形状,
     # 改形会连带砸掉汇总卡。并行桶是本文件既有范式(proj_ids_by_emp 就是这么加的)。
     proj_detail_by_emp: Dict[str, Dict[str, List[Dict[str, str]]]] = {}
-    # 项目名 → 项目号。reviewItems 需要项目号(H5 越权写判据),而 proj_detail_by_emp
+    # emp → 项目名 → 项目号。reviewItems 需要项目号(H5 越权写判据),而 proj_detail_by_emp
     # 是按项目名分组的(卡片文案用名字)。另开一份映射,不改并行桶形状 ——
     # 与 proj_ids_by_emp 同样是「并行桶」范式(见其上方注释)。
-    name_to_pid: Dict[str, str] = {}
+    # 【必须逐人分桶,不能是全局单层 name→pid】:proj_detail_by_emp 是 emp→name 两层,
+    # 同名项目只在【同一个人内部】合并、跨人不合并 —— 现网不同项目起同名是真实可能的
+    # (终审实测抓到)。若用全局单层映射,后处理到的人会把前一个人的项目号顶掉/读到,
+    # 这不是"取错号"这么轻,reviewItems.projectId 是 H5 提交的【越权写判据】,
+    # 串号直接变成跨人越权写。同一人内部仍是先到先得(与卡片行合并同一取舍)。
+    name_to_pid: Dict[str, Dict[str, str]] = {}
     ts_by_emp: Dict[str, List[Dict[str, Any]]] = {}
     ts_range = {"start": "", "end": ""}
     # 工时 counts 按【中文 label】聚合,而配置按【英文 code】——分桶时顺手建映射,
@@ -372,7 +377,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 continue
             bucket = proj_by_emp.setdefault(emp, {})
             pname = str(pm.get("projectName") or pid)
-            name_to_pid.setdefault(pname, pid or "")
+            name_to_pid.setdefault(emp, {}).setdefault(pname, pid or "")
             for r in reasons:
                 bucket.setdefault(r["category"], []).append(pname)
             proj_detail_by_emp.setdefault(emp, {}).setdefault(pname, []).extend(
@@ -433,12 +438,12 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 continue
             h5 = _h5_url(emp, "project")
             # reviewItems 要带 projectId(H5 提交时的越权写判据靠它),而 mine 只有项目名。
-            # 从并行桶按名字取回项目号:proj_detail_by_emp 是按项目名分组的,
-            # 这里另建一份「名字 → 项目号」映射,不改并行桶本身的形状。
+            # 从并行桶按【本人】名字取回项目号 —— name_to_pid 必须先按 emp 取子表再按
+            # 名字取号,不能是全局单层映射(见 name_to_pid 声明处注释:同名跨人不合并)。
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
                 "routeKey": "project", "projectIds": list(proj_ids_by_emp.get(emp) or []),
-                "reviewItems": [{"projectId": name_to_pid.get(p["name"], ""),
+                "reviewItems": [{"projectId": (name_to_pid.get(emp) or {}).get(p["name"], ""),
                                  "name": p["name"], "reasons": list(p["reasons"])}
                                 for p in mine],
                 "card": build_project_card(by_id[emp]["name"], mine,
