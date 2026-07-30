@@ -34,6 +34,12 @@ const selftestSteps = ref<{ name: string; ok: boolean; msg: string }[]>([])
 // 写死必然与部署漂移 —— 生产就因为人工抄地址漏了 /pm,回调静默丢了一整期。
 const callbackUrl = computed(() => window.location.origin + apiUrl('/api/lanxin/callback'))
 
+// H5 基地址的【建议值】。绝不写死 —— 前缀由构建时的 vite base 决定(开发 '/' /
+// 生产 '/pm/')。本期问题①的根因正是「页面显示了一个漏 /pm 的地址、超管照抄」,
+// 同一个坑不能踩第二次。apiUrl('/') 去掉末尾斜杠即得部署根。
+const suggestedReviewBase = computed(
+  () => window.location.origin + apiUrl('/').replace(/\/$/, ''))
+
 async function copyCallbackUrl() {
   await navigator.clipboard.writeText(callbackUrl.value)
   ElMessage.success('回调地址已复制')
@@ -188,6 +194,18 @@ defineExpose({ rejected })
             （时间戳原值 <span class="u-num">{{ rejected.lastTimestampSample }}</span>，
             2026-07-29 联调实测蓝信发的是 19 位纳秒）
           </span>
+        </span>
+      </div>
+
+      <div class="dv-sub-head">H5 反馈页（员工点卡片跳转填报，不依赖回调）</div>
+      <div class="dv-row">
+        <span class="dv-label">对外基地址</span>
+        <el-input v-model="cfg.reviewBaseUrl" size="small" style="width: 320px"
+          data-test="lx-review-base-url" placeholder="留空 = 不发 H5 链接" />
+        <el-button size="small" data-test="lx-review-base-fill"
+          @click="cfg.reviewBaseUrl = suggestedReviewBase">填入建议值</el-button>
+        <span class="dv-hint" data-test="lx-review-base-suggest">
+          建议 {{ suggestedReviewBase }} · 按本系统实际部署前缀自动生成，不要手抄
         </span>
       </div>
 

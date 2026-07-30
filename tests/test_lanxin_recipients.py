@@ -575,3 +575,54 @@ def test_timesheet_card_omits_last_date_when_malformed():
         {"code": "MISS_SUMMARY", "label": "未填工作成果", "count": 5, "lastDate": "2026"},
     ], "2026-07-20", "2026-07-26")
     assert card["fields"][0]["value"] == "5 条"
+
+
+# ── Task 3:_card 支持 card_link(整卡可点跳 H5 填报页) ────────────────────────────
+
+def test_card_link_absent_when_empty():
+    """【承重】空 card_link 时【不许】出现 cardLink 键。
+    蓝信实测:cardLink 非空即让整卡可点;给个空串等于让整卡点了没反应,
+    比不可点更糟(用户以为坏了)。"""
+    card = LR.build_project_card("张三", [
+        {"name": "A", "reasons": [{"category": "回款延期", "detail": "1 个延期节点"}]}])
+    assert "cardLink" not in card
+
+
+def test_card_link_present_when_given():
+    card = LR.build_project_card("张三", [
+        {"name": "A", "reasons": [{"category": "回款延期", "detail": "1 个延期节点"}]}],
+        card_link="http://x/pm/review/tok")
+    assert card["cardLink"] == "http://x/pm/review/tok"
+
+
+def test_timesheet_card_link_passthrough():
+    card = LR.build_timesheet_card("张三", [
+        {"code": "X", "label": "L", "count": 1}], "", "", card_link="http://x/pm/review/tok")
+    assert card["cardLink"] == "http://x/pm/review/tok"
+    assert "cardLink" not in LR.build_timesheet_card(
+        "张三", [{"code": "X", "label": "L", "count": 1}], "", "")
+
+
+def test_card_link_not_truncated():
+    """cardLink 是 URL,截断即失效。它不受任何 fit_* 上限约束 —— 逐字原样输出。
+    token 约 100+ 字符,base 再长些,总长可轻易超过其它字段的上限。"""
+    url = "http://10.248.105.95/pm/review/" + "t" * 200
+    card = LR.build_project_card("张三", [
+        {"name": "A", "reasons": [{"category": "回款延期", "detail": "1"}]}], card_link=url)
+    assert card["cardLink"] == url
+
+
+def test_summary_card_has_no_card_link_param():
+    """【跨期承重约束】汇总卡零改动 —— 它不接 card_link,签名不许动。
+    上级收到的是知会,不承担限时反馈,不该跳 H5 填报页。"""
+    import inspect
+    assert "card_link" not in inspect.signature(LR.build_summary_card).parameters
+
+
+def test_summary_card_body_never_emits_card_link():
+    """【跨期承重约束·行为级兜底】inspect.signature 那条只钉签名,钉不住函数体
+    ——_card 有 6 个位置参数,汇总卡即使不加形参,也能在函数体里直接给第 6 位塞
+    一个字面量 URL。故必须再断言【输出里不出现 cardLink 键】,这才是真正要守的行为。"""
+    rows = [{"name": "隋文宇", "total": 14, "reasons": [("回款延期", 6), ("成本超支", 5)]}]
+    card = LR.build_summary_card("张英哲", rows, "部门级汇总（+3）")
+    assert "cardLink" not in card

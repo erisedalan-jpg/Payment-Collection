@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>反馈填报</title>
+<style>
+  /* 零外链单文件页(蓝信内置 webview 可能没有外网):CSS 全部内联在这里,
+     不引用 frontend/src/styles/theme.css —— 那套令牌体系不约束这个页面。 */
+  :root {
+    --brand: #0D3A69;
+    --ok: #6ECC54;
+    --warn: #F9D46C;
+    --danger: #C8161D;
+    --bg: #F5F6F8;
+    --card-bg: #FFFFFF;
+    --text: #262626;
+    --sub: #6B7280;
+    --border: #E5E7EB;
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    /* 系统字体栈,不外链字体 */
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+                 Helvetica, Arial, "Microsoft YaHei", sans-serif;
+    font-size: 16px;           /* 基准 16px:小于 16px 的 input/textarea 会触发 iOS 自动缩放 */
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  #review-root { max-width: 600px; margin: 0 auto; padding: 16px 16px 40px; min-height: 100vh; }
+  .header { margin-bottom: 16px; padding: 0 4px; }
+  .header h1 { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--brand); }
+  .header p { margin: 0; color: var(--sub); font-size: 14px; }
+  .state-msg { text-align: center; padding: 64px 16px; color: var(--sub); font-size: 16px; }
+  .state-msg.error { color: var(--danger); }
+  .reload-wrap { text-align: center; }
+  .reload-link {
+    display: inline-block; margin-top: 16px; padding: 0 20px; min-height: 44px; line-height: 44px;
+    border: 1px solid var(--brand); border-radius: var(--r-sm); color: var(--brand);
+    font-size: 16px; background: transparent;
+  }
+  .card {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 16px; margin-bottom: 16px;
+  }
+  .card.done { border-color: rgba(110, 204, 84, .45); background: #FAFFF8; }
+  .card h2 { font-size: 17px; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+  .reason { font-size: 14px; color: var(--sub); margin-bottom: 4px; padding-left: 14px; position: relative; }
+  .reason::before { content: '→'; position: absolute; left: 0; color: var(--brand); }
+  .badge-done {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    background: rgba(110, 204, 84, .16); color: #3F8F28; font-size: 12px; font-weight: 600;
+    margin-bottom: 8px;
+  }
+  textarea {
+    display: block; width: 100%; min-height: 84px; margin-top: 12px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 16px;
+    font-family: inherit; color: var(--text); background: #fff; resize: vertical;
+  }
+  textarea:disabled { background: #F0F1F3; color: var(--sub); }
+  textarea:focus { outline: none; border-color: var(--brand); }
+  .btn {
+    display: block; width: 100%; margin-top: 12px; min-height: 44px; border: none;
+    border-radius: var(--r-sm); background: var(--brand); color: #fff;
+    font-size: 16px; font-weight: 600;
+  }
+  .btn:disabled { background: #B7C2CC; color: #fff; }
+  .btn.done { background: var(--ok); }
+  .card-msg { margin-top: 8px; font-size: 14px; color: var(--danger); min-height: 18px; }
+</style>
+</head>
+<body>
+<!-- 根元素 id 不可改:server.py 侧的路由测试靠 "review-root" 这个串区分
+     「服务的是本页」还是「被 SPA 回退吃掉、吐出了 Vue 的挂载页 index.html」。
+     (注:此处刻意不逐字写出 Vue 挂载点的 id 属性写法,那正是运维/测试脚本用来
+     判断"是不是被 SPA 回退吃掉"的子串特征,写在这里会把它污染成假阳性。) -->
+<div id="review-root">
+  <div class="state-msg">加载中…</div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // 全文按 ES5 语法写(var/function 表达式/字符串拼接,不用 const/let/箭头函数/模板字符串):
+  // 这页零构建零 lint 零类型检查,蓝信内置 webview 的 JS 引擎版本从未被验证过,
+  // 用最保守的语法兜底,把"能不能解析"这件事的风险降到最低。
+
+  // token 取路径末段。/review/<token> 与 /pm/review/<token> 都适用(末段就是 token)。
+  var token = location.pathname.split('/').filter(Boolean).pop() || '';
+
+  // apiBase:取 pathname 里 "/review/" 之前的那段,当接口前缀。
+  // 【承重,不要写死 '/pm'】—— 生产 nginx 挂在 /pm/ 下会剥掉这段前缀,开发环境是根路径;
+  // 且 public/ 下的文件由 vite 逐字节原样拷进 dist、不参与 --base 重写,唯一的办法是
+  // 运行时从当前 URL 自己推。indexOf 找不到时显式给 -1 兜底,避免 slice(0, -1)
+  // 在异常路径下悄悄砍掉前缀的最后一个字符。
+  var reviewIdx = location.pathname.indexOf('/review/');
+  var apiBase = reviewIdx >= 0 ? location.pathname.slice(0, reviewIdx) : '';
+
+  var root = document.getElementById('review-root');
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+
+  function clearRoot() {
+    while (root.firstChild) root.removeChild(root.firstChild);
+  }
+
+  function showFullMessage(text, withReload) {
+    clearRoot();
+    root.appendChild(el('div', 'state-msg error', text));
+    if (withReload) {
+      var wrap = el('div', 'reload-wrap', null);
+      var btn = el('button', 'reload-link', '重新加载');
+      btn.type = 'button';
+      btn.addEventListener('click', function () { location.reload(); });
+      wrap.appendChild(btn);
+      root.appendChild(wrap);
+    }
+  }
+
+  // 【与简报的实测出入,详见 task-6-report.md】server.py 的 _error_payload 实际产出的是
+  // 扁平结构 {success:false, code, message}(handle_lanxin_review_submit 的失败分支
+  // 直接 _send_json(400, _error_payload(...))),不是嵌套的 {error:{code,message}}。
+  // 这里两种形状都兼容一遍,任何一边以后调整都不会让这页读出 undefined。
+  function extractErrorMessage(data) {
+    if (data && data.error && typeof data.error === 'object' && data.error.message) {
+      return String(data.error.message);
+    }
+    if (data && typeof data.error === 'string' && data.error) {
+      return data.error;
+    }
+    if (data && data.message) {
+      return String(data.message);
+    }
+    return '提交失败，请稍后重试';
+  }
+
+  function renderReasonLine(r) {
+    var cat = (r && r.category) || '';
+    var detail = (r && r.detail) || '';
+    if (cat && detail) return cat + '：' + detail;
+    return cat || detail;
+  }
+
+  function renderCard(kind, item) {
+    var card = el('div', 'card', null);
+
+    var title = kind === 'project'
+      ? (item.name || item.projectId || '')
+      : (item.label || item.code || '');
+    card.appendChild(el('h2', null, title));
+
+    var badge = el('span', 'badge-done', '已提交');
+    badge.style.display = 'none';
+    card.appendChild(badge);
+
+    if (kind === 'project') {
+      var reasons = item.reasons || [];
+      for (var i = 0; i < reasons.length; i++) {
+        var line = renderReasonLine(reasons[i]);
+        if (line) card.appendChild(el('div', 'reason', line));
+      }
+    } else {
+      var countText = (item.count !== undefined && item.count !== null) ? item.count : '-';
+      card.appendChild(el('div', 'reason', countText + ' 条'));
+      card.appendChild(el('div', 'reason', '最近 ' + (item.lastDate || '-')));
+    }
+
+    var ta = document.createElement('textarea');
+    ta.placeholder = '请输入反馈内容…';
+    card.appendChild(ta);
+
+    var btn = el('button', 'btn', '提交');
+    btn.type = 'button';
+    card.appendChild(btn);
+
+    var msg = el('div', 'card-msg', '');
+    card.appendChild(msg);
+
+    function setPending(pending) {
+      btn.disabled = pending;
+      ta.disabled = pending;
+      btn.textContent = pending ? '提交中…' : '提交';
+    }
+
+    function markDone() {
+      badge.style.display = '';
+      card.className = 'card done';
+      btn.className = 'btn done';
+      btn.textContent = '已提交';
+      btn.disabled = true;
+      ta.disabled = true;
+      msg.textContent = '';
+    }
+
+    btn.addEventListener('click', function () {
+      var content = ta.value.trim();
+      if (!content) {
+        msg.textContent = '请先填写反馈内容';
+        return;
+      }
+      msg.textContent = '';
+      setPending(true);          // 立即禁用,防连点重复提交
+
+      var payload = { token: token, content: content };
+      if (kind === 'project') {
+        payload.projectId = item.projectId;
+      } else {
+        payload.code = item.code;
+      }
+
+      fetch(apiBase + '/api/lanxin/review/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (resp) {
+        // resp.json() 失败(比如中间层吐了非 JSON 的错误页)不算网络异常,
+        // 按"看不懂的失败"处理,交给 extractErrorMessage 兜底文案。
+        return resp.json().then(function (data) {
+          return { status: resp.status, data: data };
+        }).catch(function () {
+          return { status: resp.status, data: null };
+        });
+      }).then(function (result) {
+        if (result.status === 200 && result.data && result.data.success) {
+          markDone();
+        } else {
+          // 失败:按钮/textarea 恢复可用(不然一次网络抖动就再也提交不了),
+          // 且把后端 message 原样显示,不吞掉。
+          setPending(false);
+          msg.textContent = extractErrorMessage(result.data);
+        }
+      }).catch(function () {
+        // fetch 本身被拒绝(断网/DNS/连接失败等)—— 网络异常兜底,不静默。
+        setPending(false);
+        msg.textContent = '网络异常，请检查网络后重试';
+      });
+    });
+
+    return card;
+  }
+
+  function renderPage(data) {
+    clearRoot();
+
+    var header = el('div', 'header', null);
+    header.appendChild(el('h1', null, '你好，' + (data.name || '')));
+    var hours = (data.deadlineHours !== undefined && data.deadlineHours !== null) ? data.deadlineHours : '-';
+    header.appendChild(el('p', null, '请在 ' + hours + ' 小时内反馈'));
+    root.appendChild(header);
+
+    var items = data.items || [];
+    if (items.length === 0) {
+      root.appendChild(el('div', 'state-msg', '当前没有待反馈的事项'));
+      return;
+    }
+    for (var i = 0; i < items.length; i++) {
+      root.appendChild(renderCard(data.kind, items[i]));
+    }
+  }
+
+  fetch(apiBase + '/api/lanxin/review/items?token=' + encodeURIComponent(token))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || data.success !== true) {
+        // token 失效/畸形/过期:整页显示提示,不渲染表单。
+        showFullMessage('链接已失效，请联系管理员重新推送', false);
+        return;
+      }
+      renderPage(data);
+    })
+    .catch(function () {
+      // 首屏加载阶段的网络异常兜底;这里给重新加载入口,因为重试确实可能有效
+      // (不像"链接已失效"那种重试也没用的情形)。
+      showFullMessage('网络异常，请检查网络后重试', true);
+    });
+})();
+</script>
+</body>
+</html>

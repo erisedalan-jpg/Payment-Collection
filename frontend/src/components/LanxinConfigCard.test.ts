@@ -14,6 +14,7 @@ import { apiUrl } from '@/lib/baseUrl'
 // 这样才能同时覆盖「已启用项渲染」与「未启用项仍渲染」两种场景。
 const CFG = {
   enabled: false, sendIntervalMs: 200, sendAs: 'account', reviewDeadlineHours: 24,
+  reviewBaseUrl: '',
   credentials: { appId: 'app-1', appSecret: '', orgId: '524288',
                  apiGateway: 'https://apigw.example.com', idType: 'employ_id', hasSecret: true,
                  callbackAesKey: '', callbackSignToken: '',
@@ -362,5 +363,56 @@ describe('V4.5.8 反馈时限配置与回调地址自显示', () => {
     await flushPromises()
     expect(vi.mocked(saveLanxinConfig)).toHaveBeenCalledWith(
       expect.objectContaining({ reviewDeadlineHours: 48 }))
+  })
+})
+
+describe('V4.5.9 H5 反馈页基地址配置', () => {
+  it('H5 基地址输入框绑定 reviewBaseUrl', async () => {
+    const w = await mountCard()
+    expect(w.find('[data-test="lx-review-base-url"]').exists()).toBe(true)
+    // 注意:plain el-input 的 inheritAttrs:false + attrs 直接 v-bind 在内层原生 <input> 上
+    // (与 lx-deadline-hours 用的 el-input-number 不同,那个才需要嵌套" input"选择器)——
+    // data-test 落在 <input> 标签本身,故此处不加嵌套选择器,与同文件 lx-callback-aes-key
+    // 等既有 el-input 用例(V4.0.5 节)写法一致。
+    await w.find('[data-test="lx-review-base-url"]').setValue('http://h/pm')
+    expect((w.vm as any).cfg.reviewBaseUrl).toBe('http://h/pm')
+  })
+
+  it('【承重】保存时把 reviewBaseUrl 提交给后端', async () => {
+    // 与后端 validate_config 白名单同一故障模式:漏了这个字段 →
+    // 超管填了地址、点保存、无任何报错、刷新又变回空 → H5 链接永远发不出去
+    const { saveLanxinConfig } = await import('@/lib/lanxinApi')
+    const w = await mountCard()
+    ;(w.vm as any).cfg.reviewBaseUrl = 'http://h/pm'
+    await w.find('[data-test="lx-save"]').trigger('click')
+    await flushPromises()
+    expect(vi.mocked(saveLanxinConfig)).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewBaseUrl: 'http://h/pm' }))
+  })
+
+  it('【承重】建议地址按部署前缀推导,不是写死值', async () => {
+    // 本期问题①的根因正是「页面显示了一个漏 /pm 前缀的地址、超管一字不差照抄」。
+    // 同一个坑不能踩第二次:建议值必须用与实现同源的 apiUrl() 推导。
+    // 【stubEnv 不可省】vitest 下 BASE_URL 恒为 '/',此时 joinBase 是空操作,
+    // 写死值与推导值【逐字节相同】,不 stub 的断言测不出「漏前缀」(第六种假绿)。
+    vi.stubEnv('BASE_URL', '/pm/')
+    try {
+      const w = await mountCard()
+      expect(w.find('[data-test="lx-review-base-suggest"]').text())
+        .toContain(`${window.location.origin}/pm`)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('一键填入建议地址', async () => {
+    vi.stubEnv('BASE_URL', '/pm/')
+    try {
+      const w = await mountCard()
+      await w.find('[data-test="lx-review-base-fill"]').trigger('click')
+      expect((w.vm as any).cfg.reviewBaseUrl).toBe(`${window.location.origin}/pm`)
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

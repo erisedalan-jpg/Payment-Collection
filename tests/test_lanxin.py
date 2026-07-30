@@ -746,7 +746,7 @@ def test_dispatch_returns_sent_log_for_identity_lookup(monkeypatch):
                             "role": "primary"}]}
     out = LX.dispatch(plan, {"sendIntervalMs": 0})
     assert out["sentLog"] == [{"staffId": "sid-A1", "employId": "A1", "name": "张三",
-                               "routeKey": "project", "role": "primary",
+                               "routeKey": "project", "role": "primary", "reviewItems": [],
                                "projectIds": ["P1", "P2"], "msgId": "m1"}]
 
 
@@ -1003,3 +1003,175 @@ def test_build_plan_now_goes_to_head_title():
     plan = LX.build_plan(NEW_ITEM, _pj_cfg(), TREE, PMIS, now="2026-07-28 09:00")
     card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
     assert card["headTitle"] == "推送时间：2026-07-28 09:00"
+
+
+# ── Task 4:build_plan 产 h5_url 与 reviewItems;台账存快照 ──────────────────
+
+SECRET = "s" * 43
+
+
+def _pj_cfg_with_h5(levels=1, base="http://x/pm"):
+    cfg = _cfg_items(pj_items={"回款延期": (True, True, levels)})
+    cfg["reviewBaseUrl"] = base
+    return cfg
+
+
+NEW_ITEM_H5 = [{"kind": "project", "projectId": "P1",
+                "reasons": [{"category": "回款延期", "detail": "3 个延期节点"}]}]
+
+
+def test_build_plan_primary_card_gets_card_link_when_base_configured():
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(), TREE, PMIS, review_secret=SECRET)
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert card["cardLink"].startswith("http://x/pm/review/")
+
+
+def test_build_plan_supervisor_card_never_gets_card_link():
+    """【跨期承重】汇总卡零改动:上级不承担限时反馈,不该被引到填报页。"""
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(levels=1), TREE, PMIS,
+                         review_secret=SECRET)
+    sup = [r for r in plan["recipients"] if r["role"] == "supervisor"]
+    assert sup, "夹具应产出汇总卡"
+    assert all("cardLink" not in r["card"] for r in sup)
+
+
+def test_build_plan_no_card_link_without_base_url():
+    """reviewBaseUrl 留空 → 不发链接,且文案退回「请直接回复本消息反馈」态。"""
+    cfg = _cfg_with_callback(_pj_cfg_with_h5(base=""))
+    plan = LX.build_plan(NEW_ITEM_H5, cfg, TREE, PMIS, review_secret=SECRET)
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert "cardLink" not in card
+    assert card["fields"][-1]["value"].startswith("请直接回复本消息反馈")
+
+
+def test_build_plan_no_card_link_without_secret():
+    """密钥没配 → 签不出 token → 不发链接。绝不因此让整批推送失败。"""
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(), TREE, PMIS, review_secret="")
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert "cardLink" not in card
+
+
+def test_build_plan_no_card_link_with_whitespace_secret_does_not_fail_batch():
+    """纯空白密钥是与上一条不同的分支:`not review_secret` 对非空白字符串为 False,
+    不会被 _h5_url 的早退挡住,要往下走到 lanxin_review.issue_token —— 它内部
+    strip() 后判定为空才抛 ValueError,这才是 _h5_url 里 except ValueError 分支
+    真正被走到的路径,必须单独覆盖。签不出 token 绝不能让整批推送失败 ——
+    primary 收件人必须照常产出,只是没有 cardLink。"""
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(), TREE, PMIS, review_secret="   ")
+    assert plan["recipients"], "签不出 token 不能让整批推送失败"
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert "cardLink" not in card
+
+
+def test_build_plan_action_hint_switches_to_h5_when_link_present():
+    """【承重】有 H5 链接时文案必须切成「请点击卡片逐条反馈」——
+    build_action_hint 的三态是一期就设计好的,二期只是把 h5_url 真的传进去。
+    不传 = 一期那个「二期接入无需改此函数」的承诺没兑现。"""
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(), TREE, PMIS, review_secret=SECRET)
+    card = [r for r in plan["recipients"] if r["role"] == "primary"][0]["card"]
+    assert card["fields"][-1]["value"].startswith("请点击卡片逐条反馈")
+
+
+def test_build_plan_token_binds_the_recipient_employ_id():
+    """【承重·越权】每个人的 token 必须绑他自己的工号。
+    若用同一个 token 发给所有人,任何人都能读到别人的待办。"""
+    import lanxin_review as LRV
+    items = [{"kind": "project", "projectId": "P1",
+              "reasons": [{"category": "回款延期", "detail": "3 个"}]},
+             {"kind": "project", "projectId": "P3",
+              "reasons": [{"category": "回款延期", "detail": "2 个"}]}]
+    plan = LX.build_plan(items, _pj_cfg_with_h5(levels=0), TREE, PMIS, review_secret=SECRET)
+    prim = [r for r in plan["recipients"] if r["role"] == "primary"]
+    assert len(prim) == 2
+    for r in prim:
+        tok = r["card"]["cardLink"].rsplit("/", 1)[-1]
+        assert LRV.verify_token(tok, SECRET, 1785296160)["emp"] == r["employId"]
+
+
+def test_build_plan_recipients_carry_review_items():
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(levels=0), TREE, PMIS,
+                         review_secret=SECRET)
+    r = [x for x in plan["recipients"] if x["role"] == "primary"][0]
+    assert r["reviewItems"] == [{"projectId": "P1", "name": "P1",
+                                 "reasons": [{"category": "回款延期",
+                                              "detail": "3 个延期节点"}]}]
+
+
+def test_build_plan_supervisor_review_items_empty():
+    """空集守卫:夹具若不再产出 supervisor(如 levels 被改成 0),下面的 for 循环
+    一次都不会进入,断言会恒真通过而不是真的验过什么 —— 与相邻的
+    test_build_plan_supervisor_card_never_gets_card_link 同款守卫。"""
+    plan = LX.build_plan(NEW_ITEM_H5, _pj_cfg_with_h5(levels=1), TREE, PMIS,
+                         review_secret=SECRET)
+    sup = [r for r in plan["recipients"] if r["role"] == "supervisor"]
+    assert sup, "夹具应产出汇总卡"
+    for r in sup:
+        assert r["reviewItems"] == []
+
+
+def test_build_plan_timesheet_review_items_carry_issue_detail():
+    """【接线覆盖】工时是两条路由之一,不是边角 —— H5 链接/文案切态必须在工时卡上
+    也验一遍,不能只验项目卡就当两条路由都对了(复审揪出:漏传 card_link 或
+    _hint 传空串,14 条新测试此前一条都不会红)。"""
+    cfg = _cfg_items(ts_items={"MISS_SUMMARY": (True, True, 0)})
+    cfg["reviewBaseUrl"] = "http://x/pm"
+    plan = LX.build_plan([{"kind": "timesheet", "employId": "A006", "start": "", "end": "",
+                           "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述",
+                                       "count": 3, "lastDate": "2026-07-25"}]}],
+                         cfg, TREE, PMIS, review_secret=SECRET)
+    r = [x for x in plan["recipients"] if x["role"] == "primary"][0]
+    assert r["reviewItems"] == [{"code": "MISS_SUMMARY", "label": "缺少工作概述",
+                                 "count": 3, "lastDate": "2026-07-25"}]
+    assert r["card"]["cardLink"].startswith("http://x/pm/review/")
+    assert r["card"]["fields"][-1]["value"].startswith("请点击卡片逐条反馈")
+
+
+# ── 复审修复①②:name_to_pid 必须逐人分桶(全局按名字映射会跨人泄露 projectId)──
+
+PMIS_NAMED = {
+    # 两个不同的人(张三/李四)名下各有一个项目,项目号不同但项目名相同——
+    # 现网真实可能发生(不同项目起同名);专供钉死①(不能跨人串号)与②(name≠id,
+    # 断言必须能分辨"取到名字"与"取到号"两种不同的错误实现)。
+    "P1": {"team": {"项目经理": "张三"}, "projectName": "XX智慧园区"},
+    "P7": {"team": {"项目经理": "李四"}, "projectName": "XX智慧园区"},
+}
+
+
+def test_review_items_project_id_is_per_employee_not_by_name():
+    """reviewItems 的 projectId 是 H5 提交的越权写判据,必须各自对应各自的项目号。
+    proj_detail_by_emp 是 emp→name 两层桶,同名项目只在【同一个人内部】合并、
+    跨人不合并;如果 name→projectId 的映射是全局单层,后一个人会拿到前一个人
+    的项目号 —— 从"取错号"升级成"跨人越权写"。"""
+    items = [{"kind": "project", "projectId": "P1",
+              "reasons": [{"category": "回款延期", "detail": "3 个"}]},
+             {"kind": "project", "projectId": "P7",
+              "reasons": [{"category": "回款延期", "detail": "2 个"}]}]
+    plan = LX.build_plan(items, _pj_cfg_with_h5(levels=0), TREE, PMIS_NAMED,
+                         review_secret=SECRET)
+    prim = {r["employId"]: r for r in plan["recipients"] if r["role"] == "primary"}
+    assert set(prim) == {"A006", "A007"}
+    # 各自的 projectId 必须对应各自的项目号,不能因为项目名相同而互相串号
+    assert prim["A006"]["reviewItems"][0]["projectId"] == "P1"
+    assert prim["A007"]["reviewItems"][0]["projectId"] == "P7"
+    # name 字段应为项目名而不是项目号(name≠id,把两者分辨开)
+    assert prim["A006"]["reviewItems"][0]["name"] == "XX智慧园区"
+    assert prim["A007"]["reviewItems"][0]["name"] == "XX智慧园区"
+
+
+def test_dispatch_sent_log_carries_review_items(monkeypatch):
+    """接线回归:build_plan 算出来了不等于 dispatch 记下来了。
+    本仓反复出现「lib 契约 ≠ 接线」(V4.0.5/V4.5.6/V4.5.7/V4.5.8 均有)。"""
+    # 沿用本文件既有的 dispatch 测试范式(monkeypatch get_app_token/id_mapping/send_message),
+    # 参照 test_dispatch_returns_sent_log_for_identity_lookup。
+    monkeypatch.setattr(LX, "get_app_token", lambda cfg: "tk")
+    monkeypatch.setattr(LX, "id_mapping", lambda cfg, tk, emp: "sid-" + emp)
+    monkeypatch.setattr(LX, "send_message", lambda *a, **k: {"msgId": "m1"})
+    plan = {"recipients": [{"employId": "A1", "name": "张三", "card": {},
+                            "projectIds": ["P1"], "routeKey": "project",
+                            "role": "primary",
+                            "reviewItems": [{"projectId": "P1", "name": "XX",
+                                             "reasons": [{"category": "回款延期",
+                                                          "detail": "3 个"}]}]}]}
+    out = LX.dispatch(plan, {"sendIntervalMs": 0})
+    assert out["sentLog"][0]["reviewItems"]
+    assert out["sentLog"][0]["reviewItems"][0]["projectId"] == "P1"

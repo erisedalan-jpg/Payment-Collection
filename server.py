@@ -54,6 +54,7 @@ import lanxin_config
 import lanxin_crypto
 import lanxin_inbox
 import lanxin_recipients
+import lanxin_review
 import lanxin_unresponded
 
 # ── PMIS 上传白名单（防目录穿越/任意写） ──
@@ -194,16 +195,43 @@ MAX_UPLOAD_BODY = 512 * 1024 * 1024   # 文件上传 body 上限(512MB,xlsx 留�
 
 # /api/lanxin/callback 免登录:蓝信服务端不会带我们的会话 cookie。
 # 它的安全边界是【SHA1 验签】而非会话 —— 见 handle_lanxin_callback。
-_AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me', '/api/lanxin/callback')
+# /api/lanxin/review/{items,submit} 免登录:H5 页在蓝信内置 webview 里打开,
+# 那里没有本系统会话。安全边界是【token 验签 + 越权写校验】而非会话,
+# 与 /api/lanxin/callback 同级对待(见 spec §4.5.4)。
+_AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me', '/api/lanxin/callback',
+                '/api/lanxin/review/items', '/api/lanxin/review/submit')
 
 
 def _path_needs_auth(path):
     """纯函数：判断路径是否需要登录鉴权。
-    豁免：/api/login、/api/logout、/api/auth/me、/api/lanxin/callback 及非受保护路径。
+    豁免：/api/login、/api/logout、/api/auth/me、/api/lanxin/callback、
+    /api/lanxin/review/items、/api/lanxin/review/submit（蓝信 H5 填报页两个免登录
+    写入口，安全边界是 token 验签 + 越权写校验而非会话，见 _AUTH_EXEMPT 上方注释）
+    及非受保护路径。
     拦截：/api/* /data/* /input/* /yundocs_data/* /report/* /log/* 路径。"""
     if path in _AUTH_EXEMPT:
         return False
     return path.startswith(('/api/', '/data/', '/input/', '/yundocs_data/', '/report/', '/log/'))
+
+
+# 【复审 I-1】蓝信 H5 review token 的 48 小时免登录凭据一旦完整落进 log/server.log
+# 就等同于泄漏本身:GET /review/<token> 走 INFO 级(log_message 同时写 stderr,常被
+# journald 等外部日志系统采集)、GET /api/lanxin/review/items?token=… 走 DEBUG 级,
+# 两条都会落文件(file_handler 是 DEBUG)。同一份日志里已有既存实证:
+# POST /api/lanxin/callback?timestamp=…&nonce=…&signature=… 逐字落盘(那条不在本次
+# 改动范围)。掩码只保留【前 8 字符】而非整段抹掉:8 位不足以被人拿去重放访问
+# (48 小时 TTL × 全部 base64url 字符空间,前 8 位远不能穷举出后续部分),但足够
+# 运维人员在同一批日志里把同一个 token 的多条访问记录关联起来排障。
+_REVIEW_TOKEN_LOG_RE = re.compile(r'(/review/|token=)([A-Za-z0-9._-]+)')
+
+
+def _mask_review_token(msg):
+    """给访问日志文本里出现的 review token 打码,见上方注释。纯字符串处理,
+    不识别 token 是否合法——哪怕格式已经不对,只要形状像,也按同一规则打码。"""
+    def _mask(m):
+        prefix, tok = m.group(1), m.group(2)
+        return prefix + (tok[:8] + '…' if len(tok) > 8 else tok)
+    return _REVIEW_TOKEN_LOG_RE.sub(_mask, msg)
 
 
 # 仅超管可访问的写/运维端点(数据更新/导入/清空/回滚/停服/原始文件下载/数据历史/文件状态等);
@@ -384,6 +412,18 @@ _lanxin_rejected = {"count": 0, "lastAt": "", "lastFrom": "", "lastReason": "",
                     # 被拒报文的 timestamp【原值】。不是密钥(不是签名、不是报文体、不是密钥),
                     # 可安全下发给超管 —— 这是判断「蓝信实际发的什么格式」的唯一可见线索。
                     "lastTimestampSample": ""}
+
+# H5 反馈的内容上限。与回调条目同一个量级(lanxin_callback._MAX_TEXT)——
+# 收件箱是给人读的,超长正文只会把界面撑爆;免登录写入口更必须封顶。
+LANXIN_H5_MAX_TEXT = 20000
+# 单工号单日提交上限。免登录写入口若不限频,等于给了任何持链接者一个写盘放大器。
+# 计数从收件箱现有条目得出,不新增状态。
+LANXIN_H5_MAX_PER_DAY = 100
+# 【复审 I-2】免登录写入口的【报文】上限,与 /api/lanxin/callback 同量级。注意它和
+# LANXIN_H5_MAX_TEXT 管的不是一回事:后者是入库文本上限,在 token 校验【之后】
+# 才生效;报文上限必须在【读 body 之前】就卡住,否则无 token 者也能让服务端
+# 先吃满 16MB(MAX_JSON_BODY)再拒。
+LANXIN_H5_MAX_BODY_BYTES = 1024 * 1024
 
 # 存证文件的滚动归档(I-2)。参照 audit.py 的既有做法:活动文件超上限就整份挪进
 # 归档目录、只保留最近若干份。不做滚动的话这个纯 append 的 jsonl 只增不减 ——
@@ -1148,6 +1188,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_lanxin_inbox_get()
         elif parsed.path == '/api/lanxin/unresponded':
             self.handle_lanxin_unresponded_get()
+        elif parsed.path == '/api/lanxin/review/items':
+            self.handle_lanxin_review_items()
         elif parsed.path == '/api/lanxin/callback':
             # 回调只收 POST。这里显式回 405 而非落到静态文件分支,
             # 便于超管在浏览器里直接打开回调地址时看到明确提示。
@@ -1171,6 +1213,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed.path == '/data/analysis_data.json':
             self.handle_data_json()
         else:
+            # H5 填报页(免登录)。必须在 SPA 回退【之前】—— should_spa_fallback('/review/xxx')
+            # 返回 True(无 /api 前缀、末段无点),不拦就会吐 Vue 的 index.html:
+            # 页面能打开、但完全不是那个页面,且不会有任何报错。
+            if parsed.path.startswith('/review/'):
+                self._serve_review_html()
+                return
             translated = self.translate_path(parsed.path)
             if os.path.isfile(translated):
                 super().do_GET()
@@ -1337,6 +1385,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_lanxin_send()
         elif parsed.path == '/api/lanxin/callback':
             self.handle_lanxin_callback()
+        elif parsed.path == '/api/lanxin/review/submit':
+            self.handle_lanxin_review_submit()
         elif parsed.path == '/api/lanxin/inbox/handle':
             self.handle_lanxin_inbox_handle()
         elif parsed.path == '/api/lanxin/inbox/delete':
@@ -3358,7 +3408,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, _lanxin_config_payload())
 
     def handle_lanxin_config_save(self):
-        """POST /api/lanxin/config {config} - 超管专属。appSecret 传空串=沿用旧值(save_config 已处理)。"""
+        """POST /api/lanxin/config {config} - 超管专属。四个密钥字段
+        (appSecret/callbackAesKey/callbackSignToken/reviewTokenSecret)各自传空串=
+        沿用旧值(save_config 已处理,其 docstring 已同步成四个,这层曾经落后)。"""
         body = self._read_json_body()
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
@@ -3425,9 +3477,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
         try:
+            secret = lanxin_config.ensure_review_token_secret(LANXIN_CONFIG_FILE, cfg)
             plan = lanxin.build_plan(body.get('items') or [], cfg,
                                      self._lanxin_tree(), self._lanxin_pmis(),
-                                     now=datetime.now().strftime('%Y-%m-%d %H:%M'))
+                                     now=datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                     review_secret=secret)
         except FileNotFoundError:
             self._send_json(400, _error_payload(ERR_VALIDATION,
                             "未找到 input/组织架构.xlsx，无法解析收件人"))
@@ -3461,9 +3515,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, _error_payload(ERR_VALIDATION, "另一次推送正在进行中，请稍候"))
             return
         try:
+            secret = lanxin_config.ensure_review_token_secret(LANXIN_CONFIG_FILE, cfg)
             plan = lanxin.build_plan(body.get('items') or [], cfg,
                                      self._lanxin_tree(), self._lanxin_pmis(),
-                                     now=datetime.now().strftime('%Y-%m-%d %H:%M'))
+                                     now=datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                     review_secret=secret)
             result = lanxin.dispatch(plan, cfg)
         except lanxin.LanxinError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION,
@@ -3633,6 +3689,215 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True,
                               "rows": lanxin_unresponded.compute(store, hours, now),
                               "deadlineHours": hours})
+
+    def _review_secret(self):
+        """取 H5 token 密钥。【复审 M-7:只读,绝不生成/落盘】。
+
+        本方法只被两个【免登录】端点调用。若在这里 ensure(缺失则生成并落盘),
+        未鉴权请求就能触发一次配置写盘;而 load_config 遇到损坏文件会静默退回
+        默认配置,那一写会把 appSecret 与回调双密钥一并抹掉。密钥的生成时机在
+        【已鉴权的】预览/发送两处(handle_lanxin_preview/handle_lanxin_send)——
+        那里必须先有密钥才签得出 token,先有签发才谈得上校验。
+        密钥为空时 verify_token 一律返回 None → 页面显示「链接失效」,正是期望行为。
+        绝不打日志。
+        """
+        cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
+        return str((cfg.get('credentials') or {}).get('reviewTokenSecret') or ''), cfg
+
+    def _serve_review_html(self):
+        """GET /review/<token> —— H5 填报页。【免登录】,且【不在这一步校验 token】。
+
+        为什么不校验:页面本身零敏感内容(待办数据靠 items 接口另取),而且这样
+        token 失效时用户看到的是页面里的「链接失效」提示,而不是白屏或 403 ——
+        后者会让人以为系统坏了。校验在 items/submit 两个接口。
+        """
+        path = os.path.join(WEB_ROOT, 'review.html')
+        if not os.path.isfile(path):
+            self._send_json(404, {"success": False, "reason": "review.html 未部署"})
+            return
+        with open(path, 'rb') as f:
+            body = f.read()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        # H5 页内容随 token 变(页面本身是静态的,但避免中间层缓存住旧版)
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_lanxin_review_items(self):
+        """GET /api/lanxin/review/items?token=… —— 该员工的待办快照。【免登录】。
+
+        清单取自【推送快照】(发送台账的 reviewItems)而非实时重算:「关注原因」
+        口径在前端 TS,后端没有它;实时查只能靠跨语言复制口径,或把 17MB 全员数据
+        下发给这个【免登录】页面 —— 两条都不可接受(见 spec §4.5.1a)。
+
+        【2026-07-30 更正】快照取的是该工号【最近一次】同 kind 的 primary 推送
+        (下方 reversed(...)+role=='primary' 过滤),不严格等于"员工手上那张卡"——
+        48 小时 TTL 内若发生第二次推送,这里会返回【新】快照,与旧卡片不一致;
+        若新快照移除了某项目,员工按旧卡提交会被 submit 侧的越权写校验拒绝。
+        此取舍已知且影响温和,不在本次改动范围,见 spec §4.5.1a 与 PROGRESS.md L-61。
+        """
+        token = (parse_qs(urlparse(self.path).query).get('token') or [''])[0]
+        secret, cfg = self._review_secret()
+        payload = lanxin_review.verify_token(token, secret, int(time.time()))
+        if not payload:
+            # 200 + success:false(不是 401/500)—— 让页面显示「链接失效」
+            self._send_json(200, {"success": False, "reason": "invalid"})
+            return
+        with _lanxin_inbox_lock:
+            store = _load_lanxin_inbox()
+        items, name = [], ''
+        for e in reversed(store.get('sent') or []):
+            if str(e.get('employId') or '') != payload['emp']:
+                continue
+            if str(e.get('routeKey') or '') != payload['kind']:
+                continue
+            # 【复审 C-2】必须限定 role=='primary':同一个人可能既收到自己的
+            # primary 卡、又收到一张汇总卡(上级身份),而汇总卡的 reviewItems
+            # 恒为 []。build_plan 固定【先 primary 后汇总】,record_sent 按序
+            # append,故 reversed 第一个命中的若不排除汇总卡,会是它 → 快照被
+            # 抹成空 → 页面空白,且全程零报错。
+            if str(e.get('role') or '') != 'primary':
+                continue
+            items = list(e.get('reviewItems') or [])
+            name = str(e.get('name') or '')
+            break                      # 最近一次推送即当前待办
+        self._send_json(200, {
+            "success": True, "kind": payload['kind'], "name": name, "items": items,
+            "deadlineHours": int(cfg.get('reviewDeadlineHours')
+                                 or lanxin_config.DEFAULT_REVIEW_DEADLINE_HOURS)})
+
+    def handle_lanxin_review_submit(self):
+        """POST /api/lanxin/review/submit —— 落收件箱。【免登录】。
+
+        闸门:① 报文大小 → ② token 验签 → ③ 越权写(目标必须落在该工号的推送
+        快照里) → ④ 内容非空 + 长度封顶 → ⑤ 频率(单工号单日,锁内原子判定) →
+        ⑥ 落库。
+
+        ③ 是本期最容易漏的一条:不校验的话,任何人拿自己的 token 就能往【任意】
+        项目写反馈。判据是纯数据的 —— token 绑工号 → 查该工号台账 → 白名单。
+
+        入库存【原文】,不在这里 html.escape:归入跟进域那一步已经会转义 +
+        换行只用 <br>,这里再转一次会双重转义成可见乱码。既有回调条目同样存原文。
+        """
+        # 【复审 I-2】① 报文大小必须在【读 body 之前】就卡住,且必须先于 token
+        # 校验 —— 否则无 token 者也能让服务端先把 body 吃满内存再拒绝。
+        # 不能用通用 _read_json_body()(上限是 MAX_JSON_BODY=16MB,比这个免登录
+        # 写入口该有的上限宽 16 倍)。
+        raw = self._read_body_bytes(LANXIN_H5_MAX_BODY_BYTES)
+        if raw is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        try:
+            body = json.loads(raw.decode('utf-8'))
+        except (ValueError, UnicodeDecodeError):
+            body = None
+        if not isinstance(body, dict):
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        secret, _cfg = self._review_secret()
+        payload = lanxin_review.verify_token(body.get('token'), secret, int(time.time()))
+        if not payload:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "链接已失效"))
+            return
+        emp, kind = payload['emp'], payload['kind']
+        content = str(body.get('content') or '').strip()
+        if not content:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "反馈内容不能为空"))
+            return
+
+        with _lanxin_inbox_lock:
+            store = _load_lanxin_inbox()
+        # ③ 越权写:目标必须落在【该工号】最近一次同类推送的快照里
+        snapshot = []
+        for e in reversed(store.get('sent') or []):
+            if (str(e.get('employId') or '') == emp
+                    and str(e.get('routeKey') or '') == kind
+                    # 【复审 C-2】必须限定 primary,理由同 handle_lanxin_review_items:
+                    # 汇总卡(role=='supervisor')的 reviewItems 恒为 [],且排在
+                    # 同一人 primary 条目之后,reversed 命中它就等于快照被抹空。
+                    and str(e.get('role') or '') == 'primary'):
+                snapshot = list(e.get('reviewItems') or [])
+                break
+        target_pid = str(body.get('projectId') or '')
+        target_code = str(body.get('code') or '')
+        if kind == 'project':
+            # 【复审 C-1】落库时 projectId 与 issueCode 两个键都会写,但下面的
+            # 校验只查与本 kind 匹配的那一个字段 —— 不属于本 kind 的字段完全在
+            # 校验范围之外,若不就地清空就会原样落库,成为伪造输入(timesheet
+            # 快照里本就没有任何 projectId,反之亦然)。
+            target_code = ''
+            allowed = {str(i.get('projectId') or '') for i in snapshot}
+            ok_target = bool(target_pid) and target_pid in allowed
+        else:
+            target_pid = ''
+            allowed = {str(i.get('code') or '') for i in snapshot}
+            ok_target = bool(target_code) and target_code in allowed
+        if not ok_target:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "该条目不在你的待办清单内"))
+            return
+
+        now = datetime.now().strftime(lanxin_inbox.TS_FMT)
+        today = now[:10]
+
+        def _mutate(st):
+            # 【复审 M-6】⑤ 频率判定必须在锁内、对着这次事务【刚重新加载】的 st
+            # 计数 —— 若在锁外用先前读的 store 计数(此前的写法),这是一次
+            # check-then-act:并发请求会全部读到同一份"未超限"快照、一起放行,
+            # 限频形同虚设(TOCTOU)。用 ValueError 让 _followup_txn 把"计数→
+            # 比较→写入"原子地锁在同一次事务里。
+            same_day = sum(1 for it in (st.get('items') or [])
+                           if it.get('source') == 'h5'
+                           and str(it.get('employId') or '') == emp
+                           and str(it.get('receivedAt') or '')[:10] == today)
+            if same_day >= LANXIN_H5_MAX_PER_DAY:
+                raise ValueError("今日提交次数已达上限")
+            lanxin_inbox.add_item(st, {
+                # 【复审 I-1】id 此前只到秒,同一员工同秒提交两条不同目标(逐条
+                # 反馈连点)会撞车 —— 归入(按 id 取首条)与删除(按 id 全删)都
+                # 按 id 索引,撞车后"归入写错内容、删一条丢两条"。加目标标识 +
+                # 微秒。target_pid/target_code 此刻已按 kind 清空了不相关的
+                # 那一个,不会把无关字段带进 id。
+                "id": "h5-%s-%s-%s" % (emp, target_pid or target_code or '-',
+                                       datetime.now().strftime('%Y%m%dT%H%M%S%f')),
+                "receivedAt": now,
+                "status": "parsed",
+                "unparsedReason": None,
+                "eventType": "h5_review",
+                # staffId 从台账按工号反查补上 —— 收件箱既有的身份反查与归因候选
+                # 都按 staffId 索引,补上它们对 H5 条目照样生效
+                "staffId": lanxin_inbox.staff_id_of_employ(st, emp),
+                "employId": emp,
+                "name": next((str(e.get('name') or '') for e in reversed(st.get('sent') or [])
+                              if str(e.get('employId') or '') == emp), None) or None,
+                "msgType": "text",
+                "text": content[:LANXIN_H5_MAX_TEXT],
+                "rawMsgData": {},
+                "groupId": None,
+                "groupName": None,
+                "handled": False,
+                "handledInfo": None,
+                # 本期新增两键。既有回调条目没有它们 → 前端按「缺失即回调」处理
+                "source": "h5",
+                "projectId": target_pid or None,
+                "issueCode": target_code or None,
+            })
+            lanxin_inbox.prune(st, now)
+            return True
+
+        ok, res = self._followup_txn(_lanxin_inbox_lock, _load_lanxin_inbox,
+                                     _mutate, _save_lanxin_inbox)
+        if not ok:
+            # 【复审 M-5】_followup_txn 的契约是 ValueError→(False,str)(业务校验
+            # 失败,400)/ 其它异常→(False,False)(服务端内部故障,500)。此前
+            # 一律回 400,会把"磁盘写满/权限错误"这类服务端故障伪装成客户端
+            # 输入错误。照抄本仓 handle_lanxin_inbox_handle/delete 的既有写法。
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL,
+                                           res or "保存失败，请重试"))
+            return
+        self._send_json(200, {"success": True})
 
     def handle_lanxin_inbox_handle(self):
         """POST /api/lanxin/inbox/handle {itemId, domain, projectId, riskCode?, instanceId?}
@@ -4270,8 +4535,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True, "user": _user_payload(account, rec)})
 
     def log_message(self, format, *args):
-        # API 请求记录到日志文件
-        msg = format % args
+        # API 请求记录到日志文件。掩码见 _mask_review_token 上方注释(I-1)。
+        msg = _mask_review_token(format % args)
         if '/api/' in str(args[0]):
             logger.debug(f"HTTP {msg}")
         else:
