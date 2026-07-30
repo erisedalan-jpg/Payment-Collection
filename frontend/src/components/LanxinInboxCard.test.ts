@@ -311,6 +311,17 @@ describe('LanxinInboxCard', () => {
     expect(vm.handleForm.projectId).toBe('P7')
   })
 
+  it('【承重】H5 自带项目号优先于归因候选,不被候选项覆盖', async () => {
+    // server.py 对收件箱【每一条】记录都按 staffId 算 candidateProjects、不区分 source,
+    // 所以 H5 条目常常两者【同时非空】。自带项目号是员工点开那张卡片时就确定的事实,
+    // 归因候选只是「这个人最近还被推过哪些项目」的猜测 —— 猜测绝不许压过事实。
+    const w = await mountInbox([baseItem({
+      id: 'h5-2', source: 'h5', projectId: 'P7', candidateProjects: ['P999'] })])
+    await openHandleDrawer(w)
+    const vm = w.vm as unknown as { handleForm: { projectId: string } }
+    expect(vm.handleForm.projectId).toBe('P7')
+  })
+
   it('既有回调条目缺 source 键时不报错、按「回复」处理且不预选项目', async () => {
     // 老数据向后兼容:V4.5.8 及以前的条目没有 source/projectId/issueCode 三个键
     const w = await mountInbox([baseItem({ id: 'cb-1' })])
