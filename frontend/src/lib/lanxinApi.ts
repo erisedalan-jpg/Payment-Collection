@@ -23,6 +23,9 @@ export interface LanxinConfig {
   sendAs: 'account' | 'bot'
   /** 反馈时限(小时,1~720)。卡片文案「N 小时内未反馈…」与《未响应清单》判定共用此值。 */
   reviewDeadlineHours: number
+  /** H5 反馈页对外基地址(不含末尾斜杠,如 http://host/pm)。留空 = build_plan 不发 H5 链接。
+   *  建议值由前端 apiUrl() 按部署前缀推导、不写死,见 LanxinConfigCard.vue 的 suggestedReviewBase。 */
+  reviewBaseUrl: string
   credentials: {
     appId: string; appSecret: string; orgId: string
     apiGateway: string; idType: string; hasSecret?: boolean
@@ -30,6 +33,9 @@ export interface LanxinConfig {
     // public_config 脱敏后恒为空串，has* 布尔才是「是否已配置」的唯一依据。
     callbackAesKey: string; callbackSignToken: string
     hasCallbackAesKey?: boolean; hasCallbackSignToken?: boolean
+    // H5 反馈令牌签名密钥(服务端自生成,签发/校验逐人链接用)。前端只该看到这个布尔——
+    // reviewTokenSecret 本身绝不下发(蓝信双向约定「绝不记密钥」)。
+    hasReviewTokenSecret?: boolean
   }
   routes: LanxinRoute[]
 }
