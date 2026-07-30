@@ -204,11 +204,34 @@ _AUTH_EXEMPT = ('/api/login', '/api/logout', '/api/auth/me', '/api/lanxin/callba
 
 def _path_needs_auth(path):
     """纯函数：判断路径是否需要登录鉴权。
-    豁免：/api/login、/api/logout、/api/auth/me、/api/lanxin/callback 及非受保护路径。
+    豁免：/api/login、/api/logout、/api/auth/me、/api/lanxin/callback、
+    /api/lanxin/review/items、/api/lanxin/review/submit（蓝信 H5 填报页两个免登录
+    写入口，安全边界是 token 验签 + 越权写校验而非会话，见 _AUTH_EXEMPT 上方注释）
+    及非受保护路径。
     拦截：/api/* /data/* /input/* /yundocs_data/* /report/* /log/* 路径。"""
     if path in _AUTH_EXEMPT:
         return False
     return path.startswith(('/api/', '/data/', '/input/', '/yundocs_data/', '/report/', '/log/'))
+
+
+# 【复审 I-1】蓝信 H5 review token 的 48 小时免登录凭据一旦完整落进 log/server.log
+# 就等同于泄漏本身:GET /review/<token> 走 INFO 级(log_message 同时写 stderr,常被
+# journald 等外部日志系统采集)、GET /api/lanxin/review/items?token=… 走 DEBUG 级,
+# 两条都会落文件(file_handler 是 DEBUG)。同一份日志里已有既存实证:
+# POST /api/lanxin/callback?timestamp=…&nonce=…&signature=… 逐字落盘(那条不在本次
+# 改动范围)。掩码只保留【前 8 字符】而非整段抹掉:8 位不足以被人拿去重放访问
+# (48 小时 TTL × 全部 base64url 字符空间,前 8 位远不能穷举出后续部分),但足够
+# 运维人员在同一批日志里把同一个 token 的多条访问记录关联起来排障。
+_REVIEW_TOKEN_LOG_RE = re.compile(r'(/review/|token=)([A-Za-z0-9._-]+)')
+
+
+def _mask_review_token(msg):
+    """给访问日志文本里出现的 review token 打码,见上方注释。纯字符串处理,
+    不识别 token 是否合法——哪怕格式已经不对,只要形状像,也按同一规则打码。"""
+    def _mask(m):
+        prefix, tok = m.group(1), m.group(2)
+        return prefix + (tok[:8] + '…' if len(tok) > 8 else tok)
+    return _REVIEW_TOKEN_LOG_RE.sub(_mask, msg)
 
 
 # 仅超管可访问的写/运维端点(数据更新/导入/清空/回滚/停服/原始文件下载/数据历史/文件状态等);
@@ -3385,7 +3408,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, _lanxin_config_payload())
 
     def handle_lanxin_config_save(self):
-        """POST /api/lanxin/config {config} - 超管专属。appSecret 传空串=沿用旧值(save_config 已处理)。"""
+        """POST /api/lanxin/config {config} - 超管专属。四个密钥字段
+        (appSecret/callbackAesKey/callbackSignToken/reviewTokenSecret)各自传空串=
+        沿用旧值(save_config 已处理,其 docstring 已同步成四个,这层曾经落后)。"""
         body = self._read_json_body()
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
@@ -4505,8 +4530,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"success": True, "user": _user_payload(account, rec)})
 
     def log_message(self, format, *args):
-        # API 请求记录到日志文件
-        msg = format % args
+        # API 请求记录到日志文件。掩码见 _mask_review_token 上方注释(I-1)。
+        msg = _mask_review_token(format % args)
         if '/api/' in str(args[0]):
             logger.debug(f"HTTP {msg}")
         else:

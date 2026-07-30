@@ -1,5 +1,6 @@
 import http.client
 import json
+import logging
 import threading
 
 import auth
@@ -526,3 +527,67 @@ def test_no_secret_leaks_in_any_response(tmp_path, monkeypatch):
         assert SECRET not in json.dumps(d2, ensure_ascii=False)
     finally:
         srv.shutdown(); srv.server_close()
+
+
+# ── 【复审 I-1】48 小时免登录 review token 走 URL(path 与 query),完整落进
+# log/server.log 就等同于泄漏本身:GET /review/<token> 落 INFO 级(同时写 stderr,
+# 常被外部日志系统如 journald 采集)、GET /api/lanxin/review/items?token=… 落
+# DEBUG 级,两条都会写文件(file_handler 是 DEBUG)。掩码保留【前 8 字符】——
+# 仍可用于关联同一 token 的多条访问记录排障,但不足以被人拿去重放访问。────────
+
+TOK_FOR_MASK = "abcdefgh12345678.1785296160.deadbeefcafefeed0011223344556677"
+
+
+def test_mask_review_token_masks_path_segment():
+    """直接调用掩码函数:/review/<token> 路径段应只保留前 8 字符。"""
+    msg = '"GET /review/%s HTTP/1.1" 200 -' % TOK_FOR_MASK
+    masked = server._mask_review_token(msg)
+    assert TOK_FOR_MASK not in masked
+    assert "/review/abcdefgh…" in masked
+
+
+def test_mask_review_token_masks_query_param():
+    """直接调用掩码函数:?token=<token> 查询参数值同样只保留前 8 字符。"""
+    msg = '"GET /api/lanxin/review/items?token=%s HTTP/1.1" 200 -' % TOK_FOR_MASK
+    masked = server._mask_review_token(msg)
+    assert TOK_FOR_MASK not in masked
+    assert "token=abcdefgh…" in masked
+
+
+def test_mask_review_token_leaves_short_token_unchanged():
+    """token 长度 <=8 时没有可省的余地,原样保留 —— 不能让掩码逻辑对短输入报错或
+    产出比原串还怪的东西(反例:切出空串)。"""
+    msg = "/review/short HTTP/1.1"
+    assert server._mask_review_token(msg) == msg
+
+
+def test_review_page_token_masked_in_access_log(tmp_path, monkeypatch, caplog):
+    """【端到端,不只测纯函数】真起服务、真发一次 GET /review/<token>(INFO 级,
+    log_message 的 else 分支),用 caplog 直接读 payment_review 这个 logger 的输出 ——
+    证明掩码真的接在 log_message 这条链路上,而不是只有 _mask_review_token 本身对。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    _stub_web_root(tmp_path, monkeypatch)
+    tok = LRV.issue_token("A001", "project", SECRET, int(__import__("time").time()))
+    try:
+        with caplog.at_level(logging.INFO, logger="payment_review"):
+            _get(port, "/review/" + tok)
+    finally:
+        srv.shutdown(); srv.server_close()
+    msgs = [r.getMessage() for r in caplog.records]
+    assert not any(tok in m for m in msgs), "完整 token 不许落日志,实际日志=%r" % msgs
+    assert any(tok[:8] in m for m in msgs), "前 8 字符应保留以便关联排查"
+
+
+def test_review_items_query_token_masked_in_access_log(tmp_path, monkeypatch, caplog):
+    """同上,针对 GET /api/lanxin/review/items?token=…(DEBUG 级,log_message 的
+    if '/api/' 分支)。"""
+    srv, port = _srv(tmp_path, monkeypatch, sent=[SENT_A001])
+    tok = LRV.issue_token("A001", "project", SECRET, int(__import__("time").time()))
+    try:
+        with caplog.at_level(logging.DEBUG, logger="payment_review"):
+            _get(port, "/api/lanxin/review/items?token=" + tok)
+    finally:
+        srv.shutdown(); srv.server_close()
+    msgs = [r.getMessage() for r in caplog.records]
+    assert not any(tok in m for m in msgs), "完整 token 不许落日志,实际日志=%r" % msgs
+    assert any(tok[:8] in m for m in msgs), "前 8 字符应保留以便关联排查"
