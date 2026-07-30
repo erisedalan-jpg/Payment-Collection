@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 import lanxin_review as LR
@@ -62,11 +64,33 @@ def test_malformed_never_raises(bad):
 
 def test_empty_secret_always_rejects():
     """密钥没配时不许放行任何 token —— 空密钥下 HMAC 仍能算出值,
-    不显式拒绝等于把签名校验变成摆设。"""
+    不显式拒绝等于把签名校验变成摆设。本条用真密钥签的 token 去测,靠签名不符拦下,
+    不承担"空密钥判断本身"的举证责任 —— 那是下面
+    test_empty_secret_rejects_token_signed_with_empty_secret 的职责。"""
     t = LR.issue_token("A030910", "project", SEC, NOW)
     assert LR.verify_token(t, "", NOW) is None
     with pytest.raises(ValueError):
         LR.issue_token("A030910", "project", "", NOW)
+
+
+def test_empty_secret_rejects_token_signed_with_empty_secret():
+    """【承重·安全】密钥未配时,连【用空密钥签出来的】token 也不许放行。
+
+    这条比「用真密钥签的 token 在空密钥下被拒」严格得多:后者靠签名不符就拦下了,
+    根本走不到空密钥判断那一行(删掉判断照样绿 —— 实测过)。
+    而空密钥的签名是【任何人都能算出来的】:HMAC 的 key 就是空串,不需要任何秘密。
+    所以密钥一旦没配,攻击者可以自签一个完全合法的 token,读任意工号的待办、
+    往任意项目写反馈。这才是那道显式空密钥判断存在的理由。
+
+    构造 forged 时【复用模块自己的 _b64url_encode/_sign】而不是手写等价物 ——
+    手写等价物一旦与实现算法漂移,这条测试就变成恒真的假绿。
+    """
+    payload_b64 = LR._b64url_encode(json.dumps(
+        {"emp": "A030910", "kind": "project"},
+        ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    exp = NOW + 3600
+    forged = "%s.%d.%s" % (payload_b64, exp, LR._sign("", payload_b64, exp))
+    assert LR.verify_token(forged, "", NOW) is None
 
 
 def test_unknown_kind_rejected_at_issue():
