@@ -379,3 +379,82 @@ def test_public_config_carries_review_deadline_hours():
     cfg = LC.default_config()
     cfg["reviewDeadlineHours"] = 36
     assert LC.public_config(cfg)["reviewDeadlineHours"] == 36
+
+
+# ---- V4.5.9 Task 2:reviewTokenSecret 与 reviewBaseUrl ----
+
+def test_validate_keeps_review_token_secret():
+    """【承重·同 reviewDeadlineHours 那个坑】validate_config 的 cred 是【固定键元组】,
+    新键不加进去就被静默丢弃 —— 表现是「密钥生成了、下次读配置又没了、
+    已签发的 token 全部失效」,而全程零报错。"""
+    cfg = LC.default_config()
+    cfg["credentials"]["reviewTokenSecret"] = "abc123"
+    assert LC.validate_config(cfg)["credentials"]["reviewTokenSecret"] == "abc123"
+
+
+def test_public_config_masks_review_token_secret():
+    """密钥绝不回显。与其余三个密钥同款:抹成空串,只透 has* 布尔。"""
+    cfg = LC.default_config()
+    cfg["credentials"]["reviewTokenSecret"] = "SECRET_VALUE"
+    pub = LC.public_config(cfg)
+    assert pub["credentials"]["reviewTokenSecret"] == ""
+    assert pub["credentials"]["hasReviewTokenSecret"] is True
+    assert "SECRET_VALUE" not in json.dumps(pub, ensure_ascii=False)
+
+
+def test_default_config_has_empty_review_base_url():
+    assert LC.default_config()["reviewBaseUrl"] == ""
+
+
+def test_validate_keeps_review_base_url():
+    cfg = LC.default_config()
+    cfg["reviewBaseUrl"] = "http://10.248.105.95/pm"
+    assert LC.validate_config(cfg)["reviewBaseUrl"] == "http://10.248.105.95/pm"
+
+
+def test_validate_strips_trailing_slash_from_review_base_url():
+    """末尾斜杠必须剥掉 —— 拼 cardLink 时是 base + '/review/' + token,
+    不剥就拼出 '//review/',蓝信 webview 未必容错。"""
+    cfg = LC.default_config()
+    cfg["reviewBaseUrl"] = "http://10.248.105.95/pm/"
+    assert LC.validate_config(cfg)["reviewBaseUrl"] == "http://10.248.105.95/pm"
+
+
+@pytest.mark.parametrize("bad", ["10.248.105.95/pm", "ftp://x/pm", "javascript:alert(1)"])
+def test_validate_rejects_non_http_review_base_url(bad):
+    """必须 http:// 或 https:// 开头。这个值会被拼进【推给员工的卡片】的
+    cardLink 里,放行任意 scheme 等于把它变成一个钓鱼跳板。"""
+    cfg = LC.default_config()
+    cfg["reviewBaseUrl"] = bad
+    with pytest.raises(ValueError):
+        LC.validate_config(cfg)
+
+
+def test_empty_review_base_url_is_allowed():
+    """留空是合法状态:此时不发 H5 链接,卡片文案自动退回「请直接回复本消息反馈」。"""
+    cfg = LC.default_config()
+    cfg["reviewBaseUrl"] = ""
+    assert LC.validate_config(cfg)["reviewBaseUrl"] == ""
+
+
+def test_ensure_review_token_secret_generates_once_and_persists(tmp_path):
+    """【承重】密钥必须持久。若在 default_config/validate_config 里生成,
+    每次 load 都会换一个新的 —— 服务重启后此前签发的 token 全部失效
+    (TTL 48 小时,重启很可能落在窗口内)。故只在首次真正要用时生成【并立刻落盘】。"""
+    p = tmp_path / "lanxin_config.json"
+    cfg = LC.default_config()
+    first = LC.ensure_review_token_secret(str(p), cfg)
+    assert first and len(first) >= 32
+    assert p.exists(), "生成后必须落盘"
+    reloaded = LC.load_config(str(p))
+    assert reloaded["credentials"]["reviewTokenSecret"] == first
+    assert LC.ensure_review_token_secret(str(p), reloaded) == first, "已有则不许重新生成"
+
+
+def test_ensure_review_token_secret_does_not_log_it(tmp_path, caplog):
+    """密钥绝不进日志。"""
+    p = tmp_path / "lanxin_config.json"
+    cfg = LC.default_config()
+    with caplog.at_level(0):
+        sec = LC.ensure_review_token_secret(str(p), cfg)
+    assert sec not in caplog.text

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 from typing import Any, Dict, List
 
 from yitian_rules import ISSUE_LABELS
@@ -54,6 +55,11 @@ def default_config() -> Dict[str, Any]:
         "enabled": False,
         "sendIntervalMs": 200,
         "reviewDeadlineHours": DEFAULT_REVIEW_DEADLINE_HOURS,
+        # H5 反馈页的对外基地址(如 http://10.248.105.95/pm)。留空 = 不发 H5 链接,
+        # 卡片文案自动退回「请直接回复本消息反馈」态(build_action_hint 三态已就绪)。
+        # 为什么必须配而不能由服务端自推:nginx 把 /pm 前缀剥掉后 app 只看到 /api/...,
+        # 服务端【不知道】自己的公网前缀。配置界面按部署前缀自动推导预填(见 T7)。
+        "reviewBaseUrl": "",
         "sendAs": "account",
         "credentials": {
             "appId": "", "appSecret": "", "orgId": "",
@@ -61,6 +67,7 @@ def default_config() -> Dict[str, Any]:
             # 回调密钥与回调签名令牌,取自开发者中心「回调事件」页 ——
             # 与 AppId/AppSecret 是【另外两个】凭证,不要混。
             "callbackAesKey": "", "callbackSignToken": "",
+            "reviewTokenSecret": "",
         },
         "routes": [
             {
@@ -175,7 +182,7 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
         raise ValueError("credentials 必须是对象")
     cred: Dict[str, Any] = {}
     for k in ("appId", "appSecret", "orgId", "apiGateway",
-              "callbackAesKey", "callbackSignToken"):
+              "callbackAesKey", "callbackSignToken", "reviewTokenSecret"):
         v = cred_in.get(k, "")
         if not isinstance(v, str):
             raise ValueError("credentials.%s 必须是字符串" % k)
@@ -222,6 +229,14 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
     if send_as not in SEND_AS_VALUES:
         raise ValueError("sendAs 须为 %s 之一" % "/".join(SEND_AS_VALUES))
 
+    base = cfg.get("reviewBaseUrl", "")
+    if not isinstance(base, str):
+        raise ValueError("reviewBaseUrl 必须是字符串")
+    base = base.strip().rstrip("/")
+    # 这个值会被拼进【推给员工的卡片】的 cardLink,放行任意 scheme 等于把它变成钓鱼跳板
+    if base and not base.startswith(("http://", "https://")):
+        raise ValueError("reviewBaseUrl 必须以 http:// 或 https:// 开头")
+
     deadline = cfg.get("reviewDeadlineHours", DEFAULT_REVIEW_DEADLINE_HOURS)
     # bool 是 int 的子类,True 会被当成 1 混过去 —— 显式排掉
     if isinstance(deadline, bool) or not isinstance(deadline, int):
@@ -231,7 +246,7 @@ def validate_config(cfg: Any) -> Dict[str, Any]:
                          % (MIN_REVIEW_DEADLINE_HOURS, MAX_REVIEW_DEADLINE_HOURS))
 
     return {"enabled": enabled, "sendIntervalMs": interval, "sendAs": send_as,
-            "reviewDeadlineHours": deadline,
+            "reviewDeadlineHours": deadline, "reviewBaseUrl": base,
             "credentials": cred, "routes": routes}
 
 
@@ -277,7 +292,28 @@ def public_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     cred = out.setdefault("credentials", {})
     for field, flag in (("appSecret", "hasSecret"),
                         ("callbackAesKey", "hasCallbackAesKey"),
-                        ("callbackSignToken", "hasCallbackSignToken")):
+                        ("callbackSignToken", "hasCallbackSignToken"),
+                        ("reviewTokenSecret", "hasReviewTokenSecret")):
         cred[flag] = bool(cred.get(field, ""))
         cred[field] = ""
     return out
+
+
+def ensure_review_token_secret(path: str, cfg: Dict[str, Any]) -> str:
+    """取 H5 token 的签名密钥;缺失则生成并【立刻落盘】后返回。
+
+    为什么不在 default_config()/validate_config() 里生成:那两个函数每次 load
+    都会跑,在那里生成等于「每次读配置都换一个密钥」—— 服务一重启,此前签发的
+    token 全部失效。TTL 是 48 小时,重启很可能落在窗口内。密钥必须持久。
+
+    绝不记密钥:本函数不打日志、不进审计,返回值只在进程内用于 HMAC 计算;
+    public_config 只透 hasReviewTokenSecret 布尔。
+    """
+    cred = cfg.setdefault("credentials", {})
+    sec = str(cred.get("reviewTokenSecret") or "").strip()
+    if sec:
+        return sec
+    sec = secrets.token_urlsafe(32)
+    cred["reviewTokenSecret"] = sec
+    save_config(path, cfg)
+    return sec
