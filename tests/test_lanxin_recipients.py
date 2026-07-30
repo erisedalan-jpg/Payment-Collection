@@ -617,3 +617,12 @@ def test_summary_card_has_no_card_link_param():
     上级收到的是知会,不承担限时反馈,不该跳 H5 填报页。"""
     import inspect
     assert "card_link" not in inspect.signature(LR.build_summary_card).parameters
+
+
+def test_summary_card_body_never_emits_card_link():
+    """【跨期承重约束·行为级兜底】inspect.signature 那条只钉签名,钉不住函数体
+    ——_card 有 6 个位置参数,汇总卡即使不加形参,也能在函数体里直接给第 6 位塞
+    一个字面量 URL。故必须再断言【输出里不出现 cardLink 键】,这才是真正要守的行为。"""
+    rows = [{"name": "隋文宇", "total": 14, "reasons": [("回款延期", 6), ("成本超支", 5)]}]
+    card = LR.build_summary_card("张英哲", rows, "部门级汇总（+3）")
+    assert "cardLink" not in card
