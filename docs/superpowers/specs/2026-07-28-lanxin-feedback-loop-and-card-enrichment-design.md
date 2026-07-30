@@ -359,13 +359,34 @@ window.location.origin + apiUrl('/api/lanxin/callback')
 #### 4.5.1 流程
 
 ```
-卡片(cardLink=/pm/review/<token>) → 用户点整卡 → 蓝信内置 webview
-  → GET  /pm/review/<token>              免登录，服务 review.html
-  → GET  /api/lanxin/review/items?token= 免登录，返回该员工待办清单（实时查，不冻结快照）
+卡片(cardLink=<reviewBaseUrl>/review/<token>) → 用户点整卡 → 蓝信内置 webview
+  → GET  /review/<token>                 免登录，服务 review.html
+  → GET  /api/lanxin/review/items?token= 免登录，返回【推送快照】里该员工的待办清单
   → 用户逐条填写 → POST /api/lanxin/review/submit  免登录
   → 落收件箱（source='h5'，携带 projectId）
   → 超管在现有「蓝信回复」tab 一键归入四域
 ```
+
+#### 4.5.1a 【2026-07-29 更正】待办清单取自**推送快照**，不是实时查
+
+初稿写「实时查，不冻结快照」。**那不可实现**，两条路都堵死：
+
+- **在 Python 里重算「关注原因」** —— 口径 `riskReasons` 在**前端 TS** 里（`frontend/src/lib/riskReasons.ts`），后端从来没有它：`build_plan` 是**接收**前端算好的 `items`，自己不算。在 Python 里复制一份等于跨语言复制核心口径，是本仓最高危的改动类别（`REASON_WHITELIST` 那份不得已的跨语言副本已有前车之鉴）。
+- **把 `analysis_data.json` 下发给 H5 页** —— 那是 17MB 的**全员**数据，而 H5 是**免登录**页面。数据泄漏，不可接受。
+
+**改为：`dispatch` 把每个收件人的待办明细一并写进发送台账，H5 从台账读。** 这不是退让，是更优解：
+
+1. **员工看到的正是卡片告诉他的那几项。** 实时查会让 H5 列表与他手上那张卡不一致（推送后数据变了），反而制造困惑。
+2. **快照天然给出「越权写」的判据。** §4.5.4 把越权写标为「最容易漏的一条」——有了快照，判据是纯数据的：token 绑工号 → 查该工号的推送台账 → 得到允许提交的 `projectId` 白名单。比重新计算精确，且不需要任何新口径。
+3. **存储代价可接受**：`sentLog` 每条多存待办明细（project 侧 `[{projectId, name, reasons}]`、timesheet 侧 `[{code, label, count, lastDate}]`），按 69 收件人 × 90 天留存估为几百 KB。
+
+#### 4.5.1b `reviewBaseUrl` 配置项 —— 直接沿用本期回调地址那个教训
+
+`cardLink` 必须是**绝对 URL**（蓝信内置 webview 要打开它），而服务端**不知道自己的公网前缀**（nginx 把 `/pm` 剥掉后 app 只看到 `/api/...`）。故新增 `lanxin_config.reviewBaseUrl`（如 `http://10.248.105.95/pm`），超管可配。
+
+**关键**：配置界面必须像 §4.4.0 的回调地址那样**按部署前缀自动推导并预填**（`window.location.origin + import.meta.env.BASE_URL`），不让人手抄。本期问题①的环①根因就是「页面显示了一个漏前缀的地址、超管一字不差照抄」——同一个坑不能再踩第二次。
+
+`reviewBaseUrl` 为空时 `build_action_hint` 收到空 `h5_url`，自动退回「请直接回复本消息反馈」态或不输出（三态逻辑已就绪，无需改动）。
 
 #### 4.5.2 反馈落点：收件箱，不新开台账
 
@@ -401,10 +422,11 @@ sig     = HMAC-SHA256(tokenSecret, "payload_b64|exp").hexdigest()
 | 闸门 | 要求 |
 |---|---|
 | 身份 | token 是唯一凭据，验签失败即拒 |
-| **越权写** | **服务端必须校验 `projectId` 确实属于该 token 绑定的工号** —— 否则任何人拿一个自己的 token 就能往任意项目写反馈。这是本期最容易漏的一条。 |
+| **越权写** | **服务端必须校验 `projectId` 落在该 token 绑定工号的推送快照里** —— 判据是纯数据的（见 §4.5.1a）：token 绑工号 → 查该工号的 `sentLog` → 得到允许提交的 `projectId` 白名单。不在白名单即拒。否则任何人拿一个自己的 token 就能往任意项目写反馈。**这是二期最容易漏的一条。** |
 | 报文大小 | 提交内容长度上限（沿用 `LANXIN_CALLBACK_MAX_BYTES` 同级常量） |
 | 转义 | 内容 `html.escape`，换行只用 `<br>` |
-| 频率 | 单 token 提交次数上限，防止被当作写盘放大器 |
+| 频率 | 单工号单日提交次数上限。**从收件箱现有条目计数得出**（`source='h5'` 且 `employId` 匹配），**不新增状态** —— 与「零新数据文件」一致 |
+| 服务静态页 | `GET /review/<token>` 只负责把 `review.html` 原样吐出，**不在这一步校验 token**（校验在 `items`/`submit` 两个接口）。理由：页面本身零敏感内容，且这样 token 失效时用户看到的是页面内的「链接失效」提示，而不是一个白屏或 403 —— 后者会让人以为系统坏了 |
 
 ---
 
