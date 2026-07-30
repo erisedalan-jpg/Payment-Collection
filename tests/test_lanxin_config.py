@@ -458,3 +458,32 @@ def test_ensure_review_token_secret_does_not_log_it(tmp_path, caplog):
     with caplog.at_level(0):
         sec = LC.ensure_review_token_secret(str(p), cfg)
     assert sec not in caplog.text
+
+
+# ---- 终审 Critical 修复:save_config 曾静默清空 reviewTokenSecret ----
+
+def test_save_config_empty_review_token_secret_keeps_old(tmp_path):
+    """与其余三个密钥同规:传空串=不修改,避免脱敏读回后误清空。
+    reviewTokenSecret 是服务端自生成、界面上没有它的输入框 —— 一旦被清空,
+    已发出去的 H5 链接(TTL 48 小时)集体静默失效,且无任何报错线索。"""
+    p = str(tmp_path / "c.json")
+    cfg = LC.default_config()
+    cfg["credentials"]["reviewTokenSecret"] = "KEEPME"
+    LC.save_config(p, cfg)
+    cfg2 = LC.load_config(p)
+    cfg2["credentials"]["reviewTokenSecret"] = ""
+    saved = LC.save_config(p, cfg2)
+    assert saved["credentials"]["reviewTokenSecret"] == "KEEPME"
+
+
+def test_ensure_then_public_then_save_roundtrip_keeps_review_token_secret(tmp_path):
+    """端到端复现终审逮到的真实故障链路:ensure_review_token_secret 生成并落盘
+    → public_config 下发(该字段被抹成 "") → 前端原样把下发对象 PUT 回来
+    → save_config → 密钥仍在。这条比上一条更贴近「超管点一次保存」的真实路径。"""
+    p = str(tmp_path / "c.json")
+    cfg = LC.default_config()
+    secret = LC.ensure_review_token_secret(p, cfg)
+    pub = LC.public_config(LC.load_config(p))
+    assert pub["credentials"]["reviewTokenSecret"] == ""      # 确认下发环节真的抹空了
+    LC.save_config(p, pub)                                     # 模拟前端原样回传
+    assert LC.load_config(p)["credentials"]["reviewTokenSecret"] == secret

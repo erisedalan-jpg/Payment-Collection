@@ -259,12 +259,16 @@ def load_config(path: str) -> Dict[str, Any]:
         return default_config()
 
 
-_SECRET_FIELDS = ("appSecret", "callbackAesKey", "callbackSignToken")
+# 「密钥字段留空回传 = 沿用旧值」的保护名单。public_config 把密钥抹成空串下发,
+# 前端原样 PUT 回来时若不认识某个密钥字段,就会把空串照写落盘、覆盖真实密钥。
+# reviewTokenSecret 尤其危险:它是【服务端自己生成】的,超管界面上压根没有这个输入框,
+# 一旦被清空,已发出去的 H5 链接(TTL 48 小时)集体静默失效,且无任何报错线索。
+_SECRET_FIELDS = ("appSecret", "callbackAesKey", "callbackSignToken", "reviewTokenSecret")
 
 
 def save_config(path: str, cfg: Any) -> Dict[str, Any]:
-    """校验后原子写。三个密钥(appSecret/callbackAesKey/callbackSignToken)为空串
-    = 沿用旧值(前端读到的是脱敏值,回传空串不应清空)。"""
+    """校验后原子写。四个密钥(appSecret/callbackAesKey/callbackSignToken/
+    reviewTokenSecret)为空串 = 沿用旧值(前端读到的是脱敏值,回传空串不应清空)。"""
     clean = validate_config(cfg)
     # M-1:循环变量名不得与文件句柄同名(原先两处都叫 f,功能虽对但极易读错)。
     if any(not clean["credentials"][name] for name in _SECRET_FIELDS):
