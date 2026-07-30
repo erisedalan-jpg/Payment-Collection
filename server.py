@@ -3731,7 +3731,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         清单取自【推送快照】(发送台账的 reviewItems)而非实时重算:「关注原因」
         口径在前端 TS,后端没有它;实时查只能靠跨语言复制口径,或把 17MB 全员数据
         下发给这个【免登录】页面 —— 两条都不可接受(见 spec §4.5.1a)。
-        快照还有个好处:员工看到的正是卡片告诉他的那几项。
+
+        【2026-07-30 更正】快照取的是该工号【最近一次】同 kind 的 primary 推送
+        (下方 reversed(...)+role=='primary' 过滤),不严格等于"员工手上那张卡"——
+        48 小时 TTL 内若发生第二次推送,这里会返回【新】快照,与旧卡片不一致;
+        若新快照移除了某项目,员工按旧卡提交会被 submit 侧的越权写校验拒绝。
+        此取舍已知且影响温和,不在本次改动范围,见 spec §4.5.1a 与 PROGRESS.md L-61。
         """
         token = (parse_qs(urlparse(self.path).query).get('token') or [''])[0]
         secret, cfg = self._review_secret()
