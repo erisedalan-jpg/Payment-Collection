@@ -7,6 +7,7 @@ import type { Project, ProjectPmis } from '@/types/analysis'
 import { getLanxinInbox, handleLanxinInboxItem, deleteLanxinInboxItem } from '@/lib/lanxinApi'
 import { HANDLE_DOMAINS, needsInstance, needsRiskCode, riskChoices, canHandle, sourceLabel,
          type HandleDomain, type LanxinInboxItem } from '@/lib/lanxinInbox'
+import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 
 const data = useDataStore()
 const tempFollowup = useTempFollowupStore()
@@ -33,14 +34,26 @@ async function load() {
   }
 }
 
-/** 渠道展示：三种事件类型对应私聊/群聊(+群名)/应用号；其余(含 H5 反馈的 h5_review)原样显示 eventType。
+/** 渠道展示：三种蓝信原生事件类型对应私聊/群聊(+群名)/应用号；H5 填报页反馈的
+ *  eventType 恒为内部枚举 h5_review，展示成「H5 填报页」而非原始枚举值——超管
+ *  不该看到内部实现细节(【复审 M-1】此前兜底分支会把 h5_review 原样显示出来)；
+ *  再往后的未知类型原样兜底 eventType，不静默隐藏(排查蓝信真实回调报文的线索)。
  *  与 lib/lanxinInbox.ts 的 sourceLabel(H5 反馈/蓝信回复二选一)是两个不同维度，不要混同——
  *  改名 channelLabel 就是为了让两者能在同一处并列使用而不撞名。 */
 function channelLabel(item: LanxinInboxItem): string {
   if (item.eventType === 'bot_group_message') return item.groupName ? `群聊 · ${item.groupName}` : '群聊'
   if (item.eventType === 'bot_private_message') return '私聊'
   if (item.eventType === 'account_message') return '应用号'
+  if (item.eventType === 'h5_review') return 'H5 填报页'
   return item.eventType || '-'
+}
+
+/** 【复审 M-2】H5 工时反馈自带的问题码(如 MISS_SUMMARY)→ 中文标签。issueCode
+ *  落库且 TS 类型已声明，但界面此前从未显示——同一员工对不同问题码的反馈原本
+ *  长得一模一样，超管看不出针对哪一类。复用既有单一来源(与后端 yitian_rules.py
+ *  同表)，不新造一份映射；找不到就原样兜底显示 code，不静默隐藏。 */
+function issueLabel(code: string): string {
+  return ISSUE_LABELS[code] ?? code
 }
 
 function projectLabel(pid: string): string {
@@ -172,9 +185,15 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
       </el-table-column>
       <el-table-column label="来源" width="140">
         <template #default="{ row }: { row: LanxinInboxItem }">
-          <div>{{ channelLabel(row) }}</div>
+          <div :data-test="`lx-item-channel-${row.id}`">{{ channelLabel(row) }}</div>
           <!-- H5 反馈 vs 蓝信文本回复:超管要能一眼区分哪条自带项目号、可直接归入 -->
           <div class="dv-hint" :data-test="`lx-item-source-${row.id}`">{{ sourceLabel(row) }}</div>
+          <!-- H5 工时反馈自带问题码(8 类之一):同一员工对不同问题码的反馈原本长得
+               一模一样,超管看不出针对哪一类——显示中文标签让它们可区分。
+               项目侧反馈/蓝信文本回复没有这个字段,不渲染此行。 -->
+          <div v-if="row.issueCode" class="dv-hint" :data-test="`lx-item-issue-${row.id}`">
+            {{ issueLabel(row.issueCode) }}
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="200">
