@@ -124,3 +124,42 @@ def test_prune_drops_stale_seen_and_sent_but_keeps_items():
     assert s["seenEventIds"] == []
     assert s["sent"] == []
     assert len(s["items"]) == 1
+
+
+def test_record_sent_keeps_review_items():
+    """H5 页的待办清单从台账读(spec §4.5.1a:口径在前端,后端无法实时重算)。
+    白名单漏了这个键 → H5 页永远显示「没有待办」,而卡片明明列了项目。"""
+    s = I.new_store()
+    I.record_sent(s, [{"staffId": "sid", "employId": "A001", "name": "张三",
+                       "routeKey": "project", "role": "primary",
+                       "projectIds": ["P1"], "msgId": "m",
+                       "reviewItems": [{"projectId": "P1", "name": "XX",
+                                        "reasons": [{"category": "回款延期", "detail": "3 个"}]}]}],
+                  "2026-07-29 09:00:00")
+    assert s["sent"][0]["reviewItems"][0]["projectId"] == "P1"
+
+
+def test_record_sent_review_items_defaults_to_empty_list():
+    """老台账(V4.5.8 及以前)没有这个键 → 空列表,不是 None。
+    下游直接 for 循环它,None 会炸。"""
+    s = I.new_store()
+    I.record_sent(s, [{"staffId": "sid", "employId": "A001", "name": "张三"}],
+                  "2026-07-29 09:00:00")
+    assert s["sent"][0]["reviewItems"] == []
+
+
+def test_staff_id_of_employ_returns_latest():
+    """H5 落库时要给条目补 staffId(收件箱的身份反查与归因候选都按它索引)。
+    取【最近一条】—— 同一工号的 staffId 理论上不变,但若蓝信侧变更过,
+    最近的那条才是当前有效的。"""
+    s = I.new_store()
+    I.record_sent(s, [{"staffId": "old", "employId": "A001", "name": "张三"}],
+                  "2026-07-01 09:00:00")
+    I.record_sent(s, [{"staffId": "new", "employId": "A001", "name": "张三"}],
+                  "2026-07-29 09:00:00")
+    assert I.staff_id_of_employ(s, "A001") == "new"
+
+
+def test_staff_id_of_employ_unknown_returns_empty():
+    """查不到返回空串,【绝不编造】—— 与 resolve_identity 同一条纪律。"""
+    assert I.staff_id_of_employ(I.new_store(), "A999") == ""

@@ -15,6 +15,7 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 import lanxin_config
+import lanxin_review
 
 HTTP_TIMEOUT = 15
 TOKEN_EARLY_EXPIRE = 300          # 提前 5 分钟视为过期,避免边界失败
@@ -287,7 +288,7 @@ def _norm_reasons(raw: Any) -> List[Dict[str, str]]:
 
 def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                tree: Dict[str, Any], project_pmis: Dict[str, Any],
-               now: str = "") -> Dict[str, Any]:
+               now: str = "", review_secret: str = "") -> Dict[str, Any]:
     """事项 → 收件计划。纯计算,不发任何网络请求。
     项目侧:projectId → 项目经理(姓名) → 工号(后端自行推导,不信任前端);工时侧:employId 直连。
     V4.0.2 起每一项(问题码/关注原因)各自配 enabled/primary/supervisorLevels。
@@ -306,6 +307,10 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     # 【绝不重塑 proj_by_emp】—— 上级汇总卡的 proj_counts 依赖它的 {原因: [项目名]} 形状,
     # 改形会连带砸掉汇总卡。并行桶是本文件既有范式(proj_ids_by_emp 就是这么加的)。
     proj_detail_by_emp: Dict[str, Dict[str, List[Dict[str, str]]]] = {}
+    # 项目名 → 项目号。reviewItems 需要项目号(H5 越权写判据),而 proj_detail_by_emp
+    # 是按项目名分组的(卡片文案用名字)。另开一份映射,不改并行桶形状 ——
+    # 与 proj_ids_by_emp 同样是「并行桶」范式(见其上方注释)。
+    name_to_pid: Dict[str, str] = {}
     ts_by_emp: Dict[str, List[Dict[str, Any]]] = {}
     ts_range = {"start": "", "end": ""}
     # 工时 counts 按【中文 label】聚合,而配置按【英文 code】——分桶时顺手建映射,
@@ -323,12 +328,29 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
     reply_hint = bool(str(_cred.get("callbackAesKey") or "").strip()) and \
         bool(str(_cred.get("callbackSignToken") or "").strip())
 
+    review_base = str(cfg.get("reviewBaseUrl") or "").strip().rstrip("/")
+
+    def _h5_url(emp: str, kind: str) -> str:
+        """给某人某类推送签一个 H5 链接。base 或密钥缺一个就返回空串 ——
+        此时 build_action_hint 自动退回「请直接回复本消息反馈」态或不输出动作要求,
+        绝不因为签不出 token 让整批推送失败。
+        """
+        if not review_base or not review_secret:
+            return ""
+        try:
+            tok = lanxin_review.issue_token(emp, kind, review_secret, int(time.time()))
+        except ValueError:
+            return ""          # kind 未知/密钥空:不发链接,不炸整批
+        return "%s/review/%s" % (review_base, tok)
+
     # N 单一来源:cfg["reviewDeadlineHours"] —— 不能在这里另写一个字面量默认值,
     # 否则「卡上写 24 小时、清单按另一个数算」的事故(§4 已点名)会在这里复现。
-    action_hint = build_action_hint(
-        int(cfg.get("reviewDeadlineHours") or lanxin_config.DEFAULT_REVIEW_DEADLINE_HOURS),
-        h5_url="",              # 一期无 H5;二期在此传 token URL,文案自动切态
-        reply_hint=reply_hint)
+    deadline_hours = int(cfg.get("reviewDeadlineHours")
+                         or lanxin_config.DEFAULT_REVIEW_DEADLINE_HOURS)
+
+    def _hint(h5: str) -> str:
+        # N 单一来源:cfg["reviewDeadlineHours"],与未响应清单同源(见 V4.5.8)
+        return build_action_hint(deadline_hours, h5_url=h5, reply_hint=reply_hint)
 
     for it in items:
         kind = it.get("kind")
@@ -350,6 +372,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                 continue
             bucket = proj_by_emp.setdefault(emp, {})
             pname = str(pm.get("projectName") or pid)
+            name_to_pid.setdefault(pname, pid or "")
             for r in reasons:
                 bucket.setdefault(r["category"], []).append(pname)
             proj_detail_by_emp.setdefault(emp, {}).setdefault(pname, []).extend(
@@ -384,12 +407,18 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                     if (ts_items.get(i.get("code")) or {}).get("primary")]
             if not mine:
                 continue
+            h5 = _h5_url(emp, "timesheet")
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
                 "routeKey": "timesheet", "projectIds": [],
+                # 待办快照:H5 页从台账读它渲染表单(见 spec §4.5.1a)
+                "reviewItems": [{"code": i.get("code") or "", "label": i["label"],
+                                 "count": int(i["count"]),
+                                 "lastDate": str(i.get("lastDate") or "")} for i in mine],
                 "card": build_timesheet_card(by_id[emp]["name"], mine,
                                              ts_range["start"], ts_range["end"],
-                                             action_hint=action_hint, sent_at=now),
+                                             action_hint=_hint(h5), sent_at=now,
+                                             card_link=h5),
             })
     if r_proj:
         for emp in sorted(proj_by_emp):
@@ -402,11 +431,19 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                     mine.append({"name": pname, "reasons": keep})
             if not mine:
                 continue
+            h5 = _h5_url(emp, "project")
+            # reviewItems 要带 projectId(H5 提交时的越权写判据靠它),而 mine 只有项目名。
+            # 从并行桶按名字取回项目号:proj_detail_by_emp 是按项目名分组的,
+            # 这里另建一份「名字 → 项目号」映射,不改并行桶本身的形状。
             recipients.append({
                 "employId": emp, "name": by_id[emp]["name"], "role": "primary",
                 "routeKey": "project", "projectIds": list(proj_ids_by_emp.get(emp) or []),
+                "reviewItems": [{"projectId": name_to_pid.get(p["name"], ""),
+                                 "name": p["name"], "reasons": list(p["reasons"])}
+                                for p in mine],
                 "card": build_project_card(by_id[emp]["name"], mine,
-                                           action_hint=action_hint, sent_at=now),
+                                           action_hint=_hint(h5), sent_at=now,
+                                           card_link=h5),
             })
 
     # ② 汇总卡:按 levels 分组多次卷、再按 sup/owner/标签三层合并。
@@ -423,7 +460,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                     for owner, counts in agg[sup].items()]
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
-                "routeKey": "timesheet", "projectIds": [],
+                "routeKey": "timesheet", "projectIds": [], "reviewItems": [],
                 "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE,
                                            unit="条", head_title="工时填报提醒",
                                            title_fmt="你的团队工时填报存在 %d 条问题",
@@ -449,7 +486,7 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                         sup_ids.append(pid2)
             recipients.append({
                 "employId": sup, "name": by_id[sup]["name"], "role": "supervisor",
-                "routeKey": "project", "projectIds": sup_ids,
+                "routeKey": "project", "projectIds": sup_ids, "reviewItems": [],
                 "card": build_summary_card(by_id[sup]["name"], rows, SUMMARY_SUBTITLE,
                                            reply_hint=reply_hint),
             })
@@ -497,6 +534,9 @@ def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
                 # 「N 小时内未反馈将列入《未响应清单》」的动作要求,supervisor 汇总卡
                 # 【没有任何反馈时限承诺】。不记 role,上级会被清单当成"该催的人"。
                 "role": r.get("role") or "",
+                # 待办快照 → H5 页从台账读它渲染表单(spec §4.5.1a)。
+                # 也是 H5 提交的【越权写判据】:提交的 projectId 必须落在这里面。
+                "reviewItems": list(r.get("reviewItems") or []),
                 "projectIds": list(r.get("projectIds") or []),
                 "msgId": data.get("msgId") or "",
             })

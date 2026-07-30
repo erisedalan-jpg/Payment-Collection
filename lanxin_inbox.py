@@ -68,6 +68,9 @@ def record_sent(store: Dict[str, Any], entries: List[Dict[str, Any]], now: str) 
             "name": e.get("name") or "",
             "routeKey": e.get("routeKey") or "",
             "role": e.get("role") or "",
+            # H5 反馈页的待办清单从这里读(口径在前端、后端无法实时重算,见 spec §4.5.1a)。
+            # 老台账(V4.5.8 及以前)没有这个键 → 空列表(不是 None:下游直接 for 它)。
+            "reviewItems": copy.deepcopy(e.get("reviewItems") or []),
             "projectIds": list(e.get("projectIds") or []),
             "msgId": e.get("msgId") or "",
             "sentAt": now,
@@ -134,3 +137,16 @@ def prune(store: Dict[str, Any], now: str) -> None:
                              if (_parse(x.get("ts")) or ref) >= seen_cut]
     store["sent"] = [x for x in store.get("sent") or []
                      if (_parse(x.get("sentAt")) or ref) >= sent_cut]
+
+
+def staff_id_of_employ(store: Dict[str, Any], employ_id: str) -> str:
+    """按工号反查 staffId。查不到返回空串,【绝不编造】(同 resolve_identity 的纪律)。
+
+    取【最近一条】:同一工号的 staffId 理论上不变,但蓝信侧若变更过,
+    最近那条才是当前有效的。H5 落库时用它给条目补 staffId,让收件箱既有的
+    身份反查与归因候选(都按 staffId 索引)对 H5 条目照样生效。
+    """
+    for e in reversed(store.get("sent") or []):
+        if str(e.get("employId") or "") == str(employ_id or ""):
+            return str(e.get("staffId") or "")
+    return ""
