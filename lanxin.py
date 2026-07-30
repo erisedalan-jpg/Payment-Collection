@@ -286,6 +286,17 @@ def _norm_reasons(raw: Any) -> List[Dict[str, str]]:
     return out
 
 
+# 【复审 I-3】H5 填报页要读的键,单一来源。frontend/public/review.html 是全仓
+# 唯一无类型检查、无 lint、无单元测试的文件,字段名一旦漂移(比如 item.projectId
+# 被顺手改成 item.pid),全仓 pytest/vitest/typecheck/build 可以【全绿】,而线上
+# 表现是卡片标题空白、提交必被越权闸拒 —— 看起来像 token 或权限问题,实际是键名
+# 对不上。故在此定为单一来源,由 tests/test_review_html_contract.py 两头(build_plan
+# 产出端 + review.html 源文本消费端)比对,任一头漂移都会被钉住。
+REVIEW_ITEM_KEYS_PROJECT = ("projectId", "name", "reasons")
+REVIEW_REASON_KEYS = ("category", "detail")
+REVIEW_ITEM_KEYS_TIMESHEET = ("code", "label", "count", "lastDate")
+
+
 def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                tree: Dict[str, Any], project_pmis: Dict[str, Any],
                now: str = "", review_secret: str = "") -> Dict[str, Any]:
