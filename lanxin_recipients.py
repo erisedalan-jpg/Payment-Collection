@@ -227,7 +227,10 @@ def build_timesheet_card(name: str, issues: List[Dict[str, Any]],
     issues 元素:{"code":…, "label":…, "count":…, "lastDate": "YYYY-MM-DD"(可选)}
     lastDate 缺失 → 不拼「· 最近 …」,绝不拼出半截文案(与 start/end 同策略:
     宁可不显示,不显示空值)。
-    card_link: 整卡点击链接。非空时蓝信让整卡可点,空则卡片不可点。
+    card_link: 整卡点击链接。【返回值契约,非用户可见效果描述】:非空串时,
+    返回的 dict 会带上 cardLink 键(值即此参数,蓝信据此让整卡可点);为空串时,
+    返回的 dict 里【不会有】cardLink 键(不是"键存在但值为空") —— 下游/测试
+    判断"是否可点"应判键是否存在,见 _card()。
 
     问题码共 8 类 → 明细最多 8 行,加动作要求 = 9,永不触及蓝信 10 对上限
     (_card 仍有 fields[:MAX_FIELDS] 兜底)。
@@ -263,7 +266,10 @@ def build_project_card(name: str, projects: List[Dict[str, Any]],
     """项目卡 → 项目经理本人。一人一张。
 
     projects: [{"name": 项目名, "reasons": [{"category":…, "detail":…}, …]}, …]
-    card_link: 整卡点击链接。非空时蓝信让整卡可点,空则卡片不可点。
+    card_link: 整卡点击链接。【返回值契约,非用户可见效果描述】:非空串时,
+    返回的 dict 会带上 cardLink 键(值即此参数,蓝信据此让整卡可点);为空串时,
+    返回的 dict 里【不会有】cardLink 键(不是"键存在但值为空") —— 下游/测试
+    判断"是否可点"应判键是否存在,见 _card()。
 
     为什么仍是聚合卡而不是单项目单卡:实测 638 个在建项目里 324 个命中关注原因、
     涉及 69 人,单人最多背 32 个 —— 单项目单卡会让 3 个人一次收到 20+ 张,一次就砸掉
