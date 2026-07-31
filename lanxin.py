@@ -518,6 +518,41 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
             "totals": {"recipients": len(recipients), "unresolved": len(unresolved)}}
 
 
+def select_recipients(plan: Dict[str, Any],
+                      only: Optional[List[Dict[str, str]]]) -> Dict[str, Any]:
+    """按 (role, employId) 白名单收窄 plan 的收件人。纯函数,不改入参。
+
+    只做【收窄】,不做增补:白名单里没出现在 plan 里的项一律忽略。这是本函数的
+    安全性质 —— 前端能少发给谁,但【无论如何都加不出一个收件人、也改不了卡片
+    内容】,卡片仍是后端 build_plan 算出来的那一份。与「后端不接受前端传来的
+    标识」不冲突:employId 本就是允许前端传的三个标识之一,而 role 只在与本次
+    plan 里已有的收件人比对时用得上。
+
+    only 为 None → 原样返回(全发)。这是向后兼容的默认:老前端不传这个字段。
+    only 为空列表 → 收窄成 0 人,由调用方判定并拒绝 —— 【绝不能退化成全发】,
+    那会把"我只想试发给自己"变成"全员触达",且不可撤销。
+
+    键必须是 (role, employId) 二元组而非工号:同一个人既是项目经理又是上级时,
+    在 plan 里【是两条】收件人(本人明细卡 + 上级汇总卡,role 不同、卡片不同),
+    只按工号过滤会把两条一起选中或一起漏掉。
+    """
+    if only is None:
+        return plan
+    want = set()
+    for x in only or []:
+        if isinstance(x, dict):
+            want.add((str(x.get("role") or ""), str(x.get("employId") or "")))
+    kept = [r for r in plan.get("recipients") or []
+            if (str(r.get("role") or ""), str(r.get("employId") or "")) in want]
+    out = dict(plan)
+    out["recipients"] = kept
+    # totals 必须跟着重算:前端拿它显示"已推送给 N 人",不改就是显示全量人数。
+    totals = dict(plan.get("totals") or {})
+    totals["recipients"] = len(kept)
+    out["totals"] = totals
+    return out
+
+
 def dispatch(plan: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
     """按 plan 真发。串行 + 间隔(控速,限流阈值未知);
     单人失败不中断整批,如实计入 failed。

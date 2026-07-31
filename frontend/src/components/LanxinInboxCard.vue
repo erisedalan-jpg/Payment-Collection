@@ -3,14 +3,22 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDataStore } from '@/stores/data'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
+import { usePaymentKeyFollowupStore } from '@/stores/paymentKeyFollowup'
+import { useProjectTagsStore } from '@/stores/projectTags'
 import type { Project, ProjectPmis } from '@/types/analysis'
-import { getLanxinInbox, handleLanxinInboxItem, deleteLanxinInboxItem } from '@/lib/lanxinApi'
-import { HANDLE_DOMAINS, needsInstance, needsRiskCode, riskChoices, canHandle, sourceLabel,
+import { getLanxinInbox, handleLanxinInboxItem, unhandleLanxinInboxItem,
+         deleteLanxinInboxItem } from '@/lib/lanxinApi'
+import { HANDLE_DOMAINS, HANDLE_FIELDS, needsInstance, needsRiskCode, riskChoices, canHandle,
+         sourceLabel, handleVisibility,
          type HandleDomain, type LanxinInboxItem } from '@/lib/lanxinInbox'
+import { buildScopeInputs } from '@/lib/tempFollowup'
+import { isKeyProject } from '@/lib/keyProjects'
 import { ISSUE_LABELS } from '@/lib/yitian/compliance'
 
 const data = useDataStore()
 const tempFollowup = useTempFollowupStore()
+const paykey = usePaymentKeyFollowupStore()
+const projectTags = useProjectTagsStore()
 
 const items = ref<LanxinInboxItem[]>([])
 const rejected = ref<{ count: number; lastAt: string; lastFrom?: string }>({ count: 0, lastAt: '' })
@@ -61,6 +69,15 @@ function projectLabel(pid: string): string {
   return p?.projectName ? `${pid} ${p.projectName}` : pid
 }
 
+/** 【V4.5.10】收件箱列表上的「涉及项目」。此前整张表【一列项目信息都没有】——
+ *  超管看到一条回复，要判断它说的是哪个项目，只能点开归入抽屉才看得到预填的项目号。
+ *  H5 项目侧反馈自带确定的 projectId(结构化信息，不该丢回给人工)；
+ *  文本回复只有台账推测出来的候选，必须【标明是推测】，不能和确定的混为一谈。 */
+function projectCells(item: LanxinInboxItem): { text: string; guess: boolean }[] {
+  if (item.projectId) return [{ text: projectLabel(item.projectId), guess: false }]
+  return (item.candidateProjects ?? []).map((pid) => ({ text: projectLabel(pid), guess: true }))
+}
+
 // —— 归入抽屉 ——
 const handleOpen = ref(false)
 const handleItem = ref<LanxinInboxItem | null>(null)
@@ -90,6 +107,46 @@ function onScopeChange() {
   handleForm.value.riskCode = ''
 }
 
+// —— 归入可见性（V4.5.10 核心修复，成因与判据见 lib/lanxinInbox.handleVisibility）——
+// 归入按 projectId 直接写 store，写入永远成功；但 payment_key/temp 的行集由范围设置
+// 决定、progress 的行集只含重点项目 —— 项目不在行集里，写进去的内容【永远渲染不出来】，
+// 而条目已被标 handled、按钮转灰。现网报障「归入后在对应位置找不到内容」正是这个。
+//
+// buildScopeInputs 要遍历全部项目，故【只在抽屉打开且确实需要范围判定时才算】：
+// computed 本身惰性，这里再加两道短路，避免 /data 页一挂载就白算一遍。
+const scopeInput = computed(() => {
+  const d = handleForm.value.domain
+  if (!handleOpen.value || !handleForm.value.projectId) return undefined
+  if (d !== 'temp' && d !== 'payment_key') return undefined
+  const src = data.data as unknown as Record<string, unknown> | null
+  return buildScopeInputs(projects.value, pmisMap.value,
+    (src?.paymentNodes ?? {}) as never, (src?.projectMilestones ?? {}) as never,
+    projectTags.effectiveAssignments).find((i) => i.id === handleForm.value.projectId)
+})
+
+/** 所选临时跟进实例的 scope。未选实例 → undefined（此时不下"不可见"的判断）。 */
+const tempScope = computed(() =>
+  tempFollowup.instances.find((i) => i.id === handleForm.value.instanceId)?.scope)
+const tempInstanceName = computed(() =>
+  tempFollowup.instances.find((i) => i.id === handleForm.value.instanceId)?.name ?? '')
+
+const visibility = computed(() => {
+  const pid = handleForm.value.projectId
+  const p = projects.value.find((x) => x.projectId === pid)
+  return handleVisibility(handleForm.value.domain, {
+    projectId: pid,
+    scopeInput: scopeInput.value,
+    paymentKeyScope: paykey.scope,
+    tempScope: tempScope.value,
+    tempInstanceName: tempInstanceName.value,
+    isKeyProject: !!p && isKeyProject(p, pmisMap.value[pid]),
+  })
+})
+
+/** 归入后内容落在目标页的哪一列。抽屉里明说，省得超管到了页面还要自己找。 */
+const targetField = computed(() =>
+  handleForm.value.domain ? HANDLE_FIELDS[handleForm.value.domain].label : '')
+
 async function openHandle(item: LanxinInboxItem) {
   if (!canHandle(item)) return
   handleItem.value = item
@@ -99,9 +156,13 @@ async function openHandle(item: LanxinInboxItem) {
   handleOpen.value = true
   // 提前把临时跟进实例列表拉起来:域下拉切到 temp 时不必再等一轮网络往返才看到实例选项。
   // 复用既有 store,不是本组件自己再起一份请求逻辑(V4.0.2 多实例化后实例列表的唯一来源)。
-  if (!tempFollowup.loaded) {
-    try { await tempFollowup.load() } catch { /* 静默:实例列表加载失败不阻塞归入其它域 */ }
-  }
+  // 回款重点跟进的 scope 与标签同理 —— 可见性判定要用它们,没加载出来会把
+  // 「范围其实配了」误判成「尚未设置范围」。三个都静默失败:加载不上不该卡住归入。
+  await Promise.all([
+    tempFollowup.loaded ? null : tempFollowup.load().catch(() => {}),
+    paykey.loaded ? null : paykey.load().catch(() => {}),
+    projectTags.loaded ? null : projectTags.load().catch(() => {}),
+  ])
 }
 
 async function confirmHandle() {
@@ -120,6 +181,16 @@ async function confirmHandle() {
     }
     if (!handleForm.value.riskCode) { ElMessage.warning('风险跟进须再选一条风险记录'); return }
   }
+  // 【V4.5.10】目标页渲染不出这一行时二次确认，不再默默写进去让它蒸发。
+  // 这里【不做硬拦截】—— 与 risk 无编码那种"写进去永远读不到"不同，范围/重点项目
+  // 判定是会变的：超管完全可能打算先归入、再去把范围调过来。硬拦会把这条路堵死，
+  // 所以只要把后果说清楚并要他确认。
+  if (!visibility.value.visible) {
+    try {
+      await ElMessageBox.confirm(visibility.value.reason, '目标页当前看不到这条内容',
+        { type: 'warning', confirmButtonText: '仍然归入', cancelButtonText: '返回修改' })
+    } catch { return }
+  }
   busy.value = true
   try {
     await handleLanxinInboxItem(item.id, domain, handleForm.value.projectId,
@@ -130,6 +201,35 @@ async function confirmHandle() {
     await load()
   } catch (e) {
     ElMessage.error('归入失败：' + (e instanceof Error ? e.message : String(e)))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 【V4.5.10】撤销归入。归入原本是一次性的:选错域/项目/实例后按钮就转灰，
+ *  唯一出路是把整条回复删掉、连员工原话一起丢。
+ *  【只解除标记，不删已写进跟进域的正文】—— 那段正文是追加进富文本字段的，
+ *  可能已被人工续写，按内容反删不可靠，失手就是删掉别人手写的跟进。
+ *  所以必须把旧去向明明白白告诉超管，让他自己决定要不要去清。 */
+async function onUnhandle(item: LanxinInboxItem) {
+  const info = (item.handledInfo ?? {}) as Record<string, unknown>
+  const where = `${info.label ?? '-'} · 项目 ${info.projectId ?? '-'}`
+  try {
+    await ElMessageBox.confirm(
+      `将解除本条的「已归入」标记，使其可以重新归入。\n\n`
+      + `注意：此前已写入【${where}】的内容【不会】被自动删除，`
+      + `如需清理请到该页自行编辑。`,
+      '确认撤销归入', { type: 'warning', confirmButtonText: '撤销归入' })
+  } catch {
+    return
+  }
+  busy.value = true
+  try {
+    await unhandleLanxinInboxItem(item.id)
+    ElMessage.success('已撤销归入，可重新归入')
+    await load()
+  } catch (e) {
+    ElMessage.error('撤销失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     busy.value = false
   }
@@ -158,7 +258,8 @@ onMounted(() => { if (!data.data) data.load(); load() })
 // 测试需要绕过 el-select 的真实 popper 交互,直接摆状态调用这两个方法(参照
 // YitianRulesCard.test.ts 对 draft/onSave/applyImport 的既有做法)。
 defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
-               riskOptions, riskEmpty, riskCodeless, onScopeChange, openHandle, confirmHandle })
+               riskOptions, riskEmpty, riskCodeless, onScopeChange, openHandle, confirmHandle,
+               visibility, targetField, onUnhandle, projectCells })
 </script>
 
 <template>
@@ -205,6 +306,16 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
           <div v-if="row.status === 'unparsed'" class="li-reason dv-hint warn">{{ row.unparsedReason }}</div>
         </template>
       </el-table-column>
+      <!-- 涉及项目:此前整张表没有任何项目信息,超管看不出一条回复说的是哪个项目 -->
+      <el-table-column label="涉及项目" width="220">
+        <template #default="{ row }: { row: LanxinInboxItem }">
+          <div v-for="(c, i) in projectCells(row)" :key="i" :data-test="`lx-item-proj-${row.id}`">
+            <span>{{ c.text }}</span>
+            <span v-if="c.guess" class="dv-hint"> （推测）</span>
+          </div>
+          <span v-if="!projectCells(row).length" class="dv-hint">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="text" label="回复内容" min-width="200" show-overflow-tooltip />
       <el-table-column label="归入去向" width="200">
         <template #default="{ row }: { row: LanxinInboxItem }">
@@ -213,12 +324,22 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
             <template v-if="row.handledInfo?.riskCode">· {{ row.handledInfo.riskCode }}</template>
           </span>
           <span v-else class="dv-hint">未归入</span>
+          <!-- 撤销【不删】已写入的正文,所以旧去向必须留在界面上:不然超管不知道
+               上次写到哪儿了,那段残留内容就再也没人去清。 -->
+          <div v-if="!row.handled && row.unhandledFrom" class="li-reason dv-hint warn"
+            :data-test="`lx-item-unhandled-${row.id}`">
+            曾归入 {{ (row.unhandledFrom.info as Record<string, unknown> | null)?.label ?? '-' }} ·
+            {{ (row.unhandledFrom.info as Record<string, unknown> | null)?.projectId ?? '-' }}
+            （已撤销，该处内容未自动删除）
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140">
+      <el-table-column label="操作" width="200">
         <template #default="{ row }: { row: LanxinInboxItem }">
           <button class="dv-btn" data-test="li-handle-btn" :disabled="!canHandle(row)"
             @click="openHandle(row)">归入</button>
+          <button v-if="row.handled" class="dv-btn" data-test="li-unhandle-btn" :disabled="busy"
+            @click="onUnhandle(row)">撤销归入</button>
           <button class="dv-btn danger" data-test="li-delete-btn" @click="onDelete(row)">删除</button>
         </template>
       </el-table-column>
@@ -272,6 +393,15 @@ defineExpose({ items, rejected, received, handleOpen, handleItem, handleForm,
           </span>
         </div>
 
+        <!-- 内容会落到哪一页哪一列,直接写出来 —— 归入完就该知道去哪儿看 -->
+        <div v-if="handleForm.domain" class="dv-row dv-hint" data-test="li-target-hint">
+          将追加到「{{ HANDLE_FIELDS[handleForm.domain as HandleDomain].label }}」列
+        </div>
+        <!-- 【V4.5.10】目标页渲染不出这一行时的显式告警。此前这里什么都不说,
+             写进去的内容在目标页永远看不到,而条目已标 handled、按钮转灰。 -->
+        <div v-if="!visibility.visible" class="dv-row dv-hint warn" data-test="li-invisible-warn">
+          {{ visibility.reason }}
+        </div>
         <div class="dv-row dv-hint">
           候选项目按「最近推给此人的蓝信卡片涉及哪些项目」推测得出，仅供参考，可改选任意项目。
         </div>

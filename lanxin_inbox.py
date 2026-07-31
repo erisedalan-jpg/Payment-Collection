@@ -123,6 +123,34 @@ def mark_handled(store: Dict[str, Any], item_id: str, info: Dict[str, Any]) -> b
         if it.get("id") == item_id:
             it["handled"] = True
             it["handledInfo"] = copy.deepcopy(info)
+            # 重新归入成功 → 上一次撤销的痕迹作废,否则界面会同时显示
+            # 「已归入 A」和「上次归入 B 已撤销」两条,读的人分不清哪条是现状。
+            it.pop("unhandledFrom", None)
+            return True
+    return False
+
+
+def unmark_handled(store: Dict[str, Any], item_id: str,
+                   at: str = "", by: str = "") -> bool:
+    """撤销归入标记 —— 只动收件箱这一侧的记账,【不碰已写进跟进域的正文】。
+
+    为什么不顺手把跟进正文删掉:归入是把回复【追加】进一个富文本字段
+    (见 server._lanxin_append_reply),超管很可能已经在那条跟进里继续编辑过。
+    按内容反向摘除既不可靠(要匹配一段可能已被改写的 HTML),失手就是删掉别人
+    手写的跟进 —— 比留一段冗余文本严重得多。
+
+    所以把上一次的去向留在 unhandledFrom 里:撤销之后正文仍躺在那个域里,
+    人得知道去哪儿收拾。丢掉这个信息,撤销就成了"只解锁、不告诉你现场在哪"。
+    """
+    for it in store.get("items") or []:
+        if it.get("id") == item_id:
+            if not it.get("handled"):
+                return False
+            prev = it.get("handledInfo")
+            it["handled"] = False
+            it["handledInfo"] = None
+            it["unhandledFrom"] = {"info": copy.deepcopy(prev) if prev else None,
+                                   "at": at, "by": by}
             return True
     return False
 

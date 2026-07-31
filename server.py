@@ -264,9 +264,10 @@ _SUPER_ONLY_PATHS = frozenset({
     '/api/portal/upload',
     '/api/lanxin/config', '/api/lanxin/selftest',
     '/api/lanxin/preview', '/api/lanxin/send',
-    # 收件箱三个端点超管专属;/api/lanxin/callback【绝不能】进本集合 ——
+    # 收件箱四个端点超管专属;/api/lanxin/callback【绝不能】进本集合 ——
     # 这个闸按 path 匹配、不分 method,进了就等于把蓝信挡在门外。
-    '/api/lanxin/inbox', '/api/lanxin/inbox/handle', '/api/lanxin/inbox/delete',
+    '/api/lanxin/inbox', '/api/lanxin/inbox/handle', '/api/lanxin/inbox/unhandle',
+    '/api/lanxin/inbox/delete',
     # 未响应清单是全员推送台账(谁被推了/谁没回),敏感面同收件箱,超管专属。
     '/api/lanxin/unresponded',
 })
@@ -1389,6 +1390,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_lanxin_review_submit()
         elif parsed.path == '/api/lanxin/inbox/handle':
             self.handle_lanxin_inbox_handle()
+        elif parsed.path == '/api/lanxin/inbox/unhandle':
+            self.handle_lanxin_inbox_unhandle()
         elif parsed.path == '/api/lanxin/inbox/delete':
             self.handle_lanxin_inbox_delete()
         elif parsed.path == '/api/pmis/upload':
@@ -3504,6 +3507,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(body, dict):
             self._send_json(400, _error_payload(ERR_VALIDATION, "请求体不是合法 JSON 对象"))
             return
+        # only:可选的收件人白名单 [{role, employId}]。缺省(None)= 全发,老前端不传。
+        # 【必须区分"没传"和"传了空数组"】—— 后者是"一个都没勾",退化成全发就是
+        # 把试发变成全员触达,不可撤销。故这里只在键不存在时才当 None。
+        only = body.get('only') if 'only' in body else None
+        if only is not None and not isinstance(only, list):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "only 须为收件人数组"))
+            return
         cfg = lanxin_config.load_config(LANXIN_CONFIG_FILE)
         if not cfg.get('enabled'):
             self._send_json(400, _error_payload(ERR_VALIDATION, "蓝信推送未启用"))
@@ -3516,10 +3526,19 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         try:
             secret = lanxin_config.ensure_review_token_secret(LANXIN_CONFIG_FILE, cfg)
-            plan = lanxin.build_plan(body.get('items') or [], cfg,
+            full = lanxin.build_plan(body.get('items') or [], cfg,
                                      self._lanxin_tree(), self._lanxin_pmis(),
                                      now=datetime.now().strftime('%Y-%m-%d %H:%M'),
                                      review_secret=secret)
+            # 收窄【只发生在 build_plan 之后】:卡片内容始终是后端算的那一份,
+            # 前端只能少发给谁,加不出人、也改不了卡片(见 lanxin.select_recipients)。
+            plan = lanxin.select_recipients(full, only)
+            if only is not None and not plan['recipients']:
+                self._send_json(400, _error_payload(
+                    ERR_VALIDATION,
+                    "所选收件人不在本次推送计划内(计划共 %d 人),请重新预览后再选"
+                    % len(full['recipients'])))
+                return
             result = lanxin.dispatch(plan, cfg)
         except lanxin.LanxinError as e:
             self._send_json(400, _error_payload(ERR_VALIDATION,
@@ -3542,10 +3561,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         # 台账 90 天清理失效、归入候选恒空,且全程零报错。
         _lanxin_record_sent(result.get('sentLog') or [],
                             datetime.now().strftime(lanxin_inbox.TS_FMT))
-        self._audit_set(target='蓝信推送发送',
-                        detail='成功 %d · 失败 %d · 未解析 %d'
-                               % (result['sent'], len(result['failed']),
-                                  len(plan['unresolved'])))
+        # 部分推送必须在审计里看得出来 —— 否则事后查"当天到底发没发全",
+        # 只看到「成功 3」而计划是 71 人,分不清是选发还是发失败了 68 条。
+        detail = '成功 %d · 失败 %d · 未解析 %d' % (
+            result['sent'], len(result['failed']), len(plan['unresolved']))
+        if only is not None:
+            detail += ' · 指定收件人 %d/%d 人' % (len(plan['recipients']),
+                                                len(full['recipients']))
+        self._audit_set(target='蓝信推送发送', detail=detail)
         self._send_json(200, {"success": True, "plan": plan, "result": result})
 
     # ── 蓝信回调入站(V4.0.5):免登录回调端点 + 超管收件箱 ──
@@ -4012,6 +4035,64 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             detail += ' · 风险 %s' % risk_code
         self._audit_set(target='蓝信回复 %s' % item_id, detail=detail)
         self._send_json(200, {"success": True, "handledInfo": info})
+
+    def handle_lanxin_inbox_unhandle(self):
+        """POST /api/lanxin/inbox/unhandle {itemId} —— 撤销归入标记。超管专属。
+
+        为什么需要它:归入是【一次性且不可逆】的 —— 写完就 handled=True、
+        canHandle 转 false、按钮转灰。选错域/选错项目/选错实例(临时跟进多实例)
+        都无法重来,唯一的出路是把整条回复删掉,连员工原话一起丢。
+
+        【本端点只解除记账,不删已写进跟进域的正文】—— 理由见
+        lanxin_inbox.unmark_handled 的 docstring(正文是追加进富文本字段的,
+        可能已被人工续写,按内容反删不可靠)。响应里回传上一次的去向,
+        让调用方能明确告诉超管"旧内容还在哪儿、要不要自己去清"。
+        """
+        data = self._read_json_body()
+        if data is None:
+            self._send_json(400, _error_payload(ERR_PARSE, "请求体解析失败"))
+            return
+        item_id = str(data.get('itemId') or '').strip()
+        if not item_id:
+            self._send_json(400, _error_payload(ERR_VALIDATION, "itemId 必填"))
+            return
+        account = auth.validate_session(auth.parse_cookie_token(self.headers.get('Cookie')))
+        if not account:
+            self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
+            return
+
+        with _lanxin_inbox_lock:
+            store = _load_lanxin_inbox()
+            item = next((x for x in store.get('items') or [] if x.get('id') == item_id), None)
+        if item is None:
+            self._send_json(404, _error_payload(ERR_VALIDATION, "收件箱条目不存在"))
+            return
+        if not item.get('handled'):
+            self._send_json(400, _error_payload(ERR_VALIDATION, "该条尚未归入,无需撤销"))
+            return
+        prev = item.get('handledInfo') or {}
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ok, res = self._followup_txn(
+            _lanxin_inbox_lock, _load_lanxin_inbox,
+            lambda s: lanxin_inbox.unmark_handled(s, item_id, now, account),
+            _save_lanxin_inbox)
+        if not ok:
+            self._send_json(400 if isinstance(res, str) else 500,
+                            _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL,
+                                           res if isinstance(res, str) else "撤销归入失败"))
+            return
+        if res is False:
+            # 上面的预检与本次事务之间隔着一次重新 load —— 另一个超管在这个窗口里
+            # 撤销或删掉了同一条,unmark_handled 会返回 False。这是【校验类】结果,
+            # 不是内部错误,不能报 500 让人以为服务坏了。
+            self._send_json(400, _error_payload(
+                ERR_VALIDATION, "该条已被其它操作撤销或删除,请刷新后重试"))
+            return
+        detail = '撤销归入%s · 项目 %s' % (prev.get('label') or '-', prev.get('projectId') or '-')
+        if prev.get('riskCode'):
+            detail += ' · 风险 %s' % prev['riskCode']
+        self._audit_set(target='蓝信回复 %s' % item_id, detail=detail)
+        self._send_json(200, {"success": True, "previous": prev})
 
     def handle_lanxin_inbox_delete(self):
         """POST /api/lanxin/inbox/delete {itemId} —— 删除一条收件箱条目。超管专属。"""

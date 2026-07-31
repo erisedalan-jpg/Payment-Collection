@@ -54,9 +54,10 @@ const YITIAN_DATA_MULTI_CODE = {
 } as unknown as YitianData
 
 // vi.hoisted:mock 工厂里要用的 spy 必须在 vi.mock 提升之前先声明,否则 TDZ 报错。
-const { getYitianDataMock, lanxinPreviewMock } = vi.hoisted(() => ({
+const { getYitianDataMock, lanxinPreviewMock, lanxinSendMock } = vi.hoisted(() => ({
   getYitianDataMock: vi.fn(),
   lanxinPreviewMock: vi.fn(),
+  lanxinSendMock: vi.fn(),
 }))
 
 vi.mock('@/lib/yitianApi', () => ({
@@ -88,12 +89,16 @@ vi.mock('@/lib/lanxinApi', () => ({
   // C-1:不再把 lanxinPreview 整个 mock 成罐头数据就完事 —— 用 vi.hoisted 的 spy 接住入参,
   // 断言 buildItems() 的真实产物,而不是只断言抽屉能不能渲染一份写死的 PLAN。
   lanxinPreview: lanxinPreviewMock,
-  lanxinSend: vi.fn(async () => ({
-    plan: PLAN,
-    result: { sent: 1, failed: [{ employId: 'A005', name: '耿磊磊',
-                                  errCode: 56008, errMsg: '触发限流' }], msgIds: ['M1'] },
-  })),
+  // V4.5.10:改成 hoisted spy —— 「只推给勾选的人」要断言的是【真正发给后端的入参】,
+  // 匿名 vi.fn 接不住调用记录,只能验到"抽屉没报错"。
+  lanxinSend: lanxinSendMock,
 }))
+
+const SEND_RESULT = {
+  plan: PLAN,
+  result: { sent: 1, failed: [{ employId: 'A005', name: '耿磊磊',
+                                errCode: 56008, errMsg: '触发限流' }], msgIds: ['M1'] },
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -102,6 +107,8 @@ beforeEach(() => {
   getYitianDataMock.mockResolvedValue(YITIAN_DATA)
   lanxinPreviewMock.mockReset()
   lanxinPreviewMock.mockResolvedValue(PLAN)
+  lanxinSendMock.mockReset()
+  lanxinSendMock.mockResolvedValue(SEND_RESULT)
 })
 
 const mountDrawer = async () => {
@@ -198,5 +205,59 @@ describe('V4.0.2 逐项配置', () => {
       if (it.kind !== 'timesheet') continue
       for (const i of it.issues) expect(i.code).toBe('MISS_SUMMARY')
     }
+  })
+})
+
+// ── V4.5.10:只推送给勾选的收件人 ─────────────────────────────────────────
+//
+// 起因:配置页的连通性自检只能证明网关通,要验一次真实数据此前只能往生产上全员真发。
+// 三条测试都断言【lanxinSend 真正收到的入参】,而不是"点了没报错" ——
+// 勾选态若没接到请求上,组件照样能跑完、消息照样弹「已推送」。
+
+describe('V4.5.10 选人推送', () => {
+  const confirmAll = () => vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+
+  it('默认全选,全选时【不传 only】以保持原有的全发行为', async () => {
+    const spy = confirmAll()
+    const w = await mountDrawer()
+    await w.find('[data-test="lx-send"]').trigger('click')
+    await flushPromises()
+    expect(lanxinSendMock).toHaveBeenCalledTimes(1)
+    // 第二个实参为 undefined = 请求体里根本没有 only 字段 → 走后端原来的全发路径
+    expect(lanxinSendMock.mock.calls[0][1]).toBeUndefined()
+    spy.mockRestore()
+  })
+
+  it('取消勾选一人后,只把剩下的人以 {role, employId} 传给后端', async () => {
+    const spy = confirmAll()
+    const w = await mountDrawer()
+    // 取消勾选 A005(汇总卡),只留 A006
+    await w.find('[data-test="lx-pick-supervisor-A005"]').find('input').setValue(false)
+    await nextTick()
+    await w.find('[data-test="lx-send"]').trigger('click')
+    await flushPromises()
+    // 键必须是二元组:同一人可能同时是本人卡与汇总卡的收件人,只给工号区分不出要发哪张
+    expect(lanxinSendMock.mock.calls[0][1]).toEqual([{ role: 'primary', employId: 'A006' }])
+    spy.mockRestore()
+  })
+
+  it('全部取消勾选后推送按钮禁用(发不出去,而不是发给所有人)', async () => {
+    const w = await mountDrawer()
+    await w.find('[data-test="lx-select-all"]').find('input').setValue(false)
+    await nextTick()
+    expect(w.find('[data-test="lx-send"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('部分推送时二次确认必须说明"其余不会收到",不能沿用全发文案', async () => {
+    const spy = confirmAll()
+    const w = await mountDrawer()
+    await w.find('[data-test="lx-pick-supervisor-A005"]').find('input').setValue(false)
+    await nextTick()
+    await w.find('[data-test="lx-send"]').trigger('click')
+    await flushPromises()
+    const msg = String(spy.mock.calls[0][0])
+    expect(msg).toContain('只向勾选的 1 人')
+    expect(msg).toContain('其余不会收到')
+    spy.mockRestore()
   })
 })

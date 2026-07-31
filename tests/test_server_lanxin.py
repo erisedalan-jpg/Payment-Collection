@@ -357,3 +357,85 @@ def test_send_writes_sent_at_in_a_format_unresponded_can_parse(tmp_path, monkeyp
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# ── V4.5.10:只推送给选定的收件人 ──────────────────────────────────────────
+#
+# 起因:连通性自检只能证明网关通,要验一次真实数据此前只能往生产上全员真发。
+# 这三条测的是【接线】—— 纯函数 lanxin.select_recipients 的语义已在
+# tests/test_lanxin_select_and_unhandle.py 锁住,但 handler 若压根没把 only 传进去,
+# 那边照样全绿(本仓 V4.0.5/V4.5.6/V4.5.7 反复吃过「定义了却没接线」的亏)。
+# 故一律断言【dispatch 真正收到的 plan】,而不是只看响应码。
+
+_TWO_TREE = {"byId": {"A006": {"name": "张三", "supId": None, "l4": "", "l31": ""},
+                      "A007": {"name": "李四", "supId": None, "l4": "", "l31": ""}},
+             "byName": {"张三": ["A006"], "李四": ["A007"]}}
+_TWO_ITEMS = [{"kind": "timesheet", "employId": "A006",
+               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 1}]},
+              {"kind": "timesheet", "employId": "A007",
+               "issues": [{"code": "MISS_SUMMARY", "label": "缺少工作概述", "count": 2}]}]
+
+
+def _send_capturing(tmp_path, monkeypatch, body):
+    """发一次 /api/lanxin/send,把 dispatch 实际收到的 plan 捕获回来。
+    返回 (status, 响应体, 捕获到的 plan 或 None)。"""
+    srv, port = _srv(tmp_path, monkeypatch)
+    LC.save_config(str(tmp_path / "lanxin_config.json"), _enabled_cfg())
+    monkeypatch.setattr(lanxin_recipients, "read_org_tree", lambda path: _TWO_TREE)
+    seen = {}
+
+    def _fake_dispatch(plan, cfg):
+        seen["plan"] = plan
+        return {"sent": len(plan["recipients"]), "failed": [], "msgIds": [], "sentLog": []}
+
+    monkeypatch.setattr(lanxin, "dispatch", _fake_dispatch)
+    try:
+        conn, cookie = _login(port)
+        conn.request("POST", "/api/lanxin/send", json.dumps(body),
+                     {"Content-Type": "application/json", "Cookie": cookie})
+        r = conn.getresponse()
+        return r.status, json.loads(r.read()), seen.get("plan")
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_send_without_only_still_reaches_everyone(tmp_path, monkeypatch):
+    """向后兼容基线:不带 only 的请求必须逐字保持原来的全发行为。
+    这条同时是下一条测试的对照组 —— 没有它,"收窄成 1 人"可能只是本来就 1 人。"""
+    status, body, plan = _send_capturing(tmp_path, monkeypatch, {"items": _TWO_ITEMS})
+    assert status == 200
+    assert sorted(r["employId"] for r in plan["recipients"]) == ["A006", "A007"]
+    assert body["plan"]["totals"]["recipients"] == 2
+
+
+def test_send_with_only_narrows_what_dispatch_actually_gets(tmp_path, monkeypatch):
+    """核心断言:真正拿去发的那个 plan 只剩被勾选的人。
+    只断言 200 或只断言响应体都不够 —— handler 完全可能把 only 读进来却没用上。"""
+    status, body, plan = _send_capturing(
+        tmp_path, monkeypatch,
+        {"items": _TWO_ITEMS, "only": [{"role": "primary", "employId": "A007"}]})
+    assert status == 200
+    assert [r["employId"] for r in plan["recipients"]] == ["A007"]
+    # 响应体也必须是收窄后的:前端拿它渲染「收件 N 人」与推送结果
+    assert body["plan"]["totals"]["recipients"] == 1
+    assert body["result"]["sent"] == 1
+
+
+def test_send_with_only_that_matches_nobody_is_rejected_before_dispatch(tmp_path, monkeypatch):
+    """全部落空 → 400,且【dispatch 一次都没被调用】。
+    先发再报错 = 已经真实触达了员工,不可撤销。"""
+    status, body, plan = _send_capturing(
+        tmp_path, monkeypatch,
+        {"items": _TWO_ITEMS, "only": [{"role": "primary", "employId": "A999"}]})
+    assert status == 400
+    assert body["success"] is False
+    assert plan is None, "dispatch 不该被调用"
+
+
+def test_send_with_empty_only_does_not_fall_back_to_sending_everyone(tmp_path, monkeypatch):
+    """一个都没勾 ≠ 全发。退化成全发就是把"我只想试发给自己"变成全员触达。"""
+    status, body, plan = _send_capturing(
+        tmp_path, monkeypatch, {"items": _TWO_ITEMS, "only": []})
+    assert status == 400
+    assert plan is None

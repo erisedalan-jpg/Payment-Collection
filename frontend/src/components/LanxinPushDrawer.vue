@@ -22,6 +22,27 @@ const result = ref<LanxinSendResult | null>(null)
 const busy = ref(false)
 const items = ref<PushItem[]>([])
 
+// —— 收件人挑选(V4.5.10) ——
+// 起因:连通性自检只能证明"网关通",要验一次真实数据只能往生产上真发,而此前
+// 只有"全发"一个档 —— 想小范围试一下，就得真的打扰全部收件人。
+// 【选择键必须是 role + employId 二元组】:同一个人既是项目经理又是上级时，plan 里
+// 是两条(本人明细卡 / 上级汇总卡)，只按工号选会把两条一起选中，试发变成发两条。
+const selected = ref<Set<string>>(new Set())
+const rkey = (r: { role: string; employId: string }) => `${r.role}|${r.employId}`
+const allKeys = computed(() => (plan.value?.recipients ?? []).map(rkey))
+const allChecked = computed(() =>
+  allKeys.value.length > 0 && selected.value.size === allKeys.value.length)
+const someChecked = computed(() =>
+  selected.value.size > 0 && selected.value.size < allKeys.value.length)
+function toggleOne(k: string, on: boolean) {
+  const next = new Set(selected.value)
+  if (on) next.add(k); else next.delete(k)
+  selected.value = next
+}
+function toggleAll(on: boolean) {
+  selected.value = on ? new Set(allKeys.value) : new Set()
+}
+
 const open = computed({
   get: () => props.modelValue,
   set: (v: boolean) => emit('update:modelValue', v),
@@ -65,25 +86,40 @@ async function doPreview() {
       ElMessage.warning('倚天工时数据未加载，工时问题未纳入本次推送')
     }
     plan.value = await lanxinPreview(items.value)
+    // 默认全选 = 保持"预览完直接推"的原行为不变;想小范围试发就自己取消勾选。
+    selected.value = new Set(allKeys.value)
   } catch (e) {
     ElMessage.error('预览失败：' + (e instanceof Error ? e.message : String(e)))
     plan.value = null
+    selected.value = new Set()
   } finally { busy.value = false }
 }
 
 async function doSend() {
   if (!plan.value) return
+  const picked = (plan.value.recipients ?? []).filter((r) => selected.value.has(rkey(r)))
+  if (!picked.length) { ElMessage.warning('请至少勾选一个收件人'); return }
+  const partial = picked.length < plan.value.recipients.length
   try {
     await ElMessageBox.confirm(
-      `确定向 ${plan.value.totals.recipients} 人推送蓝信消息？该操作会真实触达员工，不可撤销。`,
+      partial
+        ? `确定只向勾选的 ${picked.length} 人推送？（本次计划共 ${plan.value.recipients.length} 人，`
+          + '其余不会收到）该操作会真实触达员工，不可撤销。'
+        : `确定向 ${plan.value.totals.recipients} 人推送蓝信消息？该操作会真实触达员工，不可撤销。`,
       '确认推送', { type: 'warning' })
   } catch { return }
   busy.value = true
   try {
-    // 与预览同一份 items → 后端同一个 build_plan → 所见即所发
-    const r = await lanxinSend(items.value)
+    // 与预览同一份 items → 后端同一个 build_plan → 所见即所发。
+    // only 只做收窄:后端拿它过滤自己算出来的 recipients,加不出人、也改不了卡片。
+    // 全选时传 undefined(不带该字段)→ 走原来的全发路径,行为逐字不变。
+    const r = await lanxinSend(items.value,
+      partial ? picked.map((p) => ({ role: p.role, employId: p.employId })) : undefined)
     plan.value = r.plan
     result.value = r.result
+    // 后端回的是【收窄后】的 plan,勾选态要跟着重建,否则 selected 里留着已被过滤掉的
+    // 键,全选框的 indeterminate 会显示成"部分选中"而列表里明明每行都打了勾。
+    selected.value = new Set((r.plan.recipients ?? []).map(rkey))
     ElMessage.success(`已推送 ${r.result.sent} 条`)
   } catch (e) {
     ElMessage.error('推送失败：' + (e instanceof Error ? e.message : String(e)))
@@ -108,10 +144,12 @@ function cardFields(card: Record<string, unknown>): { key: string; value: string
     <div class="lx-wrap">
       <div class="dv-row">
         <button class="dv-btn" :disabled="busy" @click="doPreview">重新预览</button>
-        <button class="dv-btn primary" data-test="lx-send" :disabled="busy || !plan?.recipients.length"
+        <button class="dv-btn primary" data-test="lx-send"
+          :disabled="busy || !plan?.recipients.length || !selected.size"
           @click="doSend">确认推送</button>
         <span v-if="plan" class="dv-hint">
           收件 {{ plan.totals.recipients }} 人 · 未解析 {{ plan.totals.unresolved }} 项
+          · 已选 <span class="u-num">{{ selected.size }}</span> 人
         </span>
       </div>
 
@@ -138,8 +176,18 @@ function cardFields(card: Record<string, unknown>): { key: string; value: string
 
       <div v-if="plan" class="lx-list">
         <div class="dv-sub-head">收件人与卡片全文（所见即所发）</div>
+        <!-- 只给勾选的人推送:自检只能验网关连通,验真实数据此前只能全员真发一次 -->
+        <div class="dv-row">
+          <el-checkbox :model-value="allChecked" :indeterminate="someChecked"
+            data-test="lx-select-all" @change="toggleAll(Boolean($event))">
+            全选（取消勾选即可只推送给指定的人）
+          </el-checkbox>
+        </div>
         <div v-for="r in plan.recipients" :key="r.role + r.employId" class="lx-card-prev">
           <div class="lx-item">
+            <el-checkbox :model-value="selected.has(r.role + '|' + r.employId)"
+              :data-test="`lx-pick-${r.role}-${r.employId}`"
+              @change="toggleOne(r.role + '|' + r.employId, Boolean($event))" />
             <span class="dv-badge" :class="r.role === 'primary' ? 'ok' : 'warn'">
               {{ r.role === 'primary' ? '本人' : '汇总' }}
             </span>

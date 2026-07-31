@@ -612,6 +612,20 @@ def handle_srv(tmp_path, monkeypatch):
         c.close()
         return st, json.loads(raw)
 
+    def _post(path, payload):
+        """同一会话打任意收件箱端点(V4.5.10 撤销归入要用)。
+        挂成 _handle 的属性而不是改 fixture 返回值 —— 既有十几条用例的
+        `status, payload = handle_srv(...)` 写法一个字都不用动。"""
+        c = http.client.HTTPConnection("127.0.0.1", port)
+        c.request("POST", path, json.dumps(payload),
+                  {"Content-Type": "application/json", "Cookie": cookie})
+        resp = c.getresponse()
+        st, raw = resp.status, resp.read().decode("utf-8")
+        c.close()
+        return st, json.loads(raw)
+
+    _handle.post = _post
+
     try:
         yield _handle
     finally:
@@ -859,3 +873,62 @@ def test_stale_branch_logs_the_raw_timestamp(lanxin_srv, caplog):
     assert any(stale in m for m in msgs), \
         "stale 分支必须把 timestamp 原值打进日志,否则量纲问题无从查起;实际日志=%r" % msgs
     assert not any(sig in m for m in msgs), "日志绝不能带签名"
+
+
+# ── V4.5.10:撤销归入(现网报障③「归入后无法调整」) ────────────────────────
+#
+# 归入原本是一次性且不可逆的:写完就 handled=True、按钮转灰。选错域/项目/实例
+# 都无法重来,唯一出路是把整条回复删掉,连员工原话一起丢。
+
+def test_unhandle_end_to_end_allows_rehandling(handle_srv):
+    """归入 → 撤销 → 重新归入到另一个域,全程真实 HTTP。
+
+    这条是问题③的完整回归:只测「撤销返回 200」不够 —— 真正要证明的是
+    撤销之后【还能再归入一次】,那才是超管要的"可以调整"。
+    """
+    st, _ = handle_srv(itemId="ok1", domain="risk", projectId="P0001", riskCode="R-7")
+    assert st == 200
+
+    st, body = handle_srv.post("/api/lanxin/inbox/unhandle", {"itemId": "ok1"})
+    assert st == 200, body
+    # previous 必须带得回旧去向:撤销不删正文,得告诉超管残留内容在哪儿
+    assert body["previous"]["projectId"] == "P0001"
+    assert body["previous"]["riskCode"] == "R-7"
+
+    # 撤销【不删】已写进跟进域的正文
+    assert "收到,已在处理" in server._load_risk_followup()["current"]["P0001::R-7"]["followAction"]
+
+    # 关键:可以重新归入,而且能换一个域
+    st, body = handle_srv(itemId="ok1", domain="payment_key", projectId="P0001")
+    assert st == 200, body
+
+
+def test_unhandle_marks_item_not_handled_and_leaves_a_trace(handle_srv):
+    st, _ = handle_srv(itemId="ok1", domain="risk", projectId="P0001", riskCode="R-7")
+    assert st == 200
+    handle_srv.post("/api/lanxin/inbox/unhandle", {"itemId": "ok1"})
+
+    store = server._load_lanxin_inbox()
+    it = next(x for x in store["items"] if x["id"] == "ok1")
+    assert it["handled"] is False
+    assert it["handledInfo"] is None
+    assert it["unhandledFrom"]["info"]["projectId"] == "P0001"
+    # 另一条没被碰过
+    assert next(x for x in store["items"] if x["id"] == "ok2")["handled"] is False
+    assert "unhandledFrom" not in next(x for x in store["items"] if x["id"] == "ok2")
+
+
+def test_unhandle_rejects_item_that_was_never_handled(handle_srv):
+    st, body = handle_srv.post("/api/lanxin/inbox/unhandle", {"itemId": "ok2"})
+    assert st == 400
+    assert body["success"] is False
+
+
+def test_unhandle_rejects_unknown_item(handle_srv):
+    st, _ = handle_srv.post("/api/lanxin/inbox/unhandle", {"itemId": "nope"})
+    assert st == 404
+
+
+def test_unhandle_requires_item_id(handle_srv):
+    st, _ = handle_srv.post("/api/lanxin/inbox/unhandle", {})
+    assert st == 400

@@ -3,7 +3,8 @@ import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import ElementPlus, { ElMessageBox } from 'element-plus'
 import LanxinInboxCard from './LanxinInboxCard.vue'
-import { getLanxinInbox, handleLanxinInboxItem, deleteLanxinInboxItem } from '@/lib/lanxinApi'
+import { getLanxinInbox, handleLanxinInboxItem, unhandleLanxinInboxItem,
+         deleteLanxinInboxItem } from '@/lib/lanxinApi'
 import type { LanxinInboxItem } from '@/lib/lanxinInbox'
 import { useDataStore } from '@/stores/data'
 import { useTempFollowupStore } from '@/stores/tempFollowup'
@@ -13,6 +14,7 @@ vi.mock('@/lib/lanxinApi', () => ({
     success: true, items: [], rejected: { count: 0, lastAt: '' }, received: 0,
   })),
   handleLanxinInboxItem: vi.fn(async () => ({ success: true, handledInfo: {} })),
+  unhandleLanxinInboxItem: vi.fn(async () => ({ success: true, previous: {} })),
   deleteLanxinInboxItem: vi.fn(async () => ({ success: true })),
 }))
 
@@ -376,5 +378,123 @@ describe('LanxinInboxCard', () => {
   it('无 issueCode 的条目不渲染问题码行', async () => {
     const w = await mountInbox([baseItem({ id: 'cb-2' })])
     expect(w.find('[data-test="lx-item-issue-cb-2"]').exists()).toBe(false)
+  })
+})
+
+// ── V4.5.10:现网报障三条 ──────────────────────────────────────────────────
+
+describe('V4.5.10 涉及项目列', () => {
+  it('H5 条目直接显示项目编号 + 项目名称', async () => {
+    // 此前整张表【没有任何项目信息】,超管看一条回复根本不知道说的是哪个项目,
+    // 只能点开归入抽屉才看得到预填的项目号(现网报障①)。
+    const w = await mountInbox([baseItem({ id: 'h5-1', source: 'h5', projectId: 'P001' })])
+    const cell = w.find('[data-test="lx-item-proj-h5-1"]')
+    expect(cell.exists()).toBe(true)
+    expect(cell.text()).toContain('P001')
+    expect(cell.text()).toContain('项目一')      // 编号 + 名称都要,只有编号看不出是哪个项目
+    expect(cell.text()).not.toContain('推测')    // 自带项目号是事实,不该标成推测
+  })
+
+  it('文本回复只有归因候选,必须标明是推测', async () => {
+    const w = await mountInbox([baseItem({ id: 'cb-1', candidateProjects: ['P002'] })])
+    const cell = w.find('[data-test="lx-item-proj-cb-1"]')
+    expect(cell.text()).toContain('无风险项目')
+    expect(cell.text()).toContain('推测')
+  })
+
+  it('既无项目号也无候选时显示 -,不留空白格', async () => {
+    const w = await mountInbox([baseItem({ id: 'cb-2', candidateProjects: [] })])
+    expect(w.find('[data-test="lx-item-proj-cb-2"]').exists()).toBe(false)
+    expect(w.find('[data-test="li-table"]').text()).toContain('-')
+  })
+})
+
+describe('V4.5.10 撤销归入', () => {
+  it('未归入的条目没有撤销按钮,已归入的才有', async () => {
+    const w = await mountInbox([
+      baseItem({ id: 'a', handled: false }),
+      baseItem({ id: 'b', handled: true,
+                 handledInfo: { label: '临时重点跟进', projectId: 'P001' } }),
+    ])
+    expect(w.findAll('[data-test="li-unhandle-btn"]').length).toBe(1)
+  })
+
+  it('确认后调用撤销接口并刷新列表', async () => {
+    const spy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const w = await mountInbox([baseItem({ id: 'x1', handled: true,
+      handledInfo: { label: '临时重点跟进', projectId: 'P001' } })])
+    await w.find('[data-test="li-unhandle-btn"]').trigger('click')
+    await flushPromises()
+    expect(unhandleLanxinInboxItem).toHaveBeenCalledWith('x1')
+    expect(getLanxinInbox).toHaveBeenCalledTimes(2)   // 挂载一次 + 撤销后刷新一次
+    spy.mockRestore()
+  })
+
+  it('【承重】确认文案必须写明旧内容不会被自动删除,并点出它在哪儿', async () => {
+    // 撤销只解除记账、不删已写进跟进域的正文(按内容反删不可靠,会误删人工续写的跟进)。
+    // 不说这句 → 超管以为撤销=撤回,那段残留内容永远没人去清。
+    const spy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const w = await mountInbox([baseItem({ id: 'x1', handled: true,
+      handledInfo: { label: '临时重点跟进', projectId: 'P001' } })])
+    await w.find('[data-test="li-unhandle-btn"]').trigger('click')
+    await flushPromises()
+    const msg = String(spy.mock.calls[0][0])
+    expect(msg).toContain('不会')
+    expect(msg).toContain('临时重点跟进')
+    expect(msg).toContain('P001')
+    spy.mockRestore()
+  })
+
+  it('撤销过的条目在列表上留痕,提示残留内容所在', async () => {
+    const w = await mountInbox([baseItem({ id: 'x2', handled: false,
+      unhandledFrom: { info: { label: '重点项目进展', projectId: 'P002' },
+                       at: '2026-07-31 10:00:00', by: 'admin' } })])
+    const cell = w.find('[data-test="lx-item-unhandled-x2"]')
+    expect(cell.exists()).toBe(true)
+    expect(cell.text()).toContain('重点项目进展')
+    expect(cell.text()).toContain('P002')
+  })
+})
+
+describe('V4.5.10 归入可见性守卫', () => {
+  it('【承重·接线】目标页渲染不出这一行时必须二次确认,不再默默写进去', async () => {
+    // lib 层的 handleVisibility 已有独立单测,但组件若压根没调用它,那边照样全绿
+    // (本仓反复吃过「定义了却没接线」的亏)。故这里走真实组件路径。
+    // fixture 里的 P001 没有 P1 级别、也不是 TOP1000 大合同 → 不是重点项目 →
+    // 归入「重点项目进展」后该页不会有这一行。
+    const spy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const w = await mountInbox([baseItem({ id: 'v1' })])
+    await openHandleDrawer(w)
+    const vm = w.vm as unknown as {
+      handleForm: { domain: string; projectId: string; instanceId: string; riskCode: string }
+      confirmHandle: () => Promise<void>
+    }
+    vm.handleForm.domain = 'progress'
+    vm.handleForm.projectId = 'P001'
+    await vm.confirmHandle()
+    await flushPromises()
+    expect(spy).toHaveBeenCalled()
+    expect(String(spy.mock.calls[0][0])).toContain('重点项目')
+    expect(handleLanxinInboxItem).toHaveBeenCalled()   // 确认后仍然写入
+    spy.mockRestore()
+  })
+
+  it('可见时不弹这个二次确认(不能人人都被拦一道)', async () => {
+    const spy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const w = await mountInbox([baseItem({ id: 'v2' })])
+    await openHandleDrawer(w)
+    const vm = w.vm as unknown as {
+      handleForm: { domain: string; projectId: string; riskCode: string }
+      confirmHandle: () => Promise<void>
+    }
+    // risk 域恒可见(/risk 无 scope 时展示全部);P001 在 fixture 里有风险记录 R1
+    vm.handleForm.domain = 'risk'
+    vm.handleForm.projectId = 'P001'
+    vm.handleForm.riskCode = 'R1'
+    await vm.confirmHandle()
+    await flushPromises()
+    expect(spy).not.toHaveBeenCalled()
+    expect(handleLanxinInboxItem).toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

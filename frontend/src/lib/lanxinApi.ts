@@ -92,9 +92,13 @@ export async function lanxinSelftest(employId: string) {
 export async function lanxinPreview(items: PushItem[]): Promise<LanxinPlan> {
   return (await api.post<{ plan: LanxinPlan }>('/api/lanxin/preview', { items })).plan
 }
-export async function lanxinSend(items: PushItem[]) {
+/** only:可选的收件人白名单(V4.5.10)。不传 = 全发(保持原行为)。
+ *  【必须按 role+employId 二元组给】—— 同一个人既是项目经理又是上级时，在 plan 里
+ *  是两条收件人(本人明细卡 / 上级汇总卡)，只给工号无法区分要发哪一张。
+ *  后端只用它做【收窄】，加不出人、也改不了卡片内容(见 lanxin.select_recipients)。 */
+export async function lanxinSend(items: PushItem[], only?: { role: string; employId: string }[]) {
   return await api.post<{ plan: LanxinPlan; result: LanxinSendResult }>(
-    '/api/lanxin/send', { items })
+    '/api/lanxin/send', only === undefined ? { items } : { items, only })
 }
 
 // —— 收件箱（Task 6/8）：员工在蓝信里的回复回流本系统 ——
@@ -124,6 +128,14 @@ export async function handleLanxinInboxItem(
 ): Promise<LanxinInboxHandleResp> {
   return await api.post<LanxinInboxHandleResp>('/api/lanxin/inbox/handle',
     { itemId, domain, projectId, instanceId, riskCode })
+}
+/** 撤销归入(V4.5.10)。【只解除收件箱这一侧的标记,不删已写进跟进域的正文】——
+ *  返回上一次的去向,调用方须把它显示给超管,否则他不知道残留内容在哪儿。 */
+export async function unhandleLanxinInboxItem(
+  itemId: string,
+): Promise<{ success: boolean; previous: Record<string, unknown> }> {
+  return await api.post<{ success: boolean; previous: Record<string, unknown> }>(
+    '/api/lanxin/inbox/unhandle', { itemId })
 }
 export async function deleteLanxinInboxItem(itemId: string): Promise<{ success: boolean }> {
   return await api.post<{ success: boolean }>('/api/lanxin/inbox/delete', { itemId })
