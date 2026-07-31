@@ -53,6 +53,20 @@ data/opportunities.backup-*.json
 # 临时重点跟进数据(运行时用户数据,V2.1.0)
 data/temp_followup.json
 data/temp_followup.backup-*.json
+# 重点商机跟进数据(运行时用户数据,V2.2.0)
+# 【V4.5.9 补】本条此前【漏了】—— 隔壁 opportunities.json / risk_followup.json /
+# payment_key_followup.json / temp_followup.json 四个同族都在,唯独它没进来,
+# 于是磁盘上一份 100KB 的真实商机跟进记录一直裸露在未忽略状态(所幸从未入库)。
+# 显式列举的代价就是这样:少写一行不会有任何报错,只会在某次 `git add .` 时发作。
+data/opportunity_followup.json
+data/opportunity_followup.json.tmp
+# 运行时生成的带时间戳备份/临时文件。名字里带日期,【无法预先逐个列举】,
+# 故此处用通配兜底(data/ 下没有任何文件是需要入库的)。
+# V4.5.9 实测漏网例:data/temp_followup.json.bak-20260721-1010 ——
+# 既有的 data/temp_followup.backup-*.json 与它的真实命名(.json.bak-<时间戳>)对不上。
+data/*.bak-*
+data/*.backup-*
+data/*.tmp
 # 本地账号库(含密码哈希,敏感,运行时生成,SP-2)
 data/accounts.json
 data/accounts.json.tmp
