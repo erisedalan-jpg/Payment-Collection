@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const SRC = resolve(__dirname, '..')
@@ -34,6 +34,8 @@ const FIXED = [
   'YitianComplianceView.vue',  // 同上
 ].sort()
 
+// 注:本清单按 `sticky-header` 字符串统计。views/OpportunitiesView.vue 是裸 el-table 手接
+// useTableMaxHeight 的第 17 张冻结表头表,不含该字符串故不在此列,由下面第二条用例兜住。
 const DYNAMIC = [
   'ClosedProjectsView.vue', 'KeyProjectsView.vue', 'OpportunityFollowupView.vue',
   'PayNodesView.vue', 'PayProjectsView.vue', 'PaymentKeyFollowupView.vue',
@@ -47,10 +49,18 @@ describe('sticky-header 表格高度清单守卫', () => {
     const fixed = scanVue((s) => s.includes('sticky-header') && s.includes('max-height-px'))
     const dynamic = all.filter((f) => !fixed.includes(f))
 
-    // 【自证规模】目录读取或匹配一旦失效会返回空数组,让下面两条 toEqual 变成恒真式空跑
-    // (本仓踩过:结构守卫解析失配 → 循环空跑 → 恒绿)。先钉死规模,再比内容。
-    expect(all.length, '扫到的 sticky-header 表数量异常,先检查扫描路径是否失效').toBe(16)
-    expect(fixed.length + dynamic.length).toBe(all.length)
+    // 【自证规模】先钉死规模再比内容:目录读取或匹配一旦失效,这条会给出「规模变了」这个
+    // 准确得多的失败信息(空扫描时下面两条 toEqual 也会红 —— FIXED/DYNAMIC 是非空字面量 ——
+    // 但报的是「一堆文件不见了」,指向不对)。注意扫描路径写坏时 readdirSync 直接抛 ENOENT。
+    expect(all.length, 'sticky-header 表数量变了:若你新增/删除了一张表,请把它归入下面 FIXED 或 DYNAMIC 之一并把本数字改对;若你没动过表,那就是扫描路径失效了').toBe(16)
+
+    // 分类谓词是【文件级】的:同一文件里出现第二张 sticky 表时,只要该文件已含 max-height-px
+    // 就会被整体判为 FIXED,新表哪怕没传固定高度也溜过去。钉住「一文件一表」这个前提。
+    const multi = all.filter((f) => {
+      const dir = DIRS.find((d) => existsSync(resolve(SRC, d, f)))!
+      return (readFileSync(resolve(SRC, dir, f), 'utf-8').match(/sticky-header/g) ?? []).length > 1
+    })
+    expect(multi, '这些文件里有不止一张 sticky 表,本守卫的文件级分类已不适用,请改成逐表匹配').toEqual([])
 
     expect(fixed, '这些表传了固定 max-height —— 新增的请确认它确实在长页面底部').toEqual(FIXED)
     expect(dynamic, '这些表用动态测高 —— 新增的请确认它确实在页面顶部,否则会塌缩').toEqual(DYNAMIC)

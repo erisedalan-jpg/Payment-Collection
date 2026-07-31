@@ -34,24 +34,29 @@ describe('useTableMaxHeight 默认兜底地板', () => {
     const realInnerHeight = window.innerHeight
     Object.defineProperty(window, 'innerHeight', { value: 900, writable: true, configurable: true })
 
-    const el = document.createElement('div')
-    // rect.top = 10000:表格远在视口下方,900 - 10000 - 24 为负 → 只能吃默认地板
-    el.getBoundingClientRect = () => ({ top: 10000 }) as DOMRect
+    let w: ReturnType<typeof mount> | null = null
+    try {
+      const el = document.createElement('div')
+      // rect.top = 10000:表格远在视口下方,900 - 10000 - 24 为负 → 只能吃默认地板
+      el.getBoundingClientRect = () => ({ top: 10000 }) as DOMRect
 
-    let mh: { value: number } | null = null
-    const C = defineComponent({
-      setup() {
-        mh = useTableMaxHeight(() => el).maxHeight
-        return () => h('div')
-      },
-    })
-    const w = mount(C)
-    await nextTick()
-    await nextTick() // useTableMaxHeight 在 onMounted 里 nextTick(recompute)
+      let mh: { value: number } | null = null
+      const C = defineComponent({
+        setup() {
+          mh = useTableMaxHeight(() => el).maxHeight
+          return () => h('div')
+        },
+      })
+      w = mount(C)
+      await nextTick()
+      await nextTick() // useTableMaxHeight 在 onMounted 里 nextTick(recompute)
 
-    expect(mh!.value).toBe(440)
-
-    w.unmount()
-    Object.defineProperty(window, 'innerHeight', { value: realInnerHeight, writable: true, configurable: true })
+      expect(mh!.value).toBe(440)
+    } finally {
+      // 本文件正是今后新增 computeMaxHeight 用例最自然的落点,不还原会让后续用例继承
+      // innerHeight = 900(V4.5.7 已为同形态 —— prefs.toggle 漏还原 —— 付过一次学费)。
+      w?.unmount()
+      Object.defineProperty(window, 'innerHeight', { value: realInnerHeight, writable: true, configurable: true })
+    }
   })
 })

@@ -1,17 +1,22 @@
 import { onActivated, onBeforeUnmount, onDeactivated, onMounted, nextTick, ref, type Ref } from 'vue'
 
 /** 纯计算:视口可用高度 = 视口高 − 表格顶部距 − 底部留白,不低于 min。
- *  rectTop 为负(表格顶部已滚出视口上沿)时按【贴顶】算 —— 否则 innerHeight − 负数 会算出
- *  比视口还高的表体,表头随页面滚走、冻结表头当场失效(V4.5.11)。clamp 只会【减小】结果,
- *  对现有正常表格是单向安全的。 */
+ *  rectTop 为负(表格顶部已滚出视口上沿)时按【贴顶】算,给结果封个顶 —— 否则
+ *  innerHeight − 负数 会在滚动态重算时把表体撑到远超视口(极端情况几千 px)。
+ *  注意这【不是】为了救冻结表头:rectTop < 0 时表头已经在视口上方了,与表体多高无关
+ *  (el-table 设 max-height 时表头是表内独立 wrapper,不是 viewport-sticky)。
+ *  代价:滚动态下重算会比不 clamp 时矮 |rectTop| 那么多。该路径极窄(动态测高的表都在
+ *  页面顶部,表高被算成填满剩余视口,页面可滚动量只有 pager 那几十 px),属防御性封顶。 */
 export function computeMaxHeight(rectTop: number, innerHeight: number, bottomGap: number, min: number): number {
   return Math.max(min, innerHeight - Math.max(0, rectTop) - bottomGap)
 }
 
 /** 兜底地板:测不准时(表格在折叠线以下,rect.top 远大于视口高,算出的负数不是「空间不够」
- *  而是「没测到」)最坏也要显示约 10 行。取 440 而非更大值 —— 现有页面顶部表格(top≈250)
- *  在 1080p / 768 视口下算出 676 / 494,都大于 440,故此地板对它们【不生效】;再高(如 560)
- *  会在 768 视口上把表体撑出屏幕底部,冻结表头失效。
+ *  而是「没测到」)最坏也要显示约 10 行。生效条件是 rect.top > innerHeight − 464。
+ *  现有页面顶部表格(rect.top≈250):innerHeight≈950(1080p 全屏)算出 676 > 440,不生效;
+ *  但 1366×768 笔记本的 innerHeight 实际只有 620~660(屏幕高 ≠ innerHeight),算出约 364,
+ *  地板【会】生效,表体底边比视口底低约 50px、最后一行要页面滚动才看得全。这是取 440 的
+ *  已知取舍(换来最坏情况从 4 行升到约 10 行);取 560 会把溢出扩大到约 170px,故不取。
  *  长页面底部的大明细表不该依赖这个地板,应显式传 max-height-px(见 lib/tableLayout.ts)。 */
 const DEFAULT_MIN_HEIGHT = 440
 
