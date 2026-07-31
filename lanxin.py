@@ -387,7 +387,14 @@ def build_plan(items: List[Dict[str, Any]], cfg: Dict[str, Any],
                                    "name": str(team.get("项目经理") or ""), "reason": why})
                 continue
             bucket = proj_by_emp.setdefault(emp, {})
-            pname = str(pm.get("projectName") or pid)
+            # 顶层 projectName 缺失时回退 team["项目名称"](L-55)。现网 projectPmis
+            # 共 1331 条,顶层 projectName 非空【0 条】—— 该字段只存在于 projects[]
+            # 数组(projects.load_dept_projects 构造),projectPmis 这一路从来没有。
+            # 不回退就恒退化成项目号,员工在手机上看到的卡片标题是
+            # WSGF-SS-202606189038 这类编号,得自己去 PMIS 对照才知道在给谁写反馈。
+            # 顺序是【顶层优先】:回退是兜底不是替换,将来管线补上顶层字段时优先级
+            # 不该反过来。
+            pname = str(pm.get("projectName") or team.get("项目名称") or pid)
             name_to_pid.setdefault(emp, {}).setdefault(pname, pid or "")
             for r in reasons:
                 bucket.setdefault(r["category"], []).append(pname)

@@ -1175,3 +1175,48 @@ def test_dispatch_sent_log_carries_review_items(monkeypatch):
     out = LX.dispatch(plan, {"sendIntervalMs": 0})
     assert out["sentLog"][0]["reviewItems"]
     assert out["sentLog"][0]["reviewItems"][0]["projectId"] == "P1"
+
+
+# ── L-55:现网 projectPmis 的顶层 projectName 恒为空,真实项目名在 team["项目名称"] ──
+
+PMIS_TEAM_NAMED = {
+    # 现网真实形状:data/analysis_data.json 的 projectPmis 共 1331 条,顶层
+    # projectName 非空【0 条】,而 team["项目名称"] 非空 1331 条(顶层 projectName
+    # 只存在于 projects[] 数组,由 projects.load_dept_projects 构造)。
+    "P1": {"team": {"项目经理": "张三", "项目名称": "XX智慧园区一期"}},
+}
+
+
+def test_project_name_falls_back_to_team_field_when_top_level_missing():
+    """【L-55·承重】顶层 projectName 缺失时回退 team["项目名称"]。
+
+    不回退就恒退化成项目号 —— 员工在手机上看到的卡片标题是
+    WSGF-SS-202606189038 这类编号,得自己去 PMIS 里对照才知道在给哪个项目
+    写反馈。这一条同时管住卡片明细行(V4.5.8)与 H5 表单(V4.5.9)两处。
+    """
+    plan = LX.build_plan(
+        [{"kind": "project", "projectId": "P1",
+          "reasons": [{"category": "回款延期", "detail": "3 个延期节点"}]}],
+        _pj_cfg_with_h5(levels=0), TREE, PMIS_TEAM_NAMED, review_secret=SECRET)
+    r = [x for x in plan["recipients"] if x["role"] == "primary"][0]
+    assert r["reviewItems"][0]["name"] == "XX智慧园区一期"
+    # projectId 是越权写判据,不能因为换了取名来源就跟着变
+    assert r["reviewItems"][0]["projectId"] == "P1"
+    # 卡片明细行(员工在蓝信里直接看到的那一行)同样必须是项目名
+    assert any("XX智慧园区一期" in f["value"] for f in r["card"]["fields"])
+
+
+def test_top_level_project_name_still_wins_over_team_field():
+    """顶层有值时仍以顶层为准 —— 回退是兜底、不是替换。
+
+    写成替换的话,将来管线一旦补上顶层字段,两个来源的优先级就反了,
+    而那时没有任何测试会红。
+    """
+    pmis = {"P1": {"projectName": "顶层名",
+                   "team": {"项目经理": "张三", "项目名称": "team 名"}}}
+    plan = LX.build_plan(
+        [{"kind": "project", "projectId": "P1",
+          "reasons": [{"category": "回款延期", "detail": "1 个"}]}],
+        _pj_cfg_with_h5(levels=0), TREE, pmis, review_secret=SECRET)
+    r = [x for x in plan["recipients"] if x["role"] == "primary"][0]
+    assert r["reviewItems"][0]["name"] == "顶层名"
