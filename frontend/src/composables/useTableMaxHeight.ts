@@ -1,9 +1,19 @@
 import { onActivated, onBeforeUnmount, onDeactivated, onMounted, nextTick, ref, type Ref } from 'vue'
 
-/** 纯计算:视口可用高度 = 视口高 − 表格顶部距 − 底部留白,不低于 min。 */
+/** 纯计算:视口可用高度 = 视口高 − 表格顶部距 − 底部留白,不低于 min。
+ *  rectTop 为负(表格顶部已滚出视口上沿)时按【贴顶】算 —— 否则 innerHeight − 负数 会算出
+ *  比视口还高的表体,表头随页面滚走、冻结表头当场失效(V4.5.11)。clamp 只会【减小】结果,
+ *  对现有正常表格是单向安全的。 */
 export function computeMaxHeight(rectTop: number, innerHeight: number, bottomGap: number, min: number): number {
-  return Math.max(min, innerHeight - rectTop - bottomGap)
+  return Math.max(min, innerHeight - Math.max(0, rectTop) - bottomGap)
 }
+
+/** 兜底地板:测不准时(表格在折叠线以下,rect.top 远大于视口高,算出的负数不是「空间不够」
+ *  而是「没测到」)最坏也要显示约 10 行。取 440 而非更大值 —— 现有页面顶部表格(top≈250)
+ *  在 1080p / 768 视口下算出 676 / 494,都大于 440,故此地板对它们【不生效】;再高(如 560)
+ *  会在 768 视口上把表体撑出屏幕底部,冻结表头失效。
+ *  长页面底部的大明细表不该依赖这个地板,应显式传 max-height-px(见 lib/tableLayout.ts)。 */
+const DEFAULT_MIN_HEIGHT = 440
 
 /**
  * 动态测量目标元素在视口中的顶部位置,算出 el-table 的 max-height。
@@ -14,7 +24,7 @@ export function useTableMaxHeight(
   opts: { bottomGap?: number; min?: number; enabled?: () => boolean } = {},
 ): { maxHeight: Ref<number>; recompute: () => void } {
   const bottomGap = opts.bottomGap ?? 24
-  const min = opts.min ?? 200
+  const min = opts.min ?? DEFAULT_MIN_HEIGHT
   const maxHeight = ref(min)
 
   function recompute() {
