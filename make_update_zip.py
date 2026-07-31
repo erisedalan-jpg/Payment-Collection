@@ -45,10 +45,21 @@ TOP_PY = sorted(
 )
 # 顶层其它随包文件(依赖参考 + 升级手册)
 EXTRA_FILES = ["requirements.txt", os.path.join("deploy", f"升级手册-{VERSION}.md")]
-# pmisdata 按白名单纳入(下载流水线脚本 + 配置 + 桥接表;不含时间戳备份/日志)
+# pmisdata 按白名单纳入。pmisdata/ 不是开发机专属工具 —— server.py 的「下载数据」
+# 会在服务器上真的执行 run_pmis_pipeline.sh(PMISDATA_DIR 见 server.py),所以脚本
+# 变了确实需要随升级包下发。
+#
+# 【但 config.json 与 A.xlsx 刻意【不】进升级包】(V4.5.9 起):
+#   · config.json 存 PMIS 会话 cookie,服务器上那份是超管在页面里贴进去的
+#     (/api/pmis/cookie → pmis_config.py)。把开发机这份覆盖过去 = 拿开发机的
+#     cookie 顶掉生产的,「下载数据」随即失效,而报错长得像「PMIS 登录过期」,
+#     没人会想到是升级覆盖的。
+#   · A.xlsx 是售前↔原项目桥接表,服务器侧可能比开发机新,覆盖即回退业务数据。
+#   · 顺带:升级包常经邮件/网盘转手,里面不该带任何凭证。
+# 全新安装的整包(make_deploy_zip.py)是另一回事 —— 那时服务器上本来就什么都没有。
 PMISDATA_FILES = [
     "run_pmis_pipeline.sh", "fetch_pmis_tables.py", "fetch_all_projects.py",
-    "delivery_analysis.py", "update_cookie.py", "config.json", "A.xlsx",
+    "delivery_analysis.py", "update_cookie.py",
 ]
 
 os.makedirs(OUT_DIR, exist_ok=True)
