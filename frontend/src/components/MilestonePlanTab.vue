@@ -8,6 +8,7 @@ import { exportRows } from '@/lib/exportXlsx'
 import DataTable, { type DataColumn } from './DataTable.vue'
 import AppButton from './AppButton.vue'
 import AppPager from './AppPager.vue'
+import { DETAIL_TABLE_MAX_H } from '@/lib/tableLayout'
 
 const props = defineProps<{ projects: MilestoneProject[] }>()
 const router = useRouter()
@@ -51,7 +52,7 @@ function onRow(row: Record<string, any>) { router.push('/project/' + row.project
       <AppButton variant="subtle" data-test="plan-export" @click="onExport">导出Excel</AppButton>
     </div>
     <div class="mpt-scroll">
-      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable sticky-header @row-click="onRow">
+      <DataTable :columns="COLS" :rows="paged" :show-count="false" clickable sticky-header :max-height-px="DETAIL_TABLE_MAX_H" @row-click="onRow">
         <template #cell-projectId="{ value }"><span class="mpt-link">{{ value }}</span></template>
       </DataTable>
     </div>

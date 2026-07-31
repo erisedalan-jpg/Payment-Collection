@@ -34,6 +34,7 @@ import { usePersistentSort } from '@/lib/usePersistentSort'
 import { userScopedKey } from '@/lib/userScopedKey'
 import { useDeferredMount } from '@/lib/useDeferredMount'
 import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
+import { DETAIL_TABLE_MAX_H } from '@/lib/tableLayout'
 
 defineOptions({ name: 'CostDetailView' })
 useViewScrollMemory()
@@ -229,7 +230,7 @@ defineExpose({ baseProjects, rows, filtered, sorted, DETAIL_COLS, fKw, selectedT
           <AppButton variant="subtle" data-test="cost-export" @click="onExport">导出Excel</AppButton>
         </div>
         <div class="cd-scroll">
-          <DataTable :columns="DETAIL_COLS" :rows="pagedSeq" :show-count="false" clickable external-sort sticky-header :max-height-px="640"
+          <DataTable :columns="DETAIL_COLS" :rows="pagedSeq" :show-count="false" clickable external-sort sticky-header :max-height-px="DETAIL_TABLE_MAX_H"
             @row-click="onRow" @sort-change="onSortChange" :default-sort="defaultSort">
             <template v-for="col in DETAIL_COLS" :key="col.key" #[`header-${col.key}`]="{ col: c }">
               <span class="cd-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="rows" /></span>

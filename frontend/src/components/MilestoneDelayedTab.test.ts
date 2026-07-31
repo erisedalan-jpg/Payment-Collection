@@ -4,6 +4,7 @@ import ElementPlus from 'element-plus'
 import MilestoneDelayedTab from './MilestoneDelayedTab.vue'
 import DataTable from './DataTable.vue'
 import AppPager from './AppPager.vue'
+import { DETAIL_TABLE_MAX_H } from '@/lib/tableLayout'
 
 const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushSpy }) }))
@@ -52,5 +53,11 @@ describe('MilestoneDelayedTab', () => {
     expect(w.find('.ap').exists()).toBe(true)
     expect(w.find('.ap-total').text()).toContain('共')
     expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([20, 50, 100])
+  })
+  it('明细表传固定 max-height(表在 6 图之下,动态测高会退到兜底地板、塌缩成 3~4 行)', () => {
+    const w = mount(MilestoneDelayedTab, { props: { projects, now }, ...opts })
+    const dt = w.findComponent(DataTable)
+    expect(dt.props('stickyHeader')).toBe(true)
+    expect(dt.props('maxHeightPx')).toBe(DETAIL_TABLE_MAX_H)
   })
 })

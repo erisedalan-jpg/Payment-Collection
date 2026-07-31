@@ -9,6 +9,7 @@ import DataTable from './DataTable.vue'
 import ColumnPicker from './ColumnPicker.vue'
 import AppPager from './AppPager.vue'
 import * as xlsx from '@/lib/exportXlsx'
+import { DETAIL_TABLE_MAX_H } from '@/lib/tableLayout'
 
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
@@ -52,6 +53,12 @@ describe('MilestoneReminderTab 核心', () => {
     const w = mountTab()
     await w.findComponent(DataTable).vm.$emit('row-click', { projectId: 'A' })
     expect(push).toHaveBeenCalledWith('/project/A')
+  })
+  it('明细表传固定 max-height(表在 6 图之下,动态测高会退到兜底地板、塌缩成 3~4 行)', () => {
+    const w = mountTab()
+    const dt = w.findComponent(DataTable)
+    expect(dt.props('stickyHeader')).toBe(true)
+    expect(dt.props('maxHeightPx')).toBe(DETAIL_TABLE_MAX_H)
   })
 })
 

@@ -4,6 +4,7 @@ import ElementPlus from 'element-plus'
 import MilestonePlanTab from './MilestonePlanTab.vue'
 import DataTable from './DataTable.vue'
 import AppPager from './AppPager.vue'
+import { DETAIL_TABLE_MAX_H } from '@/lib/tableLayout'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -41,5 +42,11 @@ describe('MilestonePlanTab', () => {
     expect(w.find('.ap').exists()).toBe(true)
     expect(w.find('.ap-total').text()).toContain('共')
     expect((w.findComponent(AppPager).vm as any).effectiveSizes).toEqual([50, 100])
+  })
+  it('明细表传固定 max-height(表在 6 图之下,动态测高会退到兜底地板、塌缩成 3~4 行)', () => {
+    const w = mount(MilestonePlanTab, { props: { projects }, ...opts })
+    const dt = w.findComponent(DataTable)
+    expect(dt.props('stickyHeader')).toBe(true)
+    expect(dt.props('maxHeightPx')).toBe(DETAIL_TABLE_MAX_H)
   })
 })

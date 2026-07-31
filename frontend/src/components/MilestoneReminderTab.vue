@@ -16,6 +16,7 @@ import ColumnPicker from './ColumnPicker.vue'
 import AppButton from './AppButton.vue'
 import AppPager from './AppPager.vue'
 import AppCard from './AppCard.vue'
+import { DETAIL_TABLE_MAX_H } from '@/lib/tableLayout'
 
 const props = defineProps<{ projects: MilestoneProject[]; now: Date }>()
 const router = useRouter()
@@ -113,7 +114,7 @@ defineExpose({ rangeModel, filtered })
       <AppCard variant="flat"><div class="mrt-k">逾期未完成</div><div class="mrt-v mrt-v-danger u-num">{{ stat.overdue }}</div></AppCard>
     </div>
     <div class="mrt-scroll">
-      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable sticky-header :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
+      <DataTable :columns="visibleColumns" :rows="paged" :show-count="false" clickable sticky-header :max-height-px="DETAIL_TABLE_MAX_H" :default-sort="psort.defaultSort.value" @sort-change="psort.onSortChange" @row-click="onRow">
         <template v-for="col in visibleColumns" :key="col.key" #[`header-${col.key}`]="{ col: c }">
           <span class="mrt-th">{{ c.label }}<ColumnFilter v-if="FILTERABLE.has(c.key)" :table-id="TABLE_ID" :col-key="c.key" :source-rows="winRows" /></span>
         </template>
