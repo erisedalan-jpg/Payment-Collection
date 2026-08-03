@@ -96,7 +96,33 @@ command -v ufw >/dev/null && sudo ufw allow 80/tcp || echo "无 ufw,按实际防
 - [ ] 浏览器开 **http://<IP>/pm** → 登录页;用**预制超管口令**登录成功
 - [ ] 登录后各页路由形如 http://<IP>/pm/payment、刷新不 404(SPA fallback OK)
 - [ ] Network:`/pm/assets/*.js` 200;`/pm/data/analysis_data.json` 200 且响应头含 `Content-Encoding: gzip`;`/pm/api/auth/me` 200(都带 /pm)
+- [ ] **主 JS 也必须是 gzip 的**(不能只查 200,见 §8.1)——`/pm/assets/index-*.js` 响应头含 `Content-Encoding: gzip`
 - [ ] 新建受限管理员(限某 L4 + 页面):只看到其 L4 数据;`curl http://<IP>/pm/data/accounts.json -H Cookie:...` 返回 **403**;`/pm/api/clear-data` 等运维端点 **403**
+
+### 8.1 主 JS 的 gzip 复核(容易漏,单条命令)
+前端主 chunk 约 2.6MB,是本系统单次冷加载最大的一坨;它和 analysis_data.json **走的是两套 MIME 类型**,
+`analysis_data.json` 压缩正常**不代表** JS 也压缩了 —— 历史上验收清单只对 JSON 查了 `Content-Encoding`、
+对 `.js` 只查了 200,这个缺口因此长期没人看见。上线后务必单独复核一次:
+```bash
+IP=<服务器IP>
+JS=$(curl -s "http://$IP/pm/" | grep -o '/pm/assets/index-[^"]*\.js' | head -1)
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip' "http://$IP$JS" | grep -i -E 'content-(type|encoding|length)'
+```
+期望输出同时包含:
+```
+content-type: text/javascript; charset=utf-8
+content-encoding: gzip
+```
+- **看不到 `content-encoding: gzip` = nginx 的 `gzip_types` 没匹配上**。后端对 `.js` 返回的是
+  `text/javascript`(CPython mimetypes 硬编码,server.py 未覆盖),若线上 conf 里写的仍是旧的
+  `application/javascript`,这一支就漏了,2.6MB 主 JS 以**原文**下发(压缩后约 1.0MB,白烧 1.64 MiB/次)。
+  修法:把 `text/javascript` 补进 `gzip_types`(见 `deploy/nginx-pmplatform-port80-pm.conf`),
+  `sudo nginx -t && sudo systemctl reload nginx` 后重跑本命令。
+- ⚠ **不要用 `curl -I` 查这一条**:`-I` 发的是 HEAD,nginx 对 header_only 响应会直接跳过 gzip 过滤器,
+  即使配置完全正确也看不到 `Content-Encoding`,会得出「没生效」的假结论。必须用 GET
+  (`-o /dev/null -D -` 只取响应头、丢弃 2.6MB body),且显式带 `Accept-Encoding: gzip`(curl 默认不发)。
+- 线上真正生效的是 `/etc/nginx/` 下那份配置,不是仓库模板。改完可用
+  `sudo nginx -T | grep -n gzip_types` 确认服务器实际加载到的值。
 
 ## 9. 数据备份
 ```bash
@@ -145,4 +171,6 @@ dist 已随包构建好;仅当要改前端源码再重建时,需在**联网机**
 ## 11. 安全与后续
 - **端口 80 = 明文 HTTP**:会话 cookie 与数据不加密,可被同网段嗅探 → 仅可信内网用。不可信网络强烈建议改 **443 + TLS**(`deploy/nginx-pmplatform.conf` 含 ssl 段,/pm 结构不变;上 TLS 后给会话 cookie 补 `Secure`,见 `auth.py:build_set_cookie`)。
 - P0-5 残留(无害):server.py 自动开浏览器/停止按钮等死代码(无头机静默失败,见 PROGRESS backlog)。
-- 性能:nginx gzip 已解决主数据传输;前端单 JS ~2.3MB 未代码分割(P1,后续可优化)。
+- 性能:nginx gzip 覆盖主数据与前端 JS/CSS(JS 需 `gzip_types` 含 `text/javascript`,见 §8.1);
+  前端单 JS ~2.6MB 未代码分割(P1,后续可优化)—— 代码分割没做之前,这条 gzip 是它唯一的缓解手段,
+  所以 §8.1 那一条复核不能跳。

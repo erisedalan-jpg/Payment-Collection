@@ -1,50 +1,37 @@
 # -*- mode: python ; coding: utf-8 -*-
 # ============================================================
-#  项目回款跟踪与管控平台 - PyInstaller 打包配置
-#  版本: V7.6.0 | 日期: 2026-06-12
+#  项目管理平台 - PyInstaller 打包配置
+#  版本单一来源: frontend/src/version.ts —— 本文件【不再写死版本号】
+#  (原头部写着「版本: V7.6.0 | 日期: 2026-06-12」,而实际版本早已到 V4.5.12,
+#   注释版本号只会烂掉,不会有人记得同步)
+#  用法: python -m PyInstaller PaymentReviewApp.spec --noconfirm  (在仓库根执行)
 # ============================================================
-import os, sys
+import glob
+import os
+
 block_cipher = None
+# 相对路径的 datas 项与下面的 glob 都以 cwd 为基准,故必须在仓库根执行构建。
 BASE = os.path.abspath('.')
 
-# ── Playwright 包路径（动态获取） ──
-import playwright as _pw
-_pw_pkg_dir = os.path.dirname(_pw.__file__)
-_pw_driver_dir = os.path.join(_pw_pkg_dir, 'driver')
-_pw_hook_dir = os.path.join(_pw_pkg_dir, '_impl', '__pyinstaller')
-
-# collect_all 收集 playwright 所有子模块、数据文件和二进制文件
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_all
-pw_datas, pw_binaries, pw_hiddenimports = collect_all('playwright')
-
-# 确保 node.exe 作为二进制文件包含（playwright 运行时需要执行此文件）
-_node_exe = os.path.join(_pw_driver_dir, 'node.exe')
-if os.path.exists(_node_exe):
-    pw_binaries.append((_node_exe, 'playwright/driver'))
-
-# 补充 playwright 隐藏导入（含 async_api 和内部模块，确保冻结环境下正常加载）
-pw_hiddenimports += [
-    'greenlet',
-    'pyee',
-    'pyee._base',
-    'playwright.sync_api',
-    'playwright.async_api',
-    'playwright._impl._path_utils',
-    'playwright._impl._api_types',
-    'playwright._impl._driver',
-    'playwright._impl._api_structures',
-    'playwright._impl._connection',
-    'playwright._impl._transport',
-    'playwright._impl._playwright',
-    'playwright._impl._browser',
-    'playwright._impl._page',
-    'playwright._impl._frame',
-    'playwright._impl._js_handle',
-    'playwright._impl._network',
-    'playwright._impl._helper',
-    'playwright._impl._object_factory',
-    'playwright._impl._event_context_manager',
-]
+# ── 后端脚本:用 glob 收全,【不再硬编码白名单】 ──
+#
+# 原来是手写九个模块名(preprocess_data / pmis / projects / snapshots / data_history /
+# milestones / profit / config / schema),漏了 collection_stages.py:
+#   · collection_stages 只被 preprocess_data.py 模块级 import(preprocess_data.py:16),
+#     server.py 的 import 头不含它 → Analysis(['server.py']) 的导入图收不到 → PYZ 里也没有;
+#   · 于是 frozen 版点「更新数据」时 _run_script_direct 的 exec_module 抛
+#     ModuleNotFoundError,页面只显示「更新失败: No module named 'collection_stages'」
+#     —— exe 版更新数据完全不可用。
+#   · 开发模式走 subprocess、模块就躺在 cwd 里,这个坑本地永远测不出来(CLAUDE.md §5)。
+# 同款硬编码白名单在 make_deploy_zip.py 上已实测漏过 27 个模块(L-59),两个 zip 脚本
+# 都已改成 glob;这里是最后一处,现在对齐。
+#
+# 新增模块不必再改这里;真要排除某个文件,加进 _PY_EXCLUDE 并写明理由。
+_PY_EXCLUDE = {'make_deploy_zip.py', 'make_update_zip.py'}   # 打包脚本自身,目标机用不到
+TOP_PY = sorted(
+    os.path.basename(p) for p in glob.glob(os.path.join(BASE, '*.py'))
+    if os.path.basename(p) not in _PY_EXCLUDE
+)
 
 # ============================================================
 # Analysis - 收集所有依赖
@@ -52,7 +39,7 @@ pw_hiddenimports += [
 a = Analysis(
     ['server.py'],
     pathex=[BASE],
-    binaries=pw_binaries,
+    binaries=[],
     datas=[
         # ── 前端构建产物（Vue3+Vite，U1 迁移后替代旧 index.html/style.css/app.js/lib） ──
         ('frontend/dist', 'dist'),
@@ -61,36 +48,21 @@ a = Analysis(
         ('app_logo.png', '.'),
         # ── 字体（Web 字体文件） ──
         ('fonts', 'fonts'),
-        # ── 后端脚本 ──
-        ('preprocess_data.py', '.'),
-        ('pmis.py', '.'),
-        ('projects.py', '.'),
-        ('snapshots.py', '.'),
-        ('data_history.py', '.'),
-        ('milestones.py', '.'),
-        ('profit.py', '.'),
-        ('pmis_download.py', '.'),
-        ('config.py', '.'),
-        ('schema.py', '.'),
-        ('fetch_yundocs_full.py', '.'),
+        # ── 启停脚本（停止服务.py 由上面的 TOP_PY 收，此处只列非 .py 的） ──
         ('sync_data.bat', '.'),
-        # ── 启停脚本 ──
         ('停止服务.bat', '.'),
         ('停止服务.command', '.'),
-        ('停止服务.py', '.'),
         ('项目回款跟踪与管控平台_启动.bat', '.'),
         ('项目回款跟踪与管控平台_启动.command', '.'),
-        # ── 用户文档 ──
-        ('用户手册.md', '.'),
-        ('管理员手册.md', '.'),
-    ] + pw_datas,
+    # ── 后端脚本（全部根 .py，见上方 TOP_PY）──
+    ] + [(f, '.') for f in TOP_PY],
     hiddenimports=[
         'openpyxl', 'xlrd', 'chardet', 'bs4', 'lxml',
         'csv', 'json', 'threading', 'webbrowser',
         'http.server', 'urllib.parse', 'io', 'shutil',
         'data_history',
-    ] + pw_hiddenimports,
-    hookspath=[_pw_hook_dir],
+    ],
+    hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -109,6 +81,9 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
+    # exe 文件名刻意保持不变:桌面快捷方式/.vbs/.bat 构成的文件名兼容链依赖它
+    # (2026-06-12 R4 更名计划明确记「PaymentReviewApp.spec exe 名不动，随下次打包专项再议」)。
+    # 因此这里的 v7.6.0 是【历史文件名】而非当前版本号,当前版本见 frontend/src/version.ts。
     name='PaymentReviewApp_v7.6.0',
     debug=False,
     bootloader_ignore_signals=False,
