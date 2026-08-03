@@ -33,6 +33,7 @@ export const usePaymentKeyFollowupStore = defineStore('paymentKeyFollowup', () =
     archives.value = r.archives ?? []
     // 内置跟进数据留存;自定义列若配 clearOnArchive 由后端按字段清,用回传 current 回填(缺省则保持留存)。
     current.value = r.current ?? current.value
+    return r.kept ?? 0     // 被保留的范围外记录条数(L-63),供页面提示
   }
   async function deleteArchive(idx: number) {
     const r = await paymentKeyFollowupApi.deleteArchive(idx)

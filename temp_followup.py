@@ -112,8 +112,9 @@ def apply_update(instance, project_id, field, content, account, now, extra_field
     return _fs.apply_update(_CFG, instance, project_id, field, content, account, now, extra_fields=extra_fields)
 
 
-def apply_archive(instance, rows, now, clear_fields=None) -> None:
-    _fs.apply_archive(_CFG, instance, rows, now, clear_fields=clear_fields)
+def apply_archive(instance, rows, now, clear_fields=None, archived_keys=None) -> int:
+    return _fs.apply_archive(_CFG, instance, rows, now, clear_fields=clear_fields,
+                             archived_keys=archived_keys)
 
 
 def apply_archive_delete(instance, idx) -> bool:

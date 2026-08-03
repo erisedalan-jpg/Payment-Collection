@@ -21,7 +21,10 @@ export const useProjectProgressStore = defineStore('projectProgress', () => {
   async function archive(rows: Parameters<typeof projectProgressApi.archiveProgress>[0]) {
     const r = await projectProgressApi.archiveProgress(rows)
     archives.value = r.archives ?? []
-    current.value = {}
+    // 后端只清「本次快照覆盖到的」记录,范围外(非重点项目)的记录会被留下 —— 必须据回传回填,
+    // 不可硬编码清空(缺省 {} 兼容旧后端/既有测试 mock)。返回被保留的条数供页面提示。
+    current.value = r.current ?? {}
+    return r.kept ?? 0
   }
   async function deleteArchive(idx: number) {
     const r = await projectProgressApi.deleteArchive(idx)

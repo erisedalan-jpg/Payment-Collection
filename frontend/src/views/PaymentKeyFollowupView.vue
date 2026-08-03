@@ -35,6 +35,7 @@ import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
 import { htmlToPlainText } from '@/lib/richText'
+import { notifyArchived } from '@/lib/followupArchive'
 
 defineOptions({ name: 'PaymentKeyFollowupView' })
 useViewScrollMemory()
@@ -145,7 +146,7 @@ const archiving = ref(false)
 const archiveConfirm = ref(false)
 async function doArchive() {
   archiving.value = true
-  try { await pk.archive(currentRows.value as any); archiveConfirm.value = false; fp.mode.value = 'current' }
+  try { notifyArchived(await pk.archive(currentRows.value as any)); archiveConfirm.value = false; fp.mode.value = 'current' }
   finally { archiving.value = false }
 }
 

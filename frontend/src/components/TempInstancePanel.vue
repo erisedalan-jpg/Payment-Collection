@@ -31,6 +31,7 @@ import { exportSheets } from '@/lib/exportXlsx'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
 import { htmlToPlainText } from '@/lib/richText'
+import { notifyArchived } from '@/lib/followupArchive'
 
 defineOptions({ name: 'TempInstancePanel' })   // 测试用 findComponent({name}) 找它,必须有
 
@@ -158,7 +159,7 @@ const archiving = ref(false)
 const archiveConfirm = ref(false)
 async function doArchive() {
   archiving.value = true
-  try { await temp.archive(currentRows.value as any); archiveConfirm.value = false; fp.mode.value = 'current' }
+  try { notifyArchived(await temp.archive(currentRows.value as any)); archiveConfirm.value = false; fp.mode.value = 'current' }
   finally { archiving.value = false }
 }
 

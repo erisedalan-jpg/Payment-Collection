@@ -57,6 +57,7 @@ export const useTempFollowupStore = defineStore('tempFollowup', () => {
     const inst = instances.value.find((i) => i.id === id)
     // 表级清空;clearOnArchive=false 的自定义列后端留存,用回传 current 回填(缺省则空,向后兼容)。
     if (inst) { inst.archives = r.archives ?? []; inst.current = r.current ?? {} }
+    return r.kept ?? 0     // 被保留的范围外记录条数(L-63),供页面提示
   }
   async function deleteArchive(idx: number) {
     const id = activeId.value

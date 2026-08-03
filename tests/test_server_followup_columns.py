@@ -175,7 +175,10 @@ def test_archive_on_clear_table_wipes_builtin_but_keeps_custom_col_with_clear_on
     _post('/api/opportunity-followup/update', {"oppId": "opp-1", "field": "weekProgress", "content": "本周进展"})
     _post('/api/opportunity-followup/update', {"oppId": "opp-1", "field": keep_key, "content": "常驻备注"})
 
-    r = _post('/api/opportunity-followup/archive', {"rows": [{"oppId": "opp-1"}]})
+    # 归档行的主键字段是 `id`(前端 OppFollowupRow 的字段名),不是 `oppId`(那只是 update 端点的
+    # 请求体参数名)。L-63 之前后端根本不看 rows 的内容,这里写成什么都能过;现在 rows 决定了
+    # 「清空作用域」,形状必须与真实前端行一致 —— 写错会让归档一条都不清(安全方向,但功能坏)。
+    r = _post('/api/opportunity-followup/archive', {"rows": [{"id": "opp-1"}]})
     assert r.status == 200
 
     body = _get('/api/opportunity-followup')
@@ -188,9 +191,9 @@ def test_archive_on_clear_table_wipes_builtin_but_keeps_custom_col_with_clear_on
 def test_archive_none_clear_fields_behavior_unaffected_when_no_custom_columns():
     """未配置任何自定义列时(常态)归档行为须与升级前逐字一致——回归安全网。"""
     _post('/api/opportunity-followup/update', {"oppId": "opp-1", "field": "weekProgress", "content": "a"})
-    _post('/api/opportunity-followup/archive', {"rows": [{"oppId": "opp-1"}]})
+    _post('/api/opportunity-followup/archive', {"rows": [{"id": "opp-1"}]})   # 主键字段是 id,见上一用例注释
     body = _get('/api/opportunity-followup')
-    assert body['current'] == {}   # 表级清空,老行为
+    assert body['current'] == {}   # 表级清空,老行为(该记录在 rows 里 → 属于本次快照作用域)
 
     _post('/api/risk-followup/update', {"riskKey": "R1", "field": "followAction", "content": "b"})
     _post('/api/risk-followup/archive', {"rows": [{"riskKey": "R1"}]})

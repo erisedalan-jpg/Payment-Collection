@@ -813,10 +813,40 @@ def _progress_apply_update(store, project_id, field, content, account, now):
     return rec
 
 
-def _progress_apply_archive(store, rows, now):
-    """纯函数:把当前已构建行冻结为历史快照(archiveTime=now),并清空 current(开始新一期)。"""
+def _archived_keys(rows, key_field):
+    """从前端传来的快照行里提取该表的 store key。五张跟进表的主键字段名各不相同:
+    temp / payment_key / progress = projectId、opportunity = id、risk = riskKey(复合键)。
+
+    ★ 取不到 key 的行【不贡献】,于是行结构变了(字段改名/前端旧版本)时集合会缩小甚至为空
+    —— 结果是「少清」(内容原样留着,调用方据 kept 提示用户)而不是「多清」(内容消失)。
+    这个方向是故意选的:归档看起来没生效可以重来,内容销毁不可逆。
+    """
+    out = set()
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        k = r.get(key_field)
+        if isinstance(k, str) and k:
+            out.add(k)
+    return out
+
+
+def _progress_apply_archive(store, rows, now, archived_keys=None):
+    """纯函数:把当前已构建行冻结为历史快照(archiveTime=now),并清空 current(开始新一期)。
+
+    ★ 只清【快照真正覆盖到的】记录(L-63):本域行集是「重点项目」子集,非重点项目的记录
+    (蓝信归入写进来的、或项目降级后不再是重点的)在页面上看不见 → 不在 rows 里 → 从未进过
+    任何快照,一旦随手清空就永久消失。archived_keys=None 保持旧的全清语义(老调用方零回归)。
+    返回被保留的范围外记录条数。
+    """
     store.setdefault('archives', []).append({"archiveTime": now, "rows": rows})
-    store['current'] = {}
+    current = store.setdefault('current', {})
+    if archived_keys is None:
+        store['current'] = {}
+        return 0
+    kept = {k: v for k, v in current.items() if k not in archived_keys}
+    store['current'] = kept
+    return len(kept)
 
 
 def _progress_apply_archive_delete(store, idx) -> bool:
@@ -1990,15 +2020,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._audit_set(detail='归档 %d 行' % len(rows))
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+        holder = {}
+
         def _apply(s):
-            _progress_apply_archive(s, rows, now)
+            holder['kept'] = _progress_apply_archive(
+                s, rows, now, archived_keys=_archived_keys(rows, 'projectId'))
+            holder['current'] = s.get("current", {})   # 含被保留的范围外记录,前端据此回填
             return s.get("archives", [])
 
         ok, res = self._followup_txn(_progress_lock, _load_progress, _apply, _save_progress)
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res})
+        self._audit_archive(rows, holder.get("kept", 0))
+        self._json_response({"success": True, "archives": res,
+                             "current": holder.get("current", {}), "kept": holder.get("kept", 0)})
 
     def handle_progress_archive_delete(self):
         """POST /api/progress/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -2111,7 +2147,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             inst = _temp.find_instance(s, str(data.get('instanceId') or ''))
             if inst is None:
                 raise ValueError("instanceId 不存在")
-            _temp.apply_archive(inst, rows, now, clear_fields=_clear)
+            holder['kept'] = _temp.apply_archive(inst, rows, now, clear_fields=_clear,
+                                                 archived_keys=_archived_keys(rows, 'projectId'))
             holder['current'] = inst.get("current", {})   # 归档后 current(按字段清):前端据此回填,免整表清/留与后端错位
             return inst.get("archives", [])
 
@@ -2119,7 +2156,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
+        self._audit_archive(rows, holder.get("kept", 0))
+        self._json_response({"success": True, "archives": res,
+                             "current": holder.get("current", {}), "kept": holder.get("kept", 0)})
 
     def handle_temp_followup_archive_delete(self):
         """POST /api/temp-followup/archive/delete {instanceId, archiveIdx} — 删指定实例的指定历史快照。超管专属。"""
@@ -2297,7 +2336,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         holder = {}
 
         def _apply(s):
-            _oppf.apply_archive(s, rows, now, clear_fields=_clear)
+            holder['kept'] = _oppf.apply_archive(s, rows, now, clear_fields=_clear,
+                                                 archived_keys=_archived_keys(rows, 'id'))
             holder['current'] = s.get("current", {})
             return s.get("archives", [])
 
@@ -2305,7 +2345,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
+        self._audit_archive(rows, holder.get("kept", 0))
+        self._json_response({"success": True, "archives": res,
+                             "current": holder.get("current", {}), "kept": holder.get("kept", 0)})
 
     def handle_opportunity_followup_archive_delete(self):
         """POST /api/opportunity-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -2408,7 +2450,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         holder = {}
 
         def _apply(s):
-            _riskfu.apply_archive(s, rows, now, clear_fields=_clear)
+            holder['kept'] = _riskfu.apply_archive(s, rows, now, clear_fields=_clear,
+                                                   archived_keys=_archived_keys(rows, 'riskKey'))
             holder['current'] = s.get("current", {})
             return s.get("archives", [])
 
@@ -2416,7 +2459,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
+        self._audit_archive(rows, holder.get("kept", 0))
+        self._json_response({"success": True, "archives": res,
+                             "current": holder.get("current", {}), "kept": holder.get("kept", 0)})
 
     def handle_risk_followup_archive_delete(self):
         """POST /api/risk-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -2519,7 +2564,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         holder = {}
 
         def _apply(s):
-            _paykey.apply_archive(s, rows, now, clear_fields=_clear)
+            holder['kept'] = _paykey.apply_archive(s, rows, now, clear_fields=_clear,
+                                                   archived_keys=_archived_keys(rows, 'projectId'))
             holder['current'] = s.get("current", {})
             return s.get("archives", [])
 
@@ -2527,7 +2573,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         if not ok:
             self._send_json(400 if isinstance(res, str) else 500,
                             _error_payload(ERR_VALIDATION if isinstance(res, str) else ERR_INTERNAL, res or "归档失败")); return
-        self._json_response({"success": True, "archives": res, "current": holder.get("current", {})})
+        self._audit_archive(rows, holder.get("kept", 0))
+        self._json_response({"success": True, "archives": res,
+                             "current": holder.get("current", {}), "kept": holder.get("kept", 0)})
 
     def handle_paykey_followup_archive_delete(self):
         """POST /api/payment-key-followup/archive/delete {archiveIdx} — 删指定历史快照。超管专属。"""
@@ -4346,6 +4394,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._audit_target = target
         if detail is not None:
             self._audit_detail = detail
+
+    def _audit_archive(self, rows, kept):
+        """归档审计的最终富化(覆盖 handler 入口处那条 '归档 N 行')。归档不可逆,排查时需要知道
+        当时清了多少、留了多少:kept 若等于全部记录数,说明 rows 里一个 store key 都没提出来
+        (行结构变了),归档实际什么也没清 —— 这条日志是唯一留痕。"""
+        if kept:
+            self._audit_set(detail='归档 %d 行;另有 %d 条范围外记录未清空(保留)' % (len(rows), kept))
+        else:
+            self._audit_set(detail='归档 %d 行' % len(rows))
 
     def _audit_login(self, account, ok, reason=''):
         """登录/登出以外的认证补录:登录成功/失败。绝不记密码。"""

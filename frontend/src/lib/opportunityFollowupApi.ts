@@ -6,7 +6,7 @@ import type { Archive } from './projectProgressApi'
 export interface OppFollowupGetResp { success?: boolean; scope: ScopeFilter; current: Record<string, ProgressRecord>; archives: Archive[] }
 export interface OppFollowupScopeResp { success: boolean; scope: ScopeFilter }
 export interface OppFollowupUpdateResp { success: boolean; record: ProgressRecord }
-export interface OppFollowupArchiveResp { success: boolean; archives: Archive[]; current?: Record<string, ProgressRecord> }
+export interface OppFollowupArchiveResp { success: boolean; archives: Archive[]; current?: Record<string, ProgressRecord>; kept?: number }
 
 export const opportunityFollowupApi = {
   get: () => api.get<OppFollowupGetResp>('/api/opportunity-followup'),

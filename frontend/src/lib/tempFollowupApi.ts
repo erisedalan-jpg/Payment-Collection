@@ -14,7 +14,7 @@ export interface TempInstance {
 export interface TempGetResp { success?: boolean; instances: TempInstance[] }
 export interface TempScopeResp { success: boolean; scope: ScopeFilter }
 export interface TempUpdateResp { success: boolean; record: ProgressRecord }
-export interface TempArchiveResp { success: boolean; archives: Archive[]; current?: Record<string, ProgressRecord> }
+export interface TempArchiveResp { success: boolean; archives: Archive[]; current?: Record<string, ProgressRecord>; kept?: number }
 export interface TempInstancesResp { success: boolean; instances: TempInstance[] }
 export interface TempInstanceCreateResp extends TempInstancesResp { instance: TempInstance }
 

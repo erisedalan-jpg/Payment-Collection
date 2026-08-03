@@ -31,8 +31,9 @@ def apply_update(store, opp_id, field, content, account, now, extra_fields=()) -
     return _fs.apply_update(_CFG, store, opp_id, field, content, account, now, extra_fields=extra_fields)
 
 
-def apply_archive(store, rows, now, clear_fields=None) -> None:
-    _fs.apply_archive(_CFG, store, rows, now, clear_fields=clear_fields)
+def apply_archive(store, rows, now, clear_fields=None, archived_keys=None) -> int:
+    return _fs.apply_archive(_CFG, store, rows, now, clear_fields=clear_fields,
+                             archived_keys=archived_keys)
 
 
 def apply_archive_delete(store, idx) -> bool:

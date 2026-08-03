@@ -6,7 +6,7 @@ export interface RiskArchive { archiveTime: string; rows: Record<string, unknown
 export interface RiskGetResp { success?: boolean; scope: ScopeFilter; current: Record<string, RiskFollowRecord>; archives: RiskArchive[] }
 export interface RiskScopeResp { success: boolean; scope: ScopeFilter }
 export interface RiskUpdateResp { success: boolean; record: RiskFollowRecord }
-export interface RiskArchiveResp { success: boolean; archives: RiskArchive[]; current?: Record<string, RiskFollowRecord> }
+export interface RiskArchiveResp { success: boolean; archives: RiskArchive[]; current?: Record<string, RiskFollowRecord>; kept?: number }
 
 export const riskFollowupApi = {
   get: () => api.get<RiskGetResp>('/api/risk-followup'),

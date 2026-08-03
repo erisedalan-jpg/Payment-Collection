@@ -35,6 +35,20 @@ describe('projectProgress store', () => {
     expect(s.archives).toHaveLength(1)
     expect(s.current).toEqual({})
   })
+  it('archive 用后端回传的 current 回填,范围外记录必须留住(L-63)', async () => {
+    // 「重点项目进展」只渲染重点项目;非重点项目的记录(蓝信归入写进来的、或项目降级后的)
+    // 页面上看不见 → 不在归档 rows 里 → 后端不再清它。前端若照旧硬编码 current={},
+    // 归档后 UI 会以为它没了,刷新又冒出来。
+    vi.spyOn(apiMod.projectProgressApi, 'archiveProgress').mockResolvedValue({
+      success: true, archives: [{ archiveTime: 't1', rows: [{ projectId: 'P1' }] }],
+      current: { P9: { weekProgress: '非重点项目,页面不显示它' } }, kept: 1,
+    })
+    const s = useProjectProgressStore()
+    s.current = { P1: { weekProgress: 'A' }, P9: { weekProgress: '非重点项目,页面不显示它' } }
+    const kept = await s.archive([{ projectId: 'P1' } as any])
+    expect(s.current).toEqual({ P9: { weekProgress: '非重点项目,页面不显示它' } })
+    expect(kept).toBe(1)
+  })
   it('reset 清空 current/archives/loaded', () => {
     const s = useProjectProgressStore()
     s.current = { P1: { weekProgress: 'x' } }

@@ -28,6 +28,7 @@ import FollowupCustomCell from '@/components/FollowupCustomCell.vue'
 import FollowupColumnConfig from '@/components/FollowupColumnConfig.vue'
 import { exportSheets } from '@/lib/exportXlsx'
 import { htmlToPlainText } from '@/lib/richText'
+import { notifyArchived } from '@/lib/followupArchive'
 
 const TABLE_ID = 'opportunity-followup'
 const auth = useAuthStore()
@@ -100,7 +101,7 @@ const archiving = ref(false)
 const archiveConfirm = ref(false)
 async function doArchive() {
   archiving.value = true
-  try { await oppf.archive(inScopeRows.value as any); archiveConfirm.value = false; fp.mode.value = 'current' }
+  try { notifyArchived(await oppf.archive(inScopeRows.value as any)); archiveConfirm.value = false; fp.mode.value = 'current' }
   finally { archiving.value = false }
 }
 

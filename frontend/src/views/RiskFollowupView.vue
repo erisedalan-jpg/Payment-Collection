@@ -32,6 +32,7 @@ import { useDeferredMount } from '@/lib/useDeferredMount'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt, fmtRatio } from '@/lib/format'
 import { htmlToPlainText } from '@/lib/richText'
+import { notifyArchived } from '@/lib/followupArchive'
 
 const TABLE_ID = 'risk-followup'
 const data = useDataStore()
@@ -155,7 +156,7 @@ const archiving = ref(false)
 const archiveConfirm = ref(false)
 async function doArchive() {
   archiving.value = true
-  try { await risk.archive(currentRows.value as unknown as Record<string, unknown>[]); archiveConfirm.value = false; fp.mode.value = 'current' }
+  try { notifyArchived(await risk.archive(currentRows.value as unknown as Record<string, unknown>[])); archiveConfirm.value = false; fp.mode.value = 'current' }
   finally { archiving.value = false }
 }
 function exportRow(r: RiskRow): Record<string, unknown> {

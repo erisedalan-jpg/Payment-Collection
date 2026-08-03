@@ -6,7 +6,7 @@ import type { Archive } from './projectProgressApi'
 export interface PaymentKeyGetResp { success?: boolean; scope: ScopeFilter; current: Record<string, PaymentKeyRecord>; archives: Archive[] }
 export interface PaymentKeyScopeResp { success: boolean; scope: ScopeFilter }
 export interface PaymentKeyUpdateResp { success: boolean; record: PaymentKeyRecord }
-export interface PaymentKeyArchiveResp { success: boolean; archives: Archive[]; current?: Record<string, PaymentKeyRecord> }
+export interface PaymentKeyArchiveResp { success: boolean; archives: Archive[]; current?: Record<string, PaymentKeyRecord>; kept?: number }
 
 export const paymentKeyFollowupApi = {
   get: () => api.get<PaymentKeyGetResp>('/api/payment-key-followup'),

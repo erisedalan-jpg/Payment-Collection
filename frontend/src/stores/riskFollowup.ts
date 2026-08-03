@@ -33,6 +33,7 @@ export const useRiskFollowupStore = defineStore('riskFollowup', () => {
     // 内置跟进数据留存;但自定义列若配了 clearOnArchive 后端会按字段清,故用后端回传的 current 回填
     // (r.current 缺省[如旧后端/测试 mock]时保持留存不变,向后兼容)。
     current.value = r.current ?? current.value
+    return r.kept ?? 0     // 被保留的范围外记录条数(L-63),供页面提示
   }
   async function deleteArchive(idx: number) {
     const r = await riskFollowupApi.deleteArchive(idx)

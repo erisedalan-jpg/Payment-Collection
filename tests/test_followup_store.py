@@ -102,6 +102,54 @@ def test_apply_archive_clear_fields_drops_emptied_records():
     assert s["current"] == {"P1": {"cf-keep": "survive"}}
 
 
+# ── L-63：清空作用域必须等于快照作用域 ──────────────────────────────────────
+# 缺陷本体：快照 rows 是【前端传来的范围内可见行】,而清空作用于【后端 current 全量】。
+# 两个集合的差(current 里有、rows 里没有的 key)= 被清空且未留档 = 内容永久消失、零提示。
+# 范围外记录的来源:蓝信归入(V4.5.10 加了二次确认但仍允许写入)、范围设置被改小、
+# 数据更新后项目掉出范围。修法是让清空只作用于 archived_keys(=快照真正留存的那些 key)。
+
+def test_archive_keeps_records_outside_snapshot_on_table_level_clear():
+    cfg = _grouped()            # 表级清空(temp / opportunity 就是这一档)
+    s = fs.new_store(cfg)
+    s["current"] = {"P1": {"weekProgress": "可见,应随快照清空"},
+                    "P9": {"weekProgress": "范围外,归档前它不在任何一张快照里"}}
+    kept = fs.apply_archive(cfg, s, [{"projectId": "P1"}], "t", archived_keys={"P1"})
+    assert s["current"] == {"P9": {"weekProgress": "范围外,归档前它不在任何一张快照里"}}
+    assert kept == 1
+
+
+def test_archive_keeps_records_outside_snapshot_on_field_level_clear():
+    cfg = _single_retain()      # 表级留存 + 一个 clearOnArchive 的自定义列(risk / payment_key 这一档)
+    s = fs.new_store(cfg)
+    s["current"] = {"K1": {"followAction": "留", "cf-x": "可见行的值,应清"},
+                    "K9": {"followAction": "留", "cf-x": "范围外的值,不该被清"}}
+    kept = fs.apply_archive(cfg, s, [{"riskKey": "K1"}], "t",
+                            clear_fields={"cf-x"}, archived_keys={"K1"})
+    assert s["current"] == {"K1": {"followAction": "留"},
+                            "K9": {"followAction": "留", "cf-x": "范围外的值,不该被清"}}
+    assert kept == 1
+
+
+def test_archive_with_empty_archived_keys_clears_nothing():
+    """一个 key 都提不出来时(前端行结构变了/字段改名)必须【什么都不清】——
+    宁可归档看起来没生效(调用方据返回值提示),也不能销毁内容。"""
+    cfg = _grouped()
+    s = fs.new_store(cfg)
+    s["current"] = {"P1": {"weekProgress": "a"}, "P2": {"weekProgress": "b"}}
+    kept = fs.apply_archive(cfg, s, [{"没有认识的键": 1}], "t", archived_keys=set())
+    assert s["current"] == {"P1": {"weekProgress": "a"}, "P2": {"weekProgress": "b"}}
+    assert kept == 2 and len(s["archives"]) == 1     # 快照照存,只是没清任何东西
+
+
+def test_archive_archived_keys_none_is_legacy_full_scope():
+    """archived_keys 缺省 = 旧行为(作用于 current 全量),老调用方零回归。"""
+    cfg = _grouped()
+    s = fs.new_store(cfg)
+    s["current"] = {"P1": {"weekProgress": "a"}, "P9": {"weekProgress": "b"}}
+    kept = fs.apply_archive(cfg, s, [{"projectId": "P1"}], "t")
+    assert s["current"] == {} and kept == 0
+
+
 def test_apply_archive_none_retains_legacy_behavior():
     grouped = _grouped()
     s1 = fs.new_store(grouped); s1["current"] = {"P1": {"weekProgress": "a"}}

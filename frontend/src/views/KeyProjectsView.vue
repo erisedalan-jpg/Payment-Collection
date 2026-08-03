@@ -28,6 +28,7 @@ import { useViewScrollMemory } from '@/lib/useViewScrollMemory'
 import { sumDistinctContractWan } from '@/lib/followupTotals'
 import { fmt } from '@/lib/format'
 import { htmlToPlainText } from '@/lib/richText'
+import { notifyArchived } from '@/lib/followupArchive'
 
 defineOptions({ name: 'KeyProjectsView' })
 useViewScrollMemory()
@@ -116,7 +117,7 @@ const archiveConfirm = ref(false)
 async function doArchive() {
   archiving.value = true
   try {
-    await progress.archive(currentRows.value)
+    notifyArchived(await progress.archive(currentRows.value))
     archiveConfirm.value = false
     fp.mode.value = 'current'
   } finally {
