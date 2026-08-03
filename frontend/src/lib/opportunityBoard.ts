@@ -4,7 +4,6 @@
  */
 import type { OppRow } from '@/lib/opportunitiesApi'
 import { L4_OPTIONS } from '@/lib/opportunityColumns'
-import { CHART_LIGHT } from '@/charts/echartsTheme'
 
 export const FORECAST_ORDER = ['可参与', '可承诺', '可争取', '赢单']
 export const TOP1000_TIERS = ['TOP1000', '非TOP1000', '其他非指名', '空白']
@@ -171,6 +170,11 @@ export function aiKpis(rows: OppRow[]): { count: number; amountWan: number } {
 }
 
 // ——— 复杂图 option 构造(简单柱/饼用 chartOptions.buildRankingOption,不在此处) ———
+// 调色板刻意**不写进 option**:option.color 会盖过 ECharts 主题,而这四个图都经 ChartBox 渲染,
+// ChartBox 按 settings.theme 传 'ent'(CHART_LIGHT)/'ent-dark'(CHART_DARK)。这里原先写死 CHART_LIGHT,
+// 导致暗色主题下四张图仍出浅色系。省掉 color 键即由主题供色,浅色渲染与改前一致(同为 CHART_LIGHT),
+// 暗色下自动切到 CHART_DARK,且今后新增主题无需回改本文件。
+// 注意:必须是"不出现 color 键",不能写 color: undefined —— ECharts 合并 option 时会把 undefined 覆盖上去。
 const wanLabel = (p: { value: number }) => p.value.toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '万'
 const intLabel = (p: { value: number }) => String(Math.round(p.value))
 
@@ -182,7 +186,6 @@ export function buildMultiLineOption(
     tooltip: { trigger: 'axis' },
     legend: { type: 'scroll', top: 0 },
     grid: { left: 60, right: 20, top: 50, bottom: 60 },
-    color: CHART_LIGHT,
     xAxis: { type: 'category', data: months, axisLabel: { interval: 0, rotate: 30 } },
     yAxis: { type: 'value', name: metricLabel },
     series: teams.map((t, i) => ({
@@ -200,7 +203,6 @@ export function buildCustomerTierOption(
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { top: 0, data: ['预估金额(万元)', '商户数量'] },
     grid: { left: 60, right: 60, top: 50, bottom: 40 },
-    color: CHART_LIGHT,
     xAxis: { type: 'category', data: agg.map((a) => a.tier) },
     yAxis: [
       { type: 'value', name: '预估金额(万元)' },
@@ -221,7 +223,6 @@ export function buildStackedAmountOption(months: string[], series: string[], mat
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { type: 'scroll', top: 0 },
     grid: { left: 60, right: 20, top: 50, bottom: 60 },
-    color: CHART_LIGHT,
     xAxis: { type: 'category', data: months, axisLabel: { interval: 0, rotate: 30 } },
     yAxis: { type: 'value', name: '预估金额(万元)' },
     series: series.map((s, i) => ({ name: s, type: 'bar', stack: 'amount', data: matrix[i] })),
@@ -233,7 +234,6 @@ export function buildHorizontalBarOption(categories: string[], values: number[],
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 110, right: 50, top: 30, bottom: 30 },
-    color: CHART_LIGHT,
     xAxis: { type: 'value', name: metricLabel },
     yAxis: { type: 'category', data: categories, inverse: true },
     series: [{

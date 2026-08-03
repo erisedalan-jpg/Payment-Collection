@@ -75,8 +75,10 @@ function onToggle(key: string) {
 </template>
 
 <style scoped>
+/* 折叠/展开是"展开"类动效(整栏宽度伸缩,不是状态反馈),按规范取 --dur-2 200ms;
+   原 .15s 既不在 120/200 两档上、也没给缓动(退化成 CSS 默认 ease),一并归到 --ease。 */
 .sidebar { width: 220px; border-right: 1px solid var(--line); background: var(--card);
-  display: flex; flex-direction: column; transition: width .15s; overflow: hidden; }
+  display: flex; flex-direction: column; transition: width var(--dur-2) var(--ease); overflow: hidden; }
 .sidebar.collapsed { width: 0; border-right: none; }
 .sidebar-nav { flex: 1; overflow-y: auto; padding: var(--sp-3) 0; }
 .section { margin-bottom: var(--sp-4); }

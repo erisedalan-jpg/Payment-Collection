@@ -78,12 +78,15 @@ function rateColor(r: number | null): string {
 .or-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 /* 列表区：展示全部 L4，超出时纵向滚动；360px ≈ 8 行 × 32px 行高 + 8px 内边距，令牌无对应行高值，故用具体 px */
 .org-list { max-height: 360px; overflow-y: auto; }
-.rank-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: var(--fs-2); cursor: pointer; border-radius: 6px; }
+.rank-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: var(--fs-2); cursor: pointer; border-radius: var(--r-sm); }
 .rank-item:hover { background: var(--card2); }
 .rank-no { width: 20px; text-align: center; color: var(--mut); }
 .rank-name { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
-.rank-bar-wrap { flex: 1; background: var(--card2); border-radius: 4px; height: 10px; overflow: hidden; }
-.rank-bar { display: block; height: 10px; border-radius: 4px; }
+/* 进度条槽与填充:原 4px 不在圆角档位(6/10/14/999)上。条高 10px,取 --r-full 走胶囊语义
+   —— 浏览器会把半径按高度一半(5px)收敛,实际渲染与原 4px 只差 1px,而 --r-sm(6px) 收敛后同样是 5px、
+   两者渲染等价,故按"进度条=胶囊"的语义选 --r-full 而非最近数值档。 */
+.rank-bar-wrap { flex: 1; background: var(--card2); border-radius: var(--r-full); height: 10px; overflow: hidden; }
+.rank-bar { display: block; height: 10px; border-radius: var(--r-full); }
 .rank-amount { width: 90px; text-align: right; color: var(--sub); }
 .rank-rate { width: 56px; text-align: right; font-weight: 600; }
 .or-empty { color: var(--mut); padding: 12px; text-align: center; }

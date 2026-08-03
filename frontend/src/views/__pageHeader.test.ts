@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 
 // V4.4.8 页头与视图状态的全局守卫。三条都是【源码扫描】而非渲染断言 ——
 // 它们防的是「今后有人顺手改一下」而单页测试察觉不到的整体性破坏。
@@ -176,6 +176,67 @@ describe('V4.4.8 页头与视图状态全局守卫', () => {
     for (const [d, f, cls] of KEEP) {
       expect(new RegExp(`^\\.${cls}\\s*[,{]`, 'm').test(readFileSync(resolve(d, f), 'utf-8')),
         `${f} 的 .${cls} 语义不是标题,不应被 SectionTitle 取代`).toBe(true)
+    }
+  })
+
+  it('不得自行手写 <hN> 标题标签(标题由 SectionTitle / PageHeader 唯一实现)', () => {
+    // 上一条只断言「用 SectionTitle 的文件数 >= 20」这个【下界】——
+    // 新页面直接手写 <h3> 不会让任何数字下降,一条测试都不会红。
+    // 这一条补上负向面:全仓扫 <h1>~<h6> 的直接使用,不在豁免清单里就是违规。
+    // 只扫模板(剥掉 <script>/<style>),避免 CSS 里的 `h4 {}` 选择器与脚本字符串误报。
+    const srcRoot = resolve(viewsDir, '..')
+    const walk = (dir: string, out: string[] = []): string[] => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === '.omc' || e.name === 'node_modules') continue
+        const p = join(dir, e.name)
+        if (e.isDirectory()) walk(p, out)
+        else if (e.name.endsWith('.vue')) out.push(p)
+      }
+      return out
+    }
+    const files = walk(srcRoot)
+    const template = (f: string) => readFileSync(f, 'utf-8')
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, '')
+    const relOf = (f: string) => f.slice(srcRoot.length + 1).replace(/\\/g, '/')
+
+    // 豁免清单:每一条都要有理由。分两类 ——
+    // 【A 类·结构性豁免】标题组件自身,以及 spec 明确不归 SectionTitle 管的页头/页名。
+    // 【B 类·存量欠账】卡内三级小节标题。规范只定义了两级(card / section),
+    //   这些是第三级,SectionTitle 目前无对应 level;spec §12.3「现有页面不迁移」故不算违规。
+    //   今后 SectionTitle 若补了三级 level,应逐个迁移并把条目从这里删掉。
+    const ALLOW: Record<string, string> = {
+      'components/SectionTitle.vue': 'A:标题组件自身的 <h3 class="st">',
+      'components/PageHeader.vue': 'A:页头唯一实现,spec 明确页头标题不属于两级标题体系',
+      'components/PageStub.vue': 'A:占位页,不走 AppLayout',
+      'views/LoginView.vue': 'A:全屏页,无侧栏无布局无 PageHeader',
+      'views/ChangePasswordView.vue': 'A:全屏页,同上',
+      'views/ProjectDetailView.vue': 'A:<h2 class="pd-name"> 是项目名,上一条 KEEP 清单已裁定语义不是标题',
+      'views/ClosedProjectDetailView.vue': 'A:<h2 class="cd-name"> 同上',
+      'components/budget/DirectCostSection.vue': 'B:卡内三级小节(差补/住宿/交通),卡标题已用 SectionTitle',
+      'components/budget/ProductSection.vue': 'B:卡内三级小节(标准实施/非标实施/工作内容)',
+      'components/budget/PmSection.vue': 'B:卡内三级小节(小结)',
+      'components/budget/RateReferenceCard.vue': 'B:卡内三级小节(四张费率表各自的表名)',
+      'components/YitianRulesCard.vue': 'B:卡内三级小节,且 <h4> 内嵌了 el-switch,SectionTitle 无该插槽位',
+    }
+
+    const HEADING = /<h[1-6][\s>]/
+    const offenders = files.filter((f) => HEADING.test(template(f))).map(relOf)
+    for (const f of offenders) {
+      expect(ALLOW[f], `${f} 手写了 <hN> 标题。卡片/小节标题请用 <SectionTitle level="card|section">;` +
+        '确有理由手写(全屏页/组件自身/非标题语义)就把它加进本测试的 ALLOW 清单并写明理由').toBeTruthy()
+    }
+
+    // 自证 ①:扫描规模。路径失配/模板剥离写坏会让 files 或 offenders 退化成空集合,
+    // 上面的循环空跑、「零处违规」恒真通过(本仓 V4.5.3 踩过的第五种假绿)。
+    expect(files.length, '.vue 扫描数异常(实测 134)').toBeGreaterThan(120)
+    expect(offenders.length, '手写 <hN> 的文件数异常(实测 12)').toBeGreaterThan(8)
+
+    // 自证 ②:豁免清单不得腐烂。某文件的标题已经迁走了,条目却留着,
+    // 就会一直替一个不存在的违规兜底 —— 下次真有人在该文件手写标题时不会红。
+    // 这条同时是扫描是否生效的第二重保险:扫不出任何 heading 时它会全部失败。
+    for (const f of Object.keys(ALLOW)) {
+      expect(offenders, `${f} 已不含手写 <hN>,请把它从 ALLOW 清单里删掉`).toContain(f)
     }
   })
 
