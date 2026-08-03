@@ -66,9 +66,65 @@ class TestBuildSnapshot:
         snap = snapshots.build_snapshot("2026-06-11", _projects(), _pmis(), _nodes())
         agg = snap["agg"]
         assert agg["projectCount"] == 2
+        # expectedTotal/actualTotal 仍是节点口径求和(诊断用),不参与达成率
         assert agg["expectedTotal"] == 1000000 and agg["actualTotal"] == 100000
-        assert agg["paymentRatio"] == 0.1
         assert agg["delayedNodes"] == 1 and agg["openRiskTotal"] == 2 and agg["overspendCount"] == 0
+        # 节点口径的旧达成率键必须彻底消失,否则"第三套口径"仍在
+        assert "paymentRatio" not in agg
+        # 本 fixture 无 paymentPmis → Σ合同=0 → None(而非退回节点口径的 0.1)
+        assert agg["recordPaymentRatio"] is None
+
+
+def _pay_projects():
+    """带 9f 产物(paymentPmis)与 orgL4 的 dept_projects,用于主口径达成率。
+    P-1: 流水 30万 / 合同 100万; P-2: 流水 20万 / 合同 100万 → Σ50万/Σ200万 = 0.25"""
+    return [
+        {"projectId": "P-1", "projectName": "甲", "orgL4": "交付一部",
+         "paymentPmis": {"contract": 1000000, "actualTotal": 300000}},
+        {"projectId": "P-2", "projectName": "乙", "orgL4": "交付二部",
+         "paymentPmis": {"contract": 1000000, "actualTotal": 200000}},
+    ]
+
+
+class TestRecordPaymentRatioMainCaliber:
+    """达成率并入主口径 = Σ流水净额 ÷ Σ合同总额(CLAUDE.md 回款口径约定)。"""
+
+    def test_ratio_is_records_over_contract(self):
+        snap = snapshots.build_snapshot("2026-06-11", _pay_projects(), {}, _nodes())
+        # 节点口径会是 100000/1000000=0.1;主口径是 500000/2000000=0.25 —— 必须是后者
+        assert snap["agg"]["recordPaymentRatio"] == 0.25
+
+    def test_negative_records_not_absolute(self):
+        # 红冲/负值逐笔全加、不取绝对值(主口径明确要求)
+        projs = _pay_projects()
+        projs[1]["paymentPmis"]["actualTotal"] = -200000
+        snap = snapshots.build_snapshot("2026-06-11", projs, {}, {})
+        assert snap["agg"]["recordPaymentRatio"] == 0.05   # (300000-200000)/2000000
+
+    def test_anomalous_excluded_from_ratio_only(self):
+        # 异常项目(orgL4 空)不进分子分母……
+        projs = _pay_projects() + [
+            {"projectId": "P-9", "projectName": "丙", "orgL4": "  ",
+             "paymentPmis": {"contract": 8000000, "actualTotal": 8000000}}]
+        snap = snapshots.build_snapshot("2026-06-11", projs, {}, {})
+        assert snap["agg"]["recordPaymentRatio"] == 0.25   # 未被 P-9 拉高
+        # ……但**仍要留在 projects 里**:若把它从快照剔除,升级后首次 diff 会对每个异常项目
+        # 凭空喷出"关闭项目"/"回款节点移除"事件。排除范围只限达成率。
+        assert "P-9" in snap["projects"]
+        assert snapshots.diff_snapshots(snap, snap) == []
+
+    def test_zero_contract_returns_none(self):
+        projs = [{"projectId": "P-1", "projectName": "甲", "orgL4": "交付一部",
+                  "paymentPmis": {"contract": 0, "actualTotal": 500000}}]
+        snap = snapshots.build_snapshot("2026-06-11", projs, {}, {})
+        assert snap["agg"]["recordPaymentRatio"] is None
+
+    def test_missing_paymentpmis_treated_as_zero(self):
+        # actualTotal 可能为 None(该项目无流水),不能因此炸 TypeError
+        projs = [{"projectId": "P-1", "projectName": "甲", "orgL4": "交付一部",
+                  "paymentPmis": {"contract": 1000000, "actualTotal": None}}]
+        snap = snapshots.build_snapshot("2026-06-11", projs, {}, {})
+        assert snap["agg"]["recordPaymentRatio"] == 0.0
 
 
 class TestSnapshotIO:
@@ -110,11 +166,11 @@ class TestPickBaselines:
         assert b["lastSync"] == "2026-06-10" and b["lastWeek"] is None and b["lastMonth"] is None
 
 
-def _snap(date_str, projects=None, nodes=None):
+def _snap(date_str, projects=None, nodes=None, dept_projects=None):
     projects = projects or {}
     nodes = nodes or {}
     return {"date": date_str, "projects": projects, "nodes": nodes,
-            "agg": snapshots._agg(projects, nodes)}
+            "agg": snapshots._agg(projects, nodes, dept_projects)}
 
 
 def _proj(name="甲", stage="项目执行", milestone="正常", status="实施中",
@@ -329,15 +385,22 @@ class TestPeriodCompare:
         return _snap("2026-06-04",
                      {"P-1": _proj(stage="项目规划", openRisks=1, overspend=False),
                       "P-2": _proj(name="乙", stage="项目执行", overspend=False)},
-                     {"P-1|a#0": _node(node="a", actual=100000, status="正常实施中")})
+                     {"P-1|a#0": _node(node="a", actual=100000, status="正常实施中")},
+                     # 主口径:Σ流水 20万 ÷ Σ合同 100万 = 0.2
+                     dept_projects=[{"projectId": "P-1", "orgL4": "交付一部",
+                                     "paymentPmis": {"contract": 1000000, "actualTotal": 200000}}])
 
-    def _cur(self):
+    def _cur(self, dept_projects=None):
         return _snap("2026-06-11",
                      {"P-1": _proj(stage="项目执行", openRisks=3, overspend=True),
                       "P-2": _proj(name="乙", stage="项目执行", overspend=False),
                       "P-3": _proj(name="丙", overspend=True)},  # 新项目超支也计新超支
                      {"P-1|a#0": _node(node="a", actual=400000, status="延期"),
-                      "P-1|b#0": _node(node="b", actual=50000, status="延期")})
+                      "P-1|b#0": _node(node="b", actual=50000, status="延期")},
+                     dept_projects=dept_projects if dept_projects is not None else
+                     # 主口径:Σ流水 45万 ÷ Σ合同 100万 = 0.45
+                     [{"projectId": "P-1", "orgL4": "交付一部",
+                       "paymentPmis": {"contract": 1000000, "actualTotal": 450000}}])
 
     def test_entry_metrics(self):
         e = snapshots.compute_period_compare_entry("2026-06-04", self._base(), self._cur())
@@ -347,13 +410,36 @@ class TestPeriodCompare:
         assert e["paymentGained"] == 350000        # a +30万, b 新节点 5万
         assert e["riskNetChange"] == 2             # openRiskTotal 1→3
         assert e["newOverspendProjects"] == 2      # P-1 false→true + P-3 新入即超支
-        # paymentRatio: base 100000/500000=0.2, cur 450000/1000000=0.45 → +25.0pp
+        # 主口径达成率(Σ流水÷Σ合同): base 0.2 → cur 0.45,+25.0pp
         assert e["paymentRatioChange"] == 25.0
 
     def test_ratio_none_when_base_missing(self):
-        base = _snap("2026-06-04", {"P-1": _proj()}, {})  # exp=0 → ratio None
+        base = _snap("2026-06-04", {"P-1": _proj()}, {})  # 无 dept_projects → ratio None
         e = snapshots.compute_period_compare_entry("2026-06-04", base, self._cur())
         assert e["paymentRatioChange"] is None
+
+    def test_ratio_none_when_base_is_pre_upgrade_snapshot(self):
+        """升级首跑保护:磁盘上留存的旧快照 agg 只有节点口径 paymentRatio、没有 recordPaymentRatio。
+        跨口径相减会捏造出一个 ±Xpp,故必须判为无基线(None)。快照留 90 天,lastMonth 基线
+        在升级后 30 天内都可能命中旧份,这条不是边角情形。"""
+        base = self._base()
+        base["agg"].pop("recordPaymentRatio")
+        base["agg"]["paymentRatio"] = 0.2          # 旧快照的形态:同值但节点口径
+        e = snapshots.compute_period_compare_entry("2026-06-04", base, self._cur())
+        assert e["paymentRatioChange"] is None
+        # 其余五项指标不受影响,照常出数
+        assert e["advancedProjects"] == 1 and e["riskNetChange"] == 2
+
+    def test_ratio_change_ignores_node_caliber_movement(self):
+        """回归钉子:节点已收/计划大幅变动、但流水与合同未变 → 达成率变化必须为 0。
+        若哪天有人把分子分母改回节点口径,这条会立刻变红。"""
+        same = [{"projectId": "P-1", "orgL4": "交付一部",
+                 "paymentPmis": {"contract": 1000000, "actualTotal": 200000}}]
+        base = self._base()
+        base["agg"]["recordPaymentRatio"] = snapshots._agg({}, {}, same)["recordPaymentRatio"]
+        e = snapshots.compute_period_compare_entry("2026-06-04", base, self._cur(dept_projects=same))
+        assert e["paymentRatioChange"] == 0.0
+        assert e["paymentGained"] == 350000         # 节点侧确实动了,只是不该影响达成率
 
 
 class TestLoadSnapshotRobustness:

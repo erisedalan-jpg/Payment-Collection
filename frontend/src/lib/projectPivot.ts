@@ -22,6 +22,9 @@ export interface InsightRow {
   top1000: string   // '是' | '否'
   quadrant: string  // 象限 M1/M2/M3/M4 或 '未指定'
   contractAmount: number
+  /** 流水净额(paymentPmis.actualTotal)。回款完成率的分子用它,与全站主口径同源;
+   *  actualTotal 是【节点已收】,两者不是一回事,勿混用。 */
+  recordTotal: number
   progress: number | null
   costRatio: number | null
   expectedTotal: number
@@ -61,12 +64,17 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       paused: st.是否暂停 === true ? '是' : '否',
       top1000: v(p.top1000, '否'),
       quadrant: v(p.quadrant),
-      contractAmount: Number(cust.合同总额 ?? 0),
+      // 分母取 paymentPmis.contract(售前已回退到原项目),不取 customer.合同总额 ——
+      // 后者对售前项目为空,而其节点已收照样计入分子,导致本页「回款完成率」系统性
+      // 超过 100%(2026-08-03 实测全域 107.57%,11 个 L4 桶中 8 个 >100%,最高 424.9%)。
+      // 生产 676 个在建项目里 373 个(55%)是售前,故这不是边角情形。
+      contractAmount: Number(p.paymentPmis?.contract ?? 0),
       progress: typeof prog.完工进展 === 'number' ? prog.完工进展 : null,
       costRatio: typeof cost.消耗比 === 'number' ? cost.消耗比 : null,
       // 异常项目回款列置 0/false，不参与回款指标聚合
       expectedTotal: anomalous ? 0 : Number(p.payment?.expectedTotal ?? 0),
       actualTotal: anomalous ? 0 : Number(p.payment?.actualTotal ?? 0),
+      recordTotal: anomalous ? 0 : Number(p.paymentPmis?.actualTotal ?? 0),
       delayed: anomalous ? false : (p.payment?.delayedCount ?? 0) > 0,
     }
   })
@@ -147,6 +155,9 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
   }
   const groups = Object.entries(buckets).map(([key, grows]) => {
     const act = grows.reduce((s, r) => s + r.actualTotal, 0)
+    // 比率分子用流水净额、分母用合同 —— 与 CLAUDE.md 的全站统一口径同源。
+    // act(节点已收)仍用于「已收金额」这类展示指标,不参与比率。
+    const rec = grows.reduce((s, r) => s + r.recordTotal, 0)
     const contractAmount = grows.reduce((s, r) => s + r.contractAmount, 0)
     return {
       key,
@@ -156,7 +167,7 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
       contractAmount,
       avgProgress: avg(grows.map((r) => r.progress).filter((x): x is number => x != null)),
       avgCostRatio: avg(grows.map((r) => r.costRatio).filter((x): x is number => x != null)),
-      paymentRatio: contractAmount > 0 ? act / contractAmount : null,
+      paymentRatio: contractAmount > 0 ? rec / contractAmount : null,
       delayedProjects: grows.filter((r) => r.delayed).length,
     }
   })

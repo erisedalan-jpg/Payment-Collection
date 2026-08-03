@@ -79,6 +79,33 @@ describe('ledgerRows', () => {
   it('不在 projects 的项目跳过', () => {
     expect(ledgerRows([pn({ projectId: 'X' })], projects)).toHaveLength(0)
   })
+
+  // 全站口径:合同≤0 → 比率 null(前端 fmtRatio 显 '-')。返回 0 会被渲染成 "0.0%",
+  // 那是「一分没收」的确定结论,而真相是分母缺失、算不出结论。
+  it('合同=0 → paymentRatio null + 状态未知(哪怕已有流水入账)', () => {
+    const noContract = [{ projectId: 'P1', projectName: '甲', projectManager: '张三', orgL4: 'A组', paymentPmis: { contract: 0 } }] as any
+    const rows = ledgerRows([pn({ expectedPayment: 100, receivedAmount: 0, unpaidAmount: 100 })], noContract, paymentRecords)
+    expect(rows[0].actualPayment).toBe(600000)  // 确有流水,更不能说成 0%/未回款
+    expect(rows[0].paymentRatio).toBeNull()
+    expect(rows[0].paymentStatus).toBe('未知')  // 与 /payment/projects 的 deriveProgress 同结论
+  })
+
+  it('合同字段缺失 / 合同为负 同样 null + 未知', () => {
+    const missing = [{ projectId: 'P1', projectName: '甲', orgL4: 'A组' }] as any
+    const rm = ledgerRows([pn({})], missing, paymentRecords)[0]
+    expect(rm.paymentRatio).toBeNull()
+    expect(rm.paymentStatus).toBe('未知')
+    const neg = [{ projectId: 'P1', projectName: '甲', orgL4: 'A组', paymentPmis: { contract: -100 } }] as any
+    const rn = ledgerRows([pn({})], neg, paymentRecords)[0]
+    expect(rn.paymentRatio).toBeNull()
+    expect(rn.paymentStatus).toBe('未知')
+  })
+
+  it('合同>0 时比率与三态判定不变(回归安全网:这几条变红说明口径被误改)', () => {
+    const rows = ledgerRows([pn({ expectedPayment: 1000000, receivedAmount: 0, unpaidAmount: 400000 })], projects, paymentRecords)
+    expect(rows[0].paymentRatio).toBeCloseTo(0.3)
+    expect(rows[0].paymentStatus).toBe('部分回款')
+  })
 })
 
 describe('filterLedgerRows', () => {
@@ -107,6 +134,12 @@ describe('ledgerSummaryPmis/TierStatsPmis/StatusCountsPmis', () => {
     expect(s).toMatchObject({ projectCount: 2, totalExp: 1200000, totalAct: 400000, totalRem: 750000 })
     // 分母改为 ΣprojectAmount=1500000+300000=1800000：400000/1800000≈0.2222
     expect(s.rate).toBeCloseTo(400000 / 1800000)
+  })
+  it('Σ合同≤0 → rate null(同行级口径,不用 0 冒充)', () => {
+    const noCon = [
+      { tier: '100万以上', expectedPayment: 100, actualPayment: 50, remainingAmount: 50, paymentStatus: '未知', delayed: false, projectAmount: 0 },
+    ] as any
+    expect(ledgerSummaryPmis(noCon).rate).toBeNull()
   })
   it('tier 三档 remWan 取 ΣremainingAmount', () => {
     const t = ledgerTierStatsPmis(rows)

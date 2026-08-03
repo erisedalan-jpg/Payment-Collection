@@ -12,17 +12,50 @@ from typing import Any, Dict, List, Optional
 
 import config
 from profit import overspend_amount
-from projects import delivery_overspend_cats
+from projects import delivery_overspend_cats, payment_ratio_from_records
 
 
-def _agg(projects: Dict[str, dict], nodes: Dict[str, dict]) -> Dict[str, Any]:
+def _is_anomalous(p: dict) -> bool:
+    """异常项目判定,与前端 lib/anomaly.isAnomalous 同义:服务组 L4(orgL4)trim 后为空。
+    这类项目在全站回款统计里恒被排除,故也不得进入本模块的回款达成率分子/分母。"""
+    return not str(p.get("orgL4") or "").strip()
+
+
+def _record_payment_ratio(dept_projects: Optional[List[dict]]) -> Optional[float]:
+    """回款达成率,主口径(CLAUDE.md「回款口径约定」): Σ流水净额 ÷ Σ合同总额,排除异常项目。
+
+    分子 paymentPmis.actualTotal(逐笔流水净额,含负值红冲不取绝对值)与分母 paymentPmis.contract
+    (合同总额,售前已回退原项目)都由 preprocess_data 的 9f 段写在 dept_projects 上,本函数直接取用
+    并复用 projects.payment_ratio_from_records 做除法 —— 分子分母与除法三者都与主口径同源,
+    不会各自漂移。Σ合同 ≤ 0 → None(前端显 '-')。
+
+    历史:此处原先算的是 Σ节点 receivedAmount ÷ Σ节点 expectedPayment(节点口径),既非流水做分子
+    也非合同做分母,却与主口径同名 paymentRatio、并以「回款达成率 ±Xpp」呈现在 /activity 顶部对比卡,
+    构成一套未记录在例外清单里的第三套口径,且不排除异常项目。现已并入主口径。
+    """
+    act = 0.0
+    contract = 0.0
+    for p in dept_projects or []:
+        if _is_anomalous(p):
+            continue
+        pp = p.get("paymentPmis") or {}
+        act += pp.get("actualTotal") or 0
+        contract += pp.get("contract") or 0
+    return payment_ratio_from_records(act, contract, None)
+
+
+def _agg(projects: Dict[str, dict], nodes: Dict[str, dict],
+         dept_projects: Optional[List[dict]] = None) -> Dict[str, Any]:
+    """快照聚合。expectedTotal/actualTotal 是**节点口径**的求和(计划回款额 / 节点已收),
+    只作诊断展示,不再用来算达成率;达成率见 recordPaymentRatio(主口径)。
+    dept_projects 缺省 None 是为了让只关心 diff 的调用方仍能单独构造 agg,此时达成率为 None。"""
     exp = sum(n.get("expected") or 0 for n in nodes.values())
     act = sum(n.get("actual") or 0 for n in nodes.values())
     return {
         "projectCount": len(projects),
         "expectedTotal": round(exp, 2),
         "actualTotal": round(act, 2),
-        "paymentRatio": round(act / exp, 4) if exp > 0 else None,
+        "recordPaymentRatio": _record_payment_ratio(dept_projects),
         "delayedNodes": sum(1 for n in nodes.values() if n.get("status") == config.STATUS_DELAYED),
         "openRiskTotal": sum(p.get("openRisks") or 0 for p in projects.values()),
         "overspendCount": sum(1 for p in projects.values() if p.get("overspend")),
@@ -78,7 +111,9 @@ def build_snapshot(date_str: str, dept_projects: List[dict], project_pmis: Dict[
                 "actual": float(n.get("receivedAmount") or 0),
                 "expected": float(n.get("expectedPayment") or 0),
             }
-    return {"date": date_str, "projects": projs, "nodes": nodes, "agg": _agg(projs, nodes)}
+    # agg 的达成率要用主口径,须拿原始 dept_projects(带 paymentPmis/orgL4),projs 里没有这两项
+    return {"date": date_str, "projects": projs, "nodes": nodes,
+            "agg": _agg(projs, nodes, dept_projects)}
 
 
 # ── 文件 IO(目录由调用方传入,frozen 安全由 preprocess 的 OUTPUT_DIR 保证) ──
@@ -269,8 +304,11 @@ def compute_period_compare_entry(base_date: str, base: dict, cur: dict) -> dict:
     risk_net = int((cur.get("agg") or {}).get("openRiskTotal") or 0) - int((base.get("agg") or {}).get("openRiskTotal") or 0)
     new_overspend = sum(1 for pid, v in cp.items()
                         if v.get("overspend") and not (bp.get(pid) or {}).get("overspend"))
-    rb = (base.get("agg") or {}).get("paymentRatio")
-    rc = (cur.get("agg") or {}).get("paymentRatio")
+    # 达成率取主口径 recordPaymentRatio。旧快照(升级前写的)只有节点口径的 paymentRatio 且不含本键,
+    # 取不到 → rb 为 None → 本期不出达成率变化(前端显 '-')。绝不能回退去读 paymentRatio:
+    # 快照保留 90 天,lastMonth 基线最长 30 天内都可能是旧份,跨口径相减会算出一个凭空捏造的 ±Xpp。
+    rb = (base.get("agg") or {}).get("recordPaymentRatio")
+    rc = (cur.get("agg") or {}).get("recordPaymentRatio")
     ratio_change = round((rc - rb) * 100, 1) if (rb is not None and rc is not None) else None
     return {
         "baseDate": base_date,
