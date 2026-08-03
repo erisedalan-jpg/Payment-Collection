@@ -87,11 +87,11 @@ python server.py --stop     # 停止运行中的服务
 - 前端样式改动倾向于补充 CSS 完善表现，而非引入框架。
 
 ### 回款口径约定（2026-06-19 起，V1.15.0；改任一处先全仓核对）
-- **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外（已记技术债）**：`/insight` 项目分析的"回款完成率"仍用 节点已收/PMIS合同总额，与主口径不同源。
+- **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外清单当前为空**（2026-08-03 全部归并完毕）：`/insight` 曾用「节点已收 ÷ customer.合同总额（售前不回退）」，因 55% 的在建项目是售前、其 `customer.合同总额` 为空而分子照计，实测全域算出 **107.57%**、8/11 个 L4 桶 >100%；`snapshots.py`（/activity 的「回款达成率 ±Xpp」）曾用「Σ节点已收 ÷ Σ节点计划回款」。两者均已改为主口径，真实数据对拍 /insight 修复后 47.85%，与主口径逐位吻合。**今后再要开例外，必须在此处登记并写明理由**。
 - **回款数据核心源 = `input/collection_stages.csv`**（PMIS 收款阶段台账导出，已入"数据更新"流程）。售前项目收款阶段节点**按本项目号优先取、缺再回退原项目号**（`_collection_nodes_for`）；台账把售前节点挂在本项目号下。
 - **异常项目（`orgL4` 空）排除出回款统计**（`lib/anomaly.isAnomalous`）：回款看板硬排除、治理页告警、项目清单标「数据异常」。
 - **回款节点只为在建主域（`dept_projects`=PMIS 在建∩组织架构交付三部）及售前原项目构建**；已关闭/域外项目的收款阶段不进在建回款看板（设计边界，非缺陷）。
-- **回款子域路由**：`/payment`(总览) + `/payment/{board,projects,nodes,plan,risk}`（V1.13.0 由旧 `/panalysis` 拆分；旧路径仍 redirect 兼容）。
+- **回款子域路由**：`/payment`(总览) + `/payment/{board,calendar,projects,nodes,key}`（V1.13.0 由旧 `/panalysis` 拆分；旧路径仍 redirect 兼容）。**注**：`plan` 与 `risk` 两个子页已删除、现为 redirect 到 `/payment`；`calendar` 与 `key` 是后来新增的。（本条曾滞后于代码，2026-08-03 审查订正。）
 - **日期区间口径（V1.11.0）**：FilterBar 起止日期，计划侧按节点 planDate∈区间、已回款按流水到账日∈区间；"全部"区间≡全时口径（回归安全网）。
 
 ### 概算工具口径（2026-07-13 起，V3.1.0）
@@ -118,7 +118,7 @@ python server.py --stop     # 停止运行中的服务
 ## 设计底层规范（展示形式）
 
 > 约束**展示形式**(配色/排版/间距/卡片/圆角/阴影/动效/密度)，不规定展示内容。
-> 令牌落地于 `frontend/src/styles/theme.css`(CSS 唯一落地)与 `frontend/src/charts/echartsTheme.ts`(canvas 同源桥接，契约测试强制一致)；页面只准引用令牌，**不准手写散值**。
+> 令牌落地于 `frontend/src/styles/theme.css`(CSS 唯一落地)与 `frontend/src/charts/echartsTheme.ts`(canvas 同源桥接，契约测试强制一致)；页面只准引用令牌，**新增代码不准手写散值**。**注意存量另有约定**：设计规范 spec §12.3 明确写过「现有页面不迁移：本轮只换令牌底座；页面逐个换用新卡片/间距/层级，放到后续内容层重构」，§14 又把「现有页面迁移」列在范围边界之外 —— 所以存量散值（2026-08-03 实测间距令牌占比 87.4%，109 处硬写 px 分布在 42 个文件）是 spec 自己承认的迁移欠账，**不是违规**。`frontend/src/styles/__tokenUsage.test.ts` 用「棘轮」守住：不得超过当前基线，只准降不准升。
 > 完整取值表见 `docs/superpowers/specs/2026-06-10-design-foundation-design.md`。
 
 - **配色**：以钦定品牌色板为唯一来源(蓝色系做基调,`--accent` 浅 `#0D3A69`/暗 `#7891AC`)，light/dark 两套；结构灰阶由 4 个黑白中性色(柔纸白/米白/炭黑/深海石)明度·透明度派生。色号**按角色分类计数**，不设总数上限：结构中性色 4 + 品牌色 3（`--accent`/`--accent2`/`--highlight`）+ 状态语义色 5 + 状态文字色 5 + 图表分类色 8（其中 5 支复用前述）。新增任何一支须先归入某一类并说明理由。**结构色与状态色分离**：状态语义色固定(已回款 `--ok #6ECC54` / 待回款 `--warn #F9D46C` / 风险延期 `--danger #C8161D` / 可提前 `--c-advance` 浅 青绿`#018B8D`/暗 蓝绿`#71E2D1`)，不随基调变。图表分类用 `--chart-1..8`，表达回款状态的图表系列必须用状态色。
@@ -169,8 +169,8 @@ python -m pytest -q
 ## 8. 已知重大技术债（详见 PROGRESS.md backlog）
 
 - 长任务（`/api/reprocess` 等 SSE）期间，跨域互斥锁采用「抢不到立即 400、绝不排队」策略；调用方需自行重试。
-- `data/analysis_data.json` 全量 fetch（~2MB），前端一次性加载；vite 构建产物单 chunk >500KB（未做代码分割）。
-- `/insight` 项目分析"回款完成率"口径（节点已收/PMIS合同）与主域口径（流水/合同）不同源，待归并统一。
+- `data/analysis_data.json` 全量 fetch，前端一次性加载 —— **实测 18,285,154 B ≈ 17.4 MiB**（2026-08-03；此前文档写 ~2MB、仓内另有 8.08MB/16MB/12MB 三个互相矛盾的数字，无一等于实测。该值随数据量增长，**引用前请重新 stat，不要当常量**）。已加 ETag/304 协商缓存（未改动时不重传），但首次仍是整份下载。vite 构建产物单 chunk 2.76MB（未做代码分割）；生产 nginx 的 gzip 已补 `text/javascript`，此前该 chunk 是原文下发。
+- ~~`/insight` 回款完成率口径不同源~~ **已于 2026-08-03 归并**（分母改 `paymentPmis.contract` 售前回退、分子改流水；修复前实测全域 107.57%，修复后 47.85% 与主口径逐位吻合）。同批归并的还有 `snapshots.py`（/activity 达成率）。
 - `collection_stages.csv` 导出端覆盖风险：导出脚本若漏在建项目则其回款节点静默缺失（无校验告警）——建议加"在建项目收款阶段覆盖率"治理告警。
 
 ## 9. GitHub 远端与定期上传（2026-07-21 起，用户钦定）
