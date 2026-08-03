@@ -171,3 +171,13 @@ nul
 # frontend/src/lib/lanxin/ 与 lts/frontend/src/lib/lanxin/。无锚点的 `lanxin/` 会三个全匹配,
 # 于是今后往前端那个目录新增文件会被 git add 静默拒收(V4.5.4 的 yitian/ 原样重演)。
 /lanxin/
+
+# docs/superpowers/research/ —— 排障期从真实数据导出的画像/清单(项目编号、项目名称、
+# 项目金额、项目经理姓名、客户与签约单位字段)。2026-08-02 全量审查时发现它自 2026-06-09
+# 起就在 public 仓库里(19 个文件、去重 75 个真实项目号,另有一份 160 行 × 11 列的 xlsx),
+# 当日已用 `git filter-repo --path docs/superpowers/research --invert-paths` 从全历史清除、
+# 并把散落在文档与测试注释里的项目号统一替换为 QAGD-XX-REDACTED。
+# 【本目录在本地保留作资料,但绝不入库】。今后写调研产物请放这里,不要放 specs/plans。
+# 教训:2026-07-21 首次接入 GitHub 时只排查了 data/ input/ pmisdata/,docs/ 下同样会长出
+# 真实数据 —— 判据不是「目录名像不像数据目录」,而是「文件内容是不是从生产导出来的」。
+/docs/superpowers/research/
