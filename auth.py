@@ -218,14 +218,31 @@ def effective_scope(rec: dict, page_key: str | None = None) -> tuple:
 
 
 def domain_union_scope(rec: dict, domain: str, page_keys) -> tuple:
-    """对 page_keys 求 effective_scope 并集。任一 l4 含 '*' → (['*'], [])。空 page_keys → 回退默认。
+    """对 page_keys 求 effective_scope 并集。任一 l4 含 '*' → (['*'], [])。
+    **空 page_keys → 空范围 ([], [])(fail-closed)**。
 
     V4.5.2:`domain` 参数已不参与解析(两层模型无域层),保留仅为调用点兼容 ——
-    server.py 6 处调用点属服务端裁剪链路(安全边界),本期承诺不触碰其签名。"""
+    server.py 6 处调用点属服务端裁剪链路(安全边界),本期承诺不触碰其签名。
+
+    ── 2026-08-03 fail-closed 修正(原为「空 page_keys → 回退默认范围」)──
+    调用点一律传「该域全部页 ∩ 账号可访问页」,所以空 page_keys 的语义是明确的:
+    **该账号在本域一页都进不去**。此时唯一正确的数据范围是「什么都看不到」。
+
+    旧的回退默认是可实际利用的越权:`_make_user` 的 `allowedL4` 缺省是 `['*']`,
+    于是「该域零可访问页 + 建号时没收窄默认范围」的普通账号,回退后拿到 `['*']`,
+    命中 server.py `handle_data_json` 的 `'*' in allowed` 分支直接下发**未切分全量**
+    (`handle_yitian_data` / `handle_opportunities_get` 同构)。该账号页面上一个入口
+    都没有,却能 curl `/data/analysis_data.json` 取走全部项目数据。
+
+    顺带堵住 `migrate_domain_scopes` 文档记的「已知缺口」(PROGRESS backlog L-35):
+    域覆盖物化时若该域零可访问页则无处可落,旧代码回退默认反而**比原域覆盖更宽**;
+    fail-closed 后这条支线也收敛到空范围,方向永远是收窄、不会放大。
+
+    注意:超管不受影响 —— 6 处调用点都在用本函数结果前先判 `rec.get('isSuper')`,
+    且超管 `allowedPages` 为 `['*']` 时 page_keys 本就非空。"""
     keys = list(page_keys or [])
     if not keys:
-        l4, staff = effective_scope(rec, None)
-        return (['*'], []) if '*' in l4 else (l4, staff)
+        return [], []
     l4set: set = set()
     staffset: set = set()
     for pk in keys:
@@ -269,20 +286,17 @@ def migrate_domain_scopes(accounts: dict) -> tuple:
     服务端将下发越权数据,即权限放大。物化把域层语义搬到优先级更高的页层,堵住这条路径。
     生产虽全空,但备份回滚/其它部署副本/lts 变体都可能带非空数据进来。
 
-    ⚠ 已知缺口(终审对拍矩阵实测发现,记 PROGRESS backlog L-35,只覆盖主路径、非全部场景):
+    原「已知缺口」(PROGRESS backlog L-35)已于 2026-08-03 关闭,记录于此以免再被当成开口:
     下方只把域范围写进【该账号能访问的页】(`if not (star or pk in pages): continue`)。
-    若某账号在该域**一页都进不去**(该域全部页都不在 allowedPages 内,或 allowedPages 本身
-    为空),迁移对该域什么都不写;而 domain_union_scope 在 page_keys 为空时会【绕过
-    pageScopes 直接回退默认范围】——旧三层模型这条分支取的是 domainScopes[domain],
-    两层模型下新代码取的是 allowedL4/allowedStaff。故「该域至少一页可访问」这条主路径下,
-    迁移前后逐页/并集解析结果严格相同;但「零可访问页」这条支线下,迁移后的范围可能比
-    原域覆盖更宽(domainScopes 典型用于收窄,回退默认即变宽)。生产 20 个账号 domainScopes
-    全空,此缺口线上零影响;真要堵住须改 domain_union_scope 空 page_keys 分支的语义
-    (会改变现网行为),须单独立项 + 冒烟,本次不做(本函数的迁移逻辑与 domain_union_scope
-    均未改动)。
+    若某账号在该域**一页都进不去**,迁移对该域什么都不写;旧版 domain_union_scope 在
+    page_keys 为空时会绕过 pageScopes 回退默认范围,于是这条支线的实际范围可能比原域
+    覆盖【更宽】(domainScopes 典型用于收窄,回退默认即变宽)。现在 domain_union_scope
+    的空 page_keys 分支已改为 fail-closed(返回空范围),这条支线只会更严、不会更宽,
+    因此本函数「零可访问页时不物化」不再构成权限放大。unmaterialized 计数仍保留 ——
+    它报告的是「域范围没能落地」这一事实,对排查配置仍有意义。
 
     物化目标是最高优先级层,因此升级后的数据拿回旧版程序跑行为在主路径下也一致
-    (双向兼容,限主路径,上述缺口场景不在此列)。"""
+    (双向兼容,限主路径;零可访问页的支线在旧版上会更宽,这正是上面那条修正的理由)。"""
     import config
     users = accounts.get('users', {})
     new_users: dict = {}

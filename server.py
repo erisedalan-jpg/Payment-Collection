@@ -173,8 +173,14 @@ def _acquire_run_slot(state, lock, payload):
         state.update(payload)
         return True
 
-# 子进程引用（用于停止更新时终止）
-active_process = None
+# 注:曾有一对 `active_process` 全局 + `_terminate_active_process()`(「停止更新时终止子进程」),
+# 2026-08-03 删除 —— 全仓没有任何地方给它赋过值(run_reprocess / run_download 的 Popen 都没回填),
+# 因此那个终止函数也从来没有过调用点,整块是死代码。没有接回去而是删掉,理由:
+# ① 唯一的长跑子进程(dev 模式的 preprocess)由 run_reprocess 读到 EOF 为止,产品里没有
+#    「中止更新」这个功能,接回去等于凭空新增一个功能而不是修缺陷;
+# ② 留着一个永远是 None 的全局最危险的地方在于它长得像「已经能终止子进程」,
+#    后来人会照着它写「点停止就能杀掉更新」,而实际上什么都不会发生。
+#    真要做中止,应当连同 SSE 状态机(谁复位 running、前端怎么显示已中止)一起设计。
 
 # ── 跟进记录相关 ──
 FOLLOWUP_FILE = os.path.join(BASE_DIR, 'data', 'followup_records.json')
@@ -284,6 +290,12 @@ def _is_protected_data_path(path):
 
 _history_lock = threading.Lock()
 history_state = {"running": False}   # 回滚/撤销进行中标志,供 sync/import/pmis/reprocess 反向互斥
+
+# 长任务互斥的统一 HTTP 状态码。全站长任务(reprocess / pmis download / 人工导入 /
+# 两种回滚)一律「抢不到立即失败、绝不排队」,失败一律用这个码 + _error_payload(ERR_BUSY)。
+# 之前 7 处拒绝里有 6 处回 200,只有 1 处回 400 —— 按状态码判忙的客户端会把「忙」
+# 当成「成功」,而 CLAUDE.md §8 写的正是「抢不到立即 400」。
+HTTP_BUSY = 400
 
 
 def _error_payload(code, message):
@@ -1100,6 +1112,16 @@ def _get_next_record_num(today_str):
                 pass
     return max_num + 1
 
+# 内容哈希静态资源:vite 产物形如 assets/index-VsmAVMn1.js、assets/RiskFollowupView-CwBFOCQ3.css
+# ——【文件名里带内容哈希】意味着内容一变文件名必变,老 URL 永远指向老内容,可以放心长缓存。
+# 这类文件才允许 immutable;index.html / review.html 是 SPA 入口,里面写着当前该加载哪个
+# 哈希文件,必须保持每次校验(no-cache),否则改版后浏览器会拿着旧 index.html 一直不更新。
+# 匹配放宽到「路径中任一 /assets/ 段」而非仅前缀:反代/子路径部署(如 /pm/)下路径会带前缀。
+_HASHED_ASSET_RE = re.compile(
+    r'/assets/[^/]+-[A-Za-z0-9_-]{8,}'
+    r'\.(?:js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|ico)(?:\.map)?$')
+
+
 def should_spa_fallback(path: str) -> bool:
     """判断 GET 路径是否应回退到 dist/index.html(Vue Router history 模式)。
     /api/、/data/、/yundocs_data/ 子路径不回退(后端接口/数据文件);带文件扩展名的(静态资源)不回退;
@@ -1131,16 +1153,33 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         return static_path  # 都找不到则返回默认路径（让404处理）
     
     def end_headers(self):
-        # Disable caching for JS, CSS, and HTML files
-        parsed_path = urlparse(self.path).path
-        if parsed_path.endswith(('.js', '.css', '.html')) or '?' in self.path:
-            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
-            self.send_header('Pragma', 'no-cache')
-            self.send_header('Expires', '0')
+        """兜底缓存策略。注意本方法对**每一个**响应都会跑(含 /api/* 的 JSON),
+        所以先让位给 handler 自己发过的 Cache-Control(见 send_header 里的记账),
+        否则同一响应会带两条互相打架的 Cache-Control。"""
+        if not getattr(self, '_cache_control_sent', False):
+            parsed_path = urlparse(self.path).path
+            if _HASHED_ASSET_RE.search(parsed_path):
+                # 内容哈希文件名 → 长缓存 + immutable。原先这里对所有 .js/.css 一律
+                # no-store,导致每次刷新把整份 vite 产物(约 4.5 MiB)重下一遍、零字节可复用。
+                self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+            elif parsed_path.endswith(('.js', '.css', '.html')) or '?' in self.path:
+                # SPA 入口与非哈希脚本/样式:必须每次校验,否则改版后拿旧入口指旧资源。
+                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Expires', '0')
         super().end_headers()
+
+    def send_header(self, keyword, value):
+        # 记一笔「本响应已自带 Cache-Control」,供 end_headers 让位(见其 docstring)。
+        if str(keyword).lower() == 'cache-control':
+            self._cache_control_sent = True
+        super().send_header(keyword, value)
 
     def send_response(self, code, message=None):
         self._audit_status = code
+        # keep-alive 下同一 handler 实例复用,标志必须逐响应复位,否则上一个响应
+        # 自带 Cache-Control 会让下一个响应静默丢掉兜底策略。
+        self._cache_control_sent = False
         super().send_response(code, message)
 
     def parse_path(self):
@@ -1747,7 +1786,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def handle_manual_import(self):
         """POST /api/manual/import {sheets} - 校验→快照→替换写。"""
         if self._history_busy():
-            self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中，请稍后再导入"))
+            self._send_busy("其他数据操作进行中，请稍后再导入")
             return
         try:
             n = int(self.headers.get('Content-Length', 0))
@@ -1767,16 +1806,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response({"success": False, "code": ERR_VALIDATION,
                                  "message": f"校验未通过，共 {len(errors)} 处错误", "errors": errors})
             return
-        history_state["running"] = True
+        if not self._enter_history_slot("其他数据操作进行中，请稍后再导入"):
+            return
         try:
-            with _history_lock:
-                summary = _apply_manual_import(result, body.get('fileName', ''))
+            summary = _apply_manual_import(result, body.get('fileName', ''))
         except Exception as e:
             logger.error(f"人工数据导入写入失败: {e}", exc_info=True)
             self._json_response(_error_payload(ERR_INTERNAL, f"导入写入失败: {e}"))
             return
         finally:
-            history_state["running"] = False
+            self._exit_history_slot()
         _mp = []
         if summary.get('tags'):
             _mp.append('项目标签 %d 条' % summary['tags'].get('tagsCount', 0))
@@ -1796,7 +1835,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def handle_manual_rollback(self):
         """POST /api/manual/rollback {id} - 回滚到指定人工导入快照。"""
         if self._history_busy():
-            self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中，请稍后再回滚"))
+            self._send_busy("其他数据操作进行中，请稍后再回滚")
             return
         try:
             n = int(self.headers.get('Content-Length', 0))
@@ -1809,10 +1848,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_VALIDATION, "缺少版本 id"))
             return
         self._audit_set(target=vid, detail='回滚人工导入 %s' % vid)
-        history_state["running"] = True
+        if not self._enter_history_slot("其他数据操作进行中，请稍后再回滚"):
+            return
         try:
-            with _history_lock:
-                res = manual_history.rollback_manual(BASE_DIR, vid)
+            res = manual_history.rollback_manual(BASE_DIR, vid)
         except FileNotFoundError as e:
             self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
             return
@@ -1821,7 +1860,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_INTERNAL, f"回滚失败: {e}"))
             return
         finally:
-            history_state["running"] = False
+            self._exit_history_slot()
         self._json_response({"success": True, "message": f"已回滚到 {vid}", **res})
 
     def handle_tags_get(self):
@@ -3041,11 +3080,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         """GET /api/pmis/download - 服务器端跑 PMIS 下载流水线,SSE 流式进度。超管专属。"""
         global download_state
         if history_state.get("running") or reprocess_state.get("running"):
-            self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再下载"})
+            self._send_sse_busy("其他数据操作进行中,请稍后再下载")
             return
         if not _acquire_run_slot(download_state, _run_state_lock,
                                   {"running": True, "progress": 0, "message": "启动下载..."}):
-            self._json_response(download_state)
+            self._send_sse_busy("已有下载正在进行,请等其完成后再试", download_state)
             return
         self._audit_set(detail='触发 PMIS 数据拉取')
         threading.Thread(target=run_download, daemon=True).start()
@@ -3065,11 +3104,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         """GET /api/reprocess - 仅重跑预处理，不抓取/下载，SSE 流式返回进度"""
         global reprocess_state
         if history_state.get("running") or download_state.get("running"):
-            self._json_response({"running": False, "progress": 0, "message": "其他数据操作进行中,请稍后再更新"})
+            self._send_sse_busy("其他数据操作进行中,请稍后再更新")
             return
         if not _acquire_run_slot(reprocess_state, _run_state_lock,
                                   {"running": True, "progress": 0, "message": "启动更新..."}):
-            self._json_response(reprocess_state)
+            self._send_sse_busy("已有数据更新正在进行,请等其完成后再试", reprocess_state)
             return
         self._audit_set(detail='触发数据重新处理')
         threading.Thread(target=run_reprocess, daemon=True).start()
@@ -3088,6 +3127,47 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def _history_busy(self):
         return reprocess_state.get("running") or history_state.get("running") or download_state.get("running")
 
+    def _send_busy(self, message):
+        """长任务互斥的统一拒绝响应:HTTP_BUSY(400) + {success:False, code:'busy', message}。"""
+        self._send_json(HTTP_BUSY, _error_payload(ERR_BUSY, message))
+
+    def _send_sse_busy(self, message, state=None):
+        """SSE 两端点(reprocess / pmis download)的忙响应:结构化错误体 + 旧的
+        {running, progress} 两个键。
+
+        为什么要保留旧键:前端 useReprocess / usePmisDownload 按 content-type 分流后,
+        用 running 区分「别人正在跑」还是「刚被别的操作挡住」并把当前进度提示出来。
+        本次只把状态码从 200 改成 400,不该顺手把已有的忙提示降级成一句干巴巴的错误。
+        当前进度文案改叫 currentMessage —— message 已被结构化错误体占用,两者语义不同
+        (一个是「为什么拒绝你」,一个是「别人跑到哪了」),挤在同一个键上必然有一方被吃掉。"""
+        self._send_json(HTTP_BUSY, {
+            **_error_payload(ERR_BUSY, message),
+            "running": bool((state or {}).get("running")),
+            "progress": (state or {}).get("progress", 0),
+            "currentMessage": (state or {}).get("message", ""),
+        })
+
+    def _enter_history_slot(self, busy_message):
+        """抢占「历史/人工数据写」槽。抢到 → True(调用方**必须**在 finally 调
+        _exit_history_slot);抢不到 → 已发 HTTP_BUSY 响应并返回 False。
+
+        原实现是「先读 history_state 标志判忙,再 with _history_lock 阻塞等锁」:
+        判忙与置位之间有窗口,两个请求可同时通过,第二个随后在锁上【静默排队】
+        几十秒 —— 与 _acquire_run_slot 的「抢不到立即失败」语义正好相反,前端也
+        完全看不出自己在排队。改成一次非阻塞 acquire,判忙/置位/互斥三件事合一。"""
+        if self._history_busy():
+            self._send_busy(busy_message)
+            return False
+        if not _history_lock.acquire(blocking=False):
+            self._send_busy(busy_message)
+            return False
+        history_state["running"] = True
+        return True
+
+    def _exit_history_slot(self):
+        history_state["running"] = False
+        _history_lock.release()
+
     def handle_data_history(self):
         """GET /api/data-history - 列出历史版本与 _pre_rollback。"""
         try:
@@ -3099,7 +3179,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def handle_data_history_rollback(self):
         """POST /api/data-history/rollback {id} - 回滚到指定版本。"""
         if self._history_busy():
-            self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中,请稍后再回滚"))
+            self._send_busy("其他数据操作进行中,请稍后再回滚")
             return
         try:
             content_length = int(self.headers.get('Content-Length', 0))
@@ -3112,10 +3192,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_VALIDATION, "缺少版本 id"))
             return
         self._audit_set(target=vid, detail='回滚到版本 %s' % vid)
-        history_state["running"] = True
+        if not self._enter_history_slot("其他数据操作进行中,请稍后再回滚"):
+            return
         try:
-            with _history_lock:
-                res = data_history.rollback(BASE_DIR, vid)
+            res = data_history.rollback(BASE_DIR, vid)
         except FileNotFoundError as e:
             self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
             return
@@ -3124,19 +3204,16 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_INTERNAL, f"回滚失败: {e}"))
             return
         finally:
-            history_state["running"] = False
+            self._exit_history_slot()
         self._json_response({"success": True, "message": f"已回滚到 {res['id']}", **res})
 
     def handle_data_history_undo(self):
         """POST /api/data-history/undo-rollback - 撤销上次回滚。"""
         self._audit_set(detail='撤销上次数据回滚')
-        if self._history_busy():
-            self._json_response(_error_payload(ERR_BUSY, "其他数据操作进行中,请稍后再撤销"))
+        if not self._enter_history_slot("其他数据操作进行中,请稍后再撤销"):
             return
-        history_state["running"] = True
         try:
-            with _history_lock:
-                res = data_history.undo_rollback(BASE_DIR)
+            res = data_history.undo_rollback(BASE_DIR)
         except FileNotFoundError as e:
             self._json_response(_error_payload(ERR_NOT_FOUND, str(e)))
             return
@@ -3145,7 +3222,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json_response(_error_payload(ERR_INTERNAL, f"撤销回滚失败: {e}"))
             return
         finally:
-            history_state["running"] = False
+            self._exit_history_slot()
         self._json_response({"success": True, "message": "已撤销上次回滚", **res})
 
     def _json_response(self, data):
@@ -3166,7 +3243,38 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _analysis_validators(self):
+        """analysis_data.json 的 (ETag, Last-Modified) 或 None(文件不可读)。
+
+        ETag 取 (mtime_ns, size) 而非内容哈希:这份文件约 2 MiB,每个请求算一次
+        摘要比直接吐出去还贵;而它只由 preprocess 以原子替换整份产生,
+        「修改时间 + 字节数」足以判等,不存在同尺寸同时间戳的原地改写。"""
+        try:
+            st = os.stat(ANALYSIS_FILE)
+        except OSError:
+            return None
+        return '"%d-%d"' % (st.st_mtime_ns, st.st_size), self.date_time_string(st.st_mtime)
+
     def _serve_raw_data_file(self):
+        """下发 analysis_data.json 原文件(超管/范围含 '*' 的账号走这条)。
+
+        带 ETag + Last-Modified 并支持条件请求:这份文件只在点「更新数据」之后才变,
+        原先无任何校验头,每次刷新都整份重下。Cache-Control 用 no-cache(=可存但每次
+        必须回源校验)而不是长缓存 —— URL 固定,长缓存会让「更新数据」后的新数据
+        看不见。命中校验回 304,零字节。"""
+        validators = self._analysis_validators()
+        if validators is None:
+            self._send_json(404, _error_payload(ERR_NOT_FOUND, "数据文件不存在"))
+            return
+        etag, last_mod = validators
+        if self._conditional_hit(etag, last_mod):
+            self.send_response(304)
+            self.send_header('ETag', etag)
+            self.send_header('Last-Modified', last_mod)
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            return
         try:
             with open(ANALYSIS_FILE, 'rb') as f:
                 body = f.read()
@@ -3177,8 +3285,31 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-Length', str(len(body)))
+        self.send_header('ETag', etag)
+        self.send_header('Last-Modified', last_mod)
+        self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(body)
+
+    def _conditional_hit(self, etag, last_mod):
+        """条件请求是否命中(可回 304)。If-None-Match 优先且一票否决 —— RFC 9110:
+        两个头同时存在时以 ETag 为准,不能因为 If-Modified-Since 也对就放过一个
+        ETag 不匹配的请求(那会把改过的数据判成没变)。
+        If-None-Match 支持逗号分隔多值与 W/ 弱前缀;'*' 视为命中。"""
+        def _strong(t):
+            t = t.strip()
+            return t[2:].strip() if t.startswith('W/') else t
+
+        inm = self.headers.get('If-None-Match')
+        if inm:
+            for tag in inm.split(','):
+                if tag.strip() == '*' or _strong(tag) == _strong(etag):
+                    return True
+            return False
+        ims = self.headers.get('If-Modified-Since')
+        # 逐字比对而非解析时间:Last-Modified 由 date_time_string 生成,浏览器原样回传;
+        # 解析时区/格式只会平白引入一类只在特定 locale 下才出现的 bug。
+        return bool(ims) and ims.strip() == last_mod
 
     def handle_data_json(self):
         token = auth.parse_cookie_token(self.headers.get('Cookie'))
@@ -3674,8 +3805,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                                   audit.client_ip(self.headers, self.client_address))
             # 排查者拿不到报文体也拿不到签名(铁律),这行日志是判断"蓝信到底发的
             # 什么格式"的唯一线索——只打 timestamp 原值,绝不打签名/密钥/报文体。
-            logger.warning("蓝信回调时间戳未通过新鲜度检查(疑似重放,或时间戳格式不符假设): "
-                           "timestamp=%r", timestamp)
+            # 量纲已实证为 19 位纳秒(2026-07-29 首次入站联调,样本见
+            # lanxin_timestamp_fresh 的 docstring),所以走到这里【首先该怀疑的是
+            # 两端时钟漂移或报文重放】,而不是"单位又猜错了";真要怀疑蓝信改了量纲,
+            # 拿这行打出来的原值比一比位数即可。
+            logger.warning("蓝信回调时间戳未通过新鲜度检查(疑似重放或两端时钟漂移;"
+                           "量纲已实证为纳秒,位数异常才需怀疑格式变更): timestamp=%r", timestamp)
             self._send_json(200, {"errCode": -2, "errMsg": "时间戳超出有效窗口(疑似重放)"})
             return
 
@@ -4731,44 +4866,105 @@ def _find_script(name):
         return parent, PARENT_DIR
     return None, BASE_DIR
 
-def _run_script_direct(module_path, module_name, cwd=None):
-    """在进程内模式直接调用并执行脚本模块（而非subprocess调用），
-    将脚本的 _output_lines 输出捕获返回。用于 frozen 模式运行 preprocess_data。
+class _TeeLineWriter:
+    """按行切分写入内容、逐行回调,同时把原文透传给底层流。
 
-    注：先加载模块（确保stdout/stderr可用），再运行main()。
-    不重定向stdout/stderr，避免模块初始化静默失败。
-    """
+    为什么是 tee 而不是「换掉 stdout」:被执行的脚本在【模块初始化期】就可能报错,
+    整个换掉 stdout 会把那类报错吞进缓冲区,现场只剩一句「更新失败」——
+    这正是原实现注释里写「不重定向 stdout/stderr,避免模块初始化静默失败」的理由。
+    tee 两头都要:原文照旧流向控制台/日志,同时按行喂给进度解析。
+
+    为什么不是 StringIO:原实现在 sys.stdout 为 None 时换成 io.StringIO 且【从不清空、
+    也不还原】,于是每跑一次「更新数据」就往那个缓冲区里再堆一整轮输出,只增不减。
+    这里在 finally 里无条件还原,底层流为 None 时直接丢弃透传。"""
+
+    def __init__(self, original, on_line):
+        self._orig = original
+        self._on_line = on_line
+        self._buf = ''
+
+    def write(self, text):
+        if not isinstance(text, str):
+            text = str(text)
+        if self._orig is not None:
+            try:
+                self._orig.write(text)
+            except Exception:
+                # 控制台编码不兼容之类的问题绝不能连累数据管线本身
+                pass
+        self._buf += text
+        while '\n' in self._buf:
+            line, self._buf = self._buf.split('\n', 1)
+            self._on_line(line)
+        return len(text)
+
+    def flush(self):
+        # 冲出最后一行不带换行符的残留,否则管线最后一句话永远看不到
+        if self._buf:
+            line, self._buf = self._buf, ''
+            self._on_line(line)
+        if self._orig is not None:
+            try:
+                self._orig.flush()
+            except Exception:
+                pass
+
+    def reconfigure(self, *args, **kwargs):
+        # preprocess_data.py 开头会 sys.stdout.reconfigure(encoding='utf-8'):
+        # 那句要真的作用在底层流上,否则 GBK 控制台遇到中文会抛 UnicodeEncodeError。
+        if self._orig is not None and hasattr(self._orig, 'reconfigure'):
+            self._orig.reconfigure(*args, **kwargs)
+
+    def isatty(self):
+        return False
+
+    def writable(self):
+        return True
+
+
+def _run_script_direct(module_path, module_name, cwd=None, on_line=None):
+    """frozen 模式下进程内执行脚本模块(目标机无 python,不能 subprocess)。
+    返回脚本的全部输出(换行拼接);on_line 给一行就回调一次,供实时进度。
+
+    ⚠ 原实现靠 `hasattr(mod, '_output_lines')` 取进度,而全仓【没有任何模块定义过
+    _output_lines】(preprocess_data.py 通篇用 print),所以打包版的「更新数据」进度条
+    永远停在 10%、一行提示都没有 —— 而打包版恰恰是用户真正在跑的那个。
+    现在改为 tee 住 stdout/stderr 逐行解析,与 dev 分支的 subprocess 逐行读等价。"""
     import importlib.util
-    import io
     old_cwd = os.getcwd()
+    old_stdout, old_stderr = sys.stdout, sys.stderr
+    lines = []
+
+    def _sink(line):
+        lines.append(line)
+        if on_line is not None:
+            try:
+                on_line(line)
+            except Exception:
+                # 进度回调出错绝不能中断数据管线
+                logger.debug("进度回调异常(已忽略)", exc_info=True)
+
     if cwd:
         os.chdir(cwd)
-    mod = None
     try:
-        # 确保 stdout/stderr 可用（PyInstaller --noconsole 下可能为 None/NullWriter）
-        if sys.stdout is None:
-            sys.stdout = io.StringIO()
-        if sys.stderr is None:
-            sys.stderr = io.StringIO()
-
-        # 加载并执行模块（不重定向stdout/stderr）
+        sys.stdout = _TeeLineWriter(old_stdout, _sink)
+        sys.stderr = _TeeLineWriter(old_stderr, _sink)
         spec = importlib.util.spec_from_file_location(module_name, module_path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-
-        # 直接运行 main()
         if hasattr(mod, 'main'):
             mod.main()
     finally:
+        for stream in (sys.stdout, sys.stderr):
+            if isinstance(stream, _TeeLineWriter):
+                try:
+                    stream.flush()
+                except Exception:
+                    pass
+        # 无条件还原:哪怕脚本自己又改过 sys.stdout,也不能把 tee 留在全局上
+        sys.stdout, sys.stderr = old_stdout, old_stderr
         os.chdir(old_cwd)
-        # 收集输出：优先使用脚本的 _output_lines 缓冲区，其次使用捕获的 stdout
-        output_parts = []
-        # 尝试获取脚本的 _output_lines（脚本内定义的安全输出缓冲区）
-        if mod and hasattr(mod, '_output_lines') and mod._output_lines:
-            output_parts.extend(mod._output_lines)
-        # 注意：不再重定向stdout/stderr，输出直接写入日志和标准流
-        # 将捕获的输出记录到日志
-        for line in output_parts:
+        for line in lines:
             if '[ERROR]' in line:
                 logger.error(f"[fetch] {line}")
             elif '[WARN]' in line:
@@ -4777,7 +4973,7 @@ def _run_script_direct(module_path, module_name, cwd=None):
                 logger.info(f"[fetch] {line}")
             else:
                 logger.debug(f"[fetch] {line}")
-    return '\n'.join(output_parts)
+    return '\n'.join(lines)
 
 
 def classify_progress_line(line):
@@ -4823,6 +5019,28 @@ def classify_download_line(line):
     return (None, s)
 
 
+def apply_reprocess_line(raw):
+    """吃 preprocess 的一行输出 → 更新 reprocess_state / 打日志,返回 (level, text) 或 None。
+
+    frozen 与 dev 两条分支【共用】本函数。CLAUDE.md §5 反复强调两套代码路径必须同时维护,
+    而进度解析恰恰长期只有 dev 一条是真实现(frozen 依赖一个谁都没定义的 _output_lines)。
+    把这段唯一化,今后改进度口径不可能再只改一边。"""
+    global reprocess_state
+    parsed = classify_progress_line(raw)
+    if parsed is None:
+        return None
+    level, text = parsed
+    if level in ('ok', 'info'):
+        reprocess_state = {"running": True,
+                           "progress": min(reprocess_state["progress"] + 5, 95),
+                           "message": raw.strip().replace('[INFO] ', '').replace('[OK] ', '')}
+    elif level == 'warn':
+        logger.warning(f"[reprocess] {raw.strip()}")
+    elif level == 'error':
+        logger.error(f"[reprocess] {raw.strip()}")
+    return parsed
+
+
 def run_reprocess():
     """仅运行 preprocess_data.py(读 input/ 与 input/pmis/ 全部数据文件重算 analysis_data)。
     不抓取、不下载。供"更新数据"按钮调用。"""
@@ -4833,15 +5051,23 @@ def run_reprocess():
         if not preprocess_script:
             reprocess_state = {"running": False, "progress": 0, "message": "预处理脚本不存在"}
             return
+        errs = []
+
+        def _on_line(raw):
+            parsed = apply_reprocess_line(raw)
+            if parsed and parsed[0] == 'error':
+                errs.append(parsed[1])
+
         if getattr(sys, 'frozen', False):
             try:
                 old_argv = sys.argv[:]
                 sys.argv = [preprocess_script]
-                _run_script_direct(preprocess_script, 'preprocess_data', pcwd)
+                _run_script_direct(preprocess_script, 'preprocess_data', pcwd, on_line=_on_line)
                 logger.info("数据更新完成(直接模式)")
             except SystemExit as e:
                 if e.code and e.code != 0:
-                    reprocess_state = {"running": False, "progress": 0, "message": f"更新失败(退出码:{e.code})"}
+                    tail = '; '.join(errs[-3:]) if errs else f"退出码:{e.code}"
+                    reprocess_state = {"running": False, "progress": 0, "message": f"更新失败: {tail}"}
                     return
             except Exception as e:
                 reprocess_state = {"running": False, "progress": 0, "message": f"更新失败: {str(e)[:100]}"}
@@ -4854,20 +5080,8 @@ def run_reprocess():
                 [sys.executable, '-u', preprocess_script],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 cwd=pcwd, encoding='utf-8', errors='replace')
-            errs = []
             for raw in process.stdout:
-                parsed = classify_progress_line(raw)
-                if parsed is None:
-                    continue
-                level, text = parsed
-                if level in ('ok', 'info'):
-                    reprocess_state = {"running": True, "progress": min(reprocess_state["progress"] + 5, 95),
-                                       "message": raw.strip().replace('[INFO] ', '').replace('[OK] ', '')}
-                elif level == 'warn':
-                    logger.warning(f"[reprocess] {raw.strip()}")
-                elif level == 'error':
-                    logger.error(f"[reprocess] {raw.strip()}")
-                    errs.append(text)
+                _on_line(raw)
             process.wait()
             if process.returncode != 0:
                 reprocess_state = {"running": False, "progress": 0,
@@ -4933,18 +5147,6 @@ def run_download():
         time.sleep(3)
         download_state["running"] = False
 
-
-def _terminate_active_process():
-    """终止当前活跃的子进程"""
-    global active_process
-    if active_process is not None:
-        try:
-            logger.info(f"终止子进程 PID={active_process.pid}")
-            active_process.kill()
-            active_process = None
-        except Exception as e:
-            logger.warning(f"终止子进程失败: {e}")
-            active_process = None
 
 def _kill_port_process(port, exclude_self=True):
     """自动清理占用指定端口的进程（Windows）

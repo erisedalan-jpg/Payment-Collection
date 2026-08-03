@@ -78,13 +78,34 @@ describe('useDataStore.reset', () => {
   })
 })
 
-describe('useDataStore load 防缓存', () => {
-  it('load() 拉取 URL 带防缓存参数 ?t=', async () => {
+describe('useDataStore 协商缓存', () => {
+  // 旧实现拼 '?t=' + Date.now():每次请求都是全新 URL,ETag/Last-Modified 永远无从命中,
+  // 17MB 快照每次全量重传。现在改为原始 URL + cache:'no-cache'(强制条件请求、但不禁用缓存),
+  // 未变则 304 复用本地副本,变了才传全量 —— 「更新数据后立刻拿到新数据」的诉求仍然成立。
+  function stubFetch() {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }))
     vi.stubGlobal('fetch', fetchMock as any)
-    const store = useDataStore()
-    await store.load()
-    const url = (fetchMock.mock.lastCall as unknown as string[])[0]
-    expect(url.startsWith('/data/analysis_data.json?t=')).toBe(true)
+    return fetchMock
+  }
+  function lastCall(fetchMock: ReturnType<typeof stubFetch>) {
+    return fetchMock.mock.lastCall as unknown as [string, RequestInit | undefined]
+  }
+
+  it('load() 用原始 URL(不带任何时间戳查询参数)且强制协商', async () => {
+    const fetchMock = stubFetch()
+    await useDataStore().load()
+    const [url, init] = lastCall(fetchMock)
+    expect(url).toBe('/data/analysis_data.json')
+    expect(url).not.toContain('?')   // 钉死:再拼回 ?t= 就红
+    expect(init?.cache).toBe('no-cache')
+  })
+
+  it('reload() 同样不带时间戳,且用 no-cache 而非 reload(保留 304 收益)', async () => {
+    const fetchMock = stubFetch()
+    await useDataStore().reload()
+    const [url, init] = lastCall(fetchMock)
+    expect(url).toBe('/data/analysis_data.json')
+    expect(url).not.toContain('?')
+    expect(init?.cache).toBe('no-cache')
   })
 })

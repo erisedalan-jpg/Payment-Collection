@@ -23,31 +23,43 @@ describe('useReprocess', () => {
     expect(onDone).toHaveBeenCalled()
   })
 
-  it('忙分支(另一更新在跑):后端回 JSON,显示"已有数据更新正在进行"且不回调 onDone', async () => {
-    // 与「下载数据」并发闪退同款:忙时后端回 application/json(非 SSE),旧代码会静默闪退,
-    // 现在必须把冲突提示显示出来,且绝不触发 onDone(本次没重算任何数据)。
+  it('忙分支(另一更新在跑):后端回 400 + JSON,显示"已有数据更新正在进行"且不回调 onDone', async () => {
+    // ★ mock 用 ok:false / status:400 —— 这是生产的真实形态(server.py 的 _send_sse_busy)。
+    // 忙响应的状态码此前是 200,现已按「抢不到立即 400」的设计约定改为 400;若前端仍先判
+    // res.ok 再分流 content-type,这里就会显示成「更新失败 (400)」。本用例钉死这个顺序。
     const onDone = vi.fn()
     vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
+      ok: false,
+      status: 400,
       headers: { get: () => 'application/json' },
-      json: async () => ({ running: true, progress: 30, message: '正在更新数据(预处理)...' }),
+      json: async () => ({
+        success: false, code: 'busy', message: '已有数据更新正在进行,请等其完成后再试',
+        running: true, progress: 30, currentMessage: '正在更新数据(预处理)...',
+      }),
     })) as any)
     const s = useReprocess({ onDone })
     await s.start()
     expect(s.message.value).toContain('已有数据更新正在进行')
+    expect(s.message.value).not.toContain('更新失败')      // 绝不能把「别人在跑」说成失败
+    expect(s.message.value).toContain('正在更新数据(预处理)')  // currentMessage 要透出来
     expect(s.running.value).toBe(false)
     expect(onDone).not.toHaveBeenCalled()
   })
 
-  it('忙分支(下载/回滚在跑):透传后端提示', async () => {
+  it('忙分支(下载/回滚在跑):透传后端的拒绝原因', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
+      ok: false,
+      status: 400,
       headers: { get: () => 'application/json' },
-      json: async () => ({ running: false, progress: 0, message: '其他数据操作进行中,请稍后再更新' }),
+      json: async () => ({
+        success: false, code: 'busy', message: '其他数据操作进行中,请稍后再更新',
+        running: false, progress: 0, currentMessage: '',
+      }),
     })) as any)
     const s = useReprocess()
     await s.start()
     expect(s.message.value).toContain('其他数据操作进行中')
+    expect(s.message.value).not.toContain('更新失败')
     expect(s.running.value).toBe(false)
   })
 

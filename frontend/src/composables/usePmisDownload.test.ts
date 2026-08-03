@@ -34,33 +34,48 @@ describe('usePmisDownload', () => {
     // 这是本次修复的核心:忙时后端回 application/json(非 SSE)。旧代码会静默闪退,
     // 现在必须把冲突提示显示出来,且绝不触发 onDone(本次没下载任何数据)。
     const onDone = vi.fn()
+    // ★ mock 用 ok:false / status:400 —— 生产真实形态(server.py 的 _send_sse_busy)。
+    // 忙响应状态码已从 200 改为 400;若前端仍先判 res.ok 再分流 content-type,
+    // 这里就会显示成「下载失败 (400)」。本用例钉死这个顺序。
     vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
+      ok: false,
+      status: 400,
       headers: { get: () => 'application/json' },
-      json: async () => ({ running: true, progress: 45, message: '下载 项目风险数据 表...' }),
+      json: async () => ({
+        success: false, code: 'busy', message: '已有下载正在进行,请等其完成后再试',
+        running: true, progress: 45, currentMessage: '下载 项目风险数据 表...',
+      }),
     })) as any)
     const s = usePmisDownload({ onDone })
     await s.start()
     expect(s.message.value).toContain('已有下载正在进行')
+    expect(s.message.value).not.toContain('下载失败')
+    expect(s.message.value).toContain('项目风险数据')
     expect(s.running.value).toBe(false)
     expect(onDone).not.toHaveBeenCalled()
   })
 
   it('忙分支(其他数据操作在跑):透传后端提示', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
+      ok: false,
+      status: 400,
       headers: { get: () => 'application/json' },
-      json: async () => ({ running: false, progress: 0, message: '其他数据操作进行中,请稍后再下载' }),
+      json: async () => ({
+        success: false, code: 'busy', message: '其他数据操作进行中,请稍后再下载',
+        running: false, progress: 0, currentMessage: '',
+      }),
     })) as any)
     const s = usePmisDownload()
     await s.start()
     expect(s.message.value).toContain('其他数据操作进行中')
+    expect(s.message.value).not.toContain('下载失败')
     expect(s.running.value).toBe(false)
   })
 
   it('忙分支 JSON 解析失败:用兜底文案而非空消息', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
+      ok: false,
+      status: 400,
       headers: { get: () => 'application/json' },
       json: async () => { throw new Error('bad json') },
     })) as any)
