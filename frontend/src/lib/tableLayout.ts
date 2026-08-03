@@ -23,3 +23,26 @@
 // 笔记本的 innerHeight 实际只有 620~660(屏幕高 ≠ innerHeight),此时表体会略微越过视口底
 // —— 相比修复前的 4 行仍是大幅改善,但再往上加会明显恶化(表头随页面滚走)。
 export const DETAIL_TABLE_MAX_H = 640
+
+// ── 弹窗(Modal/el-dialog)内的表格:另一条口径 ────────────────────────────────
+// 【为什么不能复用 DETAIL_TABLE_MAX_H】页面内表格的可用高度取决于「表格在页面里的位置」,
+// 弹窗内表格的可用高度取决于「视口高 − dialog 自己的 chrome」,与位置无关 —— 640 在
+// innerHeight≈640 的笔记本上,加上 dialog 的顶边距和标题栏必然溢出。
+//
+// 【为什么用固定值而不是 useTableMaxHeight 动态测量】弹窗有开场过渡动画,挂载瞬间 rect 还在
+// 变换中;且 el-dialog 默认 destroy-on-close=false,第二次打开不会重新挂载、动态测量不会重跑。
+//
+// 【扣除项】Element Plus 默认几何:margin-top 15vh + margin-bottom 50 + 标题栏 ~54 +
+// body 上下 padding ~40 + 余量 16 ≈ 0.15×视口 + 160。地板 240(≈5 行)兜住极矮视口。
+// 不设上限:视口越高弹窗越高是对的,撑不破 —— 表体本身就被 max-height 关住了。
+export const DIALOG_TABLE_MIN_H = 240
+
+// 下钻弹窗一次最多渲染多少行。el-table 没有虚拟滚动,上千行会明显卡顿,所以上限保留;
+// 但超出部分【必须显式告诉用户】—— L-64 之前 BoardDrilldownModal / DataDrillModal 两处
+// 都是静默 slice(0, 200),用户看到的「就是全部」其实不是全部,且无从察觉。
+export const DRILL_ROW_LIMIT = 200
+
+export function dialogTableMaxHeight(innerHeight?: number): number {
+  const ih = innerHeight ?? (typeof window === 'undefined' ? 900 : window.innerHeight)
+  return Math.max(DIALOG_TABLE_MIN_H, Math.round(ih * 0.85) - 160)
+}

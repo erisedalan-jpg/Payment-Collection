@@ -4,10 +4,12 @@ import type { RiskRow } from '@/lib/riskBoard'
 import { fmtWan } from '@/lib/format'
 import Modal from './Modal.vue'
 import DataTable, { type DataColumn } from './DataTable.vue'
+import { useDialogTableHeight } from '@/composables/useDialogTableHeight'
 
 const props = defineProps<{ modelValue: boolean; title: string; rows: RiskRow[] }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 const router = useRouter()
+const tableMaxH = useDialogTableHeight(() => props.modelValue)
 
 const COLS: DataColumn[] = [
   { key: 'projectId', label: '项目编号', width: 190 },
@@ -27,6 +29,6 @@ function onRow(row: Record<string, any>) {
 <template>
   <Modal :model-value="props.modelValue" :title="`${props.title}（${props.rows.length} 个项目）`"
     @update:model-value="emit('update:modelValue', $event)">
-    <DataTable :columns="COLS" :rows="props.rows" :show-count="false" clickable @row-click="onRow" />
+    <DataTable :columns="COLS" :rows="props.rows" :show-count="false" sticky-header :max-height-px="tableMaxH" clickable @row-click="onRow" />
   </Modal>
 </template>

@@ -3,10 +3,12 @@ import { useRouter } from 'vue-router'
 import Modal from './Modal.vue'
 import DataTable, { type DataColumn } from './DataTable.vue'
 import type { MilestoneDrillRow } from '@/lib/milestoneAnalytics'
+import { useDialogTableHeight } from '@/composables/useDialogTableHeight'
 
 const props = defineProps<{ modelValue: boolean; title: string; rows: MilestoneDrillRow[] }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 const router = useRouter()
+const tableMaxH = useDialogTableHeight(() => props.modelValue)
 
 const COLS: DataColumn[] = [
   { key: 'projectId', label: '项目编号', width: 140 },
@@ -27,7 +29,7 @@ function onRow(row: Record<string, any>) {
 <template>
   <Modal :model-value="props.modelValue" :title="props.title" width="60%"
     @update:model-value="emit('update:modelValue', $event)">
-    <DataTable :columns="COLS" :rows="props.rows" :show-count="false" clickable @row-click="onRow">
+    <DataTable :columns="COLS" :rows="props.rows" :show-count="false" sticky-header :max-height-px="tableMaxH" clickable @row-click="onRow">
       <template #cell-projectId="{ value }"><span class="mdm-link">{{ value }}</span></template>
     </DataTable>
   </Modal>
