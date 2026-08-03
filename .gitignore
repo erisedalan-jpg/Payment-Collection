@@ -181,3 +181,7 @@ nul
 # 教训:2026-07-21 首次接入 GitHub 时只排查了 data/ input/ pmisdata/,docs/ 下同样会长出
 # 真实数据 —— 判据不是「目录名像不像数据目录」,而是「文件内容是不是从生产导出来的」。
 /docs/superpowers/research/
+
+# docs/audit/ —— 系统审查报告,含「哪个写端点不在超管闸内」「哪条路径可越权拿全量数据」
+# 这类安全弱点细节。本仓是 public,这类内容只留本地。
+/docs/audit/
