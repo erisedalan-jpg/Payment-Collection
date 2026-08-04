@@ -59,7 +59,17 @@ def read_holidays(path: str) -> Tuple[Set[date], Set[date]]:
             continue
     if text is None:
         return set(), set()
-    for row in csv.DictReader(io.StringIO(text)):
+    reader = csv.DictReader(io.StringIO(text))
+    # 表头规范化(线上事故根因之二):Excel 导出的 CSV 会把单元格里的制表符一并写出,
+    # 实测生产文件表头是 `"日期\t"` 而非 `日期` —— DictReader 的 key 就成了 `日期\t`,
+    # `row.get("日期")` 恒为 None,**122 行数据全被下面的 continue 静默跳过**,
+    # 最终 rest/work 全空、calendar_source 判成 fallback,告警再把「格式没读懂」
+    # 说成「未提供」(用户遂反复重传一个其实已经在位的文件)。
+    # 值不需要在这里处理 —— parse_date 的 strip() 已能吃掉制表符尾巴,失败点只在表头。
+    # 本仓 xlsx 路径(pmis.py:86 / projects.py:36)一直有同款 .strip(),CSV 路径漏了。
+    if reader.fieldnames:
+        reader.fieldnames = [str(f).strip() for f in reader.fieldnames]
+    for row in reader:
         d = parse_date(row.get("日期"))
         if d is None:
             continue

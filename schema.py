@@ -372,12 +372,19 @@ class YitianReadinessRoster(_Base):
     managers: int                    # 派生出的管理干部人数
 
 
+class YitianReadinessHolidays(_Base):
+    provided: bool                   # 文件是否存在
+    rows: int                        # 读懂的行数(休+班)。provided=True 而 rows=0
+    #                                  ⇒ 文件在但格式没读懂,与「没上传」是两码事,告警文案必须分开
+
+
 class YitianReadiness(_Base):
     top1000: YitianReadinessTop1000
     productCategory: YitianReadinessProductCat
     calibration: YitianReadinessCalib
     unattributed: YitianReadinessUnattr
     roster: YitianReadinessRoster
+    holidays: YitianReadinessHolidays
 
 
 class YitianMeta(_Base):
@@ -387,7 +394,9 @@ class YitianMeta(_Base):
     rows: int
     employees: int
     droppedRows: int                # 工号不在花名册而被丢弃的行数(治理可见)
-    calendarSource: str              # "csv" | "fallback"(holidays.csv 缺失,退化为纯周一~周五)
+    calendarSource: str              # "csv" | "fallback"。注意 fallback 的含义是「**没读到任何
+    #                                  休/班行**」,不等于「文件缺失」—— 文件在但表头/格式没读懂
+    #                                  时同样是 fallback。要区分原因看 dataReadiness.holidays。
     hoursPerDay: int
     thisBgL2: List[str]              # 本BG销售L2组织(跨BG判定常量,随数据下发)
     storeRows: int                   # 累积库总行数(供 /data 展示"累积了多久")

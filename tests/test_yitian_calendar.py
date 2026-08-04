@@ -60,6 +60,36 @@ class TestReadHolidays:
         rest, work = C.read_holidays(str(p))
         assert rest == set() and work == set()
 
+    def test_reads_real_world_excel_export_with_tabs(self, tmp_path):
+        """生产实测形态:Excel 导出的 CSV,表头与值都混进了制表符。
+
+        线上报障原文:「已上传了 holidays.csv,但仍提示未提供」。实测该文件 122 行
+        数据**一行都没进来** —— 表头是 `日期\\t`(带制表符)而非 `日期`,于是
+        `row.get("日期")` 恒为 None、每行都被 `continue` 跳过,rest/work 全空,
+        `calendar_source` 判成 fallback,告警文案再把「格式没读懂」说成「未提供」。
+
+        值本身是好的(`parse_date` 的 strip 会吃掉制表符尾巴),**唯一失败点是表头**。
+        这与 V4.4.1 的 GBK 编码事故同源:都是「Excel 导出的 CSV 格式脏」,而本仓
+        xlsx 路径(`pmis.py:86`/`projects.py:36`)一直有 `.strip()` 规范化表头,
+        CSV 路径没有。
+        """
+        p = tmp_path / "holidays_real.csv"
+        # 逐字节复刻生产文件:GBK + 字段带引号 + 表头「日期」后一个制表符 + 值后一串制表符
+        p.write_bytes(
+            ('"日期\t","类型"\r\n'
+             '"2026/1/1' + '\t' * 15 + '","休"\r\n'
+             '"2026/2/14' + '\t' * 15 + '","班"\r\n').encode("gbk"))
+        rest, work = C.read_holidays(str(p))
+        assert rest == {date(2026, 1, 1)}
+        assert work == {date(2026, 2, 14)}
+
+    def test_reads_header_with_surrounding_spaces(self, tmp_path):
+        # 同源的另一种脏法:表头前后带空格(手工编辑或某些导出工具)
+        p = tmp_path / "holidays_sp.csv"
+        p.write_text(" 日期 , 类型 \n2026-02-16,休\n", encoding="utf-8")
+        rest, work = C.read_holidays(str(p))
+        assert rest == {date(2026, 2, 16)}
+
 
 class TestIsWorkday:
     def test_plain_weekday(self):

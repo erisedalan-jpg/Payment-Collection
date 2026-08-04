@@ -29,6 +29,9 @@ def _minimal():
                                 "ambiguous": 931, "unmatched": 201},
                 "unattributed": {"rows": 478, "hours": 2810.0},
                 "roster": {"hasSupColumn": True, "managers": 14},
+                # provided 与 rows 分开:文件在但一行没读懂(provided=True/rows=0)
+                # 与没上传是两码事,告警文案据此分流(见 YitianToolbar.vue)。
+                "holidays": {"provided": True, "rows": 121},
             },
         },
         "roster": [{"id": "A1", "name": "张三", "l2": "交付中心", "l3": "交付实施三部",

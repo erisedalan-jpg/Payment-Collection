@@ -34,6 +34,8 @@ export type Rows3 = number;
 export type Hours = number;
 export type Hassupcolumn = boolean;
 export type Managers = number;
+export type Provided2 = boolean;
+export type Rows4 = number;
 export type Id = string;
 export type Name = string;
 export type L2 = string;
@@ -125,6 +127,7 @@ export interface YitianReadiness {
   calibration: YitianReadinessCalib;
   unattributed: YitianReadinessUnattr;
   roster: YitianReadinessRoster;
+  holidays: YitianReadinessHolidays;
   [k: string]: unknown;
 }
 export interface YitianReadinessTop1000 {
@@ -157,6 +160,11 @@ export interface YitianReadinessUnattr {
 export interface YitianReadinessRoster {
   hasSupColumn: Hassupcolumn;
   managers: Managers;
+  [k: string]: unknown;
+}
+export interface YitianReadinessHolidays {
+  provided: Provided2;
+  rows: Rows4;
   [k: string]: unknown;
 }
 export interface YitianRosterItem {

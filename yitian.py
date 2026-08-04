@@ -205,8 +205,12 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
         print("[WARN] 产品词库有 %d 个产品线短名无法在 %s 中唯一定位,其校准结果将被留白: %s"
               % (len(bad_aliases), config.PRODUCT_CATEGORY_FILE, "、".join(bad_aliases)))
 
-    rest, work = CAL.read_holidays(
-        os.path.join(input_dir, config.YITIAN_DIRNAME, config.YITIAN_HOLIDAYS_FILE))
+    holidays_path = os.path.join(
+        input_dir, config.YITIAN_DIRNAME, config.YITIAN_HOLIDAYS_FILE)
+    rest, work = CAL.read_holidays(holidays_path)
+    # calendar_source 看的是**解析结果**,不是文件在不在 —— 文件在但一行没读懂时同样是
+    # fallback。所以判「要不要降级」用它,判「为什么降级」必须另看 dataReadiness.holidays,
+    # 否则告警会把「格式没读懂」说成「未提供」(线上实测发生过,用户遂反复重传已在位的文件)。
     calendar_source = "csv" if (rest or work) else "fallback"
 
     dates = sorted(r["date"] for r in kept)
@@ -332,6 +336,12 @@ def build_yitian_data(base_dir: str, store: Optional[dict] = None,
                     "rows": len(prod_cats),
                     "coveredLines": len([x for x in seen_lines if x in prod_cats]),
                     "totalLines": len(seen_lines),
+                },
+                "holidays": {
+                    # 同 top1000:provided 看文件在不在,rows 看读懂了几行。两者分开,
+                    # 「没上传」与「上传了但格式没读懂」才能给出不同的告警文案。
+                    "provided": os.path.isfile(holidays_path),
+                    "rows": len(rest) + len(work),
                 },
                 "calibration": dict(calib),
                 "unattributed": {"rows": unattr_rows, "hours": round(unattr_hours, 2)},

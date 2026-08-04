@@ -54,6 +54,44 @@ describe('YitianToolbar', () => {
     expect(w.text()).toContain('holidays.csv')
   })
 
+  // ── 降级原因必须分开说(线上报障:用户上传了 holidays.csv 却被告知「未提供」) ──
+  // calendarSource 看的是**解析结果**,文件在但表头被 Excel 写成 `日期\t` 时同样是
+  // fallback。原文案一律说「未提供」,于是用户反复重传一个已经在位的文件。
+  // 注:上面那条老用例的 toContain('holidays.csv') 两种文案都满足,钉不住文案方向,
+  // 故另立这两条 —— 各自断言「该出现的词」与「绝不能出现的词」。
+  it('fallback 且文件不存在 → 文案说「未提供」', () => {
+    const w = mountBar({
+      ...DATA,
+      meta: {
+        ...DATA.meta, calendarSource: 'fallback',
+        dataReadiness: { holidays: { provided: false, rows: 0 } },
+      },
+    } as unknown as YitianData)
+    expect(w.text()).toContain('未提供')
+    expect(w.text()).not.toContain('没读懂')
+  })
+
+  it('fallback 但文件已存在(格式没读懂) → 文案绝不能说「未提供」', () => {
+    const w = mountBar({
+      ...DATA,
+      meta: {
+        ...DATA.meta, calendarSource: 'fallback',
+        dataReadiness: { holidays: { provided: true, rows: 0 } },
+      },
+    } as unknown as YitianData)
+    expect(w.text()).not.toContain('未提供')       // ← 说反了就是把人往错误方向引
+    expect(w.text()).toContain('没读懂')
+    expect(w.text()).toContain('日期,类型')        // 给出可操作的排查方向
+  })
+
+  it('meta 无 dataReadiness(旧数据/升级后未重跑) → 退化为「未提供」文案,不报错', () => {
+    // 升级后、点「更新数据」之前,yitian_data.json 还是旧的、没有 holidays 字段。
+    // 此时必须退化成旧行为而不是崩掉或显示空白告警条。
+    const w = mountBar({ ...DATA, meta: { ...DATA.meta, calendarSource: 'fallback' } } as YitianData)
+    expect(w.find('.yt-warn').exists()).toBe(true)
+    expect(w.text()).toContain('未提供')
+  })
+
   it('控件为 small 尺寸且排在同一行(不换行容器)', () => {
     const w = mountBar(DATA)
     expect(w.find('.yt-row').exists()).toBe(true)

@@ -390,7 +390,18 @@ def main():
                 print("  [WARN] 倚天工时 %d 行因工号不在组织架构花名册或工作日不可解析被丢弃"
                       % ymeta["droppedRows"])
             if ymeta["calendarSource"] == "fallback":
-                print("  [WARN] 未提供 input/yitian/holidays.csv,工作日退化为纯周一~周五(节假日周饱和度会偏低)")
+                # 与上面 top1000/productCategory 同款三态:降级的**原因**必须分开说。
+                # 原先这里一律说「未提供」,而 calendarSource 看的是解析结果不是文件在不在
+                # —— 线上真实发生过:用户上传了 holidays.csv,表头被 Excel 写成 `日期\t`
+                # 导致 122 行全部读不进,页面却告诉他「未提供」,于是反复重传同一个文件。
+                hol = rd["holidays"]
+                if not hol["provided"]:
+                    print("  [WARN] 未提供 input/yitian/holidays.csv,"
+                          "工作日退化为纯周一~周五(节假日周饱和度会偏低)")
+                else:
+                    print("  [WARN] input/yitian/holidays.csv 存在但一行都没读懂"
+                          "(表头是否恰为「日期,类型」?Excel 导出常把单元格里的制表符"
+                          "一并写进表头),工作日退化为纯周一~周五(节假日周饱和度会偏低)")
     except Exception as e:   # 倚天域是附加特性,任何异常都不得影响 analysis_data.json
         print(f"  [WARN] 倚天工时域生成失败,本次跳过: {e}")
 

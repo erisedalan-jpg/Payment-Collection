@@ -35,6 +35,13 @@ const DISPLAY_OPTIONS = [
 ] as const
 
 const isFallback = computed(() => store.data?.meta.calendarSource === 'fallback')
+// 降级的**原因**要分开说:calendarSource 只表示「没读到任何休/班行」,文件在不在得另看。
+// 文件在却读不出行 = 格式没读懂(实测生产是 Excel 把制表符写进了表头 `日期\t`),
+// 此时说「未提供」会把人往错误方向引 —— 用户会去反复重传一个已经在位的文件。
+// 可选链 + ?? false:旧 yitian_data.json 没有 holidays 字段(升级后未重跑更新数据),
+// 此时退化为「未提供」文案,与旧行为一致。
+const holidaysProvided = computed(
+  () => store.data?.meta?.dataReadiness?.holidays?.provided ?? false)
 
 /** 数据跨度外的日期禁选——没有工作日标注就算不出基础工时。 */
 function disabledDate(d: Date): boolean {
@@ -106,7 +113,12 @@ defineExpose({ l4Options, disabledDate })
     </div>
 
     <div v-if="isFallback" class="yt-warn">
-      未提供 input/yitian/holidays.csv，工作日按「周一~周五」近似计算；含法定节假日的周期，饱和度会偏低、未填名单会误报。
+      <template v-if="holidaysProvided">
+        input/yitian/holidays.csv 已上传但一行都没读懂（表头是否恰为「日期,类型」？用 Excel 导出时常把单元格里的制表符一并写进表头），工作日按「周一~周五」近似计算；含法定节假日的周期，饱和度会偏低、未填名单会误报。
+      </template>
+      <template v-else>
+        未提供 input/yitian/holidays.csv，工作日按「周一~周五」近似计算；含法定节假日的周期，饱和度会偏低、未填名单会误报。
+      </template>
     </div>
   </div>
 </template>
