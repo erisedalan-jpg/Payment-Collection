@@ -35,6 +35,10 @@ describe('RichTextCell 显示态', () => {
     expect(w.find('.rtc-prefix').text()).toBe('2026-07-10：')
     expect(w.find('.rtc-body').element.innerHTML).toBe('<b>粗</b>')
   })
+  it('显示态:块级容器渲染成换行', () => {
+    const w = mountCell({ content: '第一行<div>第二行</div>', editable: false })
+    expect(w.find('.rtc-body').element.innerHTML).toBe('第一行<br>第二行')
+  })
   it('空内容 + editable → 点击填写', () => {
     const w = mountCell({ content: '', editable: true })
     expect(w.find('.rtc-empty').text()).toBe('点击填写')
@@ -67,6 +71,17 @@ describe('RichTextCell 编辑态', () => {
     await flushPromises()
     expect(saveHandler).toHaveBeenCalledWith('<b>hi</b>')       // script 被净化
     expect(w.find('.rtc-editor').exists()).toBe(false)
+  })
+  it('保存:按回车换的行不丢(浏览器用 <div> 承载新行 → 存成 <br>)', async () => {
+    // innerHTML 取自真实 Chrome 151 在 contenteditable 里敲「第一行 ⏎ 第二行」的实测产物。
+    // lib 层单测绿不等于组件调对了 —— 这条钉的是 commit() 到 sanitizeRichText 的接线。
+    const saveHandler = vi.fn().mockResolvedValue(undefined)
+    const w = mountCell({ content: '', editable: true, saveHandler })
+    await w.find('.rtc-empty').trigger('click')
+    ;(w.find('[contenteditable]').element as HTMLElement).innerHTML = '第一行<div>第二行</div>'
+    await w.find('.rtc-save').trigger('click')
+    await flushPromises()
+    expect(saveHandler).toHaveBeenCalledWith('第一行<br>第二行')
   })
   it('取消:不回调、关闭', async () => {
     const saveHandler = vi.fn()

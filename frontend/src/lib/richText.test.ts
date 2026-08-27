@@ -42,6 +42,53 @@ describe('sanitizeRichText 白名单', () => {
   })
 })
 
+// 输入串全部取自真实 Chrome 151 在 contenteditable 里实测产出的 innerHTML(见 PROGRESS.md V4.5.15)。
+// 浏览器用块级容器承载「按回车换行」——Chrome/Edge 用 <div>,粘贴自 Word/网页则常见 <p>/<li>。
+// 这些标签不在白名单里会被拆解,拆解时**必须补回换行载体 <br>**,否则用户敲的回车被静默吃掉。
+describe('sanitizeRichText 块级容器换行', () => {
+  it('Enter 产生的 <div> 新行 → <br>', () => {
+    expect(sanitizeRichText('第一行<div>第二行</div>')).toBe('第一行<br>第二行')
+  })
+  it('连按两次 Enter 的空行:不丢也不多(块内占位 <br> 不重复计)', () => {
+    expect(sanitizeRichText('第一行<div><br></div><div>第三行</div>')).toBe('第一行<br><br>第三行')
+  })
+  it('开头的空行保留', () => {
+    expect(sanitizeRichText('<div><br></div><div>第三行</div>')).toBe('<br>第三行')
+  })
+  it('粘贴自网页的 <p> 段落 → <br>', () => {
+    expect(sanitizeRichText('<p>第一段</p><p>第二段</p>')).toBe('第一段<br>第二段')
+  })
+  it('块与块之间的缩进空白不算一行', () => {
+    expect(sanitizeRichText(`<p>a</p>
+  <p>b</p>`)).toBe('a<br>b')
+  })
+  it('列表每项一行', () => {
+    expect(sanitizeRichText('<ul><li>a</li><li>b</li></ul>')).toBe('a<br>b')
+  })
+  it('嵌套块只算一次换行', () => {
+    expect(sanitizeRichText('a<div><div>b</div></div>')).toBe('a<br>b')
+  })
+  it('单个块不凭空多出换行(现有契约不变)', () => {
+    expect(sanitizeRichText('<div><b>x</b></div>')).toBe('<b>x</b>')
+  })
+  it('块内格式与块外 <br> 混排', () => {
+    expect(sanitizeRichText('第一行<br><b>第二行</b><div><b>第三行</b></div>'))
+      .toBe('第一行<br><b>第二行</b><br><b>第三行</b>')
+  })
+  it('在中间行按回车(块内含 <br>)', () => {
+    expect(sanitizeRichText('第一行<div>插入行<br>第二行</div>')).toBe('第一行<br>插入行<br>第二行')
+  })
+  it('已扁平化的内容再编辑,往返稳定(幂等)', () => {
+    const once = sanitizeRichText('第一行<br>第二行<div>第三行</div>')
+    expect(once).toBe('第一行<br>第二行<br>第三行')
+    expect(sanitizeRichText(once)).toBe(once)
+  })
+  it('拆解块级容器不会复活其中的脚本', () => {
+    expect(sanitizeRichText('<div><script>alert(1)</script></div>')).toBe('')
+    expect(sanitizeRichText('a<div><script>alert(1)</script></div>')).toBe('a<br>')
+  })
+})
+
 describe('htmlToPlainText 去标签', () => {
   it('空 → 空', () => { expect(htmlToPlainText('')).toBe('') })
   it('去标签取文字', () => {
