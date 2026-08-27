@@ -14,11 +14,17 @@ import os
 import re
 import threading
 import time
+from datetime import datetime, timedelta
 
 import pytest
 
 import lanxin_config
 import server
+
+# 下面 test_record_sent_populates_identity_lookup 要走 lanxin_inbox.candidate_projects,
+# 它的窗口相对 datetime.now(),夹具时间必须相对今天算(写死绝对时间会在 30 天后自己变红)。
+# 同 tests/test_lanxin_inbox.py 顶部那段说明。
+_RECENT = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def test_callback_path_is_auth_exempt():
@@ -117,7 +123,7 @@ def test_record_sent_populates_identity_lookup(tmp_path, monkeypatch):
     server._lanxin_record_sent([{"staffId": "524288-aaa", "employId": "A000701",
                                  "name": "张三", "routeKey": "anomaly",
                                  "projectIds": ["P0001"], "msgId": "m1"}],
-                               '2026-07-20 10:00:00')
+                               _RECENT)
     store = server._load_lanxin_inbox()
     assert lanxin_inbox.resolve_identity(store, "524288-aaa")["employId"] == "A000701"
     assert lanxin_inbox.candidate_projects(store, "524288-aaa") == ["P0001"]

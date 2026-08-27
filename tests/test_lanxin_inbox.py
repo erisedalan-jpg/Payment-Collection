@@ -1,7 +1,17 @@
 """lanxin_inbox 纯数据操作的回归。"""
+from datetime import datetime, timedelta
+
 import lanxin_inbox as I
 
-NOW = "2026-07-20 10:00:00"
+# candidate_projects 的窗口是相对 datetime.now() 的「最近 N 天」(它是本模块唯一读墙上时钟的函数;
+# prune 的 now 由调用方显式传入,不受此影响)。所以喂给它的夹具时间**必须相对今天算**。
+# 教训:这里原先写死 NOW = "2026-07-20 10:00:00",于是墙上时钟一过 2026-08-19,
+# from_recent_sends 那条就自己变红;而 excludes_other_people 同时退化成假绿 ——
+# 它返回 [] 不再是因为「筛掉了别人」,而是因为全部超窗。
+# 反过来,ignores_stale_sends 用的 "2026-01-01" 是【恒定远古】、永不进入窗口,那样写是安全的。
+_FMT = "%Y-%m-%d %H:%M:%S"
+NOW = datetime.now().strftime(_FMT)                                  # 参考「现在」
+RECENT = (datetime.now() - timedelta(days=1)).strftime(_FMT)         # 落在 30 天窗口内
 
 
 def _store_with_sent():
@@ -11,7 +21,7 @@ def _store_with_sent():
          "routeKey": "project", "projectIds": ["P001", "P002"], "msgId": "m1"},
         {"staffId": "524288-bbb", "employId": "A000702", "name": "李四",
          "routeKey": "timesheet", "projectIds": [], "msgId": "m2"},
-    ], NOW)
+    ], RECENT)
     return s
 
 
