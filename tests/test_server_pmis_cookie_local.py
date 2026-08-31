@@ -196,6 +196,34 @@ def test_取到的cookie缺SESSION时不写入(tmp_path, monkeypatch):
         srv.shutdown(); srv.server_close()
 
 
+def test_配置文件不存在时首次取cookie仍成功(tmp_path, monkeypatch):
+    """交付机实测场景(V4.5.17):解压出来的目录里没有 pmisdata/,更没有 config.json,
+    点「获取 PMIS Cookie」曾报
+      写入失败: [Errno 2] No such file or directory: ...pmisdata/config.json
+    这条打的是真实端点(lib 层已有 test_pmis_config 覆盖,但 lib 绿 != 端点对)。"""
+    _accounts(tmp_path, monkeypatch)
+    monkeypatch.setattr(S, "cookie_core", _FakeCore(_OK))
+    # 刻意【不】预先创建 config.json,连 pmisdata/ 目录都不建
+    cfg = tmp_path / "pmisdata" / "config.json"
+    monkeypatch.setattr(S, "PMISDATA_CONFIG", str(cfg))
+    srv = S.create_server(host="127.0.0.1", port=0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        conn, ck = _login(srv.server_address[1], "super")
+        st, data = _req(conn, "POST", PATH, ck, body="{}")
+        assert st == 200
+        d = _json.loads(data)
+        assert d["success"] is True, d.get("message")
+        assert d["sessionPreview"] == "fresh123"
+        saved = _json.loads(cfg.read_text(encoding="utf-8"))
+        assert saved["session_cookie"] == _OK["cookie"]
+        # 建出来的必须是完整模板:下载脚本要读同一个文件里的这些键
+        assert saved["base_url"].startswith("https://")
+        assert "phases" in saved
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
 def test_模块缺失时给明确提示(tmp_path, monkeypatch):
     """打包漏收 cookie_core / 开发态没有 client/ 目录时,要说清楚是哪儿的问题,
     不能抛 AttributeError 变成 500。"""

@@ -4,7 +4,21 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V4.5.17**（Z 级 · **单机版取 PMIS Cookie 不再依赖本机代理进程 —— 交付机零 Python 依赖**）**【未部署】**——生产报障：交付机上双击 `client/启动代理.vbs` 后平台读不到代理，浏览器直连 `http://127.0.0.1:8765/ping` 报 `ERR_CONNECTION_REFUSED`（本机开发环境一切正常）。三问题工单的**第一步**（另两步：下载管线 sh→py 跨平台、下载流程一键化，见下方 Backlog）。
+- 当前版本：**V4.5.18**（Z 级 · **首次部署时 `pmisdata/config.json` 不存在导致取 Cookie 失败**）**【未部署】**——V4.5.17 交付机实测报障：解压后点「获取 PMIS Cookie」报 `写入失败: [Errno 2] No such file or directory: ...项目管理平台-V4.5.17\pmisdata\config.json`；**手工建出该目录与文件后即成功**（提示「已从本机获取并更新 Cookie」、config 修改时间有变化）。
+
+  **★ 这次报障顺带证实了 V4.5.17 里我明确保留的那一层**：当时真机冒烟卡在 DNS（开发机不在零信任内网），TLS 证书链**没验到**，我如实记了「`cacert.pem` 在包里但不算已证实」。这回在交付机上真的取到并写入了 cookie —— **`requests` 在 frozen 下能建立 TLS 连接、`certifi` 证书链工作正常**，该层现已证实。
+
+  **★ 根因**：`pmis_config.write_session_cookie` 第一步就 `open(config_path, 'r')`（为了「保留其余键」——这个意图是对的），但**一台新机器上「没有其余键」本来就是正常状态**，不该让首次取 cookie 直接失败。而 exe 的 `datas` 里不含 `pmisdata/`（那是数据目录，本就不该打进包），所以交付机上该目录压根不存在。
+
+  **★ 修法**：`pmis_config` 新增 `DEFAULT_CONFIG`（34 个键，取自现网配置**仅剔除 `session_cookie`**，无部门特有信息、无凭证）与 `_load_or_default()`；写入前 `os.makedirs(parent, exist_ok=True)`。三个要点：① **只补一个 `{"session_cookie": ...}` 不够** —— 下载脚本（`fetch_pmis_tables`/`fetch_all_projects`/`delivery_analysis`）读的是同一个文件里的十几个配置项，缺了它们下载会换一种方式失败，所以模板必须完整；② **「文件不存在」与「坏 JSON」严格分开** —— 后者说明用户有一份配置只是坏了，静默套模板会把他改过的并发数、阶段开关一起抹掉，故坏 JSON 照旧抛错；③ 已存在的那条路径**一字不变**（回归安全网：不覆盖用户的 `base_url`，也不把模板的键塞进去）。
+
+  **★ 测试 6 条 + 反向验证 4 条**：`tests/test_pmis_config.py` 5 条（含「创建出来的必须是完整模板而非只有 cookie 一个键」「坏 JSON 抛错且原文未被动过」）；`tests/test_server_pmis_cookie_local.py` 补 1 条**端点级**用例，直接复现交付机场景（连 `pmisdata/` 目录都不建）——**lib 绿 ≠ 端点对**（承 V4.5.7）。四条变异（不建父目录／模板退化成空／坏 JSON 也套模板／撤掉「不存在则用模板」）各自精确命中对应用例。
+
+  `verify.sh` 全绿：pytest **1505**、前端 256 文件 / **2447** 用例、build OK。
+
+  **★ 遗留**：交付机上点「下载数据」目前会得到「下载脚本不存在(pmisdata/run_pmis_pipeline.sh)」—— 这是**预期**的，下载管线本身要到第二步（sh → py 跨平台 + 脚本打进 exe）才可用。
+
+- 上一版本：**V4.5.17**（Z 级 · **单机版取 PMIS Cookie 不再依赖本机代理进程 —— 交付机零 Python 依赖**）**【未部署】**——生产报障：交付机上双击 `client/启动代理.vbs` 后平台读不到代理，浏览器直连 `http://127.0.0.1:8765/ping` 报 `ERR_CONNECTION_REFUSED`（本机开发环境一切正常）。三问题工单的**第一步**（另两步：下载管线 sh→py 跨平台、下载流程一键化，见下方 Backlog）。
 
   **★ 根因两层，第一层是我先判错的**：我先实测到 `cookie_agent.py` 的 `DEFAULT_ALLOWED_ORIGINS` 只列了 `http://localhost:8080`，而 exe 自动打开的是 `http://127.0.0.1:8080`（`_open_browser` 用 `HOST` 拼），三种 Origin 实测 **403 / 200 / 200** —— 白名单确实是真缺陷，但用户反馈「localhost 也不行」，说明**代理进程根本没起来**，403 那层还轮不到。真正的第一层是：**vbs 用 `shell.Run cmd, 0, False`（隐藏窗口 + 不等待 + 不查返回码），而它依赖 `pythonw` 在 PATH、依赖 `requests`；交付机没装 Python，于是三种失败长得一模一样 —— 全都静默**。教训：**我只验证了自己能构造的那一层（手动 `python cookie_agent.py` 起进程测 Origin），跳过了报障者实际走的那条启动路径**。
 
