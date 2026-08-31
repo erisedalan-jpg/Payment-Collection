@@ -165,6 +165,13 @@ nul
 /yitian-new/
 /项目数据运营工具/
 
+# 新部门交付用的真实业务数据(PMIS 导出 + 组织架构花名册,2026-08-30 放入)。
+# 【必须带前导斜杠】与上面同理。发现经过:git check-ignore -v new-dep/ 报了个
+# 「.gitignore:184: new-dep/」看着像已覆盖,但 184 行其实是【空行】、全文件没有这条规则 ——
+# 对带尾斜杠的目录名 check-ignore 会给假阳性。逐文件 check-ignore 与 git status 两路
+# 交叉验证才是准的(同类误判本仓已栽三次)。
+/new-dep/
+
 # 蓝信对接副本(他人基于 LTS-1.1.0 制作的督办系统整份复制,含 server.py/projects.py/frontend/tests)。
 # 非本平台组成部分,只读参考、绝不入库;根 conftest.py 的 collect_ignore 亦已含它。
 # 【必须带前导斜杠】仓库里有三个叫 lanxin 的目录 —— 另两个是【已跟踪】的

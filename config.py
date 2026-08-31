@@ -89,6 +89,10 @@ INPUT_UPLOAD_NAMES = [ORG_FILE, MAPPING_FILE, DELIVERY_FILE, DELIVERY_FILE_LEGAC
                       COLLECTION_STAGES_FILE, TOP1000_FILE, PRODUCT_CATEGORY_FILE,
                       YITIAN_TIMESHEET_FILE, YITIAN_HOLIDAYS_FILE]
 DEPT_L3 = "交付实施三部"
+# 部门白名单:【仅当】组织架构表里出现多个「新L3组织」时才启用(= 误放了跨部门/全公司清单)。
+# 单一部门的表按表自身那个值走、不看这里 —— 让任何部门的花名册开箱即用(V4.5.16 多部门交付),
+# 判据与取值见 projects._org_dept_rows。要同时纳入多个部门时在这里列举。
+DEPT_L3S = [DEPT_L3]
 PRESALE_PREFIX = "售前服务"
 PRESALE_PROJECT_TYPE = "售前服务类"  # 售前判定(取代 name.startswith);与终验时间取列共用
 DELIVERY_COST_CATEGORIES = [

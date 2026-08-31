@@ -187,13 +187,13 @@ def main():
         print("  [WARN] 未提供 PMIS 数据(input/pmis/ 为空),数据治理视图将提示去获取")
 
     # === 9c. 构建项目主域(PMIS在建 ∩ 交付三部,Phase P1) ===
-    print("[INFO] 构建项目主域(交付实施三部)...")
+    print("[INFO] 构建项目主域(PMIS 在建 ∩ 组织架构花名册)...")
     dept_projects, projects_quality = projects_mod.load_dept_projects(
         os.path.join(BASE_DIR, "input"), project_pmis, mapping)
     org_names, _org_l4s, _org_rows = projects_mod.read_org_names(
         os.path.join(BASE_DIR, "input", config.ORG_FILE))
     closed_projects = pmis.build_closed_projects(pmis_dir, org_names)
-    print(f"  [OK] 已关闭项目清单 {len(closed_projects)} 个(交付三部)")
+    print(f"  [OK] 已关闭项目清单 {len(closed_projects)} 个(本部门)")
     if projects_quality["orgFile"]["provided"]:
         print(f"  [OK] 主域项目 {projects_quality['deptProjectCount']} 个, "
               f"售前已映射 {projects_quality['presaleMapped']}/{projects_quality['presaleTotal']}, "

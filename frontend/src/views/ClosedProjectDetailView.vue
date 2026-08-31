@@ -56,7 +56,7 @@ const costRows = computed(() => [
   <div class="closed-detail-view">
     <AppEmpty v-if="!p">
       <SectionTitle level="card" class="cd-404-title">未找到该已关闭项目</SectionTitle>
-      <div class="cd-404-sub">项目编号 {{ route.params.id }} 不在交付三部已关闭清单中。</div>
+      <div class="cd-404-sub">项目编号 {{ route.params.id }} 不在本部门已关闭清单中。</div>
       <RouterLink to="/projects/closed" class="cd-404-link">← 返回已关闭项目</RouterLink>
     </AppEmpty>
     <template v-else>

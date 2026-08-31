@@ -90,7 +90,7 @@ python server.py --stop     # 停止运行中的服务
 - **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外清单当前为空**（2026-08-03 全部归并完毕）：`/insight` 曾用「节点已收 ÷ customer.合同总额（售前不回退）」，因 55% 的在建项目是售前、其 `customer.合同总额` 为空而分子照计，实测全域算出 **107.57%**、8/11 个 L4 桶 >100%；`snapshots.py`（/activity 的「回款达成率 ±Xpp」）曾用「Σ节点已收 ÷ Σ节点计划回款」。两者均已改为主口径，真实数据对拍 /insight 修复后 47.85%，与主口径逐位吻合。**今后再要开例外，必须在此处登记并写明理由**。
 - **回款数据核心源 = `input/collection_stages.csv`**（PMIS 收款阶段台账导出，已入"数据更新"流程）。售前项目收款阶段节点**按本项目号优先取、缺再回退原项目号**（`_collection_nodes_for`）；台账把售前节点挂在本项目号下。
 - **异常项目（`orgL4` 空）排除出回款统计**（`lib/anomaly.isAnomalous`）：回款看板硬排除、治理页告警、项目清单标「数据异常」。
-- **回款节点只为在建主域（`dept_projects`=PMIS 在建∩组织架构交付三部）及售前原项目构建**；已关闭/域外项目的收款阶段不进在建回款看板（设计边界，非缺陷）。
+- **回款节点只为在建主域（`dept_projects`=PMIS 在建 ∩ 组织架构花名册；部门范围按表自身判定、不写死部门名，见 `projects._org_dept_rows`）及售前原项目构建**；已关闭/域外项目的收款阶段不进在建回款看板（设计边界，非缺陷）。
 - **回款子域路由**：`/payment`(总览) + `/payment/{board,calendar,projects,nodes,key}`（V1.13.0 由旧 `/panalysis` 拆分；旧路径仍 redirect 兼容）。**注**：`plan` 与 `risk` 两个子页已删除、现为 redirect 到 `/payment`；`calendar` 与 `key` 是后来新增的。（本条曾滞后于代码，2026-08-03 审查订正。）
 - **日期区间口径（V1.11.0）**：FilterBar 起止日期，计划侧按节点 planDate∈区间、已回款按流水到账日∈区间；"全部"区间≡全时口径（回归安全网）。
 

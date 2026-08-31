@@ -65,12 +65,40 @@ def read_sheet_headers(path: str, key_header: str) -> List[str]:
     return headers or []
 
 
+def _org_dept_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """按部门裁组织架构表的行。
+
+    这道过滤的原意是【防误放全公司清单】,而不是锁定某一个部门 —— 所以判据取自表自身
+    有几个部门,不写死部门名。写死的代价是另一个部门的花名册会被整表丢弃,而且
+    主域(build_projects 按项目经理姓名筛)与倚天工时(yitian 按工号筛)两条链会同时
+    静默清零、全程零报错(V4.5.16 多部门交付)。
+
+      · 无 新L3组织 列 / 该列全空 → 不过滤(既有降级路径,原样保留)
+      · 唯一值 → 按这个值过滤(这张表就是某个部门的花名册)。对现网三部逐字节等价:
+        实测 85 行 L3 全为「交付实施三部」,且 L3 留空的行照旧被排除
+      · 多个值 → 误放了跨部门清单,按 config.DEPT_L3S 白名单收;一个都匹配不上则告警,
+        因为返回空会让 build_projects 的 `if org_names` 守卫失效、主域退化成
+        PMIS 在建全量(把全公司项目收进来),这条路绝不能没有声音
+    """
+    if not rows:
+        return rows
+    seen = {str(r.get("新L3组织") or "").strip() for r in rows}
+    seen.discard("")
+    if not seen:
+        return rows
+    allow = seen if len(seen) == 1 else {d for d in config.DEPT_L3S if d in seen}
+    if not allow:
+        print("[WARN] 组织架构表含多个部门 %s,均不在白名单 config.DEPT_L3S %s 内 —— "
+              "本次读到 0 人,主域将退化为 PMIS 在建全量。请核对组织架构文件或白名单。"
+              % ("、".join(sorted(seen)), "、".join(config.DEPT_L3S)))
+        return []
+    return [r for r in rows if str(r.get("新L3组织") or "").strip() in allow]
+
+
 def read_org_names(path: str) -> Tuple[set, set, int]:
     """组织架构表 → (姓名集合, L4组织集合, 行数)。按"表头含工号"自动选 sheet。
-    若存在 新L3组织 列,仅收 交付实施三部 行(防误放全公司清单);姓名/L4 先 strip 再判空。"""
-    rows = _read_header_sheet(path, "工号")
-    if rows and any(r.get("新L3组织") for r in rows):
-        rows = [r for r in rows if str(r.get("新L3组织") or "").strip() == config.DEPT_L3]
+    部门范围见 _org_dept_rows(按表自身判定,不写死部门名);姓名/L4 先 strip 再判空。"""
+    rows = _org_dept_rows(_read_header_sheet(path, "工号"))
     names: set = set()
     l4s: set = set()
     for r in rows:
@@ -91,10 +119,8 @@ def read_sheet_by_header(path: str, key_header: str) -> List[Dict[str, Any]]:
 def read_org_roster(path: str) -> List[Dict[str, str]]:
     """组织架构表 → 花名册 list[dict]。
     键:id(工号,大写归一)/name/l2/l3/l31/l4/category/supId(直接上级工号,大写归一)/supName。
-    仅收 新L3组织 == 交付实施三部 的行(同 read_org_names);工号为空的行跳过——工号是跨域连接键。"""
-    rows = _read_header_sheet(path, "工号")
-    if rows and any(r.get("新L3组织") for r in rows):
-        rows = [r for r in rows if str(r.get("新L3组织") or "").strip() == config.DEPT_L3]
+    部门范围同 read_org_names(见 _org_dept_rows);工号为空的行跳过——工号是跨域连接键。"""
+    rows = _org_dept_rows(_read_header_sheet(path, "工号"))
     out: List[Dict[str, str]] = []
     for r in rows:
         emp_id = str(r.get("工号") or "").strip().upper()

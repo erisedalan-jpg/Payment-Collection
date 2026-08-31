@@ -49,7 +49,7 @@ describe('ClosedProjectDetailView', () => {
   it('未找到→404 文案', async () => {
     const ds = useDataStore(); ds.data = { closedProjects: [CP] } as any
     const w = await mountAt('NOPE')
-    expect(w.text()).toContain('不在交付三部已关闭清单')
+    expect(w.text()).toContain('不在本部门已关闭清单')
   })
 
   it('404 空态容器改用 AppEmpty(default 变体,卡片外观收归组件)', async () => {

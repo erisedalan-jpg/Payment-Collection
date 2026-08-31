@@ -286,7 +286,7 @@ const originInfo = computed(() => [
   <div class="project-detail-view">
     <AppEmpty v-if="!p">
       <SectionTitle level="card" class="pd-404-title">未找到该项目</SectionTitle>
-      <div class="pd-404-sub">项目编号 {{ route.params.id }} 不在项目主域中（仅含交付实施三部在建项目）。</div>
+      <div class="pd-404-sub">项目编号 {{ route.params.id }} 不在项目主域中（仅含组织架构花名册内的在建项目）。</div>
       <RouterLink to="/projects" class="pd-404-link">← 返回在建项目</RouterLink>
     </AppEmpty>
 

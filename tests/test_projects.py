@@ -600,3 +600,98 @@ def test_manager_ids_无直接上级列时返回空集():
     """老格式组织架构表没有该列 → 降级为空集,调用方据此把管理标签筛选置灰。"""
     roster = [{"id": "A001", "name": "老王", "supId": "", "supName": ""}]
     assert P.manager_ids(roster) == set()
+
+
+class TestOrgDeptScopeAutoDetect:
+    """组织架构表的部门范围「自动认表」(V4.5.16 多部门交付)。
+
+    过滤的原意在 read_org_names docstring 里写着:防误放全公司清单。所以判据应当是
+    「这张表里有几个部门」,而不是写死某一个部门名 —— 后者会让另一个部门的花名册
+    被整表丢弃,且全程无报错(主域、倚天工时两条链同时静默清零)。
+    """
+
+    def _org(self, tmp_path, rows, name="组织架构.xlsx"):
+        return _make_xlsx(tmp_path, name, [
+            ("Sheet1", [("工号", "姓名", "新L3组织", "新L4组织")] + rows)])
+
+    # ── 单一部门:表里是谁就收谁 ──
+    def test_单一部门_非三部_全部收下(self, tmp_path):
+        """新部门场景:表里只有一个 L3 且不是三部 → 照收。写死 DEPT_L3 时这里返回空集。"""
+        path = self._org(tmp_path, [
+            ("A1", "张三", "交付实施四部", "北京服务组"),
+            ("A2", "李四", "交付实施四部", "上海服务组"),
+        ])
+        names, l4s, rows = P.read_org_names(path)
+        assert names == {"张三", "李四"}
+        assert l4s == {"北京服务组", "上海服务组"}
+        assert rows == 2
+
+    def test_单一部门_是三部_行为不变(self, tmp_path):
+        """现网回归安全网:三部那张表(实测 85 行 L3 唯一)结果必须逐字不变。"""
+        path = self._org(tmp_path, [
+            ("A1", "佘海龙", config.DEPT_L3, "黑龙江服务组"),
+            ("A2", "杨亮", config.DEPT_L3, "黑龙江服务组"),
+        ])
+        names, l4s, rows = P.read_org_names(path)
+        assert names == {"佘海龙", "杨亮"}
+        assert l4s == {"黑龙江服务组"}
+        assert rows == 2
+
+    def test_单一部门_L3留空的行仍被排除(self, tmp_path):
+        """「唯一值」按非空值算,L3 空白的行照旧不收 —— 与写死常量时的语义一致,
+        不能因为改成自动认表就把没填部门的行放进来。"""
+        path = self._org(tmp_path, [
+            ("A1", "张三", "交付实施四部", "北京服务组"),
+            ("A2", "没填部门", "", "某组"),
+        ])
+        names, l4s, rows = P.read_org_names(path)
+        assert names == {"张三"}
+        assert l4s == {"北京服务组"}
+        assert rows == 1
+
+    # ── 多部门:退回白名单,并且绝不静默 ──
+    def test_多部门_按白名单收(self, tmp_path):
+        """误放了跨部门清单 → 这才是 config.DEPT_L3S 该出场的时候。"""
+        path = self._org(tmp_path, [
+            ("A1", "佘海龙", config.DEPT_L3, "黑龙江服务组"),
+            ("A2", "外部门人", "交付实施一部", "别的组"),
+        ])
+        names, l4s, rows = P.read_org_names(path)
+        assert names == {"佘海龙"}
+        assert l4s == {"黑龙江服务组"}
+        assert rows == 1
+
+    def test_多部门_白名单全不匹配_返回空且告警(self, tmp_path, capsys):
+        """承重:返回空 names 会让 build_projects 的 `if org_names` 守卫失效、
+        主域退化成 PMIS 在建全量(= 把全公司项目收进来)。这条路必须有声音。"""
+        path = self._org(tmp_path, [
+            ("A1", "甲", "交付实施一部", "组一"),
+            ("A2", "乙", "交付实施二部", "组二"),
+        ])
+        names, _l4s, rows = P.read_org_names(path)
+        assert names == set() and rows == 0
+        out = capsys.readouterr().out
+        assert "[WARN]" in out
+        assert "交付实施一部" in out and "交付实施二部" in out
+
+    # ── roster 走同一条判据(倚天工时链) ──
+    def test_roster_单一部门_非三部_全部收下(self, tmp_path):
+        """倚天是独立的第二条链:roster 空 → yitian 的 kept 过滤把全部工时丢弃。"""
+        path = _make_xlsx(tmp_path, "组织架构.xlsx", [("Sheet1", [
+            ("工号", "姓名", "员工类别", "新L2组织", "新L3组织", "新L3-1组织", "新L4组织",
+             "直接上级工号", "直接上级姓名"),
+            ("a1", "张三", "正式员工", "交付中心", "交付实施四部", "四部一室",
+             "北京服务组", "a0", "老张"),
+        ])])
+        roster = P.read_org_roster(path)
+        assert [p["id"] for p in roster] == ["A1"]
+        assert roster[0]["l3"] == "交付实施四部"
+
+    def test_roster_多部门_按白名单收(self, tmp_path):
+        path = _make_xlsx(tmp_path, "组织架构.xlsx", [("Sheet1", [
+            ("工号", "姓名", "新L3组织", "新L4组织"),
+            ("a1", "佘海龙", config.DEPT_L3, "黑龙江服务组"),
+            ("a2", "外部门人", "交付实施一部", "别的组"),
+        ])])
+        roster = P.read_org_roster(path)
+        assert [p["name"] for p in roster] == ["佘海龙"]
