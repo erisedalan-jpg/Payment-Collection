@@ -38,7 +38,9 @@ TOP_PY = sorted(
 # ============================================================
 a = Analysis(
     ['server.py'],
-    pathex=[BASE],
+    # client/ 也进 pathex:让 PyInstaller 把 cookie_core 当普通模块收进 PYZ,
+    # 打包态 `import cookie_core` 直接可用(开发态由 server.py 把 client/ 加进 sys.path)。
+    pathex=[BASE, os.path.join(BASE, 'client')],
     binaries=[],
     datas=[
         # ── 前端构建产物（Vue3+Vite，U1 迁移后替代旧 index.html/style.css/app.js/lib） ──
@@ -58,6 +60,11 @@ a = Analysis(
     ] + [(f, '.') for f in TOP_PY],
     hiddenimports=[
         'openpyxl', 'xlrd', 'chardet', 'bs4', 'lxml',
+        # requests:pmisdata 下载脚本与 cookie_core 都要它。主程序自身不 import,
+        # 靠导入图收不到,必须显式列出,否则打出来的 exe 一取 cookie/一下载就 ImportError。
+        'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
+        # cookie_core:单机版服务端直接取 PMIS cookie(见 server.handle_pmis_cookie_fetch_local)
+        'cookie_core',
         'csv', 'json', 'threading', 'webbrowser',
         'http.server', 'urllib.parse', 'io', 'shutil',
         'data_history',

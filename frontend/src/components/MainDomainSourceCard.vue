@@ -32,8 +32,29 @@ const pmisCookie = ref('')
 const cookieMsg = ref('')
 const cookieErr = ref(false)
 
+// 服务端直取:单机 exe 版专用。平台与零信任客户端同机时,后端调 cookie_core 直接拿,
+// 不需要本机代理进程(也就不需要交付机装 Python、跑 vbs、开 8765 端口)。
+async function fetchCookieViaServer() {
+  try {
+    const r = await api.post<{ sessionPreview: string; names: string[]; message: string }>(
+      '/api/pmis/cookie/fetch-local', {})
+    emit('cookie-change', { sessionPreview: r.sessionPreview, updatedAt: '刚刚' })
+    cookieMsg.value = r.message
+  } catch (e) {
+    cookieErr.value = true
+    cookieMsg.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
 async function onFetchPmisCookie() {
   cookieMsg.value = ''; cookieErr.value = false
+  // 两条取 cookie 的路,按环境自动选 —— 不给用户两个按钮让他猜该点哪个:
+  //   代理在线 → 生产版(平台在服务器、零信任在用户 PC,不同机,只能由 PC 上的代理取了再推)
+  //   代理不在 → 单机 exe 版(平台与零信任同机,服务端自己就能取)
+  // 顺序不能反:生产服务器上没有零信任,服务端直取要等 30s 超时才失败,先探代理是瞬时的。
+  const online = await pingAgent()
+  agentOnline.value = online
+  if (!online) { await fetchCookieViaServer(); return }
   const res = await fetchPmisCookie()
   if (!res.ok) { cookieErr.value = true; cookieMsg.value = 'PMIS cookie 获取失败：' + res.error; return }
   if (!res.hasSession) {
@@ -97,8 +118,8 @@ defineExpose({ reload: loadFileStatus, onFetchPmisCookie })
     <div class="dv-card-head">项目主域</div>
 
     <div class="dv-row">
-      <button class="dv-btn primary" data-test="btn-fetch-pmis-cookie" @click="onFetchPmisCookie">获取本机 PMIS cookie 并推送</button>
-      <span class="dv-badge" :class="agentOnline ? 'ok' : 'warn'">本机代理{{ agentOnline ? '已连接' : '未运行' }}</span>
+      <button class="dv-btn primary" data-test="btn-fetch-pmis-cookie" @click="onFetchPmisCookie">获取 PMIS Cookie</button>
+      <span class="dv-badge" :class="agentOnline ? 'ok' : 'info'">{{ agentOnline ? '本机代理已连接' : '由服务端直接获取' }}</span>
     </div>
     <div v-if="cookieMsg" class="dv-row dv-hint" :class="cookieErr ? 'err' : 'ok'">{{ cookieMsg }}</div>
     <div class="dv-row">

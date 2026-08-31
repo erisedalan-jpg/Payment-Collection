@@ -38,6 +38,7 @@ _ACTION_MAP = {
     ('GET', '/api/stop'): ('server.stop', '停止服务'),
     ('GET', '/api/pmis/download'): ('pmis.download', 'PMIS拉取'),
     ('POST', '/api/pmis/cookie'): ('pmis.cookie_save', '更新PMIS Cookie'),
+    ('POST', '/api/pmis/cookie/fetch-local'): ('pmis.cookie_fetch_local', '本机取PMIS Cookie'),
     ('POST', '/api/yitian/cookie'): ('yitian.cookie_save', '更新倚天 Cookie'),
     ('POST', '/api/yitian/settings'): ('yitian.settings', '修改倚天合规检查范围'),
     ('POST', '/api/yitian/rules'): ('yitian.rules', '修改倚天合规规则'),

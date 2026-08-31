@@ -120,6 +120,21 @@ PMISDATA_CONFIG = os.path.join(PMISDATA_DIR, 'config.json')
 YITIAN_CONFIG = os.path.join(BASE_DIR, 'data', 'yitian_config.json')
 PMIS_PIPELINE_SCRIPT = os.path.join(PMISDATA_DIR, 'run_pmis_pipeline.sh')
 
+# ── client/cookie_core.py:向 PMIS 取 cookie(requests 直连 + 本机零信任认证,不读浏览器)──
+# 单机 exe 版平台与零信任客户端同机,可直接调它取 cookie,不必经 client/ 的 8765 代理
+# —— 那套代理是为【平台在服务器、零信任在用户 PC】的生产部署准备的,单机版没有这个隔阂。
+# 单一来源:不把 cookie_core 复制一份到仓库根,避免两份实现漂移。
+#   开发态 —— client/ 加进 sys.path;打包态 —— 由 spec 的 pathex 收进 PYZ,import 直接可用。
+_CLIENT_DIR = os.path.join(BASE_DIR, 'client')
+if os.path.isdir(_CLIENT_DIR) and _CLIENT_DIR not in sys.path:
+    sys.path.insert(0, _CLIENT_DIR)
+try:
+    import cookie_core
+except ImportError:
+    # 缺 requests 或没打包进来。不阻断启动:平台其余功能与它无关,
+    # 端点自己会给出可读的提示(见 handle_pmis_cookie_fetch_local)。
+    cookie_core = None
+
 # 前端 Web 根:打包态用内置 dist,开发态用 frontend/dist
 if getattr(sys, 'frozen', False):
     WEB_ROOT = os.path.join(STATIC_DIR, 'dist')
@@ -263,7 +278,7 @@ _SUPER_ONLY_PATHS = frozenset({
     # 跟进表超管自定义列:GET(读列定义)不入本集合——普通管理员要用它渲染列;写四端点超管专属。
     '/api/followup-columns/add', '/api/followup-columns/update',
     '/api/followup-columns/reorder', '/api/followup-columns/delete',
-    '/api/pmis/cookie', '/api/pmis/download',
+    '/api/pmis/cookie', '/api/pmis/cookie/fetch-local', '/api/pmis/download',
     '/api/yitian/cookie',
     '/api/yitian/store/clear', '/api/yitian/store/delete-range',
     '/api/yitian/rules',
@@ -1421,6 +1436,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_opportunities_import()
         elif parsed.path == '/api/pmis/cookie':
             self.handle_pmis_cookie_save()
+        elif parsed.path == '/api/pmis/cookie/fetch-local':
+            self.handle_pmis_cookie_fetch_local()
         elif parsed.path == '/api/yitian/cookie':
             self.handle_yitian_cookie_save()
         elif parsed.path == '/api/yitian/settings':
@@ -3042,6 +3059,58 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         self._json_response({"success": True, "sessionPreview": preview, "message": "Cookie 已更新"})
 
+    def handle_pmis_cookie_fetch_local(self):
+        """POST /api/pmis/cookie/fetch-local - 服务端直接向 PMIS 取 cookie 并写入。超管专属。
+
+        与 handle_pmis_cookie_save 的区别:那个是前端把 cookie 传上来(生产版由用户 PC 上的
+        8765 代理取好再推),这个是【服务端自己去取】—— 只在平台与零信任客户端同机时可行,
+        也就是 Windows 单机 exe 版。服务器部署上调用它会失败(服务器上没有零信任),
+        错误消息里会说清楚该走代理那条路。
+
+        三条约束:
+          · 响应绝不回传完整 cookie —— 它是凭证,前端只需要知道成功与否 + SESSION 前 8 位。
+          · 取失败绝不覆盖已有 cookie —— 用户多半只是忘了登零信任,把旧凭证清掉会
+            连带让下载管线失效。
+          · 取到但没有 SESSION 也不写 —— 零信任重定向到别的站点时会收到一堆无关 cookie,
+            写进去等于用垃圾覆盖可用凭证。
+        """
+        import pmis_config
+        self._audit_set(detail='本机取 PMIS Cookie')
+        if cookie_core is None:
+            self._json_response({
+                "success": False,
+                "message": "cookie_core 模块不可用(开发态需要 client/ 目录，打包态需要 spec 收录；"
+                           "另需已安装 requests)。可改用「粘贴 Cookie」方式。"})
+            return
+        try:
+            res = cookie_core.fetch_pmis()
+        except Exception as e:  # noqa: BLE001 - 网络/零信任异常一律转成可读消息,不 500
+            self._json_response({"success": False, "message": "取 Cookie 失败: %s" % e})
+            return
+        if not res.get("ok"):
+            err = res.get("error") or "未知原因"
+            # cookie_core 的部分错误分支自己已经带了零信任提示(如"访问失败: ...（请确认零信任
+            # 客户端已在本机登录）"),无条件再追加一句会变成同一句提示连出两遍。只在缺的时候补。
+            tail = "" if "零信任" in err else "（请确认本机零信任客户端已登录 PMIS）"
+            self._json_response({"success": False, "message": "取 Cookie 失败: %s%s" % (err, tail)})
+            return
+        cookie = res.get("cookie") or ""
+        if "SESSION=" not in cookie:
+            self._json_response({
+                "success": False,
+                "names": res.get("names") or [],
+                "message": "取到 %d 个 Cookie 但其中没有 SESSION，未写入（多半是被零信任重定向到了"
+                           "其它站点）。" % len(res.get("names") or [])})
+            return
+        try:
+            preview = pmis_config.write_session_cookie(PMISDATA_CONFIG, cookie)
+        except (ValueError, OSError) as e:
+            self._json_response({"success": False, "message": "写入失败: %s" % e})
+            return
+        self._json_response({"success": True, "sessionPreview": preview,
+                             "names": res.get("names") or [],
+                             "message": "已从本机获取并更新 Cookie"})
+
     def handle_yitian_cookie_get(self):
         """GET /api/yitian/cookie - 当前倚天 cookie 状态。超管专属。"""
         import yitian_config
@@ -3081,6 +3150,21 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         global download_state
         if history_state.get("running") or reprocess_state.get("running"):
             self._send_sse_busy("其他数据操作进行中,请稍后再下载")
+            return
+        # 脚本在不在是【同步就能判定】的事,不该丢进子线程再靠 SSE 轮询把结论捞回来:
+        # 主线程 Thread.start() 之后【立刻】推第一帧,而子线程此时往往还没执行到写
+        # download_state 那行,于是推出去的是 "启动下载...",真正的错误要等下一轮
+        # (0.5s 后)才出现 —— 只读第一帧的客户端会拿到误导信息。平时线程调度快到看不出来,
+        # 机器负载高时稳定复现(全量 pytest 下实测)。同步判掉,顺带少启一个必然失败的线程。
+        if not os.path.exists(PMIS_PIPELINE_SCRIPT):
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream')
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self._sse_write("data: %s\n\n" % json.dumps(
+                {"running": False, "progress": 0,
+                 "message": "下载脚本不存在(pmisdata/run_pmis_pipeline.sh)"},
+                ensure_ascii=False))
             return
         if not _acquire_run_slot(download_state, _run_state_lock,
                                   {"running": True, "progress": 0, "message": "启动下载..."}):

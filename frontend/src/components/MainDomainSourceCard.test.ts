@@ -73,6 +73,10 @@ describe('MainDomainSourceCard', () => {
 
   it('取到含 SESSION 的 cookie → POST 并 emit cookie-change', async () => {
     const { api } = await import('@/api/client')
+    // 必须显式声明代理在线:beforeEach 的 restoreAllMocks 会把 vi.mock 工厂里的
+    // mockResolvedValue(true) 一并重置成 undefined(falsy),不写这行本用例会走服务端直取那条路,
+    // 而它的断言恰好也成立 —— 是个假绿。
+    vi.mocked(cookieAgent.pingAgent).mockResolvedValue(true)
     vi.spyOn(api, 'post').mockResolvedValue({ sessionPreview: 'SESSION1' } as never)
     vi.mocked(cookieAgent.fetchPmisCookie).mockResolvedValue({
       ok: true, cookie: 'SESSION=z; a=b', names: ['SESSION', 'a'], hasSession: true, error: '',
@@ -85,6 +89,7 @@ describe('MainDomainSourceCard', () => {
 
   it('取到无 SESSION → 告警且不推送、不 emit', async () => {
     const { api } = await import('@/api/client')
+    vi.mocked(cookieAgent.pingAgent).mockResolvedValue(true)   // 同上:钉住代理那条路
     const postSpy = vi.spyOn(api, 'post').mockResolvedValue({} as never)
     vi.mocked(cookieAgent.fetchPmisCookie).mockResolvedValue({
       ok: true, cookie: 'a=b', names: ['a'], hasSession: false, error: '',
@@ -168,5 +173,59 @@ describe('MainDomainSourceCard 合并上传', () => {
     expect(msgEl.text()).toContain('已上传 1 个 PMIS 九表')
     expect(msgEl.text()).toContain('失败 1 个（服务端未接收,请重试）')
     expect(msgEl.classes()).toContain('warn')
+  })
+})
+
+describe('取 PMIS cookie 的两条路：代理在线走代理，代理不在走服务端直取', () => {
+  // 背景：cookie_core 是 requests 直连 PMIS + 本机零信任认证。
+  //   生产版 —— 平台在服务器、零信任在用户 PC，两者不同机 → 必须由 PC 上的 8765 代理取了再推。
+  //   单机 exe 版 —— 平台就跑在用户机器上 → 服务端自己就能取，交付机因此不需要装 Python/跑 vbs。
+  // 所以按钮不新增，按「代理在不在」自动选路。
+
+  it('代理离线 → 调 /api/pmis/cookie/fetch-local，且不去碰本机代理', async () => {
+    const { api } = await import('@/api/client')
+    vi.mocked(cookieAgent.pingAgent).mockResolvedValue(false)
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue({
+      success: true, sessionPreview: 'LOCAL123', names: ['SESSION'], message: '已从本机获取并更新 Cookie',
+    } as never)
+    const w = await mountCard()
+    await (w.vm as any).onFetchPmisCookie()
+    await flushPromises()
+
+    expect(postSpy).toHaveBeenCalledWith('/api/pmis/cookie/fetch-local', {})
+    // 代理离线时不该再去调代理（那正是会 ERR_CONNECTION_REFUSED 的那条路）
+    expect(cookieAgent.fetchPmisCookie).not.toHaveBeenCalled()
+    expect(w.emitted('cookie-change')?.[0]).toEqual([{ sessionPreview: 'LOCAL123', updatedAt: '刚刚' }])
+    expect(w.text()).toContain('已从本机获取并更新 Cookie')
+  })
+
+  it('代理在线 → 仍走代理那条路，不调 fetch-local（生产版行为不变）', async () => {
+    const { api } = await import('@/api/client')
+    vi.mocked(cookieAgent.pingAgent).mockResolvedValue(true)
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue({ sessionPreview: 'VIA_AGENT' } as never)
+    vi.mocked(cookieAgent.fetchPmisCookie).mockResolvedValue({
+      ok: true, cookie: 'SESSION=z; a=b', names: ['SESSION', 'a'], hasSession: true, error: '',
+    })
+    const w = await mountCard()
+    await (w.vm as any).onFetchPmisCookie()
+    await flushPromises()
+
+    expect(cookieAgent.fetchPmisCookie).toHaveBeenCalled()
+    expect(postSpy).toHaveBeenCalledWith('/api/pmis/cookie', { cookie: 'SESSION=z; a=b' })
+    expect(postSpy).not.toHaveBeenCalledWith('/api/pmis/cookie/fetch-local', expect.anything())
+  })
+
+  it('服务端直取失败（零信任未登录）→ 显示后端给的原话，不 emit', async () => {
+    const { api } = await import('@/api/client')
+    vi.mocked(cookieAgent.pingAgent).mockResolvedValue(false)
+    // api.post 对 success:false 会抛 ApiRequestError，message 取自后端
+    vi.spyOn(api, 'post').mockRejectedValue(
+      new Error('取 Cookie 失败: 被重定向到登录页（零信任未登录）（请确认本机零信任客户端已登录 PMIS）'))
+    const w = await mountCard()
+    await (w.vm as any).onFetchPmisCookie()
+    await flushPromises()
+
+    expect(w.emitted('cookie-change')).toBeUndefined()
+    expect(w.text()).toContain('零信任')
   })
 })

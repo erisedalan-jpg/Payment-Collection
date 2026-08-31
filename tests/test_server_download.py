@@ -128,3 +128,37 @@ def test_super_download_missing_script_reports(tmp_path, monkeypatch):
         assert "下载脚本不存在" in data
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_脚本不存在时根本不启动下载线程(tmp_path, monkeypatch):
+    """脚本在不在是同步可判定的,不该先启动一个必然失败的线程。
+
+    这条断言钉的是上一条测试【为什么会偶发】:启动线程后 handler 立刻推第一帧,
+    而子线程此时多半还没写 download_state,推出去的是 "启动下载...",真正的错误
+    要等 0.5s 后的下一帧 —— 只读第一帧的客户端拿到的是误导信息。该竞态在
+    全量 pytest 的负载下稳定复现、单跑却不复现,所以不能只靠上一条用例守。
+    这里改验一个【与调度无关、恒定可观测】的事实:run_download 一次都没被调用。
+    """
+    _accounts(tmp_path, monkeypatch)
+    monkeypatch.setattr(S, "PMIS_PIPELINE_SCRIPT", str(tmp_path / "nope.sh"))
+    S.download_state = {"running": False, "progress": 0, "message": ""}
+    called = []
+
+    def _fake_run():
+        called.append(1)
+        # 替身【必须】把 running 置回 False。否则缺陷复现时(handler 真的起了线程),
+        # SSE 循环因 running 恒 True 永不退出 —— 本用例会【挂死】而不是变红。
+        # 挂死比失败更糟:CI 里看到的是超时,不是一条指着问题的红。
+        S.download_state = {"running": False, "progress": 0, "message": "fake"}
+
+    monkeypatch.setattr(S, "run_download", _fake_run)
+    srv = S.create_server(host="127.0.0.1", port=0); port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        conn, ck = _login(port, "super")
+        st, data = _req(conn, "GET", "/api/pmis/download", ck)
+        assert st == 200
+        assert "下载脚本不存在" in data
+        assert called == [], "脚本不存在时不该启动下载线程"
+    finally:
+        srv.shutdown(); srv.server_close()

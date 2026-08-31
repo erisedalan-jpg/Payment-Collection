@@ -17,8 +17,13 @@ sys.path.insert(0, SCRIPT_DIR)
 import cookie_core  # noqa: E402
 
 DEFAULT_PORT = 8765
+# 127.0.0.1 与 localhost 是两个不同的 Origin,浏览器不会互相等价。平台 exe 启动时
+# 自动打开的是 http://127.0.0.1:8080(server._open_browser 用 HOST 拼),此前该 Origin
+# 不在白名单里 → 代理恒返回 403、页面只显示"未连接",实测确认过。
 DEFAULT_ALLOWED_ORIGINS = [
-    "http://10.248.105.95", "http://localhost:8080", "http://localhost:5173",
+    "http://10.248.105.95",
+    "http://localhost:8080", "http://127.0.0.1:8080",
+    "http://localhost:5173", "http://127.0.0.1:5173",
 ]
 AGENT_VERSION = "1.0.0"
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "agent_config.json")
