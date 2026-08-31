@@ -40,12 +40,15 @@ a = Analysis(
     ['server.py'],
     # client/ 也进 pathex:让 PyInstaller 把 cookie_core 当普通模块收进 PYZ,
     # 打包态 `import cookie_core` 直接可用(开发态由 server.py 把 client/ 加进 sys.path)。
-    pathex=[BASE, os.path.join(BASE, 'client')],
+    pathex=[BASE, os.path.join(BASE, 'client'), os.path.join(BASE, 'pmisdata')],
     binaries=[],
     datas=[
         # ── 前端构建产物（Vue3+Vite，U1 迁移后替代旧 index.html/style.css/app.js/lib） ──
         ('frontend/dist', 'dist'),
         # ── 图标/Logo ──
+        # 下载管线的编排脚本:server 用 _run_script_direct 从【文件】加载它
+        # (spec_from_file_location 需要真实路径),所以走 datas 而不是 hiddenimports。
+        ('pmisdata/run_pmis_pipeline.py', '.'),
         ('app_icon.ico', '.'),
         ('app_logo.png', '.'),
         # ── 字体（Web 字体文件） ──
@@ -65,6 +68,10 @@ a = Analysis(
         'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
         # cookie_core:单机版服务端直接取 PMIS cookie(见 server.handle_pmis_cookie_fetch_local)
         'cookie_core',
+        # PMIS 下载管线的三个抓数脚本:由 run_pmis_pipeline 用 importlib 动态 import,
+        # 静态分析看不到,不显式列出打出来的 exe 一点「下载数据」就 ModuleNotFoundError。
+        # (同款教训见本文件顶部 collection_stages 那段。)
+        'fetch_pmis_tables', 'fetch_all_projects', 'delivery_analysis',
         'csv', 'json', 'threading', 'webbrowser',
         'http.server', 'urllib.parse', 'io', 'shutil',
         'data_history',

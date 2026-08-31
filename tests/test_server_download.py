@@ -26,6 +26,7 @@ def test_other_line_keeps_progress_none_with_message():
 # ── Task 5: cookie 端点测试 ────────────────────────────────────────────────
 import json as _json
 import http.client
+import sys
 import threading
 import auth
 
@@ -57,6 +58,48 @@ def _req(conn, method, path, cookie, body=None):
     conn.request(method, path, body, headers)
     r = conn.getresponse(); st = r.status; data = r.read().decode("utf-8")
     return st, data
+
+
+class Test按平台选下载流水线实现:
+    """Windows 走 .py(目标机既没有 bash 也没有系统 python),其余平台走 .sh
+    (Linux 生产在用,一个字没动)。选错实现的后果是「下载」按钮在某个平台上直接不可用。"""
+
+    def test_windows选py(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(S, "PMISDATA_DIR", str(tmp_path))
+        monkeypatch.setattr(S, "STATIC_DIR", str(tmp_path / "nope"))
+        (tmp_path / "run_pmis_pipeline.py").write_text("x", encoding="utf-8")
+        path, is_py = S._download_pipeline()
+        assert is_py is True
+        assert path.endswith("run_pmis_pipeline.py")
+
+    def test_打包态优先取内嵌的那份(self, tmp_path, monkeypatch):
+        """frozen 时脚本随 datas 落在 _MEIPASS(STATIC_DIR)。若同时存在,内嵌那份
+        才是与本次构建配套的,磁盘上那份可能是旧的。"""
+        static = tmp_path / "meipass"
+        static.mkdir()
+        (static / "run_pmis_pipeline.py").write_text("x", encoding="utf-8")
+        (tmp_path / "run_pmis_pipeline.py").write_text("x", encoding="utf-8")
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(S, "STATIC_DIR", str(static))
+        monkeypatch.setattr(S, "PMISDATA_DIR", str(tmp_path))
+        path, _is_py = S._download_pipeline()
+        assert path == str(static / "run_pmis_pipeline.py")
+
+    def test_linux仍走sh(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sys, "platform", "linux")
+        sh = tmp_path / "run_pmis_pipeline.sh"
+        sh.write_text("#!/bin/bash", encoding="utf-8")
+        monkeypatch.setattr(S, "PMIS_PIPELINE_SCRIPT", str(sh))
+        path, is_py = S._download_pipeline()
+        assert is_py is False
+        assert path.endswith(".sh")
+
+    def test_都不存在返回None(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(S, "STATIC_DIR", str(tmp_path / "a"))
+        monkeypatch.setattr(S, "PMISDATA_DIR", str(tmp_path / "b"))
+        assert S._download_pipeline()[0] is None
 
 
 def test_cookie_paths_are_super_only():
@@ -117,7 +160,9 @@ def test_nonsuper_blocked_from_download(tmp_path, monkeypatch):
 
 def test_super_download_missing_script_reports(tmp_path, monkeypatch):
     _accounts(tmp_path, monkeypatch)
-    monkeypatch.setattr(S, "PMIS_PIPELINE_SCRIPT", str(tmp_path / "nope.sh"))
+    # 平台无关地制造「选不出脚本」:Windows 走 .py、Linux 走 .sh,单改某一个常量
+    # 在另一个平台上不成立(V4.5.19 加入 py 实现后实测过)。
+    monkeypatch.setattr(S, "_download_pipeline", lambda: (None, sys.platform == "win32"))
     S.download_state = {"running": False, "progress": 0, "message": ""}
     srv = S.create_server(host="127.0.0.1", port=0); port = srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -140,7 +185,7 @@ def test_脚本不存在时根本不启动下载线程(tmp_path, monkeypatch):
     这里改验一个【与调度无关、恒定可观测】的事实:run_download 一次都没被调用。
     """
     _accounts(tmp_path, monkeypatch)
-    monkeypatch.setattr(S, "PMIS_PIPELINE_SCRIPT", str(tmp_path / "nope.sh"))
+    monkeypatch.setattr(S, "_download_pipeline", lambda: (None, sys.platform == "win32"))
     S.download_state = {"running": False, "progress": 0, "message": ""}
     called = []
 

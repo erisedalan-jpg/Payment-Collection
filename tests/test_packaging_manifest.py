@@ -125,7 +125,11 @@ def test_spec_collects_backend_scripts_via_glob():
 
     datas = _analysis_datas()
     assert datas is not None, "%s 里没解析到 Analysis(datas=...)" % SPEC
-    hard = [s for s in _static_data_sources(datas) if s.endswith(".py")]
+    # 只禁【根】.py 被硬编码 —— 那才是 TOP_PY 的 glob 覆盖的范围,也是 collection_stages.py
+    # 当年漏掉的地方。子目录里的脚本(如 pmisdata/run_pmis_pipeline.py)本来就不在
+    # `BASE/*.py` 的 glob 里,必须显式列出,不该被这条误伤(V4.5.19 实测撞上)。
+    hard = [s for s in _static_data_sources(datas)
+            if s.endswith(".py") and "/" not in s and os.sep not in s]
     assert not hard, \
         "%s 的 datas 里硬编码了 .py 文件名 %s;根 .py 应由 TOP_PY 的 glob 收全" % (SPEC, hard)
 
@@ -181,3 +185,45 @@ def test_repo_root_py_count_is_sane():
     root_py = [os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "*.py"))]
     assert len(root_py) >= 40, "仓库根 .py 只剩 %d 个,扫描路径疑似失效" % len(root_py)
     assert "server.py" in root_py and "followup_store.py" in root_py
+
+
+def _analysis_hiddenimports():
+    for node in ast.walk(_tree(SPEC)):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Analysis":
+            for kw in node.keywords:
+                if kw.arg == "hiddenimports":
+                    return kw.value
+    return None
+
+
+def test_spec收录下载管线的三个抓数脚本():
+    """它们由 run_pmis_pipeline 用 importlib【动态】import,PyInstaller 的静态分析
+    看不到 —— 漏收的后果与当年 collection_stages.py 一模一样:exe 版一点「下载数据」
+    就 ModuleNotFoundError,而开发模式下模块就在磁盘上,本地永远测不出来(CLAUDE.md §5)。
+
+    编排脚本本身走 datas(server 用 _run_script_direct 从文件加载,需要真实路径),
+    这里一并钉住,免得哪次「清理 datas」把它顺手删掉。"""
+    hidden = _analysis_hiddenimports()
+    assert hidden is not None, "%s 里没解析到 Analysis(hiddenimports=...)" % SPEC
+    names = set(_str_consts(hidden))
+    assert names, "hiddenimports 解析成空集 —— 解析口径失效,下面的检查会恒真"
+    for m in ("fetch_pmis_tables", "fetch_all_projects", "delivery_analysis"):
+        assert m in names, "%s 的 hiddenimports 缺 %s(动态 import,静态分析收不到)" % (SPEC, m)
+
+    datas = _analysis_datas()
+    assert datas is not None
+    srcs = _static_data_sources(datas)
+    assert any(x.endswith("run_pmis_pipeline.py") for x in srcs), \
+        "%s 的 datas 缺 run_pmis_pipeline.py —— Windows 版「下载数据」会找不到编排脚本" % SPEC
+
+
+def test_spec的pathex含pmisdata():
+    """没有它,上面三个 hiddenimports 在构建时根本解析不到(模块不在仓库根)。"""
+    for node in ast.walk(_tree(SPEC)):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Analysis":
+            for kw in node.keywords:
+                if kw.arg == "pathex":
+                    assert "pmisdata" in ast.dump(kw.value), \
+                        "%s 的 pathex 应含 pmisdata,否则三个抓数脚本解析不到" % SPEC
+                    return
+    raise AssertionError("%s 里没解析到 Analysis(pathex=...)" % SPEC)

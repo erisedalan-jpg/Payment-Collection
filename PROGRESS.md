@@ -4,7 +4,25 @@
 > 规则：开工把要做的项标 `[~] 进行中`；完成改 `[x]` 并写一句结论；新发现的问题加到 Backlog。
 > 配套机器可读清单见 `feature_list.json`。
 
-- 当前版本：**V4.5.18**（Z 级 · **首次部署时 `pmisdata/config.json` 不存在导致取 Cookie 失败**）**【未部署】**——V4.5.17 交付机实测报障：解压后点「获取 PMIS Cookie」报 `写入失败: [Errno 2] No such file or directory: ...项目管理平台-V4.5.17\pmisdata\config.json`；**手工建出该目录与文件后即成功**（提示「已从本机获取并更新 Cookie」、config 修改时间有变化）。
+- 当前版本：**V4.5.19**（Z 级 · **下载管线跨平台：Windows 单机 exe 也能跑「下载数据」**）**【未部署 · 交付机待验】**——三问题工单的**第二步**。此前 `run_download` 只有一条路径 `subprocess.Popen(["bash", run_pmis_pipeline.sh])`，Windows 上既没有 bash，打包后更没有系统 python（`sys.executable` 是 exe 自己），交付机点「下载数据」必然失败。
+
+  **★ `.sh` 一个字没动**（用户按最小生产影响原则定的）。新写 `pmisdata/run_pmis_pipeline.py` 作为**同一套编排的第二个实现**，`_download_pipeline()` 按平台选：Linux→`.sh`（生产未改动）／Windows 开发态→subprocess 跑 `.py`／**Windows 打包态→进程内跑 `.py`**（复用既有的 `_run_script_direct` + `_TeeLineWriter`，逐行喂进度）。三条路径**共用同一个 `_sink`**，进度解析只此一份，不会再出现「只改了一边」。
+
+  **★ 三个抓数脚本各加一行 `PMISDATA_DIR` 环境变量覆盖**：它们原本用 `os.path.dirname(os.path.abspath(__file__))` 定位 config、输入与输出，而**打包后 `__file__` 指向 PyInstaller 的临时解压目录** —— 配置读不到、产物落进临时目录重启即丢、脚本间传文件（`fetch_pmis_tables` 产 xlsx → `fetch_all_projects` 读）也在临时目录里进行、最后拷不到 `input/`。Linux 不设该变量 → 行为逐字不变。
+
+  **★ `_run_step` 每次先从 `sys.modules` 摘掉再 import**：这些脚本在**模块级**读 config、算 OUTPUT_DIR。同一个 server 进程里点第二次「下载数据」时若命中 import 缓存，模块级代码不会重跑 —— **用户刚更新的 cookie 不生效，却看不出任何异常**。
+
+  **★ 跨文件契约测试**（本期最有价值的一条）：py 脚本的步骤文案与 `server._DOWNLOAD_MARKERS` 分别在两个文件里，没有任何编译期约束绑住它们，改一句文案就会让进度条永远停在 0% 而所有既有测试照样绿。测试真的把每一行输出喂给 `classify_download_line`，要求 **8 个进度点一个不少**。
+
+  **★ 又逮到一条自己写的假绿**：`test_run_step每次都清import缓存` 首版 monkeypatch 了 `importlib.import_module` 本身，**而缓存检查恰恰在它内部** —— 替身无论清不清缓存都会被调两次，变异 M6 全绿。这是**把被测行为本身 mock 掉了**。改成造一个真实探针模块、观察模块级代码有没有重跑，M6 才精确变红。
+
+  **★ 打包守卫先误伤后补强**：`test_packaging_manifest` 断言「datas 里不得硬编码 .py」，而 `pmisdata/run_pmis_pipeline.py` 在子目录、`TOP_PY` 的 `BASE/*.py` glob 根本收不到它，必须显式列出。按守卫**原意**（防的是【根】.py 退回硬编码白名单，即 `collection_stages.py` 当年漏掉的那类）收窄为只禁根 .py；同时**新增两条守卫**钉住本期新风险：三个抓数脚本必须在 `hiddenimports`（`importlib` 动态 import，静态分析看不到，漏收 = exe 版点下载即 `ModuleNotFoundError`，与当年 `collection_stages.py` 同款）、编排脚本必须在 `datas`、`pathex` 必须含 `pmisdata`。三条变异各自精确命中。
+
+  **★ 两条既有用例被本次改动弄失效**（`test_super_download_missing_script_reports` 等靠 monkeypatch `PMIS_PIPELINE_SCRIPT` 制造「脚本不存在」，而 Windows 已改走 `.py`）—— 已与改动**同批**改成平台无关（直接让 `_download_pipeline` 返回 None），并补 4 条覆盖平台选择逻辑本身的用例。
+
+  **★ `pmisdata/` 的版本管理（待用户拍板）**：该目录整体 gitignore，三个抓数脚本不在 git 里。本期**只把新写的 `run_pmis_pipeline.py` 纳入 git**（纯编排逻辑，不含任何 PMIS API 细节），三个抓数脚本保持 ignore、打包时从本地磁盘取 —— 不新增任何 public 泄漏面。代价：**打包必须在有 `pmisdata/` 的机器上做**（现状本就如此），且那三行改动无版本记录（改法已写在本条）。扫描结果供决策：`fetch_all_projects.py` 有**两处注释里的真实项目号**（要纳入 git 须先脱敏），脚本含 PMIS 内部 API 路径（是否越线由用户判断），其余干净。
+
+- 上一版本：**V4.5.18**（Z 级 · **首次部署时 `pmisdata/config.json` 不存在导致取 Cookie 失败**）**【未部署】**——V4.5.17 交付机实测报障：解压后点「获取 PMIS Cookie」报 `写入失败: [Errno 2] No such file or directory: ...项目管理平台-V4.5.17\pmisdata\config.json`；**手工建出该目录与文件后即成功**（提示「已从本机获取并更新 Cookie」、config 修改时间有变化）。
 
   **★ 这次报障顺带证实了 V4.5.17 里我明确保留的那一层**：当时真机冒烟卡在 DNS（开发机不在零信任内网），TLS 证书链**没验到**，我如实记了「`cacert.pem` 在包里但不算已证实」。这回在交付机上真的取到并写入了 cookie —— **`requests` 在 frozen 下能建立 TLS 连接、`certifi` 证书链工作正常**，该层现已证实。
 

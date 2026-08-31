@@ -3156,7 +3156,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         # download_state 那行,于是推出去的是 "启动下载...",真正的错误要等下一轮
         # (0.5s 后)才出现 —— 只读第一帧的客户端会拿到误导信息。平时线程调度快到看不出来,
         # 机器负载高时稳定复现(全量 pytest 下实测)。同步判掉,顺带少启一个必然失败的线程。
-        if not os.path.exists(PMIS_PIPELINE_SCRIPT):
+        if _download_pipeline()[0] is None:
             self.send_response(200)
             self.send_header('Content-Type', 'text/event-stream')
             self.send_header('Cache-Control', 'no-cache')
@@ -5186,44 +5186,91 @@ def run_reprocess():
         reprocess_state["running"] = False
 
 
+def _download_pipeline():
+    """选下载流水线的实现,返回 (脚本路径 或 None, is_py)。
+
+    Windows(含打包 exe)→ run_pmis_pipeline.py:目标机既没有 bash,也没有系统 python
+      (frozen 下 sys.executable 是 exe 自己),原来那条 ["bash", ...] 根本走不通。
+    其它平台(Linux 生产)→ run_pmis_pipeline.sh,**一个字没动**、行为与改动前逐字一致
+      (用户按最小生产影响原则定的)。
+
+    两份编排的【步骤标记必须保持一致】—— 进度全靠 _DOWNLOAD_MARKERS 文本匹配,
+    改一句文案就会让进度条静默失灵。tests/test_run_pmis_pipeline.py 有跨文件契约测试守着。
+    """
+    if sys.platform == 'win32':
+        # frozen: 随 spec 的 datas 落在 _MEIPASS 根;开发态: 在 pmisdata/ 下
+        for cand in (os.path.join(STATIC_DIR, 'run_pmis_pipeline.py'),
+                     os.path.join(PMISDATA_DIR, 'run_pmis_pipeline.py')):
+            if os.path.exists(cand):
+                return cand, True
+        return None, True
+    return (PMIS_PIPELINE_SCRIPT if os.path.exists(PMIS_PIPELINE_SCRIPT) else None), False
+
+
 def run_download():
-    """跑 pmisdata/run_pmis_pipeline.sh:备份→从 PMIS 下载→覆盖 input/。
-    frozen/dev 同走 subprocess(脚本在磁盘 pmisdata/、依赖系统 python3)。不自动 reprocess。"""
+    """跑下载流水线:备份→从 PMIS 下载→覆盖 input/。不自动 reprocess。
+
+    三条执行路径(选实现见 _download_pipeline):
+      · Linux          → subprocess 跑 .sh              (生产,未改动)
+      · Windows 开发态 → subprocess 跑 .py(系统 python)
+      · Windows 打包态 → **进程内**跑 .py —— 目标机没有 python 可执行文件,
+        `sys.executable` 是 exe 自己,subprocess 那条路根本不存在(CLAUDE.md §5)。
+    """
     global download_state
-    if not os.path.exists(PMIS_PIPELINE_SCRIPT):
+    script, is_py = _download_pipeline()
+    if script is None:
+        name = 'run_pmis_pipeline.py' if is_py else 'run_pmis_pipeline.sh'
         download_state = {"running": False, "progress": 0,
-                          "message": "下载脚本不存在(pmisdata/run_pmis_pipeline.sh)"}
+                          "message": "下载脚本不存在(pmisdata/%s)" % name}
         return
+    errs = []
+
+    def _sink(raw):
+        """三条路径共用的一行处理 —— 进度解析只此一份,不会再出现「只改了一边」。"""
+        global download_state
+        if '✗' in raw:
+            errs.append(raw.strip())
+        parsed = classify_download_line(raw)
+        if parsed is None:
+            return
+        prog, msg = parsed
+        cur = download_state["progress"]
+        if prog is not None and prog > cur:
+            cur = prog
+        download_state = {"running": True, "progress": cur, "message": msg}
+
     try:
         download_state = {"running": True, "progress": 5, "message": "启动下载流水线..."}
-        env = {**os.environ, "PMPLATFORM_DIR": BASE_DIR}
-        _flags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
-        process = subprocess.Popen(
-            ["bash", PMIS_PIPELINE_SCRIPT],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            cwd=PMISDATA_DIR, env=env, encoding='utf-8', errors='replace',
-            creationflags=_flags)
-        errs = []
-        for raw in process.stdout:
-            if '✗' in raw:
-                errs.append(raw.strip())
-            parsed = classify_download_line(raw)
-            if parsed is None:
-                continue
-            prog, msg = parsed
-            cur = download_state["progress"]
-            if prog is not None and prog > cur:
-                cur = prog
-            download_state = {"running": True, "progress": cur, "message": msg}
-        process.wait()
-        if process.returncode != 0 or errs:
-            tail = '; '.join(errs[-3:]) if errs else f"退出码 {process.returncode}"
+        # 子脚本靠这两个变量定位 config/输入输出与拷贝目标:打包后它们的 __file__
+        # 指向 PyInstaller 临时解压目录,不显式指定就会把产物写进临时目录、重启即丢。
+        os.environ["PMPLATFORM_DIR"] = BASE_DIR
+        os.environ["PMISDATA_DIR"] = PMISDATA_DIR
+        if is_py and getattr(sys, 'frozen', False):
+            os.makedirs(PMISDATA_DIR, exist_ok=True)   # 新机器上这个目录还不存在
+            _run_script_direct(script, 'run_pmis_pipeline',
+                               cwd=PMISDATA_DIR, on_line=_sink)
+        else:
+            cmd = [sys.executable, script] if is_py else ["bash", script]
+            _flags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+            process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                cwd=PMISDATA_DIR, env=os.environ.copy(), encoding='utf-8',
+                errors='replace', creationflags=_flags)
+            for raw in process.stdout:
+                _sink(raw)
+            process.wait()
+            if process.returncode != 0:
+                errs.append("退出码 %s" % process.returncode)
+        # 进程内执行拿不到退出码,统一按「有 ✗」或「没跑到 100%」判失败 ——
+        # 后者还能覆盖脚本中途异常退出的情形(那时既没有 ✗,也没有「流水线完成」)。
+        if errs or download_state["progress"] < 100:
+            tail = '; '.join(errs[-3:]) if errs else "流水线未跑完"
             download_state = {"running": False, "progress": 0, "message": f"下载失败: {tail}"}
             return
         download_state = {"running": True, "progress": 100, "message": "下载完成，请点更新数据生效"}
     except FileNotFoundError:
         download_state = {"running": False, "progress": 0,
-                          "message": "下载失败: 未找到 bash(需 Linux/含 bash 环境)"}
+                          "message": "下载失败: 未找到 %s" % ("python" if is_py else "bash")}
     except Exception as e:
         download_state = {"running": False, "progress": 0, "message": f"下载失败: {str(e)[:100]}"}
         logger.error(f"download 失败: {e}", exc_info=True)

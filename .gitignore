@@ -150,6 +150,12 @@ data/lanxin_raw_archive/
 # 非平台组成部分。2026-07-21 接入 GitHub 前已用 git filter-repo 从 lts/pmisdata/ 全历史清除。
 pmisdata/
 lts/pmisdata/
+# 例外(V4.5.19):pmisdata/run_pmis_pipeline.py 是【本次新写的编排脚本】,只有备份/顺序/
+# 校验/拷贝逻辑,不含任何 PMIS 接口细节与业务数据,已用 `git add -f` 纳入版本管理 ——
+# 它被打进 exe、成了平台的一部分,没有版本记录就意味着别人 clone 后打不出可用的包。
+# 已跟踪的文件不受 ignore 规则影响,故这里不写 `!` 例外(父目录被排除时 `!` 也不生效)。
+# 另三个抓数脚本(fetch_*/delivery_analysis)仍不入库:含 PMIS 内部接口路径,
+# 是否公开需用户拍板;打包时从本地磁盘取。
 lts/frontend/*.tsbuildinfo
 # 散落在工作树的一次性产物/实验目录,不入库
 client.zip
