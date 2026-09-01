@@ -15,6 +15,7 @@ function makeData(over: Record<string, any> = {}): AnalysisData {
         { theme: '进度', coveragePct: 0.8, verdict: 'green' },
       ],
       unmatched: [], backfill: [], conflicts: [], dirty: [],
+      collectionStagesMissing: { count: 0, items: [] },
     },
     projectsQuality: {
       deptProjectCount: 9,
@@ -27,6 +28,7 @@ function makeData(over: Record<string, any> = {}): AnalysisData {
       profitDirectFile: { provided: true, rows: 903, matched: 620, matchRate: 0.69 },
       profitBridgeFile: { provided: true, rows: 285, matched: 280, matchRate: 0.98 },
       budgetFile: { provided: true, rows: 607, matched: 600, matchRate: 0.99 },
+      collectionStagesFile: { provided: true, rows: 1601, matched: 1215, matchRate: 0.76 },
       staffNoProject: [], managerNotInOrg: [], presaleTotal: 3, presaleMapped: 3, presaleUnmapped: [],
     },
     ...over,
@@ -38,7 +40,7 @@ describe('buildHealthReport', () => {
     const r = buildHealthReport(makeData())
     expect(r.verdict).toBe('green')
     expect(r.title).toBe('数据就绪')
-    expect(r.sources).toHaveLength(9)
+    expect(r.sources).toHaveLength(10)
     expect(r.sources.every((s) => s.provided)).toBe(true)
     expect(r.alerts.every((a) => a.count === 0)).toBe(true)
     expect(r.metaLine).toContain('2026-06-12 09:00')
@@ -101,11 +103,11 @@ describe('buildHealthReport', () => {
     expect(r.verdict).toBe('yellow')
   })
 
-  it('projectsQuality 整体缺失 → 七卡未提供+九条缺失告警', () => {
+  it('projectsQuality 整体缺失 → 八卡未提供+十条缺失告警', () => {
     const r = buildHealthReport(makeData({ projectsQuality: null }))
-    expect(r.sources.filter((s) => !s.provided).map((s) => s.key)).toEqual(['org', 'mapping', 'delivery', 'milestone', 'payRecords', 'profit', 'bridge'])
-    // org/mapping/delivery/msActive/paymentRecords/profitDirect 高 + msClosed/profitBridge/budget 中
-    expect(r.alerts.filter((a) => a.key.startsWith('missing-'))).toHaveLength(9)
+    expect(r.sources.filter((s) => !s.provided).map((s) => s.key)).toEqual(['org', 'mapping', 'delivery', 'milestone', 'payRecords', 'profit', 'bridge', 'collectionStages'])
+    // org/mapping/delivery/msActive/paymentRecords/profitDirect/collectionStages 高 + msClosed/profitBridge/budget 中
+    expect(r.alerts.filter((a) => a.key.startsWith('missing-'))).toHaveLength(10)
   })
 
   it('排序:0条沉底,非零按严重度高→低再条数降序', () => {
@@ -131,10 +133,10 @@ describe('buildHealthReport', () => {
     expect(r.sources.find((s) => s.key === 'pmis')!.subs[0]).toContain('主题 1/2 可用')
   })
 
-  it('导出文件名只挂在指定七类目', () => {
+  it('导出文件名只挂在指定八类目', () => {
     const r = buildHealthReport(makeData())
     expect(r.alerts.filter((a) => a.exportName).map((a) => a.key).sort())
-      .toEqual(['backfill', 'budgetMismatch', 'l4Missing', 'managerNotInOrg', 'originMissing', 'presaleUnmapped', 'unmatched'])
+      .toEqual(['backfill', 'budgetMismatch', 'collection-stages-missing', 'l4Missing', 'managerNotInOrg', 'originMissing', 'presaleUnmapped', 'unmatched'])
   })
 
   it('orgL4 空项目进 l4Missing 告警组', () => {
@@ -149,9 +151,9 @@ describe('buildHealthReport', () => {
     expect((g!.rows[0] as any).projectId).toBe('WSGF-SS-202604169018')
   })
 
-  it('R1 新源四卡:就绪计 9 卡', () => {
+  it('R1 新源四卡 + 收款阶段台账:就绪计 10 卡', () => {
     const r = buildHealthReport(makeData())
-    expect(r.sources).toHaveLength(9)
+    expect(r.sources).toHaveLength(10)
     expect(r.sources.map((s) => s.key)).toContain('milestone')
     expect(r.sources.find((s) => s.key === 'profit')!.subs[0]).toContain('budget 607')
     expect(r.verdict).toBe('green')
@@ -219,5 +221,67 @@ describe('governance — 原项目数据缺失(originMissing)', () => {
     expect(g.count).toBe(1)
     expect((g.rows[0] as any).projectId).toBe('B')
     expect((g.rows[0] as any).relatedClosedId).toBe('OLD-X')
+  })
+})
+
+describe('governance — 输入文件三态(2026-08-31 审查)', () => {
+  it('收款阶段台账进源卡:它是「回款数据核心源」,此前唯一没有就绪度上报的输入文件', () => {
+    const r = buildHealthReport(makeData())
+    const c = r.sources.find((s) => s.key === 'collectionStages')!
+    expect(c).toBeTruthy()
+    expect(c.provided).toBe(true)
+    expect(c.main).toBe('1601')
+    expect(c.subs[0]).toContain('1215')
+  })
+
+  it('★ 文件在但一行都没读懂 → 「格式无法解析」告警,不是「未提供」', () => {
+    // V4.5.14 生产报障:holidays.csv 表头带制表符 → 解析 0 行 → 告警说「未提供」→
+    // 用户反复重传一个已经在那儿的文件。修 provided 语义后若前端不补这一态,
+    // 结果会比改之前更静默(既不报「未提供」,也不报别的)。
+    const d = makeData()
+    ;(d.projectsQuality as any).paymentRecordsFile = { provided: true, rows: 0, matched: 0, matchRate: 0 }
+    const r = buildHealthReport(d)
+    expect(r.alerts.find((a) => a.key === 'missing-paymentRecords')).toBeUndefined()
+    const bad = r.alerts.find((a) => a.key === 'unreadable-paymentRecords')!
+    expect(bad).toBeTruthy()
+    expect(bad.severity).toBe('high')
+    expect(bad.note).toContain('不要重传')
+    expect(r.verdict).toBe('yellow')
+  })
+
+  it('文件真不存在时仍报「未提供」,两态不混', () => {
+    const d = makeData()
+    ;(d.projectsQuality as any).paymentRecordsFile = { provided: false, rows: 0, matched: 0, matchRate: 0 }
+    const r = buildHealthReport(d)
+    expect(r.alerts.find((a) => a.key === 'missing-paymentRecords')).toBeTruthy()
+    expect(r.alerts.find((a) => a.key === 'unreadable-paymentRecords')).toBeUndefined()
+  })
+
+  it('有合同却零收款阶段节点 → 覆盖率告警(带项目号/合同/归属组)', () => {
+    const d = makeData({
+      dataQuality: {
+        ...(makeData().dataQuality as any),
+        collectionStagesMissing: {
+          count: 2,
+          items: [
+            { projectId: 'P-A', projectName: '甲项目', orgL4: '河北服务组', contract: 4690500 },
+            { projectId: 'P-B', projectName: '乙项目', orgL4: '银行服务组', contract: 673000 },
+          ],
+        },
+      },
+    })
+    const r = buildHealthReport(d)
+    const g = r.alerts.find((a) => a.key === 'collection-stages-missing')!
+    expect(g).toBeTruthy()
+    expect(g.count).toBe(2)
+    expect(g.rows).toHaveLength(2)
+    expect(String(g.rows[0].projectId)).toBe('P-A')
+  })
+
+  it('无缺口时告警组仍在但 count=0(沉底,与 budgetSourceMismatch 同惯例)', () => {
+    const r = buildHealthReport(makeData())
+    const g = r.alerts.find((a) => a.key === 'collection-stages-missing')!
+    expect(g).toBeTruthy()
+    expect(g.count).toBe(0)
   })
 })

@@ -7,6 +7,7 @@ export type Severity = 'high' | 'mid' | 'low'
 
 export interface SourceCard {
   key: 'yundocs' | 'pmis' | 'org' | 'mapping' | 'delivery' | 'milestone' | 'payRecords' | 'profit' | 'bridge'
+    | 'collectionStages'
   label: string
   provided: boolean
   main: string
@@ -50,6 +51,16 @@ const MISSING: Record<string, { label: string; note: string }> = {
   profitDirect: { label: '数据源缺失:全预算(direct)', note: '预算核算科目树缺失。请提供 input/profit_loss_direct.csv 后点「更新数据」。' },
   profitBridge: { label: '数据源缺失:桥接预算', note: '售前项目的原项目预算核算缺失。请提供 input/profit_loss_bridge.csv 后点「更新数据」。' },
   budget: { label: '数据源缺失:预算版本(budget)', note: '科目树概算/核算两列将为空。请提供 input/budget_data.csv 后点「更新数据」。' },
+  collectionStages: { label: '数据源缺失:收款阶段台账', note: '回款看板整体空态——它是全站回款口径的核心源。请提供 input/collection_stages.csv 后点「更新数据」。' },
+}
+
+// 三态里的第二态:文件确实在,但一行都没解析出来(编码不对/表头漂移)。
+// 这一态过去被当成「未提供」上报,结果是运维反复重传一个已经在那儿的文件
+// ——V4.5.14 的生产报障就是这么来的(holidays.csv 表头带一个制表符)。
+// 文案必须明确说「不要重传」,否则修了 provided 语义也白搭。
+function unreadableNote(label: string): string {
+  return `${label}:文件已就位,但一行都没能解析出来。多半是编码(Excel 导出常见 GBK)或表头有多余字符。`
+    + '请用纯文本编辑器核对首行列名与编码,改好后点「更新数据」。**不要重传同一个文件**——文件已经在位,重传不会有任何变化。'
 }
 
 export function buildHealthReport(data: AnalysisData): HealthReport {
@@ -71,6 +82,7 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
   const pdF = pq?.profitDirectFile
   const pbF = pq?.profitBridgeFile
   const bgF = pq?.budgetFile
+  const csF = pq?.collectionStagesFile
 
   const sources: SourceCard[] = [
     { key: 'yundocs', label: '云文档', provided: yundocsOk,
@@ -104,18 +116,31 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
     { key: 'bridge', label: '桥接预算', provided: !!pbF?.provided,
       main: pbF?.provided ? String(pbF.matched ?? 0) : '-', mainLabel: '售前命中',
       subs: pbF?.provided ? [`${pbF.rows ?? 0} 行`] : ['未提供'] },
+    // 收款阶段台账:CLAUDE.md 明确的「回款数据核心源」,2026-08-31 审查前是唯一
+    // 一个没有就绪度上报的输入文件 —— 导出端漏了在建项目时会静默少掉整批节点。
+    { key: 'collectionStages', label: '收款阶段台账', provided: !!csF?.provided,
+      main: csF?.provided ? String(csF.rows ?? 0) : '-', mainLabel: '台账行数',
+      subs: csF?.provided ? [`命中主域 ${csF.matched ?? 0}`] : ['未提供'] },
   ]
 
   const alerts: AlertGroup[] = []
-  const missPairs: [keyof typeof MISSING, boolean, Severity][] = [
-    ['pmis', pmisOk, 'high'], ['org', !!orgF?.provided, 'high'],
-    ['mapping', !!mapF?.provided, 'high'], ['delivery', !!delF?.provided, 'high'],
-    ['msActive', !!msA?.provided, 'high'], ['msClosed', !!msC?.provided, 'mid'],
-    ['paymentRecords', !!prF?.provided, 'high'], ['profitDirect', !!pdF?.provided, 'high'],
-    ['profitBridge', !!pbF?.provided, 'mid'], ['budget', !!bgF?.provided, 'mid'],
+  // 第四位是「读懂了几行」。undefined = 该源没有行数概念(如 PMIS 七表整体),不参与第二态判定。
+  const missPairs: [keyof typeof MISSING, boolean, Severity, number | undefined][] = [
+    ['pmis', pmisOk, 'high', undefined], ['org', !!orgF?.provided, 'high', orgF?.rows],
+    ['mapping', !!mapF?.provided, 'high', mapF?.rows], ['delivery', !!delF?.provided, 'high', delF?.rows],
+    ['msActive', !!msA?.provided, 'high', msA?.rows], ['msClosed', !!msC?.provided, 'mid', msC?.rows],
+    ['paymentRecords', !!prF?.provided, 'high', prF?.rows], ['profitDirect', !!pdF?.provided, 'high', pdF?.rows],
+    ['profitBridge', !!pbF?.provided, 'mid', pbF?.rows], ['budget', !!bgF?.provided, 'mid', bgF?.rows],
+    ['collectionStages', !!csF?.provided, 'high', csF?.rows],
   ]
-  for (const [k, ok, sev] of missPairs) {
-    if (!ok) alerts.push({ key: `missing-${k}`, label: MISSING[k].label, severity: sev, count: 1, columns: [], rows: [], note: MISSING[k].note })
+  for (const [k, ok, sev, rows] of missPairs) {
+    if (!ok) {
+      alerts.push({ key: `missing-${k}`, label: MISSING[k].label, severity: sev, count: 1, columns: [], rows: [], note: MISSING[k].note })
+    } else if (rows === 0) {
+      // 文件在、却一行没读懂。绝不能沉默,也绝不能说成「未提供」。
+      alerts.push({ key: `unreadable-${k}`, label: MISSING[k].label.replace('数据源缺失', '数据源无法解析'),
+        severity: sev, count: 1, columns: [], rows: [], note: unreadableNote(MISSING[k].label.replace('数据源缺失:', '')) })
+    }
   }
   const unmatched = (dq?.unmatched ?? []) as Record<string, unknown>[]
   alerts.push({ key: 'unmatched', label: 'PMIS 未匹配', severity: 'high', count: unmatched.length,
@@ -156,6 +181,15 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
     columns: [{ key: 'projectId', label: '项目编号' }, { key: 'pmisBudget', label: 'PMIS总预算' },
               { key: 'profitBudget', label: '损益预算成本' }, { key: 'diff', label: '差额' }],
     rows: budgetMismatch, exportName: '预算口径分歧.xlsx' })
+
+  // 有合同却零收款阶段节点:合同进达成率分母、分子恒 0,系统性拉低全域达成率
+  // (2026-08-31 实测 31 个项目、合同 2276 万、拉低 2.39pp)。与页面上那个
+  // noStageCount 不同 —— 那个把「合同=0、本来就不该有节点」也算进去了,是噪音。
+  const csMissing = ((dq as any)?.collectionStagesMissing?.items ?? []) as Record<string, unknown>[]
+  alerts.push({ key: 'collection-stages-missing', label: '回款覆盖:有合同却无收款阶段节点', severity: 'high', count: csMissing.length,
+    columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' },
+              { key: 'orgL4', label: 'L4组' }, { key: 'contract', label: '合同总额' }],
+    rows: csMissing, exportName: '回款覆盖-缺收款阶段.xlsx' })
 
   const anomalies = anomalyRows(data.projects ?? [])
   alerts.push({ key: 'l4Missing', label: '回款排除：服务组 L4 缺失', severity: 'mid', count: anomalies.length,

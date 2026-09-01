@@ -28,7 +28,9 @@ const summary = computed(() =>
 const metrics = computed(() => {
   const s = summary.value
   return [
-    { k: '项目数', v: String(s.totalAll), cls: '', sub: `${s.noStageCount} 个项目无回款阶段`, action: 'projects' },
+    // 口径:只数【有合同却无收款阶段】的。合同=0 的项目本来就不该有收款阶段,
+    // 算进来这个数就成了噪音(2026-08-31 审查实测:生产 75 vs 31)。下钻清单仍是全量。
+    { k: '项目数', v: String(s.totalAll), cls: '', sub: `${s.noStageWithContractCount} 个有合同项目无回款阶段`, action: 'projects' },
     { k: '回款节点数', v: String(s.relatedNodeCount), cls: '', action: 'nodes' },
     { k: '已回款(万)', v: fmtWan(s.totalActual), cls: 'paid' },
     { k: '待回款(万)', v: fmtWan(s.totalRemaining), cls: 'remain' },

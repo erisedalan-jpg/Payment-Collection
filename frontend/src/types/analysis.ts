@@ -316,6 +316,7 @@ export interface DataQuality {
   backfill?: Backfill;
   conflicts?: Conflicts;
   dirty?: Dirty;
+  collectionStagesMissing?: Collectionstagesmissing;
   [k: string]: unknown;
 }
 export interface QualitySummary {
@@ -325,6 +326,9 @@ export interface QualitySummary {
   matchedClosed?: Matchedclosed;
   unmatched?: Unmatched;
   lastPmisUpdate?: Lastpmisupdate;
+  [k: string]: unknown;
+}
+export interface Collectionstagesmissing {
   [k: string]: unknown;
 }
 export interface Project {
@@ -468,6 +472,7 @@ export interface ProjectsQuality {
   profitDirectFile?: InputFileStat6;
   profitBridgeFile?: InputFileStat7;
   budgetFile?: InputFileStat8;
+  collectionStagesFile?: InputFileStat9;
   staffNoProject?: Staffnoproject;
   managerNotInOrg?: Managernotinorg;
   presaleTotal?: Presaletotal;
@@ -532,6 +537,13 @@ export interface InputFileStat7 {
   [k: string]: unknown;
 }
 export interface InputFileStat8 {
+  provided?: Provided;
+  rows?: Rows;
+  matched?: Matched1;
+  matchRate?: Matchrate;
+  [k: string]: unknown;
+}
+export interface InputFileStat9 {
   provided?: Provided;
   rows?: Rows;
   matched?: Matched1;

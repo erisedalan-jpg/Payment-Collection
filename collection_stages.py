@@ -140,3 +140,46 @@ def load_collection_stages(input_dir: str, today: str) -> Dict[str, List[Dict[st
     for nodes in by_pid.values():
         nodes.sort(key=lambda n: (n["planDate"] == "", n["planDate"]))
     return by_pid
+
+
+def collection_stages_stat(input_dir: str, keep_ids) -> Dict[str, Any]:
+    """收款阶段台账的就绪度,形状与 projectsQuality 里另外 9 个输入文件完全一致。
+
+    ★ 2026-08-31 审查补:本文件是 CLAUDE.md 明确的「回款数据核心源」,却是唯一一个
+      没有任何就绪度上报的输入文件 —— 导出端漏了在建项目时,其回款节点会静默缺失,
+      看板上只表现为「这些项目没有收款阶段」,没有任何告警说数据源可能不全。
+
+    provided 看【文件在不在】,rows 看【读懂了几行】。两者分开的理由见 profit.read_csv_rows。
+    """
+    path = os.path.join(input_dir, config.COLLECTION_STAGES_FILE)
+    rows = profit.read_csv_rows(path)
+    keep = set(keep_ids or ())
+    matched = sum(1 for r in rows if str(r.get("项目编号") or "").strip() in keep)
+    return {"provided": os.path.isfile(path), "rows": len(rows), "matched": matched,
+            "matchRate": round(matched / len(rows), 4) if rows else 0.0}
+
+
+def missing_coverage(projects, payment_nodes) -> List[Dict[str, Any]]:
+    """治理告警:【有合同却一个收款阶段节点都没有】的主域项目。
+
+    为什么不是简单的 noStageCount:合同=0 的项目本来就不该有收款阶段,把它们混进来
+    会让这个数变成噪音(2026-08-31 实测生产 75 个零节点项目里,只有 31 个有合同)。
+    这 31 个的合同【进达成率分母、分子为 0】,实测拉低全域达成率 2.39 个百分点 ——
+    究竟是「真的没有收款阶段」还是「导出漏了」需要业务侧判断,但先得让它可见。
+
+    异常项目(orgL4 空)不计:全站已把它们硬排除出回款统计(lib/anomaly.isAnomalous),
+    这里算进来会让告警数与看板对不上。
+    """
+    nodes = payment_nodes or {}
+    out: List[Dict[str, Any]] = []
+    for p in projects or []:
+        if not str(p.get("orgL4") or "").strip():
+            continue
+        contract = (p.get("paymentPmis") or {}).get("contract")
+        if not contract or contract <= 0:
+            continue
+        if nodes.get(p.get("projectId")):
+            continue
+        out.append({"projectId": p.get("projectId"), "projectName": p.get("projectName") or "",
+                    "orgL4": p.get("orgL4"), "contract": contract})
+    return out

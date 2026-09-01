@@ -36,6 +36,7 @@ function seed(over: Record<string, any> = {}) {
       profitDirectFile: { provided: true, rows: 903, matched: 632, matchRate: 0.7 },
       profitBridgeFile: { provided: true, rows: 285, matched: 276, matchRate: 0.97 },
       budgetFile: { provided: true, rows: 607, matched: 574, matchRate: 0.95 },
+      collectionStagesFile: { provided: true, rows: 1601, matched: 1215, matchRate: 0.76 },
       staffNoProject: [], managerNotInOrg: [], presaleTotal: 3, presaleMapped: 3, presaleUnmapped: [],
     },
     ...over,
@@ -70,22 +71,22 @@ describe('DataQualityView', () => {
     expect(w.find('[data-test="banner"]').classes()).toContain('red')
   })
 
-  it('九张源卡,缺失源置灰带未提供徽章', () => {
+  it('十张源卡,缺失源置灰带未提供徽章', () => {
     seed()
     const ds = useDataStore()
     ;(ds.data as any).projectsQuality.orgFile = { provided: false, rows: 0, matched: 0, matchRate: 0 }
     const w = mountView()
-    expect(w.findAll('.gov-src')).toHaveLength(9)
+    expect(w.findAll('.gov-src')).toHaveLength(10)
     const org = w.find('[data-test="src-org"]')
     expect(org.classes()).toContain('off')
     expect(org.text()).toContain('未提供')
   })
 
-  it('V4.5.0 九张源卡改用 AppCard(raised 变体);同页的 .gov-alert 属非目标,不得被换掉', () => {
+  it('V4.5.0 源卡改用 AppCard(raised 变体);同页的 .gov-alert 属非目标,不得被换掉', () => {
     seed()
     const w = mountView()
     const cards = w.findAll('.gov-src')
-    expect(cards).toHaveLength(9)
+    expect(cards).toHaveLength(10)
     expect(cards.every((c) => c.classes().includes('ac--raised'))).toBe(true)
     // 告警条是提示条不是卡片(spec §3.3 非目标),不应挂上 AppCard 的类
     const alerts = w.findAll('.gov-alert')

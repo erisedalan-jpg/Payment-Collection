@@ -151,7 +151,8 @@ def _load_one(path: str, keep_ids: Set[str], exclude: Optional[Set[str]] = None
     既不计入 matched 也不进入输出,使已结项统计反映净新增贡献。"""
     rows = read_pmis_sheet(path)
     if not rows:
-        return {}, _stat(False, 0, 0)
+        # provided 看文件在不在,rows 看读懂了几行 —— 同 profit.py,理由见 V4.5.14。
+        return {}, _stat(os.path.isfile(path), 0, 0)
     exclude = exclude or set()
     out: Dict[str, List[Dict[str, Any]]] = {}
     matched = 0

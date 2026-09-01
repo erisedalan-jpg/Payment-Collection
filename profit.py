@@ -17,15 +17,34 @@ _BUDGET_KEYS = {"概算金额": "estimate", "核算金额": "final"}
 _GROSS_ALIAS = {"3.1": "3", "3.2": "4"}  # budget 毛利编码 → direct 毛利编码
 
 
+# CSV 编码回退序:生产这些 CSV 是从 PMIS/Excel 导出的,编码不受我们控制。
+# V4.4.1 实际发生过一次 GBK 导出(当时是 holidays.csv,倚天列全空)。
+CSV_ENCODINGS = ("utf-8-sig", "gbk")
+
+
 def read_csv_rows(path: str) -> List[Dict[str, str]]:
-    """utf-8-sig CSV → List[dict];缺失/不可读返回 []。"""
+    """CSV → List[dict];缺失/任何编码都读不通 → []。
+
+    ★ 逐个试 CSV_ENCODINGS,不是只试 utf-8-sig:
+      原来 `except (OSError, csv.Error)` **接不住 UnicodeDecodeError**(它是 ValueError
+      的子类),而本函数在主管线里被 load_profit / load_payment_records 直接调用、
+      调用点没有任何 try/except —— 一份 GBK 导出的 CSV 会让整个「更新数据」崩掉,
+      且报错是 UnicodeDecodeError 而不是「文件编码不对」。
+
+    ★ 返回 [] 不代表「文件不在」:调用方判 provided 必须用 os.path.isfile,不能用
+      `bool(rows)` —— 两者混同正是 V4.5.14 那次「文件在却提示未提供」的生产报障根因。
+    """
     if not os.path.exists(path):
         return []
-    try:
-        with open(path, "r", encoding="utf-8-sig", newline="") as f:
-            return list(csv.DictReader(f))
-    except (OSError, csv.Error):
-        return []
+    for enc in CSV_ENCODINGS:
+        try:
+            with open(path, "r", encoding=enc, newline="") as f:
+                return list(csv.DictReader(f))
+        except UnicodeDecodeError:
+            continue
+        except (OSError, csv.Error):
+            return []
+    return []
 
 
 def _num(v: Any) -> Optional[float]:
@@ -110,9 +129,12 @@ _SUMMARY_COLS = ["预算收入", "预算成本", "实际成本", "成本消耗�
 def load_profit(input_dir: str, keep_ids: Set[str]
                 ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     """direct+budget+bridge → {pid: {summary, rows, bridge}}, stats{direct,budget,bridge}。"""
-    direct = read_csv_rows(os.path.join(input_dir, config.PROFIT_DIRECT_FILE))
-    budget = read_csv_rows(os.path.join(input_dir, config.BUDGET_FILE))
-    bridge = read_csv_rows(os.path.join(input_dir, config.PROFIT_BRIDGE_FILE))
+    direct_path = os.path.join(input_dir, config.PROFIT_DIRECT_FILE)
+    budget_path = os.path.join(input_dir, config.BUDGET_FILE)
+    bridge_path = os.path.join(input_dir, config.PROFIT_BRIDGE_FILE)
+    direct = read_csv_rows(direct_path)
+    budget = read_csv_rows(budget_path)
+    bridge = read_csv_rows(bridge_path)
 
     budget_map: Dict[str, Dict[Tuple[str, str], Dict[str, Optional[float]]]] = {}
     budget_matched = 0
@@ -172,10 +194,12 @@ def load_profit(input_dir: str, keep_ids: Set[str]
             "rows": parse_profit_rows(r, "桥接_"),
         }
 
+    # provided 看【文件在不在】,rows 看【读懂了几行】—— 两者分开才能区分「没放文件」
+    # 与「文件在但格式坏了」,告警文案才不会把后者说成前者(V4.5.14 生产报障根因)。
     stats = {
-        "direct": _stat(bool(direct), len(direct), direct_matched),
-        "budget": _stat(bool(budget), len(budget), budget_matched),
-        "bridge": _stat(bool(bridge), len(bridge), bridge_matched),
+        "direct": _stat(os.path.isfile(direct_path), len(direct), direct_matched),
+        "budget": _stat(os.path.isfile(budget_path), len(budget), budget_matched),
+        "bridge": _stat(os.path.isfile(bridge_path), len(bridge), bridge_matched),
     }
     return out, stats
 
@@ -183,9 +207,12 @@ def load_profit(input_dir: str, keep_ids: Set[str]
 def load_payment_records(input_dir: str, keep_ids: Set[str]
                          ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
     """payment_records.csv → {pid: {total,count,lastDate,records[新→旧]}}。"""
-    rows = read_csv_rows(os.path.join(input_dir, config.PAYMENT_RECORDS_FILE))
+    pr_path = os.path.join(input_dir, config.PAYMENT_RECORDS_FILE)
+    rows = read_csv_rows(pr_path)
     if not rows:
-        return {}, _stat(False, 0, 0)
+        # provided 看文件在不在:文件在但读不出行时要报 provided=True/rows=0,
+        # 否则告警会说「未提供回款流水」,运维就去重传一个已经在那儿的文件。
+        return {}, _stat(os.path.isfile(pr_path), 0, 0)
     out: Dict[str, Dict[str, Any]] = {}
     matched = 0
     for r in rows:

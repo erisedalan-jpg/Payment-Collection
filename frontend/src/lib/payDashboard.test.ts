@@ -355,6 +355,17 @@ describe('payDashboard 整体项目数/无回款阶段', () => {
     expect(s.noStageCount).toBe(2)  // B、C 空节点
   })
 
+  it('★ noStageWithContractCount 只数【有合同】的,把噪音与信号分开', () => {
+    // 2026-08-31 审查:生产 676 个项目里 75 个零节点,但其中 44 个合同=0
+    // ——那些本来就不该有收款阶段,混进来让这个数变成噪音。真正的信号是有合同
+    // 却零节点的 31 个:它们的合同进达成率分母、分子恒 0,拉低全域达成率 2.39pp。
+    const projects = [P('A'), P('B', 'X', 0), P('C')]
+    const paymentNodes = { A: [{ planDate: '2026-01-01', expectedPayment: 1, unpaidAmount: 0, status: '待回款' }], B: [], C: [] } as any
+    const s = payDashSummary([], projects, OPTS, {}, paymentNodes, '', '')
+    expect(s.noStageCount).toBe(2)               // B(合同0) + C —— 下钻清单口径不变
+    expect(s.noStageWithContractCount).toBe(1)   // 只有 C 有合同 —— 标题数字口径
+  })
+
   it('noStageProjects 只列空节点项目 + 合同额转万', () => {
     const projects = [P('A'), P('B'), P('C')]
     const paymentNodes = { A: [{ planDate: '2026-01-01', expectedPayment: 1, unpaidAmount: 0, status: '待回款' }], B: [], C: [] } as any

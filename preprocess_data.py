@@ -219,13 +219,21 @@ def main():
     projects_quality["profitDirectFile"] = pf_stats["direct"]
     projects_quality["profitBridgeFile"] = pf_stats["bridge"]
     projects_quality["budgetFile"] = pf_stats["budget"]
+    # 收款阶段台账是「回款数据核心源」(CLAUDE.md),此前是唯一没有就绪度上报的输入文件
+    cs_stat = collection_mod.collection_stages_stat(os.path.join(BASE_DIR, "input"), keep_ids)
+    projects_quality["collectionStagesFile"] = cs_stat
     for label, st in [("里程碑(在建)", ms_a), ("里程碑(已结项)", ms_c),
                       ("回款流水", pr_stat), ("全预算(direct)", pf_stats["direct"]),
-                      ("预算版本(budget)", pf_stats["budget"]), ("桥接预算", pf_stats["bridge"])]:
-        if st["provided"]:
-            print(f"  [OK] {label} {st['rows']} 行, 命中 {st['matched']}")
-        else:
+                      ("预算版本(budget)", pf_stats["budget"]), ("桥接预算", pf_stats["bridge"]),
+                      ("收款阶段台账", cs_stat)]:
+        # 三态:没放文件 / 文件在但一行都没读懂 / 正常。第二态若说成第一态,
+        # 运维会去重传一个已经在那儿的文件(V4.5.14 生产报障的原样)。
+        if not st["provided"]:
             print(f"  [WARN] 未提供 {label} 数据文件")
+        elif st["rows"] == 0:
+            print(f"  [WARN] {label} 文件在,但一行都没解析出来 —— 检查编码与表头,不要重传")
+        else:
+            print(f"  [OK] {label} {st['rows']} 行, 命中 {st['matched']}")
 
     # === S2: 整体超支金额回填(同源 profit.overspend_amount;无 profit 数据自动 None,供详情页风险徽章,与事件快照同口径) ===
     for p in dept_projects:
@@ -274,6 +282,15 @@ def main():
                               "field": "actualRatio", "value": r})
     data_quality["dirty"] = dirty
     data_quality["collectionParseErrors"] = collection_parse_errors
+    # 治理告警:有合同却零收款阶段节点。这些项目的合同进达成率分母、分子恒 0,
+    # 系统性拉低全域达成率(2026-08-31 实测 31 个、合同 2276 万、拉低 2.39pp)。
+    # 与前端既有的 noStageCount 不同:那个把合同=0(本来就不该有节点)也算进去了。
+    cs_missing = collection_mod.missing_coverage(dept_projects, payment_nodes)
+    data_quality["collectionStagesMissing"] = {"count": len(cs_missing), "items": cs_missing}
+    if cs_missing:
+        _amt = sum(m["contract"] for m in cs_missing)
+        print(f"  [WARN] {len(cs_missing)} 个在建项目有合同却无收款阶段节点"
+              f"(合同合计 {_amt:,.0f} 元)—— 可能是收款阶段导出漏了,已并入数据质量告警")
 
     # === 10. 构建最终数据 ===
     final_data = {

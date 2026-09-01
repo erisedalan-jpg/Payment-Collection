@@ -447,6 +447,27 @@
 
 ## 进行中
 
+- [x] **A-1 输入文件就绪度上报的完整修复（2026-08-31 系统审查 A 档第一项；**版本号待用户拍板**，未占号）** —— `verify.sh`:pytest **1536**、前端 256 文件 / **2453** 用例、typecheck + build 全绿。
+
+  **★ 审查时只看见症状,动手才挖到根。** 审查报告里记的是「`collection_stages.csv` 是 CLAUDE.md 明确的回款核心源,却是唯一没有就绪度上报的输入文件」。顺着 `provided` 的判定往下查,发现**真正的根是 V4.5.14 那次生产事故的病根在主域这边原封不动地存在**：当时 `holidays.csv` 表头带一个制表符 → 解析 0 行 → 告警说「未提供」→ 用户反复重传一个已经在那儿的文件;修复时在 `yitian.py:327` 定下了正确模式并写进注释(「provided 看文件是否存在,rows 看解析结果」),而 `profit.py` / `milestones.py` 的 **6 个输入文件全都没照做**(`payment_records` / `profit_loss_direct` / `profit_loss_bridge` / `budget_data` / 里程碑在建 / 里程碑已结项),一律 `_stat(bool(rows), ...)`。**正确模式就在同一个仓库里,这 6 个是没照做的那些。**
+
+  **★ 第二条实测:`read_csv_rows` 的 `except (OSError, csv.Error)` 接不住 `UnicodeDecodeError`**(它是 `ValueError` 子类),而这几处调用在主管线里**没有任何 try/except 兜底** —— 一份 GBK 导出的 CSV(V4.4.1 真实发生过)会让整个「更新数据」崩掉,报错还是 `UnicodeDecodeError` 而非「文件编码不对」。已加 `CSV_ENCODINGS = ("utf-8-sig", "gbk")` 回退。
+
+  **★ 改动四块**(全程 TDD,22 条新用例逐条先红后绿)：① `read_csv_rows` 编码回退 + 接住解码异常;② 6 个文件的 `provided` 改看 `os.path.isfile`;③ 新增 `collection_stages.collection_stages_stat()` 与 `missing_coverage()`,接进 `projectsQuality.collectionStagesFile` 与 `dataQuality.collectionStagesMissing`(两者均已在 `schema.py` **显式声明**,不再靠 `extra=allow` 混过去 —— 那正是「改字段名找不到消费方」的温床);④ 前端治理页补第十张源卡 + **三态告警** + `noStageWithContractCount`。
+
+  **★ ④ 是我自己给自己挖的坑**：把 `provided` 改成「看文件在不在」之后,前端 `missPairs` 的「未提供 X」只在文件真不存在时才触发 —— **「文件在但一行没读懂」这个新的第二态反而比改之前更静默**(既不报未提供,也不报别的)。补了 `unreadable-*` 告警,文案直接写「**不要重传同一个文件**」,因为用户看到这条时第一反应就是去重传。
+
+  **★ 真实数据端到端验证,数字与审查实测逐一吻合**：`collectionStagesFile = {provided: True, rows: 1601, matched: 1215, matchRate: 0.7589}`;`collectionStagesMissing.count = **31**`,合同合计 **22,764,757.97 元**,全部已收 0、`orgL4` 全部有值。这 31 个的合同**进达成率分母而分子恒 0**,实测拉低全域达成率 **2.39pp**(47.56% → 剔除后 49.95%)。究竟是「真的没有收款阶段」还是「导出漏了」需业务侧判断,但先得让它可见 —— 治理页现可导出(带项目号/名称/L4组/合同额)。
+
+  **★ `/payment` 首行口径换掉**：原「N 个项目无回款阶段」用的是全量 `noStageCount`(生产 **75**),把「合同=0、本来就不该有收款阶段」也算了进去 —— **75 像噪音,31 才是信号**。标题数字改用 `noStageWithContractCount`,**下钻清单仍是全量口径,不改**。
+
+  **⚠ 升级须知:本版必须点一次「更新数据」**。旧 `analysis_data.json` 里没有 `collectionStagesFile` 键 → 治理页会多出一条黄色「数据源缺失:收款阶段台账」告警、横幅转黄。属预期,重跑数据后即消。(该行为是被 `DataQualityView.test.ts` 的夹具缺字段暴露出来的 —— 视图测试红了才想到生产会同样红。)
+
+  **★ 三次 verify 才绿,两次红都是「验证范围不足 → 把没红当成对了」**：① 单文件 `vitest` 23 条全绿我就宣布 GREEN,而 `typecheck` 红(`SourceCard.key` 是字面量联合、没放行新 key)——**vitest 走 esbuild,只剥类型不校验**(本仓第三次栽,承 V3.3.0/V4.4.0);② `governance.test.ts`(lib 层)全绿而 `DataQualityView.test.ts`(视图层)4 条红 —— **lib 层契约 ≠ 视图接线**(承 V4.5.7 的判据,我又只跑 lib 层就下了结论)。③ 第三轮 pytest 红一条 `test_server_budget.py` 的 `ConnectionAbortedError [WinError 10053]`,是**既有 Windows flake**：本轮未动任何 `.py`、前两轮同代码 1536 passed、该文件单跑 3 次全过(36×3)。给 L-32/L-50 记的「verify 闸门本身不稳」补了**第二种** flake 样本(那两条记的是 `test_server_download.py` 的竞态,这是 socket 层的)。
+
+  **★ 顺手钉死一条碰瓷断言**：`DashMetrics.test.ts` 原 `expect(sub.text()).toContain('1')` —— 只要文本里有任何一个「1」就通过,换口径照样绿。改成钉完整文案 `toBe('1 个有合同项目无回款阶段')`。
+
+
 - [x] **安全事件：public 仓库真实业务数据清除（2026-08-02，整体审查发现并当日处置完毕）** —— `docs/superpowers/research/` 自 **2026-06-09** 起就在 public 仓库里，内含从生产导出的真实数据：`2026-06-09-unmatched-166.xlsx`（**160 行 × 11 列**，项目编号 / 项目名称 / **项目金额** / **项目经理姓名**）、`3B`+`3A` 三个 CSV（295 / 87 / 34 行项目清单）、`2026-06-19-在建项目缺失清单.md`（66 个项目号）、`data-census-data.json`（417 行，含「客户」「签约单位」字段）、`data-profiles/*.txt`（数据画像样本）。文本文件里去重共 **75 个真实项目号**，另加 xlsx 内 160 行（二进制，`git grep` 搜不到，需单独读）。**处置（经用户授权「彻底清除、无需转 private」）**：① `git filter-repo --path docs/superpowers/research --invert-paths` 从全部 **1957 个提交、3 个分支**移除；② `--replace-text` 正则把散落在 `PROGRESS.md` / 4 个 V2.6.x 升级手册 / 2 个 spec-plan / 2 个 `paymentBoard.test.ts` 里的项目号统一替换为 `QAGD-XX-REDACTED`（这些文件本身有用只能脱敏；测试里的项目号只在**用例名注释**中、不是数据 key，替换不影响逻辑）；③ `--force-with-lease` 强推；④ **三重验证**：本地全 blob 扫描 0 残留、**从 GitHub 重新 clone 独立验证 0 残留**、`verify.sh` 全绿（pytest 1422 / 前端 2283，证明重写没砸坏任何东西）；⑤ 本地两个 feat 分支用重写版替换后 `gc --prune=now`，本地亦 0 残留；⑥ `.gitignore` 加 `/docs/superpowers/research/`，资料本身留在本地原路径。**★ 根因教训**：2026-07-21 首次接入 GitHub 时只排查了 `data/` `input/` `pmisdata/`，判据是「**目录名像不像数据目录**」—— 而 `docs/` 下同样会长出真实数据。正确判据是「**文件内容是不是从生产导出来的**」，与它放在哪个目录无关。**⚠ 已公开的内容无法保证收回**：仓库自 2026-06-09 起公开近两个月，可能已被 fork、爬取或被搜索引擎缓存；本次操作只能阻止后续访问。
 
 - [x] **L-63 + L-64 合并修复（2026-08-02，V4.5.12，`verify.sh` 全绿）**：① L-63 跟进页归档销毁范围外内容（后端，**5 张表全部受影响** —— 比 backlog 原记录的「仅 temp」更广）；② L-64 下钻弹窗内长表格无高度约束（前端，6 个弹窗 + 独立的弹窗高度口径 + 清单守卫扩为三分类）。结论与教训见本文件顶部 V4.5.12 条目。

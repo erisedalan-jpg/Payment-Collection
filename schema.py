@@ -110,6 +110,9 @@ class DataQuality(_Base):
     backfill: List[Dict[str, Any]] = []
     conflicts: List[Dict[str, Any]] = []
     dirty: List[Dict[str, Any]] = []
+    # 有合同却零收款阶段节点的项目。显式声明(而非靠 extra=allow 混进去),
+    # 这样前端 gen:types 能生成类型、改名时 typecheck 能找到消费方。
+    collectionStagesMissing: Dict[str, Any] = {"count": 0, "items": []}
 
 
 class ProjectPayment(_Base):
@@ -225,6 +228,7 @@ class ProjectsQuality(_Base):
     profitDirectFile: InputFileStat = InputFileStat()
     profitBridgeFile: InputFileStat = InputFileStat()
     budgetFile: InputFileStat = InputFileStat()
+    collectionStagesFile: InputFileStat = InputFileStat()
     staffNoProject: List[Dict[str, Any]] = []
     managerNotInOrg: List[Dict[str, Any]] = []
     presaleTotal: int = 0

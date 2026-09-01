@@ -28,6 +28,10 @@ export interface PayDashSummary {
   totalProjects: number
   totalAll: number
   noStageCount: number
+  /** 其中【合同>0】的那些 —— 标题数字用它。合同=0 的项目本来就不该有收款阶段,
+   *  混在一起会把这个指标变成噪音(2026-08-31 实测生产 75 个零节点里 44 个合同=0)。
+   *  下钻清单仍用 noStageCount/noStageProjects 的全量口径,不改。 */
+  noStageWithContractCount: number
   totalExpected: number
   totalActual: number
   totalRemaining: number
@@ -47,7 +51,10 @@ export function payDashSummary(
 ): PayDashSummary {
   const inScope = filterProjects(projects, opts)
   const totalAll = inScope.length
-  const noStageCount = inScope.filter((p) => !(paymentNodes?.[p.projectId]?.length)).length
+  const noStage = inScope.filter((p) => !(paymentNodes?.[p.projectId]?.length))
+  const noStageCount = noStage.length
+  // 有合同却零节点 = 真正的信号:它们的合同进达成率分母而分子恒 0,系统性拉低完成率。
+  const noStageWithContractCount = noStage.filter((p) => (p.paymentPmis?.contract ?? 0) > 0).length
   // 已回款/完成率恒全时口径(CLAUDE.md 全站统一口径 Σ流水净额全加 ÷ Σ合同，与首页 computeKpis / L4 表 / board / 详情页一致)：
   // 已回款=Σ全时流水(不随所选日期区间过滤)；完成率=已回款 ÷ Σ合同(全 inScope)。待回款/计划/延期/项目活动数仍随区间。
   const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, '', ''), 0)
@@ -61,6 +68,7 @@ export function payDashSummary(
     totalProjects,
     totalAll,
     noStageCount,
+    noStageWithContractCount,
     totalExpected, totalActual, totalRemaining,
     rate: totalContract > 0 ? totalActual / totalContract : null,
     delayedProjects: delayedPids.size,

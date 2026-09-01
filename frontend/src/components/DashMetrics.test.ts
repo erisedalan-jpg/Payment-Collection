@@ -86,8 +86,10 @@ describe('DashMetrics', () => {
 
     const sub = projectCard!.find('.dm-sub')
     expect(sub.exists()).toBe(true)
-    expect(sub.text()).toContain('无回款阶段')
-    expect(sub.text()).toContain('1') // noStageCount
+    // 钉完整文案而不是 toContain('1') —— 后者只要文本里有任何一个「1」就通过,
+    // 本夹具下两种口径都得 1、文本都含「1」,所以换口径时它照样绿(按夹具推演,非实跑)。
+    // 夹具:P2 合同 100 万且零节点 → 1;若把口径改回全量口径,这条会红。
+    expect(sub.text()).toBe('1 个有合同项目无回款阶段')
 
     await w.find('[data-test="pay-projects-card"]').trigger('click')
     expect(push).toHaveBeenCalledWith('/projects')
