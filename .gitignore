@@ -198,3 +198,15 @@ nul
 # docs/audit/ —— 系统审查报告,含「哪个写端点不在超管闸内」「哪条路径可越权拿全量数据」
 # 这类安全弱点细节。本仓是 public,这类内容只留本地。
 /docs/audit/
+
+# 登录页角色立绘的草稿与截图评审产物(37 个文件:puppeteer 抓图脚本 shot.js/shot-dark.js/diag.js、
+# 多轮裁切与遮罩的 png、以及带真实账号界面的登录页截图)。属于设计过程物,不是平台组成部分。
+# 2026-08-31 审查发现:它们【既未跟踪也未被忽略】,在 public 仓库前裸露 —— CLAUDE.md §9 禁止
+# `git add -A`,但那是纪律不是机制,一次手滑就进去了,而上次泄漏已经证明推出去洗不掉。
+/avatar-drafts/
+/wxt.png
+/wangxutong.png
+
+# report/ —— 系统审查报告。含真实项目编号、合同金额、各域指标实测值(全部从生产数据导出),
+# 判据同 docs/superpowers/research/:看内容是不是从生产导出来的,不看目录名。只留本地。
+/report/

@@ -525,7 +525,7 @@
 - [ ] **L-68（V4.5.13 修复轮遗留，2026-08-03；出包前已逐条处置，剩 ②④⑤）** ① ~~未实跑 PyInstaller~~ **【2026-08-03 用户拍板作废】**「无需 exe，整体会做生产上线，不做本地」。`.spec` 的修复保留在库（静态核对通过：`ast.parse`、顶层只 import 标准库、57 个 datas 源全部存在），但**exe 不再是交付路径**；日后若重新需要，仍须先跑一次 `python -m PyInstaller PaymentReviewApp.spec --noconfirm` 并核对 6.20 版对 `cipher=`/`a.zipped_data` 等旧写法的兼容。② **nginx 只改了仓库模板**，生产机上的配置需**手工同步**（步骤见 `deploy/升级手册-V4.5.13.md` §2.5），上线后用 `curl -s -I -H "Accept-Encoding: gzip" .../assets/index-*.js | grep -i content-encoding` 复核。③ ~~权限 fail-closed 的账号影响面~~ **【2026-08-03 已查清，零影响，关闭】** 拿生产 `data/accounts.json` 24 个账号逐个跑判据：只有 `cuishengqiang` 在 `yitian` 域命中「零可访问页」，但 `_YITIAN_PAGE_KEYS` 与 `config.DOMAIN_PAGES['yitian']` 是同一组 8 个 key、该账号 `allowedPages` 一个倚天页都没有 ⇒ `handle_yitian_data` 的**页面权限前置闸先返回 403**，`domain_union_scope` 的结果根本走不到；`project`/`opportunity` 两域 0 命中。**不阻塞上线**。④ **/activity 升级后首次点更新数据会显示 `-`**（旧快照没有 `recordPaymentRatio`），下次生成快照后自动恢复 —— 已写进升级手册 §1.3 与验证清单第 6 条。⑤ **ETag/304 与暗色图表两项需人工目验**（jsdom 测不出：304 要看浏览器 Network，图表配色要在暗色主题下实拍）。⑥ ~~`lts/snapshots.py` 同款节点口径缺陷~~ **【2026-08-03 用户拍板作废】**「LTS 作为精简版交付已完成历史工作需要，暂无需任何处理，必要时我会删掉」。缺陷确实存在（`lts/snapshots.py:25` 仍是 `act/exp` 节点口径），**有意不修**，记录于此以免日后被当成新发现。
   **★ 出包前另外实证的三件事（都不是 backlog 项，是「上线才会炸」的排查）**：① **全新安装包**：48 个根 `.py` 对 `server.py` 的 import 闭包 41 个模块**零缺失**（`ast` 递归求闭包），L-59 从「静态守卫说没问题」升级为「证明了不会启动即 ImportError」；② **`/pm` 前缀（L-54）**：全仓 162 处 `/api|/data` 路径字面量逐个过，非测试文件里那 85 处**全部**走 `api.get`/`api.post`，而 `api/client.ts:14` 是 `fetch(apiUrl(path))`；`stores/data.ts` 走 `apiUrl`；`review.html` 用 `location.pathname` 自推前缀 ⇒ **实现全对**，L-54 确系「测试证明不了」而非缺陷；③ **缓存策略**：`index.html` 命中 `no-cache` 分支、只有带内容哈希的 `/assets/*` 才 `immutable` ⇒ 升级后不会有人卡在旧版。另核实 `make_deploy_zip.py` 的产物落在**仓库根目录**且**含 `data/`+`input/`**（accounts、lanxin_config 的 AppSecret、全部真实业务数据），`.gitignore:2` 的 `pmplatform-deploy-*.zip` 已覆盖 —— **用真实探针文件测的**，没再踩 L-30 那个「尾斜杠规则 + 目录不存在」的假阴性。
 - [ ] **L-67（2026-08-02 整体审查：本轮覆盖范围与未覆盖范围，供下次接续）** 本轮是**安全面 + 已知债务的实证复核**，不是完整的代码级实现审查。**已实证**：① public 仓库真实数据泄漏（已处置，见「进行中」区）；② L-59 全新安装包漏 27 个根 `.py` **精确复核仍成立**（`TOP_FILES` 硬编码 21 个 vs 实有 48 个，漏全部 `lanxin*`(12)、`yitian*`(9)、`followup_store`/`audit`/`portal`/`budget_*` —— 用全新安装包部署会启动即 `ImportError`；日常升级包用通配符不受影响，所以这条债从未被触发过）；③ L-29 全量 pytest 污染真实 `data/audit_log.jsonl` **确认成立**（该文件 1.78MB，最后修改时间正是跑 `verify.sh` 的时刻）；④ 上传白名单前后端单一来源守卫**存在且有效**（`useInputFiles.test.ts` + `test_server_links_status.py`，实跑通过），L-42 的这一对已闭环。**未覆盖，待下次按域分批做**：各域计算口径正确性复核（含 CLAUDE.md §8 记的 `/insight` 回款完成率与主域口径不同源）、蓝信四条承重设计的现状核对、权限模型越权面、性能（`dist` 单 chunk 2.76MB 未做代码分割）。**★ 本轮我自己的两次检查失误值得记**：一次差点误报 `data/lanxin_raw_archive/` 未忽略（见 L-30）；一次统计脚本因中文路径的**八进制转义**导致 `git show` 全部失败、被 `except` 静默吞掉，把泄漏面从 75 个低估成 6 个（改用 `git grep -z` 才对）——**扫描类脚本必须先自证「读取成功了几个、失败了几个」，否则失败会伪装成「没问题」**。
-- [ ] **L-30（原文留档）** `.gitignore` 漏列 `data/payment_key_followup.json` / `data/risk_followup.json` —— 两个本地跟进数据文件（同类的 `followup_records.json`/`project_tags.json` 等都已忽略），当前靠"没人 `git add data/`"侥幸没被提交。补上。
+- [x] ~~**L-30（原文留档）** `.gitignore` 漏列 `data/payment_key_followup.json` / `data/risk_followup.json` —— 两个本地跟进数据文件（同类的 `followup_records.json`/`project_tags.json` 等都已忽略），当前靠"没人 `git add data/`"侥幸没被提交。补上。~~ **【2026-08-31 审查作废】** 实测两个文件均已 `ignored=YES`(`.gitignore:117-120`),早已修好,条目忘了关。
 - [ ] **L-31（V4.0.5 蓝信回调，复审 refix2 记录）** nonce 重放缓存未做，当前依赖 **±5 分钟时间戳窗口 + 存证滚动归档两道叠加**兜底重放风险（`lanxin_timestamp_fresh` + `_lanxin_rotate_raw`）。这条窗口本身建立在一个未经证实的假设上——蓝信文档从未记载回调 `timestamp` 字段的单位与格式，`lanxin_timestamp_fresh` 按 epoch 秒解读纯属假设，首次联调必须核实。**这笔债与上面的窗口耦合**：若日后因为发现时间戳格式判断有误而放宽、简化或摘掉这道窗口，"没有 nonce 重放缓存"这个问题会跟着无声重新打开——两者必须一起处理，不能只改一头。已加 `_lanxin_rejected.lastReason`('signature'/'stale') 与只打 timestamp 原值(不含签名/密钥/报文体)的告警日志,便于首次联调时快速定位蓝信实际发送的格式。**【2026-07-29 V4.5.8 更新，部分勾销】** 上面「时间戳格式是未经证实的假设」这一前提**已被实证推翻**：生产首次入站联调（回调地址补上 `/pm` 前缀后）拿到 `lastReason=stale` 的真实报文，`timestamp` 确认是 **19 位纳秒**（非秒、非毫秒），四条真实样本钉成回归用例 `REAL_NS_SAMPLES`（`tests/test_server_lanxin_callback.py`）；`lanxin_timestamp_fresh` 此前 `if abs(val)>=10**11: val//=1000` 只除一次，19 位纳秒除一次只降到微秒，导致**每一条回调都判 stale**，V4.5.8 T0 已修（`if`→`while` 逐级降到秒）。**但本条债并未还清**：nonce 重放缓存依然没做，`±5 分钟窗口 + 存证滚动归档`两道叠加仍是唯一兜底，这部分风险与本条开头所述完全一致、继续挂起——**勾销的只是「格式未经证实」这一具体假设，不是整条 L-31**。
 - [ ] **L-32（测试卫生，verify.sh 闸门）** `tests/test_server_download.py::test_super_download_missing_script_reports` 是既有竞态 flake（2026-07-20 复审实测 3 次全量：2 红 1 绿），非本版引入。它会让 `verify.sh` 这个合并闸门随机变红，侵蚀"全绿才算 done"的规矩。建议改为轮询到 SSE 终态帧再断言，而不是发完请求立即读一次响应体。
 - [ ] **L-33（V4.5.2 权限重构遗留）** `allowedStaff`（员工级数据范围）按用户要求保留后，项目经理重名过匹配债继续存在：`data_scope.allowed_project_ids` 按**项目经理姓名**匹配（非工号等唯一标识），同名不同部门的项目经理会被一起放行、造成数据越权。生产该维度暂 0 账号使用故当前无实际影响，但**启用 `allowedStaff` 前必须先修**（改按工号，或姓名+部门复合匹配）。
@@ -591,7 +591,7 @@
 - [x] **B-1** `server.py:1319` 改 `ThreadingHTTPServer`：解决同步 SSE 期间全站阻塞、"停止同步"失效。（A2 完成：ThreadingHTTPServer + create_server）
 - [x] **B-2** `server.py:1319` 绑定 `127.0.0.1` 而非 `""`：避免局域网无认证访问/触发同步/清空数据。（A2 完成：绑定 127.0.0.1）
 - [x] **B-3** `server.py:751` `os.environ.get('PROGRAMFILES(X86)')` 补默认值 `''`：缺该环境变量时会 TypeError 崩溃。（A2 完成：PROGRAMFILES(X86) 缺省值 + 可测）
-- [ ] **B-4** `index.html:9` 改用本地 `fonts/google-fonts.css`，移除外链 Google Fonts：离线环境消除超时/字体闪烁。
+- [x] ~~**B-4** `index.html:9` 改用本地 `fonts/google-fonts.css`，移除外链 Google Fonts。~~ **【2026-08-31 审查作废】** 实测 `frontend/index.html` 仅 12 行、外链字体 **0 处**;设计规范已定「前端禁止外链字体」,`--font-sans` 用系统栈。旧原生 JS 前端(`app.js` / `index.html` / `data/analysis_data.js`)已随 Vue3 重写退役删除,本条指向的文件不存在。
 
 ### 🟠 高（后端健壮性）
 - [x] **A2-debt** 继续消除硬编码（A1 遗留）：compute_dashboard/compute_tier_summary 中 ~15 处 nodeStatus 字符串改用 config.STATUS_*；tier 迭代/校验改用 config.TIER_LABELS；集成测试 process_below100_nodes 的时间依赖改注入 now。（A2 完成：status/tier 去硬编码 + now 注入）
@@ -604,10 +604,10 @@
 - [ ] **P8-pre** 质量数据后端细分备忘（P8 治理页重设计为零后端改动，本项保留）：mappingFile matchRate 0.671 需拆分（75 条映射不在 PMIS=陈旧、68 条 closed、9 条被部门筛除）；增加"L4 命中但项目经理为空"告警；projectsQuality 三个 List[Dict] 收紧为带字段模型。注：P8 已落地告警注册表（lib/governance.ts buildHealthReport），新增告警类目只需后端补数据 + 注册表加一项，接入点就绪。
 
 ### 🟡 中（前端架构，较大重构，需在测试保护下分步做）
-- [ ] **M-9** `app.js` 按页面拆分 ES Modules，事件委托替代内联 `onclick`。
-- [ ] **M-10** `data/analysis_data.js` 改为 `.json` + `fetch()` 加载。
-- [ ] **M-11** 统一 innerHTML 渲染处的转义（140 处），降低 XSS 与重排。
-- [ ] **M-12** `app.js` 清理 24% 空行（Prettier 一遍）。
+- [x] ~~**M-9** `app.js` 按页面拆分 ES Modules，事件委托替代内联 `onclick`。~~ **【2026-08-31 审查作废】** 旧原生 JS 前端(`app.js` / `index.html` / `data/analysis_data.js`)已随 Vue3 重写退役删除,本条指向的文件不存在。
+- [x] ~~**M-10** `data/analysis_data.js` 改为 `.json` + `fetch()` 加载。~~ **【2026-08-31 审查作废】** 早已是 `.json` + `fetch()`(`stores/data.ts`)。旧原生 JS 前端(`app.js` / `index.html` / `data/analysis_data.js`)已随 Vue3 重写退役删除,本条指向的文件不存在。
+- [x] ~~**M-11** 统一 innerHTML 渲染处的转义（140 处），降低 XSS 与重排。~~ **【2026-08-31 审查作废】** 实测 Vue 前端全仓只剩 **1 处 `v-html`**(`RichTextCell.vue:139`,经 `lib/richText.ts` 白名单净化)+ 2 处 `innerHTML`,140 处随旧前端一并消失。
+- [x] ~~**M-12** `app.js` 清理 24% 空行（Prettier 一遍）。~~ **【2026-08-31 审查作废】** 旧原生 JS 前端(`app.js` / `index.html` / `data/analysis_data.js`)已随 Vue3 重写退役删除,本条指向的文件不存在。
 
 ### 🟦 Phase B 前端（Vue3+TS 重写）
 - [x] **B1** 前端脚手架与基建：Vue3+Vite+TS 工程、由 schema.py 生成 analysis.ts（类型同源）、统一 API 客户端、数据加载 Pinia store、最小 shell、verify.sh 接入前端检查（typecheck+vitest+build）。
@@ -648,7 +648,7 @@
 ### 🟢 低
 - [ ] **P-perf-next（V2.6.6 复测后余量,2026-07-03）**：重型列表页首挂剩余 ~0.9-1.4s 单块@4x（/payment/projects 1362、/payment 1074、日历 914、已关闭 914、里程碑 867ms）——如仍嫌首进有顿感,可按 V2.5.8 模式给这些页铺 `useDeferredMount` 骨架(纯前端机械改造);列筛选超长选项列表(如项目名~600项)可虚拟滚动。另:主 chunk 2.37MB 未分割/16MB analysis_data 全量 fetch 为既有 backlog(生产 nginx 已 gzip)。
 - [ ] **L-13** 收紧 CORS（去掉 `Access-Control-Allow-Origin: *`）。
-- [ ] **L-14** `index.html:143` 硬编码内网地址改为配置项/留空。
+- [x] ~~**L-14** `index.html:143` 硬编码内网地址改为配置项/留空。~~ **【2026-08-31 审查作废】** 旧原生 JS 前端(`app.js` / `index.html` / `data/analysis_data.js`)已随 Vue3 重写退役删除,本条指向的文件不存在。
 - [ ] **L-15** 跨平台一致性：macOS 下 taskkill/netstat/快捷方式逻辑失效，明确提示或补实现。
 - [ ] **L-16** 上传卡反馈改进（pmis+inputs 两卡）：白名单外文件跳过时提示原因、ok=0 时去掉"请点[更新数据]"后缀、fetch 网络异常捕获提示。
 - [ ] **L-17** CORS 收紧后续：上传/导入等写接口加 Origin/Host 校验，防跨站驱动写（配合 L-13）。
