@@ -213,6 +213,11 @@ ERR_FORBIDDEN = "forbidden"           # 权限不足(非超管)
 
 MAX_JSON_BODY = 16 * 1024 * 1024      # JSON body 上限(16MB),防超大请求撑爆内存
 MAX_UPLOAD_BODY = 512 * 1024 * 1024   # 文件上传 body 上限(512MB,xlsx 留余量)
+# 早拒(401/403)时最多读掉多少请求体(见 _drain_request_body)。
+# 取 8MB:足够覆盖任何正常的 JSON API 体(富文本跟进、配置、批量勾选),
+# 又不至于让一个【未通过鉴权】的调用方指使我们读完 512MB 上传体 ——
+# 超过就不读了,那种连接本来就要断,RST 与否已不重要。
+MAX_DRAIN_BYTES = 8 * 1024 * 1024
 
 # /api/lanxin/callback 免登录:蓝信服务端不会带我们的会话 cookie。
 # 它的安全边界是【SHA1 验签】而非会话 —— 见 handle_lanxin_callback。
@@ -4526,12 +4531,44 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._audit_set(target='倚天工时累积库', detail='删除区间 %s ~ %s 共 %d 行' % (start, end, n))
         self._send_json(200, {"success": True, "deleted": n, "stats": stats})
 
+    def _drain_request_body(self):
+        """把请求体读干净再丢掉。**只在「还没有任何 handler 读过 body」的早拒路径上调用。**
+
+        为什么必须读：BaseHTTPRequestHandler 默认 HTTP/1.0，响应后就关连接；而关闭一个
+        「接收缓冲区里还有未读数据」的 socket，**Windows 发 RST 而不是 FIN** —— 客户端
+        读响应时拿到 ConnectionAbortedError [WinError 10053]，看不到我们发的 401/403。
+
+        2026-08-31 审查实证（空白 handler 只回 401，逐档加大 body）：
+            60 KB 不读 → 0/40 报错 ｜ 200 KB → 7/40 ｜ 1 MB → 18/40 ｜ 1 MB 读完 → 0/40
+        真实影响不止测试：会话 TTL 12 小时，用户会话过期后提交一条带富文本的跟进记录
+        （POST 带 body）就走这条路 —— 浏览器收到连接重置而非干净的 401，前端无法识别
+        成「登录已过期」跳登录页，只会显示一个泛化的网络错误。生产在 nginx 后面，
+        反代吸收了一部分，所以一直没被看见（`verify.sh` 那条「Windows 抖动」老 flake
+        就是它，PROGRESS.md:105 早在 V4.5.10 记过同一文件同一用例名）。
+
+        分块读、给上限：body 由客户端声明，不设上限等于让任何人用一个超大 Content-Length
+        把线程钉在这里。超限就不读了 —— 那时连接本来就要断，RST 与否已不重要。
+        """
+        try:
+            n = int(self.headers.get('Content-Length') or 0)
+        except (TypeError, ValueError):
+            return
+        if n <= 0 or n > MAX_DRAIN_BYTES:
+            return
+        left = n
+        while left > 0:
+            chunk = self.rfile.read(min(left, 65536))
+            if not chunk:
+                break
+            left -= len(chunk)
+
     def _auth_gate(self):
         """检查请求路径是否需要鉴权；需要且无有效会话则返回 False（已发 401），否则返回 True。"""
         path = urlparse(self.path).path
         if _path_needs_auth(path):
             token = auth.parse_cookie_token(self.headers.get('Cookie'))
             if not auth.validate_session(token):
+                self._drain_request_body()   # 见该方法 docstring:不读干净会被 RST 掉
                 self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
                 return False
         return True
@@ -4551,6 +4588,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         account = auth.validate_session(token)
         rec = auth.load_accounts().get('users', {}).get(account) if account else None
         if not rec or not rec.get('isSuper'):
+            self._drain_request_body()
             self._send_json(403, _error_payload(ERR_FORBIDDEN, "需要超级管理员权限"))
             return None
         return account
@@ -4565,10 +4603,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         account = auth.validate_session(token)
         rec = auth.load_accounts().get('users', {}).get(account) if account else None
         if not rec:
+            self._drain_request_body()
             self._send_json(401, _error_payload(ERR_AUTH, "未登录或会话已过期"))
             return None, None
         pages = rec.get('allowedPages', [])
         if not (rec.get('isSuper') or '*' in pages or 'budget' in pages):
+            self._drain_request_body()
             self._send_json(403, _error_payload(ERR_FORBIDDEN, "无概算工具页面权限"))
             return None, None
         return account, rec
