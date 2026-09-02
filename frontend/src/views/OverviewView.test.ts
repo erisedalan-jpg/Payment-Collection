@@ -42,10 +42,10 @@ function seed() {
     meta: {}, dashboard: {}, summary: {},
     displayColumns: {}, followupRecords: {},
     projects: [
-      { projectId: 'P-1', projectName: '风险甲', orgL4: 'A组', payment: { relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, remainingTotal: 400, paymentRatio: 0.6, delayedCount: 1 }, deliveryCosts: [],
+      { projectId: 'P-1', projectName: '风险甲', orgL4: 'A组', payment: { relatedNodeCount: 1, expectedTotal: 1000, nodeActualTotal: 600, remainingTotal: 400, paymentRatio: 0.6, delayedCount: 1 }, deliveryCosts: [],
         paymentPmis: { contract: 1000 },
         health: { progressAbnormal: true, riskAbnormal: true, costAbnormal: false, paymentAbnormal: true, overall: '风险' } },
-      { projectId: 'P-2', projectName: '健康乙', orgL4: 'B组', payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }, deliveryCosts: [],
+      { projectId: 'P-2', projectName: '健康乙', orgL4: 'B组', payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }, deliveryCosts: [],
         paymentPmis: { contract: 0 },
         health: { overall: '健康' } },
     ],
@@ -54,6 +54,11 @@ function seed() {
       'P-2': { status: { 项目状态: '实施中', 是否暂停: true }, cost: {} },
     },
     rawNodes: [],
+    // 达成率分子只认流水表(2026-08-31 审查拆掉了「无流水表退化节点已收」那条未登记例外)。
+    // 真实数据一定有 paymentRecords;夹具不给,测的就是一条已经不存在的降级路径。
+    paymentRecords: {
+      'P-1': { total: 600, count: 1, lastDate: '2026-02-01', records: [{ date: '2026-02-01', amount: 600 }] },
+    },
     // 回款重点带换收款阶段口径(3E-2):band 取 paymentNodeRows(paymentNodes,projects)。当月节点用本月固定日避免跨月脆弱
     paymentNodes: {
       'P-1': [

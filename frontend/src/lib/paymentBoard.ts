@@ -67,13 +67,11 @@ export function buildPayBoardRows(
       end,
     )
     // 完成率恒全时口径(与 /overview computeKpis、项目详情页、CLAUDE.md 全站统一口径一致)：
-    // 分子 = Σ全时流水(payment_records，start=end=''，不随所选日期区间过滤)；无流水表时退化 payment.actualTotal。
+    // 分子 = Σ全时流水(payment_records，start=end=''，不随所选日期区间过滤)。
     // 分母 = 合同(paymentPmis.contract)。计划回款/延期/未收(rp.*)仍随区间。
-    const actualAll = round2(
-      paymentRecords
-        ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
-        : Number(p.payment?.actualTotal ?? 0),
-    )
+    // ★ 无流水表时分子为 0,不退化节点已收:那是另一套口径(生产实测差 570 万),
+    //   而 CLAUDE.md 的例外清单当前为空。宁可明显坏(0%),不要悄悄错(46.36%)。
+    const actualAll = round2(actualInRange(paymentRecords?.[p.projectId]?.records, '', ''))
     const ratioAll = rp.contract > 0 ? round4(actualAll / rp.contract) : null
     const progress = deriveProgress(rp.contract, ratioAll)
     return {

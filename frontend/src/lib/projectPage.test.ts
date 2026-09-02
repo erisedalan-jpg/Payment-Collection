@@ -4,10 +4,10 @@ import { buildProjectPage, RISK_COLUMNS, fmtDateCell } from './projectPage'
 
 const PROJECTS = [
   { projectId: 'P-1', projectName: '终端安全', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '',
-    payment: { relatedNodeCount: 1, expectedTotal: 100, actualTotal: 0, remainingTotal: 100, paymentRatio: 0, delayedCount: 0 },
+    payment: { relatedNodeCount: 1, expectedTotal: 100, nodeActualTotal: 0, remainingTotal: 100, paymentRatio: 0, delayedCount: 0 },
     deliveryCosts: [], health: { overall: '健康' } },
   { projectId: 'P-2', projectName: '售前服务-某局', projectManager: '李四', orgL4: 'B组', isPresale: true, relatedClosedId: 'OLD-9',
-    payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+    payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
     deliveryCosts: [], health: { overall: '关注' } },
 ] as unknown as Project[]
 

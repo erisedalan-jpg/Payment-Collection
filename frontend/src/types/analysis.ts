@@ -85,7 +85,7 @@ export type Ispresale = boolean;
 export type Relatedclosedid = string;
 export type Relatednodecount = number;
 export type Expectedtotal = number;
-export type Actualtotal = number;
+export type Nodeactualtotal = number;
 export type Remainingtotal = number;
 export type Paymentratio = number | null;
 export type Delayedcount = number;
@@ -97,7 +97,7 @@ export type NoName37 = number | null;
 export type Deliverycosts = DeliveryCostItem[];
 export type Overspendamount = number | null;
 export type Contract = number | null;
-export type Actualtotal1 = number | null;
+export type Actualtotal = number | null;
 export type Paymentcount = number;
 export type Expectedtotal1 = number;
 export type Nodecount = number;
@@ -354,7 +354,7 @@ export interface Project {
 export interface ProjectPayment {
   relatedNodeCount?: Relatednodecount;
   expectedTotal?: Expectedtotal;
-  actualTotal?: Actualtotal;
+  nodeActualTotal?: Nodeactualtotal;
   remainingTotal?: Remainingtotal;
   paymentRatio?: Paymentratio;
   delayedCount?: Delayedcount;
@@ -370,7 +370,7 @@ export interface DeliveryCostItem {
 }
 export interface ProjectPaymentPmis {
   contract?: Contract;
-  actualTotal?: Actualtotal1;
+  actualTotal?: Actualtotal;
   paymentCount?: Paymentcount;
   expectedTotal?: Expectedtotal1;
   nodeCount?: Nodecount;

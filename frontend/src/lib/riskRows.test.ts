@@ -76,7 +76,7 @@ describe('riskRowMatches(单表两级 AND/OR)', () => {
 describe('buildRiskRows — 项目级 scope 字段(补齐 /projects 列)', () => {
   const projects = [
     { projectId: 'P1', projectName: '甲', orgL4: '一组', paymentPmis: { contract: 2_000_000 },
-      payment: { relatedNodeCount: 1, delayedCount: 0, remainingTotal: 0, actualTotal: 100, paymentRatio: 0.5 },
+      payment: { relatedNodeCount: 1, delayedCount: 0, remainingTotal: 0, nodeActualTotal: 100, paymentRatio: 0.5 },
       health: { overall: '关注' }, top1000: '是', quadrant: 'Q1', overspendAmount: 8000 },
   ] as any
   const pmis = { P1: {

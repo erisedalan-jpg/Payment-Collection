@@ -38,12 +38,12 @@ function seed() {
     ],
     projects: [
       { projectId: 'P-1', projectName: '终端安全项目', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '', 合同编号: 'HT-2026-001', customer: '海聚博源',
-        payment: { relatedNodeCount: 1, expectedTotal: 500000, actualTotal: 0, remainingTotal: 500000, paymentRatio: 0, delayedCount: 1 },
+        payment: { relatedNodeCount: 1, expectedTotal: 500000, nodeActualTotal: 0, remainingTotal: 500000, paymentRatio: 0, delayedCount: 1 },
         deliveryCosts: [{ 类别: '内部人员成本', 预算金额: 122641.51, 实际发生: 0.0, 剩余预算: 122641.51, 消耗率: 0.0 }],
         top1000: '是', quadrant: 'M1 战略核心区',
         health: { overall: '风险' } },
       { projectId: 'P-2', projectName: '售前服务-某局', projectManager: '李四', orgL4: 'B组', isPresale: true, relatedClosedId: 'OLD-9',
-        payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+        payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
         deliveryCosts: [], health: { overall: '关注' } },
     ],
     projectPmis: {

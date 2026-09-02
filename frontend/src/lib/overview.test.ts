@@ -3,15 +3,15 @@ import type { Project, ProjectPmis, PaymentRecordsEntry } from '@/types/analysis
 import type { PayNodeRow } from './paymentPmis'
 import { computeKpis, healthSummary, paymentBand } from './overview'
 
-const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
+const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
 // orgL4 非空 = 正常项目（P-3 无 orgL4 = 异常项目，回款达成率应排除）
 // paymentPmis.contract 为合同总额，作为达成率分母（P-1=2000, P-2=1500; P-3 异常排除）
 const PROJECTS = [
-  { projectId: 'P-1', projectName: '甲', orgL4: '交付一组', payment: { ...PAY0, expectedTotal: 1000, actualTotal: 600 }, deliveryCosts: [],
+  { projectId: 'P-1', projectName: '甲', orgL4: '交付一组', payment: { ...PAY0, expectedTotal: 1000, nodeActualTotal: 600 }, deliveryCosts: [],
     paymentPmis: { contract: 2000 },
     health: { progressAbnormal: true, riskAbnormal: true, costAbnormal: false, paymentAbnormal: false, overall: '风险' } },
-  { projectId: 'P-2', projectName: '乙', orgL4: '交付二组', payment: { ...PAY0, expectedTotal: 1000, actualTotal: 0 }, deliveryCosts: [],
+  { projectId: 'P-2', projectName: '乙', orgL4: '交付二组', payment: { ...PAY0, expectedTotal: 1000, nodeActualTotal: 0 }, deliveryCosts: [],
     paymentPmis: { contract: 1500 },
     health: { progressAbnormal: false, riskAbnormal: false, costAbnormal: true, paymentAbnormal: false, overall: '关注' } },
   { projectId: 'P-3', projectName: '丙', payment: { ...PAY0 }, deliveryCosts: [],
@@ -31,8 +31,12 @@ describe('computeKpis', () => {
     expect(k.paused).toBe(1)
     expect(k.highRisk).toBe(1)
     expect(k.overspend).toBe(1)
-    // 无 paymentRecords 时退化节点 actualTotal: P-1=600; 分母改为 Σcontract=2000+1500=3500
-    expect(k.paymentRatio).toBeCloseTo(600 / 3500)
+    // ★ 2026-08-31 口径变更:【不再】有「无 paymentRecords 时退化节点已收」这条降级。
+    //   本用例原本断言的正是那条降级(600/3500)—— 它是 CLAUDE.md 例外清单里没登记的例外。
+    //   现在流水表缺失 → 分子 0 → 达成率 0%。明显坏,有人会报;退化到节点口径则是
+    //   悄悄给一个看起来合理的错数(生产实测两口径差 570 万),没人会发现。
+    //   用 toBe 而非 toBeCloseTo:后者默认只比到 2 位小数,0.0001 也会算「接近 0」。
+    expect(k.paymentRatio).toBe(0)
   })
   it('传入 paymentRecords 时分子改用全量流水(全时 start=end=\'\')', () => {
     // P-1 流水 800, P-2 流水 300; P-3 异常排除; 分母=Σ合同 3500

@@ -32,13 +32,13 @@ function seed() {
     displayColumns: {}, followupRecords: {}, events: [],
     projects: [
       { projectId: 'P-1', projectName: '甲', projectManager: '何平', orgL4: '交付一组',
-        payment: { relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, remainingTotal: 400, paymentRatio: 0.6, delayedCount: 1 },
+        payment: { relatedNodeCount: 1, expectedTotal: 1000, nodeActualTotal: 600, remainingTotal: 400, paymentRatio: 0.6, delayedCount: 1 },
         deliveryCosts: [], health: { overall: '风险' } },
       { projectId: 'P-2', projectName: '乙', projectManager: '何平', orgL4: '交付二组',
-        payment: { relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 1000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
+        payment: { relatedNodeCount: 1, expectedTotal: 1000, nodeActualTotal: 1000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
         deliveryCosts: [], health: { overall: '健康' } },
       { projectId: 'P-3', projectName: '丙', projectManager: '李四', orgL4: '交付一组',
-        payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+        payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
         deliveryCosts: [], health: { overall: '健康' } },
     ],
     projectPmis: {

@@ -125,13 +125,11 @@ export function projectPaymentRows(
     )
 
     // 已回款/完成率恒全时口径(全站统一口径 Σ流水全加÷合同，与 /payment/board、项目详情页一致)：
-    // 分子=Σ全时流水(actualInRange(records,'','')，不随所选日期区间过滤；无流水表退化 payment.actualTotal)；分母=合同。
+    // 分子=Σ全时流水(actualInRange(records,'','')，不随所选日期区间过滤)；分母=合同。
     // 计划回款(expectedTotal)/延期(delayedCount)/未收(remainingTotal)/节点计数(rp.*)仍随日期区间。
-    const actualAll = round2(
-      paymentRecords
-        ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
-        : Number(p.payment?.actualTotal ?? 0),
-    )
+    // ★ 无流水表时分子为 0,不退化节点已收(那是另一套口径,生产实测差 570 万;
+    //   CLAUDE.md 例外清单当前为空)。宁可明显坏(0%),不要悄悄错(46.36%)。
+    const actualAll = round2(actualInRange(paymentRecords?.[p.projectId]?.records, '', ''))
     const ratioAll = rp.contract > 0 ? round4(actualAll / rp.contract) : null
     const progress = deriveProgress(rp.contract, ratioAll)
     return {

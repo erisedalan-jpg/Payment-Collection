@@ -120,7 +120,7 @@ class TestProjectsContract:
             "projectId": "SF-1", "projectName": "售前服务A", "projectManager": "佘海龙",
             "orgL4": "黑龙江服务组", "orgL3_1": "三部一组", "合同编号": "HT-1",
             "isPresale": True, "relatedClosedId": "SS-99",
-            "payment": {"relatedNodeCount": 1, "expectedTotal": 10.0, "actualTotal": 0.0,
+            "payment": {"relatedNodeCount": 1, "expectedTotal": 10.0, "nodeActualTotal": 0.0,
                         "remainingTotal": 10.0, "paymentRatio": 0.0, "delayedCount": 1},
             "deliveryCosts": [{"类别": "差旅费", "预算金额": 100.0, "实际发生": None,
                                "剩余预算": None, "消耗率": None}],

@@ -88,6 +88,7 @@ python server.py --stop     # 停止运行中的服务
 
 ### 回款口径约定（2026-06-19 起，V1.15.0；改任一处先全仓核对）
 - **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外清单当前为空**（2026-08-03 全部归并完毕）：`/insight` 曾用「节点已收 ÷ customer.合同总额（售前不回退）」，因 55% 的在建项目是售前、其 `customer.合同总额` 为空而分子照计，实测全域算出 **107.57%**、8/11 个 L4 桶 >100%；`snapshots.py`（/activity 的「回款达成率 ±Xpp」）曾用「Σ节点已收 ÷ Σ节点计划回款」。两者均已改为主口径，真实数据对拍 /insight 修复后 47.85%，与主口径逐位吻合。**今后再要开例外，必须在此处登记并写明理由**。
+- **分子字段只有一个合法名字（2026-08-31 审查）**：`paymentPmis.actualTotal` = **流水净额**，是全站唯一合法分子；项目对象上的**节点已收**已从 `payment.actualTotal` 改名为 `payment.nodeActualTotal`。改名前两者同名并列、生产实测差 **570 万**（46.36% vs 47.56%），任何人写 `Σ` 节点那个除以合同都会静默拿到错的，而 review 看不出来 —— 字段名、类型、数量级全都正常。同批拆掉了 `overview.ts` / `paymentBoard.ts` / `paymentPmis.ts` 三处「无流水表时退化节点口径」——**那是三条未登记的例外**；现在流水表缺失时分子为 0、比率显 0%，**宁可明显坏，不要悄悄错**。守卫见 `tests/test_payment_caliber_guard.py`（**它逮不到别名访问，那一层靠 `npm run typecheck`**）。
 - **回款数据核心源 = `input/collection_stages.csv`**（PMIS 收款阶段台账导出，已入"数据更新"流程）。售前项目收款阶段节点**按本项目号优先取、缺再回退原项目号**（`_collection_nodes_for`）；台账把售前节点挂在本项目号下。
 - **异常项目（`orgL4` 空）排除出回款统计**（`lib/anomaly.isAnomalous`）：回款看板硬排除、治理页告警、项目清单标「数据异常」。
 - **回款节点只为在建主域（`dept_projects`=PMIS 在建 ∩ 组织架构花名册；部门范围按表自身判定、不写死部门名，见 `projects._org_dept_rows`）及售前原项目构建**；已关闭/域外项目的收款阶段不进在建回款看板（设计边界，非缺陷）。

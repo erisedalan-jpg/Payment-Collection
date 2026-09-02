@@ -11,7 +11,7 @@ function baseProject(overrides: Partial<Project> = {}): Project {
     payment: {
       delayedCount: 0,
       relatedNodeCount: 2,
-      actualTotal: 100,
+      nodeActualTotal: 100,
       remainingTotal: 50,
       expectedTotal: 150,
       paymentRatio: 0.67,
@@ -41,7 +41,7 @@ function basePmis(overrides: Partial<ProjectPmis> = {}): ProjectPmis {
 
 describe('riskReasons — 数据异常短路', () => {
   it('orgL4 为空 → 仅返回 [数据异常]，不含其它', () => {
-    const p = baseProject({ orgL4: '', payment: { delayedCount: 3, relatedNodeCount: 3, actualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
+    const p = baseProject({ orgL4: '', payment: { delayedCount: 3, relatedNodeCount: 3, nodeActualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
     const pmis = basePmis({ progress: { 里程碑进度状态: '滞后' }, cost: { 消耗比: 1.5, 项目超支: true }, risk: { 未关闭风险数: 2 } })
     const result = riskReasons(p, pmis)
     expect(result).toHaveLength(1)
@@ -59,7 +59,7 @@ describe('riskReasons — 数据异常短路', () => {
 
 describe('riskReasons — 回款延期', () => {
   it('delayedCount > 0 命中回款延期', () => {
-    const p = baseProject({ payment: { delayedCount: 3, relatedNodeCount: 3, actualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
+    const p = baseProject({ payment: { delayedCount: 3, relatedNodeCount: 3, nodeActualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
     const result = riskReasons(p)
     expect(result.some((r) => r.category === '回款延期')).toBe(true)
     const r = result.find((r) => r.category === '回款延期')!
@@ -68,7 +68,7 @@ describe('riskReasons — 回款延期', () => {
   })
 
   it('delayedCount = 0 不命中回款延期', () => {
-    const p = baseProject({ payment: { delayedCount: 0, relatedNodeCount: 2, actualTotal: 50, remainingTotal: 50, expectedTotal: 100, paymentRatio: 0.5 } })
+    const p = baseProject({ payment: { delayedCount: 0, relatedNodeCount: 2, nodeActualTotal: 50, remainingTotal: 50, expectedTotal: 100, paymentRatio: 0.5 } })
     const result = riskReasons(p)
     expect(result.some((r) => r.category === '回款延期')).toBe(false)
   })
@@ -198,7 +198,7 @@ describe('riskReasons — 健康项目返回空数组', () => {
 describe('riskReasons — 组合：多类同时命中时顺序', () => {
   it('顺序为 回款延期→里程碑滞后→总成本超支→交付成本超支→风险未闭环', () => {
     const p = baseProject({
-      payment: { delayedCount: 1, relatedNodeCount: 2, actualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 },
+      payment: { delayedCount: 1, relatedNodeCount: 2, nodeActualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 },
       overspendAmount: 5000,
     })
     const pmis = basePmis({
@@ -224,7 +224,7 @@ describe('riskReasons — 组合：多类同时命中时顺序', () => {
 describe('riskReasons — 未获取原项目预算(第3参)', () => {
   it('noOrigBudget=true → 产未获取原项目预算(mut)、不产总/交付成本超支;其它原因仍在', () => {
     const p = baseProject({ overspendAmount: 12000,
-      payment: { delayedCount: 1, relatedNodeCount: 2, actualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
+      payment: { delayedCount: 1, relatedNodeCount: 2, nodeActualTotal: 0, remainingTotal: 100, expectedTotal: 100, paymentRatio: 0 } })
     const pmis = basePmis({ cost: { 交付超支: true } })
     const cats = riskReasons(p, pmis, true).map((x) => x.category)
     expect(cats).toContain('未获取原项目预算')

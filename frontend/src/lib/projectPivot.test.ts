@@ -5,18 +5,18 @@ import {
   INSIGHT_DIMENSIONS, INSIGHT_METRICS,
 } from './projectPivot'
 
-const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
+const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
 // orgL4 非空 = 正常项目；orgL4 为空/undefined = 异常项目(回款列置 0/false，行本身保留)
 const PROJECTS = [
-  // paymentPmis.actualTotal(流水净额)与 payment.actualTotal(节点已收)【刻意取不同值】——
+  // paymentPmis.actualTotal(流水净额)与 payment 上的 nodeActualTotal(节点已收)【刻意取不同值】——
   // 回款完成率的分子必须是流水,读成节点已收时下面的比率断言才会红。
   { projectId: 'P-1', projectName: '甲', projectManager: '何平', orgL4: '交付一组',
-    payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 600, delayedCount: 1 },
+    payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, nodeActualTotal: 600, delayedCount: 1 },
     paymentPmis: { contract: 2000000, actualTotal: 750 },
     deliveryCosts: [], health: { overall: '风险' } },
   { projectId: 'P-2', projectName: '乙', projectManager: '何平', orgL4: '交付二组',
-    payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, actualTotal: 1000 },
+    payment: { ...PAY0, relatedNodeCount: 1, expectedTotal: 1000, nodeActualTotal: 1000 },
     paymentPmis: { contract: 1000000, actualTotal: 900 },
     deliveryCosts: [], health: { overall: '健康' } },
   { projectId: 'P-3', projectName: '丙', projectManager: '李四', orgL4: '交付一组',
@@ -51,7 +51,7 @@ describe('buildInsightRows', () => {
     // 构造含异常项目的列表
     const anomProject = { projectId: 'P-X', projectName: '异常甲', projectManager: '测试员',
       // orgL4 undefined = isAnomalous → true
-      payment: { ...PAY0, expectedTotal: 5000, actualTotal: 3000, delayedCount: 2 },
+      payment: { ...PAY0, expectedTotal: 5000, nodeActualTotal: 3000, delayedCount: 2 },
       deliveryCosts: [], health: { overall: '健康' } } as unknown as Project
     const rows = buildInsightRows([anomProject], {})
     // 行本身保留(不被过滤)
@@ -138,7 +138,7 @@ describe('回款完成率口径(与全站主口径同源)', () => {
     // 11 个 L4 桶里 8 个 >100%,最高 424.9%。修复后全域回到 47.85%,与主口径逐位吻合。
     const presale = [{
       projectId: 'S-1', projectName: '售前甲', projectManager: '张三', orgL4: '交付一组',
-      payment: { ...PAY0, expectedTotal: 1000, actualTotal: 944000 },
+      payment: { ...PAY0, expectedTotal: 1000, nodeActualTotal: 944000 },
       paymentPmis: { contract: 1180000, actualTotal: 944000 },
       deliveryCosts: [], health: {},
     }] as unknown as Project[]

@@ -272,7 +272,7 @@ describe('projectPaymentRows projectLevel（3E，供 /payment/projects 表格化
 describe('paymentNodeRows（扁平化 + 维度 join 到所属项目）', () => {
   const projects = [
     proj({ projectId: 'A', projectName: '甲', orgL4: '组1',
-      payment: { relatedNodeCount: 2, expectedTotal: 2_000_000, actualTotal: 1_000_000, remainingTotal: 1_000_000, paymentRatio: 0.5, delayedCount: 1 },
+      payment: { relatedNodeCount: 2, expectedTotal: 2_000_000, nodeActualTotal: 1_000_000, remainingTotal: 1_000_000, paymentRatio: 0.5, delayedCount: 1 },
       paymentPmis: pm({ contract: 2_000_000 }) }),
   ]
   const pmisMap: Record<string, ProjectPmis> = { A: { progress: { 项目阶段: '实施' } } as ProjectPmis }

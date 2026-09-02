@@ -73,7 +73,7 @@ export function buildInsightRows(projects: Project[], pmisMap: Record<string, Pr
       costRatio: typeof cost.消耗比 === 'number' ? cost.消耗比 : null,
       // 异常项目回款列置 0/false，不参与回款指标聚合
       expectedTotal: anomalous ? 0 : Number(p.payment?.expectedTotal ?? 0),
-      actualTotal: anomalous ? 0 : Number(p.payment?.actualTotal ?? 0),
+      actualTotal: anomalous ? 0 : Number(p.payment?.nodeActualTotal ?? 0),
       recordTotal: anomalous ? 0 : Number(p.paymentPmis?.actualTotal ?? 0),
       delayed: anomalous ? false : (p.payment?.delayedCount ?? 0) > 0,
     }

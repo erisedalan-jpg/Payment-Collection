@@ -253,7 +253,15 @@ def build_payment_summary(contract, nodes, pay_record):
 
 
 def aggregate_payment_pmis(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """项目回款子域聚合(收款阶段节点级,3E-3);形态同旧 payment 以兼容前端消费方。"""
+    """项目回款子域聚合(收款阶段节点级,3E-3);形态同旧 payment 以兼容前端消费方。
+
+    ★ `nodeActualTotal` 原名 `actualTotal`,2026-08-31 审查改名。原因:同一个项目对象里
+      并排躺着两个 actualTotal —— 这里的是【节点已收】,`paymentPmis.actualTotal` 是
+      【流水净额】(全站主口径分子),生产实测两者差 570 万(46.36% vs 47.56%)。
+      名字毫无区分度时,任何人拿 payment 上那个 actualTotal 去除以合同,都会静默拿到
+      错的那个,而 review 看不出来 —— 字段名、类型、数量级全都正常。
+      守卫见 tests/test_payment_caliber_guard.py。
+    """
     exp = sum(float(n.get("expectedPayment") or 0) for n in nodes)
     act = sum(float(n.get("receivedAmount") or 0) for n in nodes)
     rem = sum(float(n.get("unpaidAmount") or 0) for n in nodes)
@@ -261,7 +269,7 @@ def aggregate_payment_pmis(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {
         "relatedNodeCount": len(nodes),
         "expectedTotal": round(exp, 2),
-        "actualTotal": round(act, 2),
+        "nodeActualTotal": round(act, 2),
         "remainingTotal": round(rem, 2),
         "paymentRatio": None,
         "delayedCount": delayed,

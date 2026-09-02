@@ -56,7 +56,9 @@ export function paymentStatusOf(p: Project): string {
   const pay = p.payment
   if (!pay || !pay.relatedNodeCount) return '无节点'
   if ((pay.delayedCount ?? 0) > 0) return '延期'
-  if ((pay.remainingTotal ?? 0) <= 0 && (pay.actualTotal ?? 0) > 0) return '已回清'
+  // nodeActualTotal = 节点已收(此处判「有没有收到过钱」,节点口径正合适)。
+  // 2026-08-31 审查改名前叫 actualTotal —— 那时它与 paymentPmis.actualTotal(流水净额)同名。
+  if ((pay.remainingTotal ?? 0) <= 0 && (pay.nodeActualTotal ?? 0) > 0) return '已回清'
   return '回款中'
 }
 

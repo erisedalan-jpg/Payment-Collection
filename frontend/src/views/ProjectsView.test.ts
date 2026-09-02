@@ -35,10 +35,10 @@ function seed() {
     displayColumns: {}, followupRecords: {},
     projects: [
       { projectId: 'P-1', projectName: '终端安全', projectManager: '何平', orgL4: 'A组', isPresale: false, relatedClosedId: '',
-        payment: { relatedNodeCount: 2, expectedTotal: 100, actualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 },
+        payment: { relatedNodeCount: 2, expectedTotal: 100, nodeActualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 },
         deliveryCosts: [], health: { overall: '健康' } },
       { projectId: 'P-2', projectName: '售前服务-某局', projectManager: '李四', orgL4: 'B组', isPresale: true, relatedClosedId: 'OLD-9',
-        payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+        payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
         deliveryCosts: [], health: { overall: '关注' } },
     ],
     projectPmis: {
@@ -316,9 +316,9 @@ describe('ProjectsView', () => {
       displayColumns: {}, followupRecords: {},
       projects: [
         { projectId: 'NORMAL', projectName: '正常项目', projectManager: '甲', orgL4: 'A组', isPresale: false, relatedClosedId: '',
-          payment: { relatedNodeCount: 1, expectedTotal: 100, actualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 }, health: { overall: '健康' } },
+          payment: { relatedNodeCount: 1, expectedTotal: 100, nodeActualTotal: 50, remainingTotal: 50, paymentRatio: 0.5, delayedCount: 0 }, health: { overall: '健康' } },
         { projectId: 'WSGF-SS-202604169018', projectName: '异常项目', projectManager: '乙', orgL4: '', isPresale: false, relatedClosedId: '',
-          payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }, health: { overall: '关注' } },
+          payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }, health: { overall: '关注' } },
       ],
       projectPmis: {},
     } as any

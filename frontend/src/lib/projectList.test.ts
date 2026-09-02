@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { Project, ProjectPmis } from '@/types/analysis'
 import { buildProjectRows, filterProjectRows, paymentStatusOf, type ProjectFilters } from './projectList'
 
-const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
+const PAY0 = { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 }
 
 function proj(over: Partial<Project> = {}): Project {
   return {
@@ -31,13 +31,13 @@ describe('paymentStatusOf', () => {
     expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, delayedCount: 1 } }))).toBe('延期')
   })
   it('remainingTotal<=0 且 actualTotal>0 → 已回清', () => {
-    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, actualTotal: 100, remainingTotal: 0 } }))).toBe('已回清')
+    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, nodeActualTotal: 100, remainingTotal: 0 } }))).toBe('已回清')
   })
   it('其余 → 回款中', () => {
-    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, actualTotal: 50, remainingTotal: 50 } }))).toBe('回款中')
+    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, nodeActualTotal: 50, remainingTotal: 50 } }))).toBe('回款中')
   })
   it('remainingTotal 为负(超收) → 已回清', () => {
-    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, actualTotal: 120, remainingTotal: -20 } }))).toBe('已回清')
+    expect(paymentStatusOf(proj({ payment: { ...PAY0, relatedNodeCount: 2, nodeActualTotal: 120, remainingTotal: -20 } }))).toBe('已回清')
   })
 })
 

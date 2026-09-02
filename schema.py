@@ -118,7 +118,10 @@ class DataQuality(_Base):
 class ProjectPayment(_Base):
     relatedNodeCount: int = 0
     expectedTotal: float = 0
-    actualTotal: float = 0
+    # 【节点已收】。与 PaymentPmis.actualTotal(流水净额,主口径分子)不是一回事:
+    # 生产实测两者差 570 万(46.36% vs 47.56%)。2026-08-31 审查从 actualTotal 改名,
+    # 就是为了让名字说真话 —— 详见 tests/test_payment_caliber_guard.py。
+    nodeActualTotal: float = 0
     remainingTotal: float = 0
     paymentRatio: Optional[float] = None
     delayedCount: int = 0

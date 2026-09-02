@@ -37,10 +37,11 @@ export function computeKpis(
     // 回款达成率排除异常项目；分母改为 Σ合同(paymentPmis.contract)
     if (!isAnomalous(p)) {
       con += p.paymentPmis?.contract ?? 0
-      // 分子=Σ流水(全时)；无流水表时退化节点汇总
-      act += paymentRecords
-        ? actualInRange(paymentRecords[p.projectId]?.records, '', '')
-        : (p.payment?.actualTotal ?? 0)
+      // 分子=Σ流水(全时)。无流水表时分子为 0(比率显 0%),不退化节点已收 ——
+      // 后者是另一套口径,与流水净额生产实测差 570 万;CLAUDE.md 回款口径约定写着
+      // 「例外清单当前为空,今后再要开例外必须在此处登记」,这条降级就是未登记的例外。
+      // 宁可明显坏(0%),不要悄悄错(46.36%)。
+      act += actualInRange(paymentRecords?.[p.projectId]?.records, '', '')
     }
   }
   return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: con > 0 ? act / con : null }

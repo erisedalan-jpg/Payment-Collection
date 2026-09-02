@@ -342,7 +342,7 @@ class TestAggregatePaymentPmis:
         r = P.aggregate_payment_pmis(nodes)
         assert r["relatedNodeCount"] == 2
         assert r["expectedTotal"] == 2000000
-        assert r["actualTotal"] == 600000
+        assert r["nodeActualTotal"] == 600000   # 节点已收;流水口径那个在 paymentPmis 上
         assert r["remainingTotal"] == 1400000
         assert r["paymentRatio"] is None
         assert r["delayedCount"] == 1

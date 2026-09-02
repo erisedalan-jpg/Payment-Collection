@@ -28,17 +28,17 @@ const recordsB: PaymentRecord[] = [rec(1_000_000, '2024-06-10')]
 const projects: Project[] = [
   {
     projectId: 'A', projectName: '甲', projectManager: '张三', orgL4: '组1',
-    payment: { relatedNodeCount: 1, expectedTotal: 1_500_000, actualTotal: 1_000_000, remainingTotal: 500_000, paymentRatio: 0.5, delayedCount: 1 },
+    payment: { relatedNodeCount: 1, expectedTotal: 1_500_000, nodeActualTotal: 1_000_000, remainingTotal: 500_000, paymentRatio: 0.5, delayedCount: 1 },
     paymentPmis: { contract: 2_000_000, actualTotal: 1_000_000, expectedTotal: 1_500_000, delayedCount: 1 },
   } as unknown as Project,
   {
     projectId: 'B', projectName: '乙', projectManager: '李四', orgL4: '组1',
-    payment: { relatedNodeCount: 1, expectedTotal: 1_000_000, actualTotal: 1_000_000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
+    payment: { relatedNodeCount: 1, expectedTotal: 1_000_000, nodeActualTotal: 1_000_000, remainingTotal: 0, paymentRatio: 1, delayedCount: 0 },
     paymentPmis: { contract: 1_000_000, actualTotal: 1_000_000, expectedTotal: 1_000_000, delayedCount: 0 },
   } as unknown as Project,
   {
     projectId: 'C', projectName: '丙', projectManager: '李四', orgL4: '组2',
-    payment: { relatedNodeCount: 0, expectedTotal: 0, actualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
+    payment: { relatedNodeCount: 0, expectedTotal: 0, nodeActualTotal: 0, remainingTotal: 0, paymentRatio: null, delayedCount: 0 },
     paymentPmis: { contract: 0, actualTotal: 0, expectedTotal: 0, delayedCount: 0 },
   } as unknown as Project,
 ]
@@ -120,7 +120,7 @@ describe('buildPayBoardRows', () => {
     // 合同 750_000，两笔流水均在 2025 年
     const proj = [{
       projectId: 'Z', projectName: '真实', projectManager: '王五', orgL4: '京津服务组',
-      payment: { relatedNodeCount: 2, expectedTotal: 525_000, actualTotal: 525_000, remainingTotal: 0, paymentRatio: 0.7, delayedCount: 0 },
+      payment: { relatedNodeCount: 2, expectedTotal: 525_000, nodeActualTotal: 525_000, remainingTotal: 0, paymentRatio: 0.7, delayedCount: 0 },
       paymentPmis: { contract: 750_000, actualTotal: 525_000, expectedTotal: 525_000, delayedCount: 0 },
     }] as unknown as Project[]
     const recs = { Z: { records: [rec(367_500, '2025-09-30'), rec(157_500, '2025-07-23')] } } as unknown as import('@/types/analysis').Paymentrecords
