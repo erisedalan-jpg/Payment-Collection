@@ -317,6 +317,7 @@ export interface DataQuality {
   conflicts?: Conflicts;
   dirty?: Dirty;
   collectionStagesMissing?: Collectionstagesmissing;
+  paymentNoContract?: Paymentnocontract;
   [k: string]: unknown;
 }
 export interface QualitySummary {
@@ -329,6 +330,9 @@ export interface QualitySummary {
   [k: string]: unknown;
 }
 export interface Collectionstagesmissing {
+  [k: string]: unknown;
+}
+export interface Paymentnocontract {
   [k: string]: unknown;
 }
 export interface Project {

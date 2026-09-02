@@ -252,6 +252,37 @@ def build_payment_summary(contract, nodes, pay_record):
     }
 
 
+def no_contract_with_payment(dept_projects, payment_records):
+    """【无合同却有流水】的主域项目清单,供治理页单列。
+
+    为什么要有它:达成率的分子分母必须是同一批项目(见 lib/paymentRate.ts),所以
+    合同缺失/为 0 的项目被排除出比率计算 —— 但它们**确实收到过钱**,把它们排除掉
+    却不告诉任何人,就是把一批对不上合同的资金流悄悄藏起来。生产实测 6 个售前项目、
+    流水合计 136.68 万。列出来才好去查:是原项目映射漏了,还是 PMIS 没录合同。
+
+    异常项目(orgL4 空)不计:全站已把它们排除出回款统计,列进来会与看板对不上。
+    按流水金额倒序 —— 大额的先查。
+    """
+    out = []
+    for p in dept_projects or []:
+        if not str(p.get("orgL4") or "").strip():
+            continue
+        contract = (p.get("paymentPmis") or {}).get("contract")
+        if contract and contract > 0:
+            continue
+        rec = (payment_records or {}).get(p.get("projectId")) or {}
+        total = rec.get("total") or 0
+        if not total:
+            continue
+        out.append({"projectId": p.get("projectId"),
+                    "projectName": p.get("projectName") or "",
+                    "orgL4": p.get("orgL4"),
+                    "contract": contract,
+                    "flowTotal": total})
+    out.sort(key=lambda r: -(r["flowTotal"] or 0))
+    return out
+
+
 def aggregate_payment_pmis(nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """项目回款子域聚合(收款阶段节点级,3E-3);形态同旧 payment 以兼容前端消费方。
 

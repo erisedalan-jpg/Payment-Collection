@@ -2,6 +2,7 @@ import type { Project, ProjectPmis, Paymentnodes, Paymentrecords } from '@/types
 import type { CrossMatrix, PivotResult, PivotRow, PivotCol } from './pivot'
 import { deriveTier, deriveProgress, deriveDept, deriveStage } from './paymentPmis'
 import { paymentPmisInRange, actualInRange } from './paymentRange'
+import { aggregateRate } from './paymentRate'
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 const round4 = (n: number) => Math.round(n * 10000) / 10000
@@ -152,9 +153,11 @@ export interface PayBoardGroup {
 }
 
 function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoardGroup {
-  const contractSum = grows.reduce((s, r) => s + r.contract, 0)
-  // 分组完成率(rate)分子恒全时(actualAll)，与行级 paymentRatio 同口径；计划/未收仍随区间
-  const actualSum = grows.reduce((s, r) => s + r.actualAll, 0)
+  // 分组完成率(rate)分子恒全时(actualAll)，与行级 paymentRatio 同口径；计划/未收仍随区间。
+    // 分子分母恒同一集合(contract>0);无合同的项目不进分子,治理页单列。见 lib/paymentRate.ts
+  const rated = aggregateRate(grows, (r) => r.contract, (r) => r.actualAll)
+  const contractSum = rated.contractSum
+  const actualSum = rated.actualSum
   const expectedSum = grows.reduce((s, r) => s + r.expectedTotal, 0)
   return {
     key,
@@ -165,7 +168,7 @@ function buildGroup(key: string, values: string[], grows: PayBoardRow[]): PayBoa
     actualSum,
     expectedSum,
     pendingSum: grows.reduce((s, r) => s + r.remainingTotal, 0),
-    rate: contractSum > 0 ? actualSum / contractSum : null,
+    rate: rated.rate,
     delayedNodeSum: grows.reduce((s, r) => s + r.delayedCount, 0),
   }
 }

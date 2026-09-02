@@ -85,7 +85,10 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
   const csF = pq?.collectionStagesFile
 
   const sources: SourceCard[] = [
-    { key: 'yundocs', label: '云文档', provided: yundocsOk,
+    // 标签原为「云文档」—— 云文档/WPS 已于 V1.16.2 彻底移除,这张卡如今判的是
+    // 【主域数据是否非空】(projects.length > 0)、主数字是收款阶段节点行数。
+    // 名字与含义脱节两年,看板上写着一个早就不存在的数据源(2026-09-01 目验发现)。
+    { key: 'yundocs', label: '主域数据', provided: yundocsOk,
       main: yundocsOk ? String(meta.totalPaymentNodes ?? 0) : '-', mainLabel: '节点行数',
       subs: yundocsOk ? [`项目 ${meta.totalProjects ?? 0}`, `更新 ${meta.lastUpdate || '-'}`] : ['未提供'] },
     { key: 'pmis', label: 'PMIS 七表', provided: pmisOk,
@@ -191,6 +194,15 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
               { key: 'orgL4', label: 'L4组' }, { key: 'contract', label: '合同总额' }],
     rows: csMissing, exportName: '回款覆盖-缺收款阶段.xlsx' })
 
+  // 无合同却有流水:这些项目被排除出达成率(分子分母须同一集合,见 lib/paymentRate.ts),
+  // 但它们确实收到过钱 —— 排除而不声张,等于把一批对不上合同的资金流藏起来。
+  // 2026-09-01 生产实测 6 个售前项目、流水合计 136.68 万。
+  const noContract = ((dq as any)?.paymentNoContract?.items ?? []) as Record<string, unknown>[]
+  alerts.push({ key: 'payment-no-contract', label: '回款口径:有流水却无合同金额', severity: 'high', count: noContract.length,
+    columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' },
+              { key: 'orgL4', label: 'L4组' }, { key: 'flowTotal', label: '回款流水' }],
+    rows: noContract, exportName: '回款口径-无合同却有流水.xlsx' })
+
   const anomalies = anomalyRows(data.projects ?? [])
   alerts.push({ key: 'l4Missing', label: '回款排除：服务组 L4 缺失', severity: 'mid', count: anomalies.length,
     columns: [{ key: 'projectId', label: '项目编号' }, { key: 'projectName', label: '项目名称' }, { key: 'reason', label: '原因' }],
@@ -217,7 +229,7 @@ export function buildHealthReport(data: AnalysisData): HealthReport {
   let verdict: Verdict
   let title: string
   let sub = ''
-  if (!yundocsOk) { verdict = 'red'; title = '数据不可用:云文档主数据缺失'; sub = '请在数据管理页同步或导入回款数据' }
+  if (!yundocsOk) { verdict = 'red'; title = '数据不可用:主域数据缺失'; sub = '请在数据管理页导入 PMIS 与组织架构后点「更新数据」' }
   else if (actionable.length) { verdict = 'yellow'; title = `${actionable.length} 类告警需关注`; sub = lowCount ? `另有 ${lowCount} 条低优先提示` : '' }
   else { verdict = 'green'; title = '数据就绪'; sub = lowCount ? `${lowCount} 条低优先提示` : '' }
   const metaLine = `同步于 ${meta.lastUpdate || '-'} · 项目 ${meta.totalProjects ?? 0} · 节点 ${meta.totalPaymentNodes ?? 0}`

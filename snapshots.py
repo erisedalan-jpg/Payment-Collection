@@ -39,8 +39,15 @@ def _record_payment_ratio(dept_projects: Optional[List[dict]]) -> Optional[float
         if _is_anomalous(p):
             continue
         pp = p.get("paymentPmis") or {}
+        c = pp.get("contract") or 0
+        # ★ 分子分母必须是同一批项目(2026-09-01 目验发现)。原先无合同的项目
+        #   流水进分子、合同记 0 进分母 —— 生产实测把 47.56% 抬到 47.85%(+0.29pp),
+        #   与 /insight 当年 107.57% 同形。这些项目由 projects.no_contract_with_payment
+        #   单列进治理页,不是被悄悄丢掉。
+        if c <= 0:
+            continue
         act += pp.get("actualTotal") or 0
-        contract += pp.get("contract") or 0
+        contract += c
     return payment_ratio_from_records(act, contract, None)
 
 

@@ -113,6 +113,9 @@ class DataQuality(_Base):
     # 有合同却零收款阶段节点的项目。显式声明(而非靠 extra=allow 混进去),
     # 这样前端 gen:types 能生成类型、改名时 typecheck 能找到消费方。
     collectionStagesMissing: Dict[str, Any] = {"count": 0, "items": []}
+    # 无合同却有流水的项目。这些被排除出达成率(分子分母须同一集合),
+    # 单列出来供业务侧核对:是原项目映射漏了,还是 PMIS 没录合同。
+    paymentNoContract: Dict[str, Any] = {"count": 0, "items": []}
 
 
 class ProjectPayment(_Base):

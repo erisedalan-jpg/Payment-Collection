@@ -110,3 +110,66 @@ class Test全仓无残留消费方:
         assert not pat.search('const y = p.paymentPmis.actualTotal')
         assert not pat.search('act += pp.get("actualTotal") or 0')
         assert not pat.search('s["actualTotal"] == 700000.0')
+
+
+class Test分子分母必须同一集合:
+    """★ 2026-09-01 目验发现:有流水但【无合同】的项目,流水进了分子、合同记 0 进分母。
+    生产实测 6 个售前项目、流水 136.68 万,把全域达成率从 47.56% 抬到 47.85%(+0.29pp)。
+    与 /insight 当年 107.57% 是同一形状(分子计了、分母没计),只是偏差小到没人怀疑。
+
+    用户 2026-09-01 拍板:合同记 0 的,分子也不计入;被排除的项目在治理页单列。
+    """
+
+    def test_快照达成率排除无合同项目(self):
+        import snapshots
+        ps = [
+            {"projectId": "A", "orgL4": "X", "paymentPmis": {"contract": 1000000, "actualTotal": 500000}},
+            {"projectId": "B", "orgL4": "X", "paymentPmis": {"contract": None, "actualTotal": 300000}},
+        ]
+        # 改前:(500000+300000)/1000000 = 0.8;改后:500000/1000000 = 0.5
+        assert snapshots._record_payment_ratio(ps) == 0.5
+
+    def test_快照_合同为0与缺失同等对待(self):
+        import snapshots
+        ps = [
+            {"projectId": "A", "orgL4": "X", "paymentPmis": {"contract": 800000, "actualTotal": 400000}},
+            {"projectId": "B", "orgL4": "X", "paymentPmis": {"contract": 0, "actualTotal": 200000}},
+        ]
+        assert snapshots._record_payment_ratio(ps) == 0.5
+
+    def test_无合同却有流水的项目要能被列出来(self):
+        """不能只是「排除」—— 排除掉就没人知道有这么一批钱收了却对不上合同。
+        治理页要单列一张表,所以得有个纯函数产出清单。"""
+        import projects as P
+        ps = [
+            {"projectId": "A", "projectName": "甲", "orgL4": "银行服务组",
+             "paymentPmis": {"contract": 1000000}},
+            {"projectId": "B", "projectName": "乙", "orgL4": "河北服务组",
+             "paymentPmis": {"contract": None}},
+            {"projectId": "C", "projectName": "丙", "orgL4": "京津服务组",
+             "paymentPmis": {"contract": 0}},
+            {"projectId": "D", "projectName": "丁", "orgL4": "上海一服务组",
+             "paymentPmis": {"contract": None}},   # 无合同【也没有流水】→ 不该列
+        ]
+        recs = {
+            "A": {"total": 500000.0},
+            "B": {"total": 858800.0},
+            "C": {"total": 90000.0},
+        }
+        out = P.no_contract_with_payment(ps, recs)
+        assert [r["projectId"] for r in out] == ["B", "C"], "只列【无合同且有流水】的"
+        assert out[0] == {"projectId": "B", "projectName": "乙", "orgL4": "河北服务组",
+                          "contract": None, "flowTotal": 858800.0}
+
+    def test_按流水金额倒序_大额排前面(self):
+        import projects as P
+        ps = [{"projectId": x, "projectName": x, "orgL4": "X", "paymentPmis": {"contract": None}}
+              for x in ("A", "B", "C")]
+        recs = {"A": {"total": 100.0}, "B": {"total": 900.0}, "C": {"total": 500.0}}
+        assert [r["projectId"] for r in P.no_contract_with_payment(ps, recs)] == ["B", "C", "A"]
+
+    def test_异常项目不计入(self):
+        """orgL4 空 = 异常项目,全站已排除出回款统计;列进来会与看板对不上。"""
+        import projects as P
+        ps = [{"projectId": "A", "projectName": "甲", "orgL4": "", "paymentPmis": {"contract": None}}]
+        assert P.no_contract_with_payment(ps, {"A": {"total": 999.0}}) == []

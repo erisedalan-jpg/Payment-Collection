@@ -1,6 +1,7 @@
 import type { Project, ProjectPmis } from '@/types/analysis'
 import type { CrossMatrix, PivotResult, PivotRow, PivotCol } from './pivot'
 import { isAnomalous } from './anomaly'
+import { aggregateRate } from './paymentRate'
 
 // 项目域透视(/insight,spec 4.5):与 lib/pivot(回款节点域)并行,复用其泛型结构类型;
 // 回款域 groupByDims/PivotGroup 不动,P6 归并期再议统一。
@@ -157,8 +158,9 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
     const act = grows.reduce((s, r) => s + r.actualTotal, 0)
     // 比率分子用流水净额、分母用合同 —— 与 CLAUDE.md 的全站统一口径同源。
     // act(节点已收)仍用于「已收金额」这类展示指标,不参与比率。
-    const rec = grows.reduce((s, r) => s + r.recordTotal, 0)
-    const contractAmount = grows.reduce((s, r) => s + r.contractAmount, 0)
+    // 分子分母恒同一集合(contract>0);无合同的项目不进分子,治理页单列。见 lib/paymentRate.ts
+    const rated = aggregateRate(grows, (r) => r.contractAmount, (r) => r.recordTotal)
+    const contractAmount = rated.contractSum
     return {
       key,
       values: defs.map((d) => grows[0][d.key]),
@@ -167,7 +169,7 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
       contractAmount,
       avgProgress: avg(grows.map((r) => r.progress).filter((x): x is number => x != null)),
       avgCostRatio: avg(grows.map((r) => r.costRatio).filter((x): x is number => x != null)),
-      paymentRatio: contractAmount > 0 ? rec / contractAmount : null,
+      paymentRatio: rated.rate,
       delayedProjects: grows.filter((r) => r.delayed).length,
     }
   })

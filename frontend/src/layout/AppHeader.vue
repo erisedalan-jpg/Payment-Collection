@@ -41,7 +41,10 @@ async function onLogout() {
         <span class="sync-dot u-pulse" /> 数据已同步
         <span class="date-badge">{{ store.data.meta.lastUpdate }}</span>
       </template>
-      <span v-else class="no-data">未加载数据</span>
+      <!-- 说「主域」而不是笼统的「未加载数据」:倚天各页走独立数据文件(yitian_data.json),
+           主域数据本就不会加载,页面满屏图表却顶着「未加载数据」会让人以为出故障了
+           (2026-09-01 目验发现)。 -->
+      <span v-else class="no-data">主域数据未加载</span>
       <template v-if="auth.user">
         <span class="user-name">{{ auth.user.displayName || auth.user.account }}</span>
         <button data-test="logout" class="logout-btn u-press" @click="onLogout">登出</button>

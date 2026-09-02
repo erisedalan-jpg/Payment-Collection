@@ -2,6 +2,7 @@ import type { Project, PaymentRecordsEntry, PaymentNodePmis } from '@/types/anal
 import type { PayNodeRow } from './paymentPmis'
 import { filterProjects, deriveTier, type FilterOpts as ProjFilterOpts } from './paymentPmis'
 import { inRange, actualInRange, hasActivityInRange } from './paymentRange'
+import { aggregateRate } from './paymentRate'
 
 export interface PayNodeFilterOpts {
   dateStart: string
@@ -57,8 +58,15 @@ export function payDashSummary(
   const noStageWithContractCount = noStage.filter((p) => (p.paymentPmis?.contract ?? 0) > 0).length
   // 已回款/完成率恒全时口径(CLAUDE.md 全站统一口径 Σ流水净额全加 ÷ Σ合同，与首页 computeKpis / L4 表 / board / 详情页一致)：
   // 已回款=Σ全时流水(不随所选日期区间过滤)；完成率=已回款 ÷ Σ合同(全 inScope)。待回款/计划/延期/项目活动数仍随区间。
-  const totalActual = inScope.reduce((s, p) => s + actualInRange(paymentRecords?.[p.projectId]?.records, '', ''), 0)
-  const totalContract = inScope.reduce((s, p) => s + (p.paymentPmis?.contract ?? 0), 0)
+  // 分子分母恒同一集合(contract>0)。改前分子全加、分母把无合同的记 0,
+  // 生产实测把 47.56% 抬到 47.85%(+0.29pp)。被排除的项目在治理页单列,不藏。
+  const rated = aggregateRate(
+    inScope,
+    (p) => p.paymentPmis?.contract,
+    (p) => actualInRange(paymentRecords?.[p.projectId]?.records, '', ''),
+  )
+  const totalActual = rated.actualSum
+  const totalContract = rated.contractSum
   const totalExpected = rows.reduce((s, r) => s + r.expectedPayment, 0)
   const totalRemaining = rows.reduce((s, r) => s + r.unpaidAmount, 0)
   const delayedPids = new Set(rows.filter((r) => r.status === '延期').map((r) => r.projectId))
@@ -70,7 +78,7 @@ export function payDashSummary(
     noStageCount,
     noStageWithContractCount,
     totalExpected, totalActual, totalRemaining,
-    rate: totalContract > 0 ? totalActual / totalContract : null,
+    rate: rated.rate,
     delayedProjects: delayedPids.size,
   }
 }

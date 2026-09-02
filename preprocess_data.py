@@ -285,6 +285,15 @@ def main():
     # 治理告警:有合同却零收款阶段节点。这些项目的合同进达成率分母、分子恒 0,
     # 系统性拉低全域达成率(2026-08-31 实测 31 个、合同 2276 万、拉低 2.39pp)。
     # 与前端既有的 noStageCount 不同:那个把合同=0(本来就不该有节点)也算进去了。
+    # 治理告警:无合同却有流水。达成率的分子分母必须同一批项目,故这些项目被排除出
+    # 比率计算 —— 但它们确实收到过钱,排除却不声张就是把一批对不上合同的资金流藏起来。
+    nc = projects_mod.no_contract_with_payment(dept_projects, payment_records)
+    data_quality["paymentNoContract"] = {"count": len(nc), "items": nc}
+    if nc:
+        _sum = sum(r["flowTotal"] for r in nc)
+        print(f"  [WARN] {len(nc)} 个在建项目有回款流水却无合同金额"
+              f"(流水合计 {_sum:,.0f} 元)—— 已排除出达成率计算并单列进数据治理")
+
     cs_missing = collection_mod.missing_coverage(dept_projects, payment_nodes)
     data_quality["collectionStagesMissing"] = {"count": len(cs_missing), "items": cs_missing}
     if cs_missing:

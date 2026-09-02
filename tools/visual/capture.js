@@ -82,6 +82,11 @@ async function loginCookie() {
 async function main() {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf-8'))
   const ignore = manifest.ignore || []
+  // 主题:light / dark / both。★ 暗色不是锦上添花 —— V3.2.0 那个「ECharts canvas 配色错」
+  //   只在暗色下出现,浅色一切正常。只拍浅色 = 对那一整类缺陷完全失明。
+  const themeArg = process.argv.indexOf('--theme')
+  const themeOpt = themeArg > -1 ? (process.argv[themeArg + 1] || 'light') : (process.env.VISUAL_THEME || 'light')
+  const themes = themeOpt === 'both' ? ['light', 'dark'] : [themeOpt]
   const onlyArg = process.argv.indexOf('--only')
   const only = onlyArg > -1 ? new Set((process.argv[onlyArg + 1] || '').split(',')) : null
 
@@ -127,10 +132,17 @@ async function main() {
   if (ACCOUNT && PASSWORD) cookie = await loginCookie()
 
   const rows = []
+  for (const theme of themes) {
+  if (themes.length > 1) console.log(`── ${theme} ──`)
   for (const t of targets) {
     const page = await browser.newPage()
     await page.setViewport({ width: 1600, height: 1000, deviceScaleFactor: 2 })
     if (cookie) await page.setCookie(cookie)
+    // 主题必须写 localStorage:应用在挂载时从 stores/settings.ts 读 'theme',
+    // 直接 setAttribute('data-theme') 会在挂载那一刻被应用自己覆盖回去。
+    await page.evaluateOnNewDocument((t) => {
+      try { localStorage.setItem('theme', t) } catch { /* 隐私模式下不可用,退回默认主题 */ }
+    }, theme)
     const bad = { consoleError: [], pageError: [], reqFailed: [] }
     // 把资源 URL 一起记下来:console 文本只有「status of 404」,不带 URL,
     // 白名单就没法按 URL 精确放行(而按「status of 404」放行会把真正缺失的
@@ -148,7 +160,8 @@ async function main() {
     try {
       await page.goto(BASE + t.visit, { waitUntil: 'networkidle2', timeout: 90000 })
       await new Promise((r) => setTimeout(r, SETTLE_MS))
-      await page.screenshot({ path: path.join(outDir, `${t.name}.png`), fullPage: true })
+      const suffix = themes.length > 1 ? `-${theme}` : ''
+      await page.screenshot({ path: path.join(outDir, `${t.name}${suffix}.png`), fullPage: true })
     } catch (e) {
       note = `导航/截图失败: ${e.message.slice(0, 80)}`
     }
@@ -157,10 +170,11 @@ async function main() {
       bad[k] = bad[k].filter((m) => !matchesIgnore(m, ignore))
     }
     const n = bad.consoleError.length + bad.pageError.length + bad.reqFailed.length
-    rows.push({ name: t.name, title: t.title, ms: Date.now() - t0, n, bad, note })
+    rows.push({ name: t.name, theme, title: t.title, ms: Date.now() - t0, n, bad, note })
     const flag = note ? '✗' : (n ? '!' : ' ')
     console.log(`  ${flag} ${String(t.name).padEnd(26)} ${String(rows.at(-1).ms).padStart(6)}ms  问题 ${n}${note ? '  ' + note : ''}`)
     await page.close()
+  }
   }
   await browser.close()
 
@@ -180,7 +194,7 @@ async function main() {
   }
   console.log(`[!] ${dirty.length} 页有问题:`)
   for (const r of dirty) {
-    console.log(`  ── ${r.name} (${r.title})`)
+    console.log(`  ── ${r.name} (${r.title}) [${r.theme}]`)
     if (r.note) console.log(`     ${r.note}`)
     for (const k of ['pageError', 'consoleError', 'reqFailed']) {
       for (const m of r.bad[k].slice(0, 4)) console.log(`     [${k}] ${String(m).slice(0, 150)}`)

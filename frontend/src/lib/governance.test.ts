@@ -64,7 +64,7 @@ describe('buildHealthReport', () => {
     expect(r.alerts.find((a) => a.key === 'backfill')!.rows[0].missingFields).toBe('评级、行业')
   })
 
-  it('云文档缺失 → 红(优先级最高)', () => {
+  it('主域数据缺失 → 红(优先级最高) —— 卡名原为「云文档」,V1.16.2 后名不副实,2026-09-01 订正', () => {
     const r = buildHealthReport(makeData({ projects: [] }))
     expect(r.verdict).toBe('red')
     expect(r.title).toContain('数据不可用')
@@ -133,10 +133,10 @@ describe('buildHealthReport', () => {
     expect(r.sources.find((s) => s.key === 'pmis')!.subs[0]).toContain('主题 1/2 可用')
   })
 
-  it('导出文件名只挂在指定八类目', () => {
+  it('导出文件名只挂在指定九类目', () => {
     const r = buildHealthReport(makeData())
     expect(r.alerts.filter((a) => a.exportName).map((a) => a.key).sort())
-      .toEqual(['backfill', 'budgetMismatch', 'collection-stages-missing', 'l4Missing', 'managerNotInOrg', 'originMissing', 'presaleUnmapped', 'unmatched'])
+      .toEqual(['backfill', 'budgetMismatch', 'collection-stages-missing', 'l4Missing', 'managerNotInOrg', 'originMissing', 'payment-no-contract', 'presaleUnmapped', 'unmatched'])
   })
 
   it('orgL4 空项目进 l4Missing 告警组', () => {
@@ -281,6 +281,38 @@ describe('governance — 输入文件三态(2026-08-31 审查)', () => {
   it('无缺口时告警组仍在但 count=0(沉底,与 budgetSourceMismatch 同惯例)', () => {
     const r = buildHealthReport(makeData())
     const g = r.alerts.find((a) => a.key === 'collection-stages-missing')!
+    expect(g).toBeTruthy()
+    expect(g.count).toBe(0)
+  })
+})
+
+describe('governance — 无合同却有流水(2026-09-01 目验发现)', () => {
+  it('生成告警组,带项目号/名称/L4组/流水额,可导出', () => {
+    const base = makeData()
+    const d = makeData({
+      dataQuality: {
+        ...(base.dataQuality as any),
+        paymentNoContract: {
+          count: 2,
+          items: [
+            { projectId: 'P-A', projectName: '甲', orgL4: '河北服务组', flowTotal: 858800 },
+            { projectId: 'P-B', projectName: '乙', orgL4: '京津服务组', flowTotal: 50400 },
+          ],
+        },
+      },
+    })
+    const r = buildHealthReport(d)
+    const g = r.alerts.find((a) => a.key === 'payment-no-contract')!
+    expect(g).toBeTruthy()
+    expect(g.severity).toBe('high')
+    expect(g.count).toBe(2)
+    expect(g.rows).toHaveLength(2)
+    expect(g.exportName).toBeTruthy()
+    expect(g.columns.map((c) => c.key)).toContain('flowTotal')
+  })
+
+  it('无此类项目时告警组仍在但 count=0(沉底)', () => {
+    const g = buildHealthReport(makeData()).alerts.find((a) => a.key === 'payment-no-contract')!
     expect(g).toBeTruthy()
     expect(g.count).toBe(0)
   })

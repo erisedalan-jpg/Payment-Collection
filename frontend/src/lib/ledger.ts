@@ -1,6 +1,7 @@
 import type { Project, Paymentrecords } from '@/types/analysis'
 import { deriveProgress, type PayNodeRow } from './paymentPmis'
 import { actualInRange } from './paymentRange'
+import { aggregateRate } from './paymentRate'
 
 export interface LedgerProjectRow {
   projectId: string
@@ -86,9 +87,10 @@ export function ledgerSummaryPmis(rows: LedgerProjectRow[]): LedgerSummaryPmis {
   const totalAct = rows.reduce((s, r) => s + r.actualPayment, 0)
   // 待回款=Σ节点未收(remainingAmount),与下钻"未收"列同口径;不取 expected-received(收款阶段三列独立填报,未必自洽)
   const totalRem = rows.reduce((s, r) => s + r.remainingAmount, 0)
-  const totalCon = rows.reduce((s, r) => s + (r.projectAmount || 0), 0)
-  // 分母 Σ合同≤0 → null,理由同行级:0% 是个结论,而这里根本算不出结论
-  return { projectCount: rows.length, totalExp, totalAct, totalRem, rate: totalCon > 0 ? totalAct / totalCon : null }
+  // 分母 Σ合同≤0 → null,理由同行级:0% 是个结论,而这里根本算不出结论。
+    // 分子分母恒同一集合(contract>0);无合同的项目不进分子,治理页单列。见 lib/paymentRate.ts
+  const rated = aggregateRate(rows, (r) => r.projectAmount, (r) => r.actualPayment)
+  return { projectCount: rows.length, totalExp, totalAct: rated.actualSum, totalRem, rate: rated.rate }
 }
 
 const LEDGER_TIERS_PMIS = ['100万以上', '50-100万', '50万以下']

@@ -2,6 +2,7 @@ import type { Project, ProjectPmis, PaymentRecordsEntry, Paymentrecords } from '
 import type { PayNodeRow } from './paymentPmis'
 import { isAnomalous } from './anomaly'
 import { actualInRange } from './paymentRange'
+import { aggregateRate } from './paymentRate'
 
 // 项目总览(/)的纯计算层(spec 4.1)。两套口径:KPI 用主域 projects[] 聚合;
 // 回款重点带与 /payment 同口径(全部门 isPaymentRelated 节点)——微块点击钻的就是 /payment。
@@ -26,8 +27,7 @@ export function computeKpis(
   let paused = 0
   let overspend = 0
   let highRisk = 0
-  let con = 0
-  let act = 0
+  const rated: Project[] = []
   for (const p of projects) {
     const m = (pmisMap[p.projectId] ?? {}) as Record<string, any>
     if (m.status?.项目状态 === '实施中') active++
@@ -35,16 +35,15 @@ export function computeKpis(
     if (m.cost?.项目超支 === true) overspend++
     if (p.health?.riskAbnormal) highRisk++
     // 回款达成率排除异常项目；分母改为 Σ合同(paymentPmis.contract)
-    if (!isAnomalous(p)) {
-      con += p.paymentPmis?.contract ?? 0
-      // 分子=Σ流水(全时)。无流水表时分子为 0(比率显 0%),不退化节点已收 ——
-      // 后者是另一套口径,与流水净额生产实测差 570 万;CLAUDE.md 回款口径约定写着
-      // 「例外清单当前为空,今后再要开例外必须在此处登记」,这条降级就是未登记的例外。
-      // 宁可明显坏(0%),不要悄悄错(46.36%)。
-      act += actualInRange(paymentRecords?.[p.projectId]?.records, '', '')
-    }
+    // 达成率只统计【有合同】的项目:分子分母恒同一集合。
+    // 无合同却有流水的项目原本进分子、不进分母,生产实测虚高 0.29pp(见 lib/paymentRate.ts)。
+    // 分子恒用流水,不退化节点已收 —— 那是另一套口径(实测差 570 万),
+    // CLAUDE.md 例外清单当前为空。宁可明显坏(0%),不要悄悄错(46.36%)。
+    if (!isAnomalous(p)) rated.push(p)
   }
-  return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: con > 0 ? act / con : null }
+  const agg = aggregateRate(rated, (p) => p.paymentPmis?.contract,
+    (p) => actualInRange(paymentRecords?.[p.projectId]?.records, '', ''))
+  return { total: projects.length, active, paused, highRisk, overspend, paymentRatio: agg.rate }
 }
 
 export interface HealthSummary {

@@ -99,7 +99,9 @@ const series = computed(() => {
 function lineOption(name: string, data: (number | null)[], unit = '') {
   return {
     tooltip: { trigger: 'axis', valueFormatter: (v: number) => `${v}${unit}` },
-    grid: { left: 48, right: 16, top: 24, bottom: 56 },
+    // right 从 16 提到 48:markLine 的均值标签渲染在线的【右端】,16px 只放得下两个字符 ——
+    // 2026-09-01 目验实测「30」被裁成「3C」、「100」被裁成「1C」,而两字符的「13」完好。
+    grid: { left: 48, right: 48, top: 24, bottom: 56 },
     xAxis: { type: 'category', data: series.value.weeks },
     yAxis: { type: 'value' },
     dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 20 }],

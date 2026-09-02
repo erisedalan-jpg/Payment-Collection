@@ -1,6 +1,7 @@
 import type { Project, ProjectPaymentPmis, ProjectPmis, PaymentNodePmis, PaymentRecordsEntry } from '@/types/analysis'
 import { isAnomalous } from './anomaly'
 import { paymentPmisInRange, actualInRange } from './paymentRange'
+import { aggregateRate } from './paymentRate'
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 const round4 = (n: number) => Math.round(n * 10000) / 10000
@@ -181,14 +182,16 @@ export function summaryByDim(rows: PayProjectRow[], dimKey: string): DimSummary[
   }
   return Object.entries(buckets)
     .map(([value, grp]) => {
-      const contractSum = grp.reduce((s, r) => s + r.contract, 0)
-      const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
+    // 分子分母恒同一集合(contract>0);无合同的项目不进分子,治理页单列。见 lib/paymentRate.ts
+      const rated = aggregateRate(grp, (r) => r.contract, (r) => r.actualTotal)
+      const contractSum = rated.contractSum
+      const actualSum = rated.actualSum
       return {
         value,
         projectCount: grp.length,
         contractSum,
         actualSum,
-        rate: contractSum > 0 ? actualSum / contractSum : null,   // 已回/合同
+        rate: rated.rate,   // 已回/合同(同集合)
         delayedNodeSum: grp.reduce((s, r) => s + r.delayedCount, 0),
         remainingSum: grp.reduce((s, r) => s + r.remainingTotal, 0),
         nodeSum: grp.reduce((s, r) => s + r.nodeCount, 0),
@@ -215,6 +218,8 @@ export interface L4SummaryTotals {
 
 /** 回款数据表(L4汇总)总计行：计数/金额列 Σ；两比率列按口径重算(Σ分子÷Σ分母，分母0→null)。 */
 export function l4SummaryRow(rows: DimSummary[]): L4SummaryTotals {
+  // 这里的入参已是 summaryByDim 的产物、两个合计早已受限于 contract>0,
+  // 故直接相加即可 —— 不必也不该再过一次 aggregateRate(会把 contractSum 当单项目合同重判)。
   const contractSum = rows.reduce((s, r) => s + r.contractSum, 0)
   const actualSum = rows.reduce((s, r) => s + r.actualSum, 0)
   const nodeSum = rows.reduce((s, r) => s + r.nodeSum, 0)
@@ -331,10 +336,11 @@ export function progressBuckets(rows: PayProjectRow[]): { buckets: ProgressBucke
   }
   const buckets = PROGRESS_ORDER.map((key) => {
     const grp = map[key] || []
-    const contractSum = grp.reduce((s, r) => s + r.contract, 0)
-    const actualSum = grp.reduce((s, r) => s + r.actualTotal, 0)
+    // 分子分母恒同一集合(contract>0);无合同的项目不进分子,治理页单列。见 lib/paymentRate.ts
+    const rated = aggregateRate(grp, (r) => r.contract, (r) => r.actualTotal)
     const expectedSum = grp.reduce((s, r) => s + r.expectedTotal, 0)
-    return { key, projectCount: grp.length, contractSum, actualSum, expectedSum, rate: contractSum > 0 ? actualSum / contractSum : null }
+    return { key, projectCount: grp.length, contractSum: rated.contractSum,
+             actualSum: rated.actualSum, expectedSum, rate: rated.rate }
   })
   return { buckets, unknown }
 }

@@ -388,3 +388,28 @@ describe('除零回退 null', () => {
     expect(s.rate).toBeNull()
   })
 })
+
+describe('达成率的分子分母必须同一集合(2026-09-01 目验发现)', () => {
+  const OPTS2 = { viewMode: 'global' as const, viewL4: '', viewPM: '', excludeActive: false, excludedIds: {} }
+
+  it('★ 有流水但【无合同】的项目:流水不进分子,项目不进分母', () => {
+    // 生产实测:6 个售前项目有流水 136.68 万却没有合同 —— 流水进了分子、合同记 0 进分母,
+    // 把全域完成率从 47.56% 抬到 47.85%。这是 /insight 当年 107.57% 的同款形状,
+    // 只是偏差小到没人会怀疑。★ 改前全仓 138 条回款测试无一构造过这种项目,所以没人发现。
+    const projects = [
+      { projectId: 'A', projectName: 'A', projectManager: '张', orgL4: 'X', paymentPmis: { contract: 1_000_000 } },
+      { projectId: 'B', projectName: 'B', projectManager: '张', orgL4: 'X', paymentPmis: { contract: null } },
+    ] as any
+    const records = {
+      A: { total: 500_000, count: 1, records: [{ date: '2026-03-01', amount: 500_000 }] },
+      B: { total: 300_000, count: 1, records: [{ date: '2026-03-01', amount: 300_000 }] },
+    } as any
+    const s = payDashSummary([], projects, OPTS2, records, {}, '', '')
+    expect(s.totalActual).toBe(500_000)          // 改前是 800_000
+    expect(s.rate).toBe(0.5)                     // 改前是 0.8
+  })
+
+  // 曾在此处放过一条「已回款 ÷ 合同额 == 完成率」的自洽性断言 —— 已删。
+  // 旧代码里 rate 本就是 totalActual/totalContract 算的,该断言【两种口径下都成立】、
+  // 永远不会红。留一条永不失败的测试比没有更糟:它会让人以为这一面被守住了。
+})

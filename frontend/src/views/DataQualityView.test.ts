@@ -16,7 +16,8 @@ function seed(over: Record<string, any> = {}) {
   ds.data = {
     meta: { lastUpdate: '2026-06-12 09:00', totalProjects: 10, totalPaymentNodes: 50 },
     dashboard: {}, summary: {},
-    // yundocsOk 换 projects.length>0(3E-2):非空主域 → 云文档主数据已就绪
+    // yundocsOk 换 projects.length>0(3E-2):非空主域 → 主域数据已就绪
+    // (卡名 2026-09-01 由「云文档」订正为「主域数据」—— 云文档 V1.16.2 就移除了)
     projects: [{ projectId: 'P-1', orgL4: 'A组' }],
     rawNodes: [{ projectId: 'P-1', tier: 't', isPaymentRelated: true }],
     dataQuality: {
@@ -65,7 +66,7 @@ describe('DataQualityView', () => {
     expect(w.text()).toContain('数据就绪')
   })
 
-  it('红横幅:云文档缺失', () => {
+  it('红横幅:主域数据缺失', () => {
     seed({ projects: [] })
     const w = mountView()
     expect(w.find('[data-test="banner"]').classes()).toContain('red')

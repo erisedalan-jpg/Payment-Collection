@@ -87,7 +87,7 @@ python server.py --stop     # 停止运行中的服务
 - 前端样式改动倾向于补充 CSS 完善表现，而非引入框架。
 
 ### 回款口径约定（2026-06-19 起，V1.15.0；改任一处先全仓核对）
-- **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外清单当前为空**（2026-08-03 全部归并完毕）：`/insight` 曾用「节点已收 ÷ customer.合同总额（售前不回退）」，因 55% 的在建项目是售前、其 `customer.合同总额` 为空而分子照计，实测全域算出 **107.57%**、8/11 个 L4 桶 >100%；`snapshots.py`（/activity 的「回款达成率 ±Xpp」）曾用「Σ节点已收 ÷ Σ节点计划回款」。两者均已改为主口径，真实数据对拍 /insight 修复后 47.85%，与主口径逐位吻合。**今后再要开例外，必须在此处登记并写明理由**。
+- **回款达成率/完成率全站统一口径 = Σ流水净额 ÷ Σ合同总额**。分子=`payment_records` 流水（逐笔严格全加、**含负值/红冲、不取绝对值**）；分母=`paymentPmis.contract`（合同总额，售前回退原项目）。合同≤0 → 比率 `null`（前端显 "-"）。后端项目级 `payment.paymentRatio` 由 9f 用 `payment_ratio_from_records(流水, 合同)` 设置（`aggregate_payment_pmis` 自身 paymentRatio=None）；前端各聚合 rate 分母均为 Σ合同。**例外清单当前为空**（2026-08-03 全部归并完毕）：`/insight` 曾用「节点已收 ÷ customer.合同总额（售前不回退）」，因 55% 的在建项目是售前、其 `customer.合同总额` 为空而分子照计，实测全域算出 **107.57%**、8/11 个 L4 桶 >100%；`snapshots.py`（/activity 的「回款达成率 ±Xpp」）曾用「Σ节点已收 ÷ Σ节点计划回款」。两者均已改为主口径。**⚠ 当时记的「修复后 47.85%」本身偏高** —— 2026-09-01 目验发现各聚合点的**分子分母不是同一批项目**：分子把「有流水但无合同」的项目全加了，分母给它们记 0（生产实测 6 个售前项目、流水 136.68 万），把 **47.56% 抬成 47.85%**。那次归并把两处对齐了，但对齐到的是同一个有偏口径。**现已修正:合同 ≤ 0 的项目分子分母一律不计入**，全站聚合唯一实现是 `frontend/src/lib/paymentRate.ts` 的 `aggregateRate()`（后端对应 `snapshots._record_payment_ratio`）；被排除的项目**不藏起来**，由 `projects.no_contract_with_payment` 产出、在数据治理页单列一张表。**当前全域基准 = 47.56%**。**今后再要开例外，必须在此处登记并写明理由**。
 - **分子字段只有一个合法名字（2026-08-31 审查）**：`paymentPmis.actualTotal` = **流水净额**，是全站唯一合法分子；项目对象上的**节点已收**已从 `payment.actualTotal` 改名为 `payment.nodeActualTotal`。改名前两者同名并列、生产实测差 **570 万**（46.36% vs 47.56%），任何人写 `Σ` 节点那个除以合同都会静默拿到错的，而 review 看不出来 —— 字段名、类型、数量级全都正常。同批拆掉了 `overview.ts` / `paymentBoard.ts` / `paymentPmis.ts` 三处「无流水表时退化节点口径」——**那是三条未登记的例外**；现在流水表缺失时分子为 0、比率显 0%，**宁可明显坏，不要悄悄错**。守卫见 `tests/test_payment_caliber_guard.py`（**它逮不到别名访问，那一层靠 `npm run typecheck`**）。
 - **回款数据核心源 = `input/collection_stages.csv`**（PMIS 收款阶段台账导出，已入"数据更新"流程）。售前项目收款阶段节点**按本项目号优先取、缺再回退原项目号**（`_collection_nodes_for`）；台账把售前节点挂在本项目号下。
 - **异常项目（`orgL4` 空）排除出回款统计**（`lib/anomaly.isAnomalous`）：回款看板硬排除、治理页告警、项目清单标「数据异常」。
@@ -171,7 +171,7 @@ python -m pytest -q
 
 - 长任务（`/api/reprocess` 等 SSE）期间，跨域互斥锁采用「抢不到立即 400、绝不排队」策略；调用方需自行重试。
 - `data/analysis_data.json` 全量 fetch，前端一次性加载 —— **实测 18,285,154 B ≈ 17.4 MiB**（2026-08-03；此前文档写 ~2MB、仓内另有 8.08MB/16MB/12MB 三个互相矛盾的数字，无一等于实测。该值随数据量增长，**引用前请重新 stat，不要当常量**）。已加 ETag/304 协商缓存（未改动时不重传），但首次仍是整份下载。vite 构建产物单 chunk 2.76MB（未做代码分割）；生产 nginx 的 gzip 已补 `text/javascript`，此前该 chunk 是原文下发。
-- ~~`/insight` 回款完成率口径不同源~~ **已于 2026-08-03 归并**（分母改 `paymentPmis.contract` 售前回退、分子改流水；修复前实测全域 107.57%，修复后 47.85% 与主口径逐位吻合）。同批归并的还有 `snapshots.py`（/activity 达成率）。
+- ~~`/insight` 回款完成率口径不同源~~ **已于 2026-08-03 归并**（分母改 `paymentPmis.contract` 售前回退、分子改流水；修复前实测全域 107.57%，修复后 47.85% 与主口径逐位吻合。**但 47.85% 这个数本身仍偏高 0.29pp** —— 分子分母不是同一批项目，2026-09-01 目验发现并修正，现基准 **47.56%**，见 §4 口径约定）。同批归并的还有 `snapshots.py`（/activity 达成率）。
 - `collection_stages.csv` 导出端覆盖风险：导出脚本若漏在建项目则其回款节点静默缺失（无校验告警）——建议加"在建项目收款阶段覆盖率"治理告警。
 
 ## 9. GitHub 远端与定期上传（2026-07-21 起，用户钦定）

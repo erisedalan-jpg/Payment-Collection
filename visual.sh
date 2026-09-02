@@ -13,6 +13,9 @@
 # 用法:
 #   VISUAL_ACCOUNT=xxx VISUAL_PASSWORD=yyy bash visual.sh
 #   VISUAL_ACCOUNT=xxx VISUAL_PASSWORD=yyy bash visual.sh --only payment-board,yitian
+#   VISUAL_ACCOUNT=xxx VISUAL_PASSWORD=yyy bash visual.sh --theme both   # 浅色+暗色各拍一遍
+#     ★ 暗色不是锦上添花:V3.2.0 那个 ECharts canvas 配色错【只在暗色下出现】,
+#       浅色一切正常。只拍浅色 = 对那一整类缺陷完全失明。发版前建议用 --theme both。
 #   bash visual.sh                      # 不给凭证 → 只拍登录页,并明确列出跳过了哪些
 #
 # 可选环境变量:
