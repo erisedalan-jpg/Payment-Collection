@@ -155,10 +155,14 @@ export function groupInsight(rows: InsightRow[], dimKeys: string[]): InsightGrou
     ;(buckets[key] ||= []).push(r)
   }
   const groups = Object.entries(buckets).map(([key, grows]) => {
-    const act = grows.reduce((s, r) => s + r.actualTotal, 0)
     // 比率分子用流水净额、分母用合同 —— 与 CLAUDE.md 的全站统一口径同源。
-    // act(节点已收)仍用于「已收金额」这类展示指标,不参与比率。
     // 分子分母恒同一集合(contract>0);无合同的项目不进分子,治理页单列。见 lib/paymentRate.ts
+    //
+    // 这里【不】聚合 r.actualTotal(节点已收):本组既不返回它,InsightGroup 也没有这个字段,
+    // 下钻弹窗只显示 recordTotal。原先有一行 `const act = ...` 连同一句「act 仍用于
+    // 『已收金额』这类展示指标」的注释,但那个变量从来没被用过(V4.5.15 起即如此),
+    // 注释是错的 —— 留着会让人以为节点口径在本页有出口。要加「已收金额」指标时,
+    // 先决定它取流水还是节点,再在 InsightGroup 里正式加字段。
     const rated = aggregateRate(grows, (r) => r.contractAmount, (r) => r.recordTotal)
     const contractAmount = rated.contractSum
     return {
