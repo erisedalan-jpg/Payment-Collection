@@ -1,0 +1,81 @@
+{
+  "$comment": [
+    "视觉验证要拍哪些页面 —— 单一来源。capture.js 与契约测试都读这一份。",
+    "",
+    "★ 为什么要有这个文件:2026-08-31 审查发现 backlog 里 8 条、30+ 项目验欠账全都写着",
+    "  「因 AI 无浏览器而积压」,而 puppeteer-core + 系统 Chrome 一直都在、单页 2.4 秒。",
+    "  真正的问题不是做不了,是【没有清单、没有入口】,于是每发一个版本就新增一批",
+    "  永远不会有人去看的欠账。",
+    "",
+    "★ route 必须与 frontend/src/router/index.ts 里的 path 【逐字一致】:",
+    "  contract 测试(frontend/src/router/visualRoutes.contract.test.ts)会比对两边,",
+    "  路由表里新增一个页面而这里没登记 → 测试红。这条守卫才是回路不会再断的原因。",
+    "",
+    "auth=false 的页面不需要凭证;其余需要 VISUAL_ACCOUNT / VISUAL_PASSWORD。",
+    "凭证只走环境变量,绝不进仓库(本仓是 public)。"
+  ],
+  "capture": [
+    { "route": "/", "visit": "/", "name": "overview", "title": "项目总览" },
+    { "route": "/login", "visit": "/login", "name": "login", "title": "登录", "auth": false },
+    { "route": "/change-password", "visit": "/change-password", "name": "change-password", "title": "修改密码" },
+    { "route": "/projects", "visit": "/projects", "name": "projects", "title": "在建项目" },
+    { "route": "/projects/closed", "visit": "/projects/closed", "name": "closed-projects", "title": "已关闭项目" },
+    { "route": "/projects/key", "visit": "/projects/key", "name": "key-projects", "title": "重点项目进展" },
+    { "route": "/projects/temp", "visit": "/projects/temp", "name": "temp-followup", "title": "临时跟进" },
+    { "route": "/activity", "visit": "/activity", "name": "activity", "title": "项目动态" },
+    { "route": "/insight", "visit": "/insight", "name": "insight", "title": "项目分析" },
+    { "route": "/insight/milestone", "visit": "/insight/milestone", "name": "milestone", "title": "里程碑" },
+    { "route": "/insight/costdetail", "visit": "/insight/costdetail", "name": "costdetail", "title": "成本明细" },
+    { "route": "/insight/risk", "visit": "/insight/risk", "name": "risk-board", "title": "风险看板" },
+    { "route": "/risk", "visit": "/risk", "name": "risk-followup", "title": "风险跟进" },
+    { "route": "/payment", "visit": "/payment", "name": "payment", "title": "回款总览" },
+    { "route": "/payment/board", "visit": "/payment/board", "name": "payment-board", "title": "回款看板" },
+    { "route": "/payment/calendar", "visit": "/payment/calendar", "name": "payment-calendar", "title": "回款日历" },
+    { "route": "/payment/projects", "visit": "/payment/projects", "name": "payment-projects", "title": "回款项目" },
+    { "route": "/payment/nodes", "visit": "/payment/nodes", "name": "payment-nodes", "title": "回款节点" },
+    { "route": "/payment/key", "visit": "/payment/key", "name": "payment-key", "title": "回款重点跟进" },
+    { "route": "/opportunities", "visit": "/opportunities", "name": "opportunities", "title": "商机清单" },
+    { "route": "/opportunities/board", "visit": "/opportunities/board", "name": "opportunities-board", "title": "商机看板" },
+    { "route": "/opportunities/key", "visit": "/opportunities/key", "name": "opportunity-followup", "title": "重点商机跟进" },
+    { "route": "/budget", "visit": "/budget", "name": "budget", "title": "概算工具" },
+    { "route": "/yitian", "visit": "/yitian", "name": "yitian", "title": "倚天工时总览" },
+    { "route": "/yitian/detail", "visit": "/yitian/detail", "name": "yitian-detail", "title": "工时明细" },
+    { "route": "/yitian/compliance", "visit": "/yitian/compliance", "name": "yitian-compliance", "title": "合规检查" },
+    { "route": "/yitian/analytics", "visit": "/yitian/analytics", "name": "yitian-analytics", "title": "工时分析" },
+    { "route": "/yitian/trend", "visit": "/yitian/trend", "name": "yitian-trend", "title": "趋势" },
+    { "route": "/yitian/customer", "visit": "/yitian/customer", "name": "yitian-customer", "title": "客户分析" },
+    { "route": "/yitian/customer-product", "visit": "/yitian/customer-product", "name": "yitian-customer-product", "title": "客户与产品" },
+    { "route": "/yitian/governance", "visit": "/yitian/governance", "name": "yitian-governance", "title": "倚天治理" },
+    { "route": "/data", "visit": "/data", "name": "data", "title": "数据管理" },
+    { "route": "/governance", "visit": "/governance", "name": "governance", "title": "数据治理" },
+    { "route": "/admin", "visit": "/admin", "name": "admin", "title": "账号管理" },
+    { "route": "/about", "visit": "/about", "name": "about", "title": "关于" }
+  ],
+  "parameterized": [
+    {
+      "route": "/project/:id",
+      "name": "project-detail",
+      "title": "项目详情",
+      "env": "VISUAL_PROJECT_ID",
+      "$why": "需要一个真实项目号。不内置样例值 —— 项目号是真实业务数据,不进 public 仓。"
+    },
+    {
+      "route": "/closed-project/:id",
+      "name": "closed-project-detail",
+      "title": "已关闭项目详情",
+      "env": "VISUAL_CLOSED_PROJECT_ID",
+      "$why": "同上。"
+    }
+  ],
+  "$ignoreWhy": [
+    "预期内的 console 噪音。每条【必须写明为什么是预期的】—— 否则这里会变成垃圾桶,",
+    "而一个每次都喊「有问题」的工具会训练人忽略它,那正是漏掉真缺陷的姿势。"
+  ],
+  "ignore": [
+    { "match": "401 (Unauthorized)", "and": "/api/auth/me", "why": "未登录时 /api/auth/me 返回 401 是设计如此,登录页必然出现。★ 用【两个子串都要命中】而不是笼统的「status of 401」—— 后者会连带吞掉真正的 401(例如某页因权限范围 bug 拿不到数据),白名单一宽工具就瞎了;也不写完整 URL —— 那会把端口焊死,换端口即失效(实测过)。" },
+    { "match": "/favicon.ico", "why": "应用没放 favicon.ico,浏览器每页都会试一次。是个真实小缺口(标签页显示默认图标),但与视觉验证无关,单独记账不在这里报。" }
+  ],
+  "skip": {
+    "/:pathMatch(.*)*": "catch-all,component 是 OverviewView、alias 就是 \"/\" —— 与上面 overview 条目是同一个页面,拍一次就够。注意它【不是】404 页:任何未知路径都渲染项目总览。"
+  }
+}
